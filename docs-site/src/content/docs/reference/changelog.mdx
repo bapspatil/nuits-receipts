@@ -5,128 +5,36 @@ sidebar:
   order: 11
 ---
 
-This page renders `CHANGELOG.md` from the repository. `scripts/version.mjs` generates the entries from Conventional Commits on every release. The first release run planted the `v0.1.0` baseline from `package.json`; entries start after it.
+This page is built from `CHANGELOG.md` in the repository by `docs-site/scripts/sync-changelog.mjs`, with commit and compare links removed. `scripts/version.mjs` generates the entries from Conventional Commits on every release. The first release run planted the `v0.1.0` baseline from `package.json`; entries start after it.
 
-## 1.0.0 (2026-10-22)
+## 1.0.2 (2026-10-23)
 
+### Fixes
 
-First stable release. No code changes since 0.7.0.
+- Settings: a list of allowed senders is limited to 75 addresses, so the longest list always fits the stored-setting limit. A value that is too long is refused with a clear message instead of failing on save.
+- Month package: the "changes" package no longer replaces the full month index.
+- Bank matching: a seller name that reduces to nothing never matches a payment.
+- The app has a tab icon.
 
-- Receipts by email or upload, read with Workers AI and cross-checked by a deterministic parser
-- Any-bank CSV matching with saved column mappings
-- Month package ZIP for the accountant
-- Sales invoices
-- In-app settings
-- Cloudflare Access sign-in
-- Redesigned, consistent UI across the whole app
+### Documentation and project site
 
-## 0.7.0 (2026-10-22)
+- The docs changelog no longer links to commits that are not in this repository.
+- The docs site sends security headers, including a Content-Security-Policy.
+- The phone tab bar and the More page are documented, and the deploy tutorial lists the right navigation.
+- The project site has a Docs link, a 404 page and a sitemap.
 
+## 1.0.1 (2026-10-23)
 
-### Features
-
-- **app:** compact, consistent UI across the whole app, including Settings v2 (#23)
-
-## 0.6.0 (2026-10-22)
-
+First public release. Earlier development history is not part of this repository.
 
 ### Features
 
-- **settings:** edit Setup in the app, with source tags, audit and reset (#22)
-
-## 0.5.0 (2026-10-22)
-
-
-### Features
-
-- **month:** month package ZIP and optional OneDrive upload (#19)
-- **sales:** sales invoices by upload and by a separate invoices email address, matched to money in (#20)
-
-## 0.4.0 (2026-10-22)
-
-
-### Features
-
-- **extraction:** parse and cross-check receipts so clean ones skip review (#17)
-
-## 0.3.0 (2026-10-22)
-
-
-### Features
-
-- **app:** redesign the app with a needs-you home, plain-language review, month close, settings, self-hosted fonts and image preview (#15)
-
-## 0.2.5 (2026-10-22)
-
-
-### Hotfixes
-
-- **imports:** show a single matching built-in layout as the chosen preset
-- **extraction:** clean NULs from PDF text, read Date paid, settle categories independently, accept unambiguous currency symbols
-
-## 0.2.4 (2026-10-22)
-
-
-### Features
-
-- **auth:** optional Cloudflare Access mode verifies the Access JWT instead of the password
-
-## 0.2.3 (2026-10-22)
-
-
-### Features
-
-- **email:** optional `FORWARD_COPY_TO` forwards a copy of every incoming email
-
-## 0.2.2 (2026-10-21)
-
-
-### Features
-
-- **site:** WebGL dot-matrix ink scene with measured fallbacks
-- **site:** motion layer with on-brand SVGs, split headings, scroll timelines and loops
-- **site:** illustrations with a cleaner that keeps the motion hooks
-
-### Hotfixes
-
-- **site:** example receipt uses Finland's 25.5% VAT (10.00 + 2.55 = 12.55)
-- **site:** draw-on starts from a faint ghost of the icon; frame check skips edge slivers
-
-## 0.2.1 (2026-10-21)
-
-
-### Features
-
-- **app:** serve the app under a configurable `APP_BASE_PATH`
-- **site:** move to receipts.nuits.net, drop workers.dev, add security headers
-
-## 0.2.0 (2026-10-21)
-
-
-### Features
-
-- **site:** one-page marketing site for Nuits Receipts
-- **config:** move deployment-specific values into validated Worker vars
-- **imports:** any-bank CSV import with presets, multiple accounts, cross-account matching, transfers
-- **imports:** label presets as CSV layouts, add no-affiliation hint and bank trademark line
-
-### UI enhancements
-
-- **site:** write the long-dash check as escapes, not literal dashes
-
-### Hotfixes
-
-- **site:** apply pre-launch legal review to the marketing site
-- **site:** update trader details and contact email
-- **site:** point canonical and OG URLs at the workers.dev preview
-- **site:** state PDF hosting cost, explain Clef, enlarge Deploy button
-- **site:** lock the hero cost line and the two Clairic disclaimers
-- **snapshot:** strip the Marketing site section from the public README
-
-## 0.1.1 (2026-10-20)
-
-
-### Hotfixes
-
-- **email:** verify sender SPF before ingesting allowlisted mail
-- **http:** add HSTS and X-Frame-Options headers
+- Self-hosted receipt and invoice reader that runs on Cloudflare Workers: PDF and image uploads, optional email ingestion with an allowlist and SPF check, private R2 storage of originals, D1 storage of extracted rows.
+- Extraction with Cloudflare's Clairic model on Workers AI (preview), VAT arithmetic checked in code, review flags for uncertain rows.
+- Vendor rules with a Clef fallback for product and expense type.
+- Bank CSV import with a column mapping, payment matching suggestions and a list of payments with no receipt.
+- Monthly package: costs in EUR by product and type, CSV or ZIP with every original and an index spreadsheet, optional OneDrive upload.
+- Sales invoices you send, matched to money coming in.
+- In-app settings, Cloudflare Access sign-in, compact mobile layout with a bottom tab bar.
+- Project site in site/ with a demo video, and a documentation site in docs-site/.
+- Apache License 2.0, no-warranty notice in the README and in the app.

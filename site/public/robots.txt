@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://receipts.nuits.net/sitemap.xml
+Sitemap: https://receipts.nuits.net/docs/sitemap-0.xml

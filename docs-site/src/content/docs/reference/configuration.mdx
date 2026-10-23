@@ -68,7 +68,7 @@ The three `ACCESS_*` vars are set together or not at all. A partial set fails wi
 
 | Var | Default | Rules | What it does | Where it can be changed |
 | --- | --- | --- | --- | --- |
-| `ALLOWED_SENDER_EMAILS` | empty | Up to 100 addresses of at most 254 characters, separated by commas, semicolons or whitespace. | Envelope senders whose mail is read. Mail from anyone else is dropped. Empty turns email ingestion off. | Settings > Email (**Allowed senders**), with a confirmation tick |
+| `ALLOWED_SENDER_EMAILS` | empty | Up to 75 addresses of at most 254 characters, separated by commas, semicolons or whitespace. | Envelope senders whose mail is read. Mail from anyone else is dropped. Empty turns email ingestion off. | Settings > Email (**Allowed senders**), with a confirmation tick |
 | `RECEIPT_ADDRESS` | empty | One email address, at most 254 characters. | The address routed to the Worker. Shown in the app. Not used to filter mail. | Settings > Email (**Receipt address**), with a confirmation tick |
 | `INVOICES_ADDRESS` | empty | One email address, different from `RECEIPT_ADDRESS` and `FORWARD_COPY_TO`. | Mail whose envelope recipient is this address is filed as a sales invoice. Empty turns it off. After a change in Settings, the previous address is still read as an invoice address for 30 days. | Settings > Email (**Invoice address**), with a confirmation tick |
 | `FORWARD_COPY_TO` | empty | One email address, or empty. | Every message the Worker receives, from any sender, is also forwarded here. It must be a verified destination address in Email Routing. A copy to the receiving address itself is skipped. | Settings > Email (**Forward a copy to**), with a confirmation tick |

@@ -483,9 +483,9 @@ export function eligible(
   if (!exact && !estimated) return false;
   const alias = rules.some(
     (rule) =>
-      rule.bank_alias &&
+      normalize(rule.bank_alias ?? '') &&
       normalize(receipt.vendor ?? '').includes(normalize(rule.vendor_contains)) &&
-      normalize(transaction.merchant) === normalize(rule.bank_alias),
+      normalize(transaction.merchant) === normalize(rule.bank_alias ?? ''),
   );
   return alias || similar(receipt.vendor ?? '', transaction.merchant, tuning.minVendorSimilarity);
 }
@@ -617,9 +617,12 @@ export function creditFit(r: Receipt, t: Transaction, tuning: Tuning = DEFAULT_T
   const reference =
     (digits(r.reference_number).length >= 3 && text.includes(digits(r.reference_number))) ||
     (digits(r.invoice_number).length >= 3 && text.includes(digits(r.invoice_number)));
+  // A client written in a script normalize() cannot read (Cyrillic, CJK, Greek) becomes ''.
+  // '' is contained in every merchant, so it must never count as a name match.
+  const client = normalize(r.client ?? '');
   const name =
-    !!r.client &&
-    (similar(r.client, t.merchant, tuning.minVendorSimilarity) || normalize(t.merchant).includes(normalize(r.client)));
+    !!client &&
+    (similar(r.client ?? '', t.merchant, tuning.minVendorSimilarity) || normalize(t.merchant).includes(client));
   if (amount && (reference || name)) return 'automatic';
   if (amount || converted || reference) return 'suggested';
   return null;

@@ -5,7 +5,7 @@ import worker from '../src/index';
 import { config, ConfigError, parseConfig, parseTuning } from '../src/config';
 import { DEFAULT_TUNING, withinWindow } from '../src/domain';
 import { kindFor } from '../src/receipts';
-import { applied, layer, sourceOf, withSettings, type Row } from '../src/settings';
+import { applied, layer, SETTING_VALUE_LIMIT, sourceOf, withSettings, type Row } from '../src/settings';
 import type { Env } from '../src/env';
 import { request } from './helpers';
 
@@ -378,4 +378,41 @@ test('a missing settings table leaves the deploy values in force', async () => {
     },
   } as unknown as Env;
   expect(await withSettings(broken)).toBe(broken);
+});
+
+test('an allowed-senders list too long for the settings table is refused, not a server error', async () => {
+  // 100 addresses of 250 characters are about 25,000 characters, and
+  // settings.value_json holds at most 20,000.
+  const list = Array.from({ length: 100 }, (_, i) => `${String(i).padStart(3, '0')}${'a'.repeat(235)}@example.org`);
+  const response = await save(
+    { ALLOWED_SENDER_EMAILS: list.join('\n'), confirm_ALLOWED_SENDER_EMAILS: 'yes' },
+    'email',
+  );
+  expect(response.status).toBe(422);
+  expect(await response.text()).toContain('Allowed senders is too long');
+  expect((await rows()).some((r) => r.key === 'ALLOWED_SENDER_EMAILS')).toBe(false);
+});
+
+test('the most allowed senders of the longest length always fit settings.value_json', async () => {
+  // 75 x 254 characters is the largest list the config accepts (MAX_ALLOWED_SENDERS).
+  const list = Array.from({ length: 75 }, (_, i) => `${String(i).padStart(2, '0')}${'a'.repeat(240)}@example.org`);
+  expect(list.every((a) => a.length === 254)).toBe(true);
+  const response = await save(
+    { ALLOWED_SENDER_EMAILS: list.join('\n'), confirm_ALLOWED_SENDER_EMAILS: 'yes' },
+    'email',
+  );
+  expect(response.status).toBe(303);
+  const stored = (await rows()).find((r) => r.key === 'ALLOWED_SENDER_EMAILS');
+  expect(String(stored?.value_json).length).toBeLessThanOrEqual(SETTING_VALUE_LIMIT);
+});
+
+test('more than 75 allowed senders are refused with a clear message', async () => {
+  const list = Array.from({ length: 76 }, (_, i) => `person${i}@example.org`);
+  const response = await save(
+    { ALLOWED_SENDER_EMAILS: list.join('\n'), confirm_ALLOWED_SENDER_EMAILS: 'yes' },
+    'email',
+  );
+  expect(response.status).toBe(422);
+  expect(await response.text()).toContain('at most 75 email addresses');
+  expect((await rows()).some((r) => r.key === 'ALLOWED_SENDER_EMAILS')).toBe(false);
 });

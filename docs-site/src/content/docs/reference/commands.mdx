@@ -111,7 +111,6 @@ When the config has no `database_id`, the resolved ID is written to `wrangler.re
 | --- | --- | --- |
 | `version:next` | `bun scripts/version.mjs next` | Reads Conventional Commits since the last `v*` tag, decides the bump and prints it as JSON. Writes nothing. |
 | `version:apply` | `bun scripts/version.mjs apply` | Decides the bump and writes `package.json` and a new `CHANGELOG.md` entry. Does not tag, commit or push. |
-| `snapshot:public` | `bash scripts/public-snapshot.sh` | Maintainer tool that builds a public repository candidate from an allowlist of files and scans it. |
 
 `scripts/version.mjs` also has a `notes <version>` command, which prints one changelog entry. It has no `bun run` alias.
 

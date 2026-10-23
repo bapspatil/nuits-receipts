@@ -31,7 +31,7 @@ export default defineConfig({
     target: "es2022",
     assetsInlineLimit: 0,
     rollupOptions: {
-      input: { main: resolve(import.meta.dirname, "index.html"), privacy: resolve(import.meta.dirname, "privacy/index.html") },
+      input: { main: resolve(import.meta.dirname, "index.html"), privacy: resolve(import.meta.dirname, "privacy/index.html"), notFound: resolve(import.meta.dirname, "404.html") },
     },
   },
 });

@@ -42,8 +42,12 @@ const banned = [
   [/[\u2013\u2014]/, "long dash (use a comma, colon, period or hyphen)"],
   [/\belf\b|\belves\b|\belfin\b/i, "elf reference"],
   [/\bcompliant\b/i, "compliance claim"],
-  [/(?<!with )\bany bank\b/i, 'unqualified "any bank" (say: banks that export CSV, presets for some, a column mapper for others)'],
+  // "any bank", "Any-bank", "any\u00a0bank", "anybank" and "any banks"; only "with any bank" (as in
+  // "not affiliated with any bank") is allowed.
+  [/(?<!with )\bany[\s\u00a0\u2010-\u2015-]*bank/i, 'unqualified "any bank" or "any-bank" (say: banks that export CSV, presets for some, a column mapper for others)'],
   [/never leaves your account|stays in your (own )?account/i, "data-locality claim (say: Nuits never sees your data)"],
+  [/github\.com\/[\w.-]+\/[\w.-]+-private\b/i, "mention of the private repository (its pages are not public)"],
+  [/github\.com\/[\w.-]+\/[\w.-]+\/(?:commit|compare)\//i, "link to a commit or compare page (404 for visitors)"],
   [/Cloudflare Receipts|Receipts for Cloudflare|CF-Receipts/i, "Cloudflare in the product name"],
   [/\btestimonial|\btrusted by\b|\bthousands of\b/i, "invented social proof"],
 ];

@@ -323,7 +323,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   const { response, entries } = await zipOf('/month/package.zip?month=2026-10&changes=1&anyway=1');
   expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="receipts-2026-10-changes.zip"');
   expect(entries.map((e) => e.name.split('_').at(-1))).toEqual([
-    'receipts-2026-10/00-index-2026-10.csv'.split('_').at(-1),
+    'receipts-2026-10/00-index-2026-10-changes.csv'.split('_').at(-1),
     `${second.id.slice(0, 6)}.pdf`,
     `${added.id.slice(0, 6)}.pdf`,
   ]);

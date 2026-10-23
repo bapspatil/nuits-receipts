@@ -60,15 +60,21 @@ function text(value: unknown, fallback: string, name: string, max = 200): string
   return result;
 }
 
+// The most allowed senders. Saved in the app they are stored as one text of
+// "a, b, c" (2 characters between addresses), at most 254 characters each:
+// 75 x 254 + 74 x 2 + 2 quotes = 19,200, under the 20,000 the settings table
+// accepts (settings.value_json). A higher count could never be saved.
+export const MAX_ALLOWED_SENDERS = 75;
+
 // Comma, semicolon or whitespace separated. Empty disables email ingestion.
-export function parseSenders(value: unknown): ReadonlySet<string> {
+export function parseSenders(value: unknown, max = 100): ReadonlySet<string> {
   const raw = typeof value === 'string' ? value : '';
   const items = raw
     .split(/[\s,;]+/)
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (items.length > 100 || items.some((s) => s.length > 254 || !EMAIL.test(s)))
-    throw new ConfigError('ALLOWED_SENDER_EMAILS must be a list of email addresses');
+  if (items.length > max || items.some((s) => s.length > 254 || !EMAIL.test(s)))
+    throw new ConfigError(`ALLOWED_SENDER_EMAILS must be a list of at most ${max} email addresses`);
   return new Set(items);
 }
 
@@ -242,7 +248,7 @@ export function parseConfig(env: Partial<Env>): AppConfig {
     throw new ConfigError('APP_BASE_PATH must look like "/app" (or be empty)');
   return {
     username,
-    allowedSenders: parseSenders(env.ALLOWED_SENDER_EMAILS),
+    allowedSenders: parseSenders(env.ALLOWED_SENDER_EMAILS, MAX_ALLOWED_SENDERS),
     receiptAddress,
     invoicesAddress,
     sellerNames: parseSellerNames(env.SELLER_NAMES),

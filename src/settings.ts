@@ -9,6 +9,9 @@ import type { Env } from './env';
 import { parseConfig, TUNING_VARS } from './config';
 import { DEFAULT_TUNING, EXPONENTS, InputError, requireInput } from './domain';
 
+// The CHECK on settings.value_json (schema/0004_settings.sql). The stored text
+// is the JSON-encoded value, quotes included.
+export const SETTING_VALUE_LIMIT = 20000;
 export type Group = 'business' | 'email' | 'accountant' | 'review' | 'integrations';
 export type SettingKey =
   | 'APP_NAME'
@@ -143,12 +146,12 @@ export const FIELDS: readonly Field[] = [
     key: 'ALLOWED_SENDER_EMAILS',
     group: 'email',
     label: 'Allowed senders',
-    help: 'Only mail from these is read. One per line.',
+    help: 'Only mail from these is read. One per line, up to 75.',
     kind: 'list',
     fallback: '',
     confirm: 'I’ve checked this list; mail from anyone else is ignored',
     warning: 'This decides who can put documents into your books.',
-    maxLength: 26000,
+    maxLength: 20000,
   },
   {
     key: 'FORWARD_COPY_TO',

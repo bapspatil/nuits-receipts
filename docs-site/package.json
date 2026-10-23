@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/nest-under-base.mjs && node scripts/check-copy.mjs",
+    "build": "node scripts/sync-changelog.mjs --check && astro build && node scripts/nest-under-base.mjs && node scripts/csp-hashes.mjs && node scripts/check-copy.mjs",
     "preview": "wrangler dev --port 4322",
     "typecheck": "astro check",
     "lint:docs": "nimbus-docs lint",
@@ -13,6 +13,7 @@
     "predeploy": "astro check && bun run build",
     "deploy": "wrangler deploy",
     "check:copy": "node scripts/check-copy.mjs",
+    "sync:changelog": "node scripts/sync-changelog.mjs",
     "preflight:launch": "node scripts/check-copy.mjs --production"
   },
   "dependencies": {

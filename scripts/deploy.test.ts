@@ -75,6 +75,8 @@ test('config selection prefers --config, then NUITS_WRANGLER_CONFIG', () => {
 test('vars and passwords are validated', () => {
   expect(validateVars({ vars: { AI_MODE: 'live' } })).toEqual([]);
   expect(validateVars({ vars: { AI_MODE: 'live', ALLOWED_SENDER_EMAILS: 'nope' } })[0]).toContain('invalid address');
+  const many = Array.from({ length: 76 }, (_, i) => `p${i}@example.org`).join(', ');
+  expect(validateVars({ vars: { AI_MODE: 'live', ALLOWED_SENDER_EMAILS: many } })[0]).toContain('at most 75');
   expect(validateVars({ vars: { AI_MODE: 'live', DEFAULT_PRODUCT: 'x' } })[0]).toContain('DEFAULT_PRODUCT');
   expect(validateVars({ vars: { AI_MODE: 'live', FORWARD_COPY_TO: 'copy@example.com' } })).toEqual([]);
   expect(

@@ -295,7 +295,9 @@ export const repositoryUrlFromRemote = (cwd) => {
   const match =
     /^git@github\.com:(.+?)(?:\.git)?$/.exec(remote) ??
     /^https:\/\/github\.com\/(.+?)(?:\.git)?$/.exec(remote);
-  return match ? `https://github.com/${match[1]}` : "";
+  // A private repository's commit and compare pages are not public, so a
+  // changelog entry must not link to them: no links at all.
+  return match && !/-private$/i.test(match[1]) ? `https://github.com/${match[1]}` : "";
 };
 
 export const parseVersionArguments = (argv) => {
@@ -377,7 +379,17 @@ export const applyPlan = (plan, { cwd }) => {
     previousTag: plan.previousTag,
   });
   fs.writeFileSync(changelogPath, prependChangelog(existing, notes));
-  return { ...plan, notes, changed: ["package.json", "CHANGELOG.md"] };
+  const changed = ["package.json", "CHANGELOG.md"];
+  // The docs Changelog page is built from CHANGELOG.md, so it is rebuilt here too.
+  const sync = path.join(cwd, "docs-site", "scripts", "sync-changelog.mjs");
+  if (fs.existsSync(sync)) {
+    const result = spawnSync(process.execPath, [sync], { cwd, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`Rebuilding the docs changelog page failed: ${result.stderr.trim()}`);
+    }
+    changed.push("docs-site/src/content/docs/reference/changelog.mdx");
+  }
+  return { ...plan, notes, changed };
 };
 
 /** The body of one existing CHANGELOG entry, for GitHub release notes. */

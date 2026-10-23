@@ -30,7 +30,7 @@ The screenshots use sample data only.
 > Nuits Receipts is free, open-source software provided "as is", without warranties or conditions of any kind, as set out in the Apache License 2.0 (sections 7 and 8). It reads documents with an AI extraction model (Cloudflare Workers AI "Clairic", currently a preview model), and it can misread or miss vendors, amounts, VAT, dates and currencies. Bank matching is a suggestion, not a reconciliation you can rely on without checking.
 > You are responsible for checking every figure, for your own bookkeeping, tax and VAT filings, and for keeping your original receipts as your local accounting law requires. Nuits Receipts is not an archive or a bookkeeping system. Ask your accountant or tax adviser about anything that matters.
 > You run it in your own Cloudflare account. Nuits does not receive, store or have access to your documents or data. You are responsible for your deployment, its security, its costs and the personal data in your receipts.
-> To the extent permitted by applicable law, Bapusaheb Patil / Nuits is not liable for any loss arising from use of the software. Nothing in this notice limits liability that cannot be limited by law.
+> To the extent permitted by applicable law, Bapusaheb Shankaragouda Patil / Nuits is not liable for any loss arising from use of the software. Nothing in this notice limits liability that cannot be limited by law.
 
 ## How it works
 

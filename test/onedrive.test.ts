@@ -423,6 +423,10 @@ test('upload puts small files, chunked large files and the index in the month fo
   ).toBe(true);
   expect(ms.calls.some((c) => decodeURIComponent(c.url).includes(largeName))).toBe(false);
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(2);
+  // Uploading only the changes still leaves the full index in the folder.
+  const index2 = new TextDecoder().decode(ms.files.get('receipts-2026-10-id/00-index-2026-10.csv'));
+  expect(index2).toContain(renamed);
+  expect(index2).toContain(largeName);
 });
 
 test('uploads run in batches of ten and continue without JavaScript', async () => {

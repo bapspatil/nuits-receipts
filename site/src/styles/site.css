@@ -105,11 +105,6 @@ a {
   text-wrap: pretty;
 }
 
-.todo {
-  color: var(--color-stamp);
-  font-weight: 600;
-}
-
 /* Bar */
 
 .bar {
@@ -145,6 +140,23 @@ a {
 .wordmark-desc {
   font-size: var(--text-small);
   color: var(--color-ink-soft);
+}
+
+.bar-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+.bar-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.5rem;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink);
 }
 
 .motion-switch {
@@ -669,18 +681,6 @@ a {
   font-weight: 800;
   font-size: 2rem;
   line-height: 1.05;
-}
-
-.fact[hidden] {
-  display: none;
-}
-
-.fact-todo {
-  border-top: 2px dashed var(--color-stamp);
-}
-
-.fact-todo .fact-figure {
-  font-size: 1.375rem;
 }
 
 .nope {

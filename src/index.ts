@@ -10,7 +10,7 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { errorPage, exportCsv, exportSalesCsv, month, morePage } from './ui';
+import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month, morePage } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import { home, importPage, monthPage, payments, previewable, receiptPage, reviewPage, settingsPage } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
@@ -144,6 +144,10 @@ async function route(request: Request, env: Env, base = ''): Promise<Response> {
     return invoicesPage(env, month(url.searchParams.get('month')), url.searchParams);
   if (request.method === 'GET' && path === '/export-sales.csv')
     return exportSalesCsv(env, month(url.searchParams.get('month')), url.origin + base);
+  if (request.method === 'GET' && path === '/favicon.svg')
+    return new Response(FAVICON_SVG, {
+      headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },
+    });
   const font = path.match(/^\/assets\/fonts\/([a-z-]+\.woff2)$/);
   if (request.method === 'GET' && font?.[1] && FONT_FILES[font[1]])
     return new Response(fontBytes(font[1]), {

@@ -16,6 +16,7 @@ import {
   planRelease,
   prependChangelog,
   renderChangelogEntry,
+  repositoryUrlFromRemote,
   setPackageVersion,
 } from "./version.mjs";
 
@@ -298,6 +299,20 @@ describe("git integration", () => {
     run(cwd, ["add", "."]);
     run(cwd, ["commit", "-q", "-m", message]);
   };
+
+  test("links to commits only for a public repository", () => {
+    const cwd = makeRepo();
+    try {
+      run(cwd, ["remote", "add", "origin", "https://github.com/someone/project.git"]);
+      expect(repositoryUrlFromRemote(cwd)).toBe("https://github.com/someone/project");
+      run(cwd, ["remote", "set-url", "origin", "git@github.com:someone/project-private.git"]);
+      expect(repositoryUrlFromRemote(cwd)).toBe("");
+      run(cwd, ["remote", "set-url", "origin", "https://github.com/someone/project-private"]);
+      expect(repositoryUrlFromRemote(cwd)).toBe("");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 
   test("plants a baseline before the first tag, then bumps from it", () => {
     const cwd = makeRepo();

@@ -49,7 +49,11 @@ export type SendStatus = {
 export type Plan = {
   month: string;
   folder: string;
+  // The files this package carries: all of them, or only the changed ones.
   files: PackageFile[];
+  // Every file of the month's package, whatever the options chose. The same
+  // as files unless only the changes were asked for.
+  all: PackageFile[];
   send: SendStatus;
   // Receipts the options leave out, for the Send step's wording.
   unchecked: number;
@@ -210,10 +214,14 @@ export async function planPackage(
     .map((receipt) => ({ receipt, folder: placement(receipt, o) }))
     .filter((p): p is { receipt: Receipt; folder: Folder } => p.folder !== null);
   const changedFiles = send.last ? placed.filter((p) => isChanged(p.receipt)).length : 0;
-  const chosen = o.changes ? (send.last ? placed.filter((p) => isChanged(p.receipt)) : []) : placed;
+  const chosen = new Set(
+    (o.changes ? (send.last ? placed.filter((p) => isChanged(p.receipt)) : []) : placed).map((p) => p.receipt.id),
+  );
   // Names are unique per folder, ignoring case as Windows and OneDrive do.
+  // They are worked out over the whole month, so a file has the same name in
+  // a changes package as in the full one.
   const taken = new Set<string>();
-  const files = chosen.map(({ receipt, folder }) => {
+  const all = placed.map(({ receipt, folder }) => {
     let name = fileName(receipt);
     for (let length = 8; taken.has(`${folder}/${name}`.toLowerCase()) && length <= 64; length += 2)
       name = fileName(receipt, length);
@@ -226,6 +234,7 @@ export async function planPackage(
       size: null,
     } as PackageFile;
   });
+  const files = all.filter((f) => chosen.has(f.receipt.id));
   if (sizes && files.length <= MAX_SIZED_FILES)
     for (let i = 0; i < files.length; i += 50)
       await Promise.all(
@@ -237,6 +246,7 @@ export async function planPackage(
     month,
     folder: folderName(env, month),
     files,
+    all,
     send,
     unchecked: rows.filter((r) => placement(r, { anyway: true, undated: false }) === CHECK_FOLDER).length,
     undated: undatedRows.length,
@@ -246,27 +256,29 @@ export async function planPackage(
 
 // Today's export columns unchanged, plus where the file is in the package.
 // Receipts only; sales invoices have their own index.
-export async function indexCsv(env: Env, plan: Plan, origin: string): Promise<TextFile> {
+// A changes package lists only its own files, so its index gets its own name
+// and never replaces the full one when unzipped over it.
+export async function indexCsv(env: Env, plan: Plan, origin: string, partial = false): Promise<TextFile> {
   const data = await Promise.all(
-    plan.files
+    (partial ? plan.files : plan.all)
       .filter((f) => f.receipt.kind !== 'sales')
       .map(async (f) => [...(await exportRow(env, f.receipt, origin)), f.path, f.folder]),
   );
   return {
-    name: `00-index-${plan.month}.csv`,
+    name: `00-index-${plan.month}${partial ? '-changes' : ''}.csv`,
     bytes: new TextEncoder().encode(csvText([...EXPORT_COLUMNS, 'file_name', 'folder'], data)),
   };
 }
 
 // Sales invoices in the package, when there are any.
-export async function salesIndexCsv(env: Env, plan: Plan, origin: string): Promise<TextFile | null> {
-  const files = plan.files.filter((f) => f.receipt.kind === 'sales');
+export async function salesIndexCsv(env: Env, plan: Plan, origin: string, partial = false): Promise<TextFile | null> {
+  const files = (partial ? plan.files : plan.all).filter((f) => f.receipt.kind === 'sales');
   if (!files.length) return null;
   const data = await Promise.all(
     files.map(async (f) => [...(await salesRow(env, f.receipt, origin)), f.path, f.folder]),
   );
   return {
-    name: `00-sales-index-${plan.month}.csv`,
+    name: `00-sales-index-${plan.month}${partial ? '-changes' : ''}.csv`,
     bytes: new TextEncoder().encode(csvText([...SALES_COLUMNS, 'file_name', 'folder'], data)),
   };
 }
@@ -309,10 +321,12 @@ export async function missingCsv(env: Env, month: string): Promise<TextFile | nu
 // Spreadsheets at the top of the month folder. Another document kind adds
 // its own index here (and its files to plan.files under its own folder);
 // the ZIP, the OneDrive upload and the manifest all pick it up.
-export async function packageTexts(env: Env, plan: Plan, origin: string): Promise<TextFile[]> {
+// A OneDrive upload always carries the full indexes, since it replaces the ones
+// in the folder; only a changes ZIP (`partial`) lists just its own files.
+export async function packageTexts(env: Env, plan: Plan, origin: string, partial = false): Promise<TextFile[]> {
   const texts: Array<TextFile | null> = [
-    await indexCsv(env, plan, origin),
-    await salesIndexCsv(env, plan, origin),
+    await indexCsv(env, plan, origin, partial),
+    await salesIndexCsv(env, plan, origin, partial),
     await missingCsv(env, plan.month),
   ];
   return texts.filter((t): t is TextFile => t !== null);
@@ -350,7 +364,7 @@ function knownLength(plan: Plan, texts: TextFile[]): bigint {
 export async function packageZip(env: Env, month: string, o: PackageOptions, origin: string): Promise<Response> {
   const plan = await planPackage(env, month, o, { sizes: true });
   requirePackable(plan, o);
-  const texts = await packageTexts(env, plan, origin);
+  const texts = await packageTexts(env, plan, origin, o.changes);
   const now = new Date();
   const length = plan.files.length <= MAX_SIZED_FILES ? knownLength(plan, texts) : null;
   async function* files() {

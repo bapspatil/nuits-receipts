@@ -384,6 +384,9 @@ body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--ink)}}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.snav a,.btn,.task,nav.main a,nav.tabs a,.menu a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
 }
+// The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
+export const FAVICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#E6EFE9"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="#0D3A36"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="#E6EFE9" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const BRAND_ICON =
   '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>';
 
@@ -463,7 +466,7 @@ export async function page(
   const head = options.head ?? pageHead(escape(title));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(title)} · ${escape(appName)}</title><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(options.nav, counts)}${signOut}</div></header>${tabs(options.nav, counts)}<main id="main">${head}${body}</main><footer class="foot"><p class="notice">${escape(APP_NOTICE)}</p><p>${release}</p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(title)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(options.nav, counts)}${signOut}</div></header>${tabs(options.nav, counts)}<main id="main">${head}${body}</main><footer class="foot"><p class="notice">${escape(APP_NOTICE)}</p><p>${release}</p></footer></body></html>`,
     { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
   );
 }

@@ -407,6 +407,21 @@ test('fonts are served by the Worker, match the site files and need sign-in', as
   expect((await worker.fetch(new Request('http://localhost/assets/fonts/bricolage.woff2'), env)).status).toBe(401);
 });
 
+test('the app has a tab icon, served by the Worker behind sign-in', async () => {
+  const html = await (await request('/')).text();
+  expect(html).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">');
+  const icon = await request('/favicon.svg');
+  expect(icon.status).toBe(200);
+  expect(icon.headers.get('Content-Type')).toBe('image/svg+xml');
+  expect(await icon.text()).toMatch(/^<svg /);
+  expect((await worker.fetch(new Request('http://localhost/favicon.svg'), env)).status).toBe(401);
+  const based = { ...env, APP_BASE_PATH: '/app' } as Env;
+  const at = (path: string) =>
+    worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), based);
+  expect(await (await at('/app/')).text()).toContain('<link rel="icon" href="/app/favicon.svg"');
+  expect((await at('/app/favicon.svg')).status).toBe(200);
+});
+
 test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
   const based = { ...env, APP_BASE_PATH: '/app' } as Env;
   const at = (path: string) =>

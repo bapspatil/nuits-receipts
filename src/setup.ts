@@ -19,6 +19,7 @@ import {
   previousInvoicesAddress,
   put,
   saveChanges,
+  SETTING_VALUE_LIMIT,
   sourceOf,
   withSettings,
   type Change,
@@ -87,6 +88,9 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
       requireInput(raw.length <= (field.maxLength ?? 400) * 2, `${field.label} is too long`);
       submitted = normalizeValue(field, raw);
     }
+    // settings.value_json holds at most SETTING_VALUE_LIMIT characters (a CHECK
+    // in the table), so a longer value is refused here, not by a failed write.
+    requireInput(JSON.stringify(submitted).length <= SETTING_VALUE_LIMIT, `${field.label} is too long`);
     if (submitted === effective(env, field)) continue;
     if (field.confirm && form.get(`confirm_${field.key}`) !== 'yes')
       throw new InputError(`To change ${field.label}, tick “${field.confirm}”.`);

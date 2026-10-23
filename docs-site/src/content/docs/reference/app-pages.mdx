@@ -9,7 +9,7 @@ Paths are relative to the app's root. With `APP_BASE_PATH` set (for example `/ap
 
 ## Main navigation
 
-The header shows these links, in this order. **Invoices** appears only when `INVOICES_ADDRESS` is set or at least one sales invoice exists.
+On a wide screen (880 pixels or more), the header shows these links, in this order. **Invoices** appears only when `INVOICES_ADDRESS` is set or at least one sales invoice exists.
 
 | Link | Path | Badge |
 | --- | --- | --- |
@@ -22,11 +22,26 @@ The header shows these links, in this order. **Invoices** appears only when `INV
 
 In Access mode the header also shows **Sign out**, which goes to `/cdn-cgi/access/logout`.
 
+### On a phone
+
+On a narrow screen the header links give way to a tab bar fixed to the bottom of the screen. It has five tabs, in this order, and the tab for the page you are on is marked. The bar hides while you type in a field, so it does not cover the keyboard.
+
+| Tab | Path | Badge |
+| --- | --- | --- |
+| Home | `/` | |
+| Review | `/review` | Number of documents waiting |
+| Payments | `/payments` | Number of payments missing a receipt |
+| Month | `/month` | |
+| More | `/more` | |
+
+**More** opens a list of the pages the bar has no room for: **Invoices** (only when the header would show it), **Settings**, and **Sign out** in Access mode. The More tab is marked on those pages too.
+
 ## Pages
 
 | Path | Page title | Query parameters | What it shows |
 | --- | --- | --- | --- |
 | `/` | Home | `month` | Heading "Welcome" on first run, "Here's what needs you" with open tasks, or "All caught up". Tasks that need you and a summary of the month with a link to close it. After the first receipt, also an **Add a receipt** upload form. |
+| `/more` | More | | The phone's list of **Invoices**, **Settings** and **Sign out**. See [On a phone](#on-a-phone). |
 | `/review` | Review | `reason`: `info`, `amount` or `sender` | Documents with status `needs_review`, filtered by **Missing info**, **Check the amount** or **Email not verified**. Documents still being read are counted in a banner. |
 | `/receipts/<id>` | The document's seller or file name | | The original (image preview, or a link to the PDF or email) beside the form: review flag cards, all fields, part of the business and kind of cost, due date, euro amount, duplicate choice, **Note for your accountant** and the approve, save and **Read it again** buttons. Also bank match suggestions and a form to add a vendor rule. Sales invoices also show **Move to receipts** and the paid-outside form. |
 | `/add` | Add documents | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or sales invoices, and the email addresses to forward to. |

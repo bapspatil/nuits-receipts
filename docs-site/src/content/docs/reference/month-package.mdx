@@ -12,7 +12,7 @@ The month package is one ZIP that holds one folder with the month's original doc
 | Item | Value |
 | --- | --- |
 | Path | `GET /month/package.zip?month=YYYY-MM` |
-| ZIP file name | `<folder>.zip`, or `<folder>-changes.zip` with `changes=1` |
+| ZIP file name | `<folder>.zip`, or `<folder>-changes.zip` with `changes=1`. A changes ZIP names its index spreadsheets `00-index-YYYY-MM-changes.csv` and `00-sales-index-YYYY-MM-changes.csv`, so they never replace the full ones. |
 | Folder name | `<EXPORT_PREFIX>-YYYY-MM`, for example `receipts-2026-10` |
 | Compression | None (stored). Originals are copied byte for byte. |
 | `Content-Length` | Sent when the package has at most 400 files. |
@@ -148,6 +148,6 @@ After a send, the Month page compares the current list with the last one and cou
 | Files per request | 10. The page then shows how many are uploaded and a **Continue uploading** button. |
 | Single upload | Files up to 4 MiB. |
 | Upload session | Larger files, in chunks of 3,276,800 bytes. |
-| Repeat uploads | Files already uploaded at the same revision are skipped. A corrected document replaces its old copy. Index files are always replaced. |
+| Repeat uploads | Files already uploaded at the same revision are skipped. A corrected document replaces its old copy. Index files are always replaced, and always list the whole month, also when only the changes are uploaded. |
 | When done | The month is recorded as sent with method `onedrive`. |
 | HTTP 429 or 503 from Microsoft | The batch stops and the page shows how many seconds to wait. |

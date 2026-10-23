@@ -30,7 +30,7 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | --- | --- |
 | Email size | 20 MiB. Larger mail is dropped. |
 | Attachments read per email | 10 supported attachments (PDF, PNG, JPEG, WebP). More are skipped and flagged `email_skipped_parts`. |
-| Allowed senders | 100 addresses of up to 254 characters |
+| Allowed senders | 75 addresses of up to 254 characters. The longest list fits the 20,000-character limit on a stored setting. |
 | Forward copy | 1 address |
 | Seller names | 20 names of up to 100 characters |
 
@@ -60,7 +60,7 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 
 | Limit | Value |
 | --- | --- |
-| Products | 1 to 200; ids and labels 1 to 100 characters |
+| Products | 1 to 200; ids and labels 1 to 100 characters. Saved in the app, the whole list must also fit the 20,000-character limit on a stored setting; the app refuses a longer one with an error. |
 | `APP_NAME` | 60 characters |
 | `EXPORT_PREFIX` | 40 characters |
 | `ACCOUNTANT_LABEL` | 100 characters |

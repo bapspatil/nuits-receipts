@@ -83,6 +83,7 @@ export function validateVars(config) {
   const senders = String(vars.ALLOWED_SENDER_EMAILS ?? '')
     .split(/[\s,;]+/)
     .filter(Boolean);
+  if (senders.length > 75) errors.push('ALLOWED_SENDER_EMAILS can list at most 75 addresses.');
   for (const s of senders) if (!email.test(s)) errors.push(`ALLOWED_SENDER_EMAILS has an invalid address: ${s}`);
   if (vars.RECEIPT_ADDRESS && !email.test(vars.RECEIPT_ADDRESS))
     errors.push('RECEIPT_ADDRESS must be an email address.');

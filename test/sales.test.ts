@@ -284,6 +284,10 @@ test('money in is matched to a sales invoice by amount and reference, never to a
   expect((await t(loose))!.receipt_id).toBeNull();
   const tx = await env.DB.prepare('SELECT * FROM bank_transactions WHERE id=?').bind(loose).first();
   expect(creditFit(other, tx as never)).toBe('suggested');
+  // A client name with no Latin letters normalizes to '' and must not match every payer.
+  expect(creditFit({ ...other, client: 'Клиент', reference_number: null, invoice_number: null }, tx as never)).toBe(
+    'suggested',
+  );
   const page = await (await request(`/receipts/${other.id}`)).text();
   expect(page).toContain('Is this the payment?');
   // Linking money in to an expense receipt is refused.
