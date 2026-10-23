@@ -1,0 +1,109 @@
+{
+  "about": "Finnish till receipt, ALV 14% and 25.5% table, no labelled date",
+  "expected": {
+    "vendor": ["Esimerkkikauppa Oy", "K-MARKET ESIMERKKI"],
+    "invoice_number": "4821",
+    "issue_date": "2026-10-22",
+    "currency": "EUR",
+    "total_minor": 2323,
+    "net_minor": 1998,
+    "vat_minor": 325
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.04072165861725807,
+        "span": [19, 37],
+        "guess": "Esimerkkikauppa Oy",
+        "confidence": 0.6827883720397949,
+        "value": "Esimerkkikauppa Oy"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.24710536003112793,
+        "span": [95, 99],
+        "guess": "4821",
+        "confidence": 0.8913960456848145,
+        "value": "4821"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.010286345146596432,
+        "span": [309, 312],
+        "guess": "EUR",
+        "confidence": 0.987106442451477,
+        "value": "EUR"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 5.056576264905743e-5,
+        "guess": "2026-10-22",
+        "confidence": 0.9999976158183017,
+        "value": "2026-10-22"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9991753697395325,
+        "guess": "2026-10-22",
+        "confidence": 0.6409321292268878,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0003422513254918158,
+        "guess": 23.23,
+        "confidence": 0.6795222867442257,
+        "value": 23.23
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.006706228945404291,
+        "guess": 23.23,
+        "confidence": 0.34786432644050685,
+        "value": 23.23
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.001034243032336235,
+        "guess": 2.24,
+        "confidence": 0.12336068629336719,
+        "value": 2.24
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.059686675667762756,
+        "guess": 25.5,
+        "confidence": 0.5878715497886665,
+        "value": 25.5
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Esimerkkikauppa", "MAITO 1L", "RUISLEIPÄ", "KAHVI", "JUUSTO", "PARISTOT AA", "YH", "PANKK", "VELO"],
+        "spans": [
+          [19, 34],
+          [117, 125],
+          [131, 140],
+          [146, 151],
+          [162, 168],
+          [174, 185],
+          [191, 193],
+          [206, 211],
+          [300, 304]
+        ],
+        "confidence": 2.166589055114255e-6
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 228,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1828,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

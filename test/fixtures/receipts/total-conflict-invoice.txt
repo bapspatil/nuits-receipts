@@ -1,0 +1,12 @@
+Invoice
+Harborline Tools Ltd
+1 Sample Road, Bristol BS1 0AA
+United Kingdom
+Invoice number HT-9002
+Invoice date 7 October 2026
+Bill to
+Sample Buyer
+Annual licence 1 €50.00
+Subtotal €50.00
+Total €50.00
+Amount paid €45.00

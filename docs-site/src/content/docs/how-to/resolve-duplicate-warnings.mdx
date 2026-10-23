@@ -1,0 +1,84 @@
+---
+title: Resolve duplicate warnings
+description: Mark a receipt as a duplicate of another, and decide what happens to bank payments that look already imported.
+sidebar:
+  order: 13
+  label: Resolve duplicates
+---
+
+Use this guide when the app tells you something may be in twice: a receipt flagged **Looks like one we already have.**, or a bank import that says payments look the same as ones from another file.
+
+## Prerequisites
+
+- For receipts: both copies are in the app.
+- For bank imports: you are on the **Check the file** page of an import. See [Import a bank CSV](/how-to/import-a-bank-csv/).
+
+## Mark a receipt as a duplicate
+
+The reader flags a receipt as a probable duplicate when another receipt has the same seller, receipt number, date, currency and total. You can also mark one yourself, for example after uploading a better copy of a scan.
+
+<Steps>
+  <Step title="Open the copy you want to drop">
+
+Open the receipt you do not want to keep, for example from **Review**. Keep the better copy (the clearer one, or the one already matched to a payment) as the original.
+
+  </Step>
+  <Step title="Pick the receipt it repeats">
+
+If it is flagged, the flag **Looks like one we already have.** has a **Same receipt as** list. Otherwise open **This is a duplicate** further down the form. Choose the receipt it repeats. The list offers receipts with the same seller or the same total; if the one you want is missing, correct the seller first and select **Save, decide later**, then try again.
+
+  </Step>
+  <Step title="Save">
+
+Select **Save, decide later** or **Approve receipt**.
+
+  </Step>
+</Steps>
+
+A receipt cannot be a duplicate of itself, of a receipt that is itself a duplicate, or be marked as a duplicate while another receipt points at it. To undo, set **Same receipt as** back to **Not a duplicate** and save.
+
+### Check that it worked
+
+The duplicate leaves the **Review** queue and the month: it is no longer counted on **Home** or **Month**, and it stays out of the CSV and the month package.
+
+Uploading the exact same file twice never makes a duplicate: the app recognises the bytes and opens the receipt you already have.
+
+## Payments that look already imported
+
+When you import a statement, payments are recognised in two ways:
+
+- **With a bank transaction ID column mapped**: a payment with the same ID in the same account is skipped. If the ID matches but the date, amount or other facts differ, the import is blocked with "Stable bank ID has conflicting facts". Check you picked the right account and file.
+- **Without a bank ID**: the app cannot tell a repeated payment from a genuine second one, so it asks.
+
+<Steps>
+  <Step title="Open the mapping panel">
+
+On **Check the file**, open **The columns look wrong? Adjust how we read the file** if it is not open. A warning says how many payments without a bank ID look the same as ones from another file.
+
+  </Step>
+  <Step title="Choose what to do">
+
+Under **If a payment was already imported**, choose:
+
+- **Skip the ones already imported** when the files overlap, for example two exports whose date ranges share a few days.
+- **Import them as extra payments** when they really are separate payments with the same date, amount and payee.
+
+Then select **Check again** and import.
+
+  </Step>
+</Steps>
+
+Two identical rows inside one file are always kept as separate payments.
+
+### Payments in another account
+
+If payments with the same date and amount already exist in a different account, the import asks you to confirm the account. Tick **I checked the account. Similar payments in my other accounts are separate payments.** if this is the right account. Nothing is merged between accounts. If those payments are money moved between your own accounts, pair them afterwards; see [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
+
+### Check that it worked
+
+The banner on **Payments** counts what was inserted, skipped and replayed. The **Missing** count does not double.
+
+## Related
+
+- The full dedupe rules: [Bank CSV import](/reference/bank-csv-import/).
+- How a duplicate affects the flags on a receipt: [Receipt fields and flags](/reference/receipt-fields-and-flags/).

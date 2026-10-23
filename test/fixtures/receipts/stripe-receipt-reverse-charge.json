@@ -1,0 +1,104 @@
+{
+  "about": "Stripe receipt, EU reverse charge, \"Date paid\" only, hyphens extracted as NUL in the original",
+  "expected": {
+    "vendor": "Lumen Labs Ireland Limited",
+    "invoice_number": ["LUMN7Q2K-0003", "4410-2283"],
+    "issue_date": "2026-10-22",
+    "currency": "EUR",
+    "total_minor": 8207,
+    "net_minor": 8207,
+    "vat_minor": 0,
+    "vat_rate_bps": 0
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.013441260904073715,
+        "span": [101, 127],
+        "guess": "Lumen Labs Ireland Limited",
+        "confidence": 0.9988620281219482,
+        "value": "Lumen Labs Ireland Limited"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.01354220975190401,
+        "span": [35, 48],
+        "guess": "LUMN7Q2K-0003",
+        "confidence": 0.9820761680603027,
+        "value": "LUMN7Q2K-0003"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.06867392361164093,
+        "span": [337, 338],
+        "guess": "€",
+        "confidence": 0.8290562033653259,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.0018763863481581211,
+        "guess": "2026-10-22",
+        "confidence": 0.9999932051067687,
+        "value": "2026-10-22"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9989888072013855,
+        "guess": "2026-11-22",
+        "confidence": 0.7236381171676854,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.00018739121151156723,
+        "guess": 82.07,
+        "confidence": 0.9934927279388283,
+        "value": 82.07
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.03626620024442673,
+        "guess": 82.07,
+        "confidence": 0.9777766677448453,
+        "value": 82.07
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.031368836760520935,
+        "guess": 0,
+        "confidence": 0.9698315003033052,
+        "value": 0
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.6863260865211487,
+        "guess": 0,
+        "confidence": 0.9635330096913843,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["L", "Lumen Labs Ireland Limited", "Lumen Pro Subscription (per seat)"],
+        "spans": [
+          [35, 36],
+          [101, 127],
+          [410, 443]
+        ],
+        "confidence": 0.0008300562994523088
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 294,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 2092,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

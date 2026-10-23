@@ -1,0 +1,168 @@
+---
+title: Troubleshoot
+description: Fixes for common problems with deploying, signing in, adding receipts, importing statements, matching and sending the month.
+sidebar:
+  order: 18
+  label: Troubleshoot
+---
+
+Find the message or symptom you see, then follow the fix. Messages in quotes are shown by the app exactly as written.
+
+## Deploying
+
+### The first build fails at the D1 migrations step
+
+The build stops with an authentication or permission error (for example code 10000 or 7403) on `wrangler d1 migrations list` or `apply`. The deploy applies the database schema during Workers Builds, and the build's API token has no D1 permission, so nothing is deployed.
+
+1. In the Cloudflare dashboard, open **My Profile** > **API Tokens** and edit the token used by Workers Builds. Your Worker shows which one under **Settings** > **Build** > **API token**.
+2. Add the account permission **D1** > **Edit** and save.
+3. Retry the build from the Worker's **Deployments** (or **Builds**) page, or push a new commit.
+
+The migration step only applies what is missing, so a retry is safe.
+
+### The button or setup cannot create the originals bucket
+
+R2 must be turned on with a payment method on your Cloudflare account, even if your use stays inside the free allowance. Add one in the dashboard, then deploy again. See [Limits](/reference/limits/).
+
+### Every page shows "Configuration error: ..."
+
+A Worker variable has a value the app does not accept. The message names it. Fix the variable in the dashboard or in your config and deploy again. (A bad value saved in **Settings** never causes this; Settings ignores it and shows a warning.) See [Configuration](/reference/configuration/).
+
+## Signing in
+
+### The browser keeps asking for the password
+
+- Check the sign-in name. It is `owner` unless you changed `AUTH_USERNAME`.
+- The password must be at least 16 characters, and example values such as `change-me` are refused. With a password that is too short, every sign-in fails. Set a new one with `bunx wrangler secret put NUITS_PASSWORD` (add `--config wrangler.production.jsonc` if you deployed with `bun run setup`).
+- The app only accepts the password over HTTPS (or on `localhost`). Open the `https://` address.
+
+### "Sign in through Cloudflare Access to use this app."
+
+Access mode is on, so the password no longer works. Sign in through your Access application, with an email listed in `ACCESS_ALLOWED_EMAILS`. See [Protect the app with Cloudflare Access](/how-to/protect-the-app-with-cloudflare-access/).
+
+### "Origin does not match" when you press a button
+
+Form posts must come from the same address the app is served on. Open the app at its normal address, not through another hostname or a copied link to a different host. If you serve it under a path, see [Serve the app under a path](/how-to/serve-the-app-under-a-path/).
+
+## Adding receipts
+
+### Error 1102 ("Worker exceeded resource limits") when uploading a PDF
+
+Reading a PDF uses far more than the Workers Free plan's 10 ms of CPU time per request. Plan on Workers Paid ($5 a month) if you upload PDFs. Photos and forwarded email bodies may fit in Free.
+
+### "File signature and media type differ"
+
+The file's contents do not match its type, for example a renamed file. Export or save it again as a real PDF, PNG, JPEG or WebP.
+
+### "Document too large" or a file that could not be added
+
+PDFs can be up to 10 MiB and 25 pages, photos up to 4 MiB, and an email up to 20 MiB. Shrink or split the file, or take a photo of the page that matters.
+
+### A receipt says "Still reading" for a long time
+
+Refresh the page. If it is still reading after two minutes, open **Read it again** and select **Read it again**.
+
+### "Reading failed." on several receipts at once
+
+Workers AI may be unavailable, or the Workers Free daily AI allowance may be used up, in which case calls fail until 00:00 UTC. Wait, then select **Read it again** on each receipt.
+
+### "This PDF has no readable text."
+
+The PDF is probably a scan; the app reads text PDFs only. Type the numbers in, or upload a photo of it with **Upload a better copy** and mark the PDF as its duplicate. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+
+### A forwarded email never appears
+
+- Check the sender is on the allowlist (`ALLOWED_SENDER_EMAILS`, or **Settings** > **Email**). With an empty allowlist, all mail is ignored.
+- Mail that fails the sender check is dropped. Forwarding services can change the sending address; check what actually arrives.
+- Look under **Review** > **Email not verified**: mail the app could not prove came from you waits there unread.
+- Check the Email Routing rule for the receipt address is **Send to a Worker** and points at this Worker. See [Set up email](/how-to/set-up-email/).
+
+### After "It's genuine, read it", the email says "We can't read this file type."
+
+The email is kept as a whole message, which the reader cannot read directly. Download it with **Download the original**, save the receipt from it, and add it with **Upload a better copy**. Then, on the email, fill in **Who you paid** to match the new receipt, select **Save, decide later**, and pick the new receipt under **This is a duplicate** > **Same receipt as**. This is how the app works today: an email it could not verify is kept whole and never read, and when you ask for it to be read it is treated as a single file the reader does not support, so it fails with `unsupported_document`. Its attachments are not read separately.
+
+### "Stale receipt. Reload before saving."
+
+The receipt changed since you opened it, for example because it was read again in another tab. Reload the page, check the values, and save again.
+
+### "Complete required facts before approval"
+
+Approval needs the seller, date, currency, total, before-VAT and VAT amounts. Fill in the empty ones; enter `0` for VAT if there is none. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
+
+## Importing a bank CSV
+
+### "This file already belongs to another account"
+
+The same file was imported into a different account. A file belongs to one account only. Pick that account, or check you exported the right statement.
+
+### "Preview expired or missing. Preview again."
+
+A preview is valid for 30 minutes. Start again from **Import bank statement**.
+
+### "Mapping fields changed. Update preview before confirming."
+
+You changed the mapping after the last check. Select **Check again**, then import.
+
+### "Stable bank ID has conflicting facts"
+
+A payment with the same bank transaction ID is already in this account, but with a different date, amount or payee. Check that you chose the right account and the right file. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+
+### The amounts are the wrong sign, or dates are off by months
+
+Open **The columns look wrong? Adjust how we read the file** and check **Money out is shown as** and **Date format**. For dates with slashes, the day and month order must be confirmed. See [Import a bank CSV](/how-to/import-a-bank-csv/).
+
+### Error 1102 or a D1 error on a large import
+
+A large file can exceed the Workers Free limits. Split the statement into smaller date ranges, or move to Workers Paid.
+
+## Matching
+
+### "Approve receipt before matching"
+
+Only approved receipts can be matched. Approve it first. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
+
+### "Confirm match exceptions"
+
+The receipt and payment do not fit the usual date and amount rules. If the match is right, tick **The amount or date doesn't line up exactly, and that's fine** and select **Match** again.
+
+### "Receipt is already matched"
+
+A receipt can be matched to one payment only. Open the other payment and select **Remove match** first.
+
+### A match I made disappeared
+
+Saving a change to a receipt removes its bank match, and automatic matching runs again. Make the match again on **Payments**.
+
+### "Payment changed or belongs to an own-account transfer. Undo the pair first."
+
+The payment is one side of a transfer pair. Select **Undo transfer** first. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
+
+### "Transfer changed or unavailable; review both payments"
+
+The two sides must be in different accounts, have the same amount and currency, and neither can be matched, marked **Not a purchase**, or already paired.
+
+## Sending the month
+
+### "This month is too big for one package."
+
+One package holds up to 900 files. Download **Spreadsheet only (CSV)** and fetch the originals from the app.
+
+### "This month changed since you opened the page."
+
+Something was added or corrected while the page was open. Reload it, check what you send, then select the **I've sent** button again.
+
+### "Nothing has changed since you sent this month."
+
+There is nothing new to send. Use **Download everything again** if you need the full package.
+
+### A very large month fails to download on Workers Free
+
+Building the ZIP checksums every byte, which can exceed the Free plan's CPU limit. Move to Workers Paid, or send **Spreadsheet only (CSV)**.
+
+### My accountant cannot open the ZIP in OneDrive
+
+OneDrive's web page does not unzip. Unzip it first and upload the folder (**Upload** > **Folder**), or turn on the direct upload. See [Upload the month to OneDrive](/how-to/upload-the-month-to-onedrive/).
+
+## Anything else
+
+"Request failed. Saved documents can be retried." means something went wrong on the server. Anything already saved is kept. Try again, and check your Worker's logs in the Cloudflare dashboard; they hold short reason codes, never receipt content.

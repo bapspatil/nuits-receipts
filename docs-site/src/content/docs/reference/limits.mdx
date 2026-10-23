@@ -1,0 +1,94 @@
+---
+title: Limits
+description: File sizes, file types, counts and the Cloudflare plan limits that apply to Nuits Receipts.
+sidebar:
+  order: 8
+---
+
+Limits set in the code are in `src/domain.ts` unless another file is named. Sizes are binary: 1 MiB is 1,048,576 bytes.
+
+## Documents
+
+| Limit | Value |
+| --- | --- |
+| Upload file types | PDF, PNG, JPEG, WebP. The type is detected from the file's first bytes and must match the type the browser sends. |
+| PDF size | 10 MiB |
+| PDF pages | 25 |
+| PDF text | A text layer is needed. Scanned PDFs without text are flagged `pdf_no_text`. There is no built-in OCR or PDF rasterisation. |
+| Image size | 4 MiB |
+| Images per read | 1 |
+| Files per upload | 10 (`src/invoices.ts`) |
+| Upload request body | 40 MiB in total |
+| Text read per document | 40,000 characters of document text plus email context. Longer input is cut and flagged `input_truncated`. |
+| Read lease | 120 seconds. A read that has not finished by then can be taken over by another. |
+| Currencies | EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY |
+| Money tolerance | 2 minor units for net + VAT = total, and for matching amounts |
+
+## Email
+
+| Limit | Value |
+| --- | --- |
+| Email size | 20 MiB. Larger mail is dropped. |
+| Attachments read per email | 10 supported attachments (PDF, PNG, JPEG, WebP). More are skipped and flagged `email_skipped_parts`. |
+| Allowed senders | 100 addresses of up to 254 characters |
+| Forward copy | 1 address |
+| Seller names | 20 names of up to 100 characters |
+
+## Bank CSV import
+
+| Limit | Value |
+| --- | --- |
+| File size | 2 MiB |
+| Rows per file | 1 to 5,000 |
+| Columns | 100 |
+| Rows above the column names, or skipped at the end | 100 each |
+| Cell size | 64 KiB |
+| Saved mapping | 32 KiB |
+| Preview validity | 30 minutes |
+
+## Month package and OneDrive
+
+| Limit | Value |
+| --- | --- |
+| Files per month package | 900 (`src/package.ts`) |
+| Packages with a known size and progress | Up to 400 files |
+| OneDrive files per request | 10 (`src/onedrive.ts`) |
+| OneDrive single upload | Up to 4 MiB per file; larger files use an upload session |
+| OneDrive sign-in window | 10 minutes between **Connect Microsoft account** and the return from Microsoft |
+
+## Configuration
+
+| Limit | Value |
+| --- | --- |
+| Products | 1 to 200; ids and labels 1 to 100 characters |
+| `APP_NAME` | 60 characters |
+| `EXPORT_PREFIX` | 40 characters |
+| `ACCOUNTANT_LABEL` | 100 characters |
+| `SEND_HINT` | 300 characters |
+| `SOURCE_REPOSITORY` | 300 characters |
+| `APP_BASE_PATH` | 60 characters |
+| Stored app setting | 20,000 characters of JSON per value (`schema/0004_settings.sql`) |
+
+## Use
+
+| Limit | Value |
+| --- | --- |
+| Users | One user per deployment, with one shared password, or the emails in `ACCESS_ALLOWED_EMAILS` in Access mode. No roles. |
+| Sign-out | None with HTTP Basic. Access mode has **Sign out**. |
+| Bank connections | CSV import only. No bank API sync, no XLSX. |
+| Matching | One bank row per document. Split and combined payments, refunds, fees and currency conversion are not matched automatically. |
+
+## Cloudflare plan limits
+
+These are Cloudflare's limits, not the app's. Check the linked pages for current values.
+
+| Limit | Workers Free | Workers Paid | Where it matters |
+| --- | --- | --- | --- |
+| CPU time per request | 10 ms | 30 s by default, up to 5 min | Reading a PDF, building a large month package, importing a large CSV. Exceeding it shows Error 1102. |
+| Subrequests to Cloudflare services per request | 1,000 | 10,000 by default | Each file in a month package is one R2 read. |
+| External subrequests per request | 50 | 10,000 by default | Frankfurter and Microsoft Graph calls. |
+| Workers AI | 10,000 Neurons a day, then calls fail until 00:00 UTC | Billed per use | Clairic and Clef. |
+
+R2 needs an R2 subscription and a payment method on the account, even when usage stays inside the free allowance. Without it the originals bucket cannot be created.
+
+Sources: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/), [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/).

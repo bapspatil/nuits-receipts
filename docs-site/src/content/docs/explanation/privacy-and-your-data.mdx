@@ -1,0 +1,47 @@
+---
+title: Privacy and your data
+description: Your deployment runs in your own Cloudflare account. Nuits never sees your data. What leaves the Worker, what is logged, and what you are responsible for.
+sidebar:
+  order: 7
+---
+
+Nuits Receipts is software you deploy, not a service you sign up for. It runs in your own Cloudflare account. Nuits never sees your data: there is no telemetry, no analytics, no update check, no licence server and no sign-up. Nobody at Nuits can open your receipts, because nothing is sent to Nuits.
+
+This page explains what that means in practice, what does leave the Worker, and what remains your responsibility.
+
+## Where your data lives
+
+- **Originals** (every PDF, image and email) are in a private R2 bucket in your account. They are served only to a signed-in user.
+- **Everything else** (what was read, your corrections, bank rows, matches, rules, settings, exchange rates) is in a D1 database in your account.
+- **Sign-in** is HTTP Basic with a password you set, or Cloudflare Access if you turn it on. There is one owner per deployment.
+
+Cloudflare runs the infrastructure, so your data is processed under your Cloudflare account and Cloudflare's terms. The app does not promise any data residency or confinement beyond what your Cloudflare configuration provides.
+
+## What leaves the Worker
+
+A few calls go outside the Worker. Each has a reason, and none goes to Nuits.
+
+- **Cloudflare Workers AI.** Clairic receives each document's text or image, with the text of the email it came in. Clef, when no vendor rule matches, receives the vendor name, line descriptions and receipt text, plus your product names. This happens under your Cloudflare account. Mail from an unverified sender is never sent here until you choose to have it read.
+- **Frankfurter** (ECB reference rates) receives a currency code and two dates, only when a foreign-currency receipt needs a rate. No amounts or receipt content.
+- **Cloudflare Access**, if you use it: the Worker fetches your team's public signing keys to check sign-in tokens. Nothing about you or your receipts is sent.
+- **Microsoft Graph**, only if you connect a Microsoft account for the OneDrive upload: the month's files and index go to the folder you chose. Nothing is sent before you connect, and disconnecting deletes the stored sign-in.
+
+The month ZIP download and the CSV make no outside calls. The exact list, with what each call sends and when, is in [Outside calls](/reference/outside-calls/).
+
+## What is logged
+
+Workers observability is turned on in `wrangler.jsonc`, with every request sampled. Logs stay in your Cloudflare account. They hold request metadata (paths, status codes, timings) and short reason codes such as `sender_auth_failed` or `email_too_large`. The app does not write receipt content, amounts or email bodies to the logs. Microsoft sign-in tokens are never logged, and the stored refresh token is encrypted.
+
+If you want fewer logs, lower `head_sampling_rate` in your Worker configuration, or turn observability off.
+
+## Other people's data in your receipts
+
+Receipts carry personal data about other people: a seller's name and address, a waiter's first name, part of a card number, a client's VAT number on a sales invoice. Once those documents are in your deployment, you are the one keeping them. You are the controller of that data. You decide how long to keep it, who can sign in, and when to delete it.
+
+The app does not delete anything on a schedule, and it has no button to delete a receipt. Originals and rows stay until you remove them yourself from the R2 bucket and the D1 database, in the Cloudflare dashboard or with Wrangler. Deleting the bucket and the database removes everything. If your local rules say how long receipts must be kept, they also say what you may keep after that. Keep your originals wherever your accounting law requires, which may not be this app; see [What it does not do](/explanation/what-it-does-not-do/).
+
+## Your responsibilities
+
+Because you run it, you are responsible for your deployment: who can sign in, how strong the password is, whether to put Cloudflare Access in front, your Cloudflare account's security, and the costs it runs up. [Protect the app with Cloudflare Access](/how-to/protect-the-app-with-cloudflare-access/) is worth reading if the app is on a domain others know.
+
+The privacy notice for the public Nuits Receipts website (not your deployment) is at [receipts.nuits.net/privacy](https://receipts.nuits.net/privacy/). Questions about it go to hi@brandnuits.com.

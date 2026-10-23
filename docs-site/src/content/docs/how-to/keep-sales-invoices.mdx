@@ -1,0 +1,71 @@
+---
+title: Keep sales invoices
+description: Route a second address for copies of the invoices you send, set your business names, and see invoices matched to money coming in.
+sidebar:
+  order: 4
+  label: Keep sales invoices
+---
+
+Use this guide to keep the invoices you send to your clients next to your receipts. Mail to a second routed address is filed as a sales invoice instead of a receipt, read for the client and VAT details, and shown under **Invoices**. Money coming in on an imported bank statement is then matched to it.
+
+## Prerequisites
+
+- Email set up and working; see [Set up email](/how-to/set-up-email/). The same **Allowed senders** list and SPF check apply to invoice mail.
+- A second address on the same domain, for example `invoices@receipts.example.com`. It must differ from the receipt address and from **Forward a copy to**.
+- Invoices as PDF or image attachments. An email without an attachment is not read as an invoice.
+
+## Steps
+
+<Steps>
+  <Step title="Route the invoice address to the Worker">
+
+In the Cloudflare dashboard, go to **Compute > Email Service > Email Routing > Routing Rules** and select **Create routing rule**. Enter the local part of the invoice address, choose **Send to a Worker** as the **Action**, pick your Nuits Receipts Worker as the **Destination**, and select **Save**.
+
+  </Step>
+  <Step title="Set the invoice address in the app">
+
+Open **Settings > Email**, fill in **Invoice address**, tick "I’ve added the Email Routing rule for this address", and press **Save email**.
+
+At deploy time the same value is the `INVOICES_ADDRESS` variable.
+
+  </Step>
+  <Step title="Set your business names">
+
+Open **Settings > Business**, fill in **Your business names** as they appear on the invoices you send, comma separated (up to 20), and press **Save business**.
+
+An invoice that names someone else as the seller is flagged "This doesn't look like an invoice you sent." and offers **Move to receipts**. Leave the field empty to skip the check. At deploy time this is the `SELLER_NAMES` variable.
+
+  </Step>
+  <Step title="Optional: set your payment terms">
+
+In **Settings > Business**, **Payment terms, days** (default 30) decides when an invoice without a printed due date counts as overdue.
+
+  </Step>
+  <Step title="Copy the invoice address when you send an invoice">
+
+Add the invoice address as CC or BCC when you email an invoice to a client, from an address on **Allowed senders**.
+
+  </Step>
+</Steps>
+
+You can also add invoices by hand: open **Invoices** and press **Add invoices**, or go to **Add** and choose **Invoices you sent** under "What are these?". Several files can be added at a time.
+
+## Check it worked
+
+1. **Invoices** appears in the top menu once the invoice address is set.
+2. The test invoice is listed there with its number, date, client, total and status.
+3. If it is flagged, open it and fix what it asks about. An email with no attachment is held with "The email had no invoice attached."
+4. After you import a bank statement with the payment, the invoice shows as paid. A payment is matched automatically when the amount fits and the bank reference carries the invoice's reference or number, or the payer is the client. Otherwise it is suggested on **Payments**.
+
+An invoice paid somewhere else (for example a payment platform payout) can be marked paid by hand: open it, fill in **Paid on** and **How**, and press **Mark as paid**.
+
+## Change the invoice address later
+
+Add a routing rule for the new address first, then change **Invoice address** in the app. Mail to the old address is still filed as an invoice for 30 days, so messages already on their way are not filed as receipts. Remove the old routing rule when you are done.
+
+## Related
+
+- [How matching works](/explanation/how-matching-works/) covers money in as well as money out.
+- [Export CSV](/reference/export-csv/) describes the sales CSV.
+- [Month package](/reference/month-package/) describes the `sales/` folder.
+- [Configuration](/reference/configuration/) for `INVOICES_ADDRESS`, `SELLER_NAMES` and `PAYMENT_TERMS_DAYS`.

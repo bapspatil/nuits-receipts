@@ -1,0 +1,30 @@
+{
+  "name": "nuits-receipts-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 4321",
+    "tokens": "node scripts/generate-tokens.mjs tokens.json --css src/styles/theme.css --wgsl src/shaders/palette.wgsl --check-shader 'src/shaders/*.wgsl,src/shaders/*.glsl'",
+    "check": "node scripts/check-contrast.mjs tokens.json --quiet && node scripts/check-copy.mjs && node scripts/check-media-range.mjs",
+    "build": "bun run tokens && node scripts/check-contrast.mjs tokens.json --quiet && vite build && node scripts/check-copy.mjs",
+    "preview": "vite preview --port 4321 --strictPort",
+    "measure-field": "node scripts/measure-field.mjs",
+    "measure-ink": "node scripts/measure-ink.mjs",
+    "svg": "node scripts/make-seal.mjs && npx --yes svgo@4 -q --config svgo.config.mjs -f src/assets/svg",
+    "og": "node scripts/og.mjs",
+    "fonts": "bash scripts/fonts.sh",
+    "check:frames": "node scripts/check-frames.mjs",
+    "lighthouse": "bash scripts/lighthouse.sh",
+    "screenshots": "node scripts/screenshots.mjs",
+    "record": "node scripts/record.mjs",
+    "preflight:launch": "node scripts/check-copy.mjs --production"
+  },
+  "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "gsap": "3.15.0",
+    "playwright-core": "1.64.1",
+    "pngjs": "7.0.0",
+    "vite": "8.3.4"
+  }
+}

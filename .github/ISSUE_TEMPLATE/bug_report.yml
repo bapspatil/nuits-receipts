@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work as the documentation says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real receipts, bank statements, account IDs, API tokens, passwords or email addresses.** Blur screenshots and use made-up values. For security problems, do not open an issue; see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use the sample files in `scripts/sample-receipts/` if you can.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the app footer, or `version` in package.json.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it run?
+      options:
+        - Deployed to Cloudflare (button)
+        - Deployed to Cloudflare (command line)
+        - Local dev (bun run dev)
+        - Docs site or project site
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error text or logs
+      description: Remove anything personal first.
+      render: text
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checks
+      options:
+        - label: I removed real receipts, personal data, account IDs and secrets from everything above.
+          required: true

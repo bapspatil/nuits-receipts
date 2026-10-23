@@ -1,0 +1,4 @@
+/* The home page entry: the shared site styles, then the motion layer, which
+   has to come later in the cascade so its rules win over the scene rules. */
+@import "./site.css";
+@import "./motion.css";

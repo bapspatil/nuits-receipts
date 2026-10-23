@@ -1,0 +1,79 @@
+---
+title: Add receipts
+description: Upload PDFs and photos of receipts, or forward receipt emails to your receipt address.
+sidebar:
+  order: 10
+  label: Add receipts
+---
+
+Use this guide to get receipts into the app, one at a time or ten at once. Each file is read on its own, and anything the reader is unsure about waits in **Review**.
+
+## Prerequisites
+
+- A deployed copy you can sign in to. See [Deploy your own copy](/tutorials/deploy-your-own-copy/).
+- Receipts as text PDFs (up to 10 MiB and 25 pages) or photos in PNG, JPEG or WebP (up to 4 MiB each).
+- For email only: a receipt address with Email Routing and your sending address on the allowlist. See [Set up email](/how-to/set-up-email/).
+
+![The Add page with the choice between receipts and invoices and a drop area for files](../../../assets/screenshots/upload.png)
+
+## Upload one receipt
+
+<Steps>
+  <Step title="Open the upload form">
+
+On **Home**, open **Add a receipt** in the right-hand column. On a brand new copy, Home shows **Let's get your first receipt in** with the same form.
+
+  </Step>
+  <Step title="Choose the file and upload">
+
+Pick the file under **PDF or photo of the receipt**, then select **Upload receipt**. The app saves the original, reads it, and opens the receipt page.
+
+  </Step>
+</Steps>
+
+## Upload several at once
+
+<Steps>
+  <Step title="Open the Add page">
+
+Follow **Add several at once** under any upload form, or the **Add receipts** button that the **Check receipts** step on **Month** shows while a month has no receipts.
+
+  </Step>
+  <Step title="Say what the files are">
+
+Under **What are these?**, keep **Receipts and bills** selected. Choose **Invoices you sent** only for sales invoices; see [Keep sales invoices](/how-to/keep-sales-invoices/).
+
+  </Step>
+  <Step title="Add the files">
+
+Drop up to 10 files on the page or choose them, then select **Add files**. The list under the drop area shows each file as it is added. A file that is too big or of the wrong type is reported on its own and the rest still go in.
+
+  </Step>
+</Steps>
+
+## Forward an email
+
+<Steps>
+  <Step title="Forward from an allowed address">
+
+Forward the receipt email, or have your supplier send it, to your receipt address. Home and the upload forms show that address when it is set.
+
+  </Step>
+  <Step title="Know what becomes a receipt">
+
+Each PDF, PNG, JPEG or WebP attachment (up to 10 per email) becomes its own receipt. An email with no supported attachment is kept as a receipt itself, saved from its HTML or text body. The email is the context the reader sees, so a short forwarding note such as the supplier's name can help.
+
+  </Step>
+</Steps>
+
+Mail from an address that is not on the allowlist is dropped unread. Mail that fails the sender check is dropped too. Mail that the app cannot prove came from you is kept, unread, and listed under **Email not verified** in **Review**. The reasons are in [Email and sender trust](/explanation/email-and-sender-trust/).
+
+## Check that it worked
+
+- After a single upload you land on the receipt page. **Everything looks fine** means it was read with no doubts; **1 thing to check** (or more) means it waits in **Review**.
+- The **Review** tab shows a count of receipts waiting.
+- On **Home**, the month card counts **Receipts dated** in the month, how many are **Ready** and how many **Need you**. A receipt with no date counts under **No date yet, need you** until you add one.
+
+Uploading the exact same file again does not create a second receipt: it opens the one you already have. To handle near-duplicates, see [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+
+Next: [Review and approve a receipt](/how-to/review-and-approve-a-receipt/). For every size and type limit, see [Limits](/reference/limits/).

@@ -1,0 +1,4 @@
+# Worker secrets. The Deploy to Cloudflare button asks for these when you deploy.
+# For local `bun run dev`, copy this file to .dev.vars and set a value (never commit .dev.vars).
+# NUITS_PASSWORD: the sign-in password. At least 16 characters, unique to this install.
+NUITS_PASSWORD=

@@ -1,0 +1,26 @@
+---
+title: Explanation
+description: Why Nuits Receipts works the way it does, what it checks, and where its limits are.
+sidebar:
+  order: 0
+  label: Overview
+  group:
+    label: Explanation
+---
+
+These pages are for reading when you want to understand the app rather than get a task done. They explain the design choices, what the app checks and what it leaves to you, so you know which figures to trust and which to look at twice.
+
+If you have a task in front of you, the [how-to guides](/how-to/) are quicker. For exact names, columns and limits, see the [reference](/reference/).
+
+<CardGrid>
+  <Card title="How it works" href="/explanation/how-it-works/">One Worker, one bucket, one database, and why there are no queues or scheduled jobs.</Card>
+  <Card title="How reading works" href="/explanation/how-reading-works/">How Clairic reads a receipt, what the code checks afterwards, and why rows get flagged.</Card>
+  <Card title="How costs are sorted" href="/explanation/how-costs-are-sorted/">Vendor rules first, Clef as the fallback, and what happens when rules disagree.</Card>
+  <Card title="How matching works" href="/explanation/how-matching-works/">Bank rows and receipts: automatic matches, suggestions, exemptions and transfers.</Card>
+  <Card title="Currencies and reference rates" href="/explanation/currencies-and-reference-rates/">Where each euro amount comes from, and why a bank match beats an ECB rate.</Card>
+  <Card title="Email and sender trust" href="/explanation/email-and-sender-trust/">The allowlist, SPF, and why unproven mail is kept but not read.</Card>
+  <Card title="Privacy and your data" href="/explanation/privacy-and-your-data/">What runs where, what Nuits sees (nothing), and what leaves your Worker.</Card>
+  <Card title="Running costs" href="/explanation/running-costs/">What you pay Cloudflare for, and when you need Workers Paid.</Card>
+  <Card title="What it does not do" href="/explanation/what-it-does-not-do/">Not bookkeeping, not advice, not an archive. The no-warranty notice in plain words.</Card>
+  <Card title="For accountants" href="/explanation/for-accountants/">How the figures in the month you received were produced, and what to check.</Card>
+</CardGrid>

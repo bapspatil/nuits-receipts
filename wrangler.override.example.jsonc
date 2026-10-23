@@ -1,0 +1,51 @@
+// Example private override for an existing deployment. Copy to
+// wrangler.production.jsonc (gitignored) and fill in your own values;
+// `bun run deploy` picks it up automatically. Never commit the copy.
+// `bun run setup` can also write this file for you.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-nuits-receipts",
+  "account_id": "<your Cloudflare account ID>",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "AI_MODE": "live",
+    "AUTH_USERNAME": "owner",
+    "ALLOWED_SENDER_EMAILS": "you@example.com",
+    "RECEIPT_ADDRESS": "receipts@example.com",
+    "FORWARD_COPY_TO": "",
+    // Optional: a second Email Routing address for sales invoices you sent,
+    // and your business names as they appear on them. See https://receipts.nuits.net/docs/reference/configuration/.
+    "INVOICES_ADDRESS": "",
+    "SELLER_NAMES": "",
+    "PRODUCTS_JSON": "[{\"id\":\"general\",\"label\":\"General\"}]",
+    "DEFAULT_PRODUCT": "general",
+    "ACCOUNTANT_LABEL": "your accountant",
+    "APP_NAME": "Nuits Receipts",
+    "EXPORT_PREFIX": "receipts",
+    "SOURCE_REPOSITORY": "",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "ACCESS_ALLOWED_EMAILS": "",
+    "SEND_HINT": "",
+    // Optional OneDrive upload: also needs the MS_CLIENT_SECRET and
+    // ONEDRIVE_TOKEN_KEY secrets. Empty keeps it off. See https://receipts.nuits.net/docs/reference/configuration/.
+    "MS_CLIENT_ID": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-nuits-receipts",
+      "database_id": "<your D1 database ID>",
+      "migrations_dir": "schema",
+      "migrations_table": "template_migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "ORIGINALS", "bucket_name": "my-nuits-receipts-originals" }],
+  "ai": { "binding": "AI" }
+}

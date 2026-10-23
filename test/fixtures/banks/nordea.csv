@@ -1,0 +1,5 @@
+Synthetic booked transactions
+Kirjauspäivä;Saaja;Summa;Valuutta;Viite
+01.09.2026;Synthetic Kauppa;-1 234,56;EUR;FAKE-1
+02.09.2026;Synthetic Palautus;12,00;EUR;FAKE-2
+Synthetic footer

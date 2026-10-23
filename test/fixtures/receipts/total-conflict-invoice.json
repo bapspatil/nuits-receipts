@@ -1,0 +1,99 @@
+{
+  "about": "Total and amount paid disagree (partial payment or discount). Must go to review.",
+  "expected": {
+    "vendor": "Harborline Tools Ltd",
+    "invoice_number": "HT-9002",
+    "issue_date": "2026-10-07",
+    "currency": "EUR"
+  },
+  "expect_review": true,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.011869075708091259,
+        "span": [8, 28],
+        "guess": "Harborline Tools Ltd",
+        "confidence": 0.9998869895935059,
+        "value": "Harborline Tools Ltd"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.0006020958535373211,
+        "span": [90, 97],
+        "guess": "HT-9002",
+        "confidence": 1,
+        "value": "HT-9002"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.057684846222400665,
+        "span": [164, 165],
+        "guess": "€",
+        "confidence": 0.433880090713501,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.0001925591641338542,
+        "guess": "2026-10-07",
+        "confidence": 0.9996698965284343,
+        "value": "2026-10-07"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9999995231628418,
+        "guess": "2026-10-04",
+        "confidence": 0.20581531693074998,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0006460216245613992,
+        "guess": 50,
+        "confidence": 0.9905098394012227,
+        "value": 50
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.18583166599273682,
+        "guess": 50,
+        "confidence": 0.9678099341563156,
+        "value": 50
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.9020137786865234,
+        "guess": 0,
+        "confidence": 0.8022303170112209,
+        "value": null
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.9943186640739441,
+        "guess": 0,
+        "confidence": 0.5674369062042596,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Annual licence 1", "Subtotal"],
+        "spans": [
+          [147, 163],
+          [171, 179]
+        ],
+        "confidence": 0.05477047770912461
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 85,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1256,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

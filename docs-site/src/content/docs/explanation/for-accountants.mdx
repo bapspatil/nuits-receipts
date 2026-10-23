@@ -1,0 +1,91 @@
+---
+title: For accountants
+description: How the figures in the month you received were produced, what was checked in code, what was not, and what to check yourself.
+sidebar:
+  order: 10
+---
+
+This page is for you if a client has sent you a month from Nuits Receipts: a CSV, or a ZIP with the original receipts and an index spreadsheet. It explains where each figure came from and how far you can lean on it. The booking decisions remain yours.
+
+Nuits Receipts organises receipts and prepares a CSV for the accountant. It is not tax, VAT or accounting advice, and it does not do bookkeeping. Figures are AI-extracted, and your client is meant to have reviewed them.
+
+## How the figures were produced
+
+Each row went through the same steps:
+
+1. **Your client collected the original.** An uploaded PDF or photo, or an email forwarded to their receipt address. The original file is kept unchanged.
+2. **An AI model read it.** Cloudflare's Clairic model read the seller, receipt number, dates, total, amount before VAT, VAT amount and VAT rate from the document. It reads text as printed and is told never to calculate.
+3. **Code checked the reading.** The same text was read again with fixed rules for labelled lines (Total, Subtotal, VAT, Invoice number and so on). Where the two readings disagreed, or the model was unsure, the row was flagged. The arithmetic was checked in code: amount before VAT plus VAT must equal the total to within two cents, and the VAT must match the stated rate.
+4. **Your client reviewed the flagged ones.** Flagged rows are shown to them one problem at a time. They correct the figures from the original, or approve the row as it is. Approving a flagged row requires them to write a reason. A row with no flag needs no action from them, so it may never have been looked at by a person.
+5. **The euro amount was set.** In this order: a euro amount your client typed in, with a reason; the amount of the matched payment on a euro bank statement; the receipt's own total if it is in euros; or the total converted at the ECB reference rate for the issue date.
+
+The details of each step are in [How reading works](/explanation/how-reading-works/) and [Currencies and reference rates](/explanation/currencies-and-reference-rates/).
+
+## Which rows went through review
+
+The CSV has one row per receipt dated in the month, with duplicates left out. Two columns say how settled each row is:
+
+- `needs_review` is `true` for a row your client has not yet approved or corrected. `review_reasons` lists the open flags as short codes. These rows are included so nothing goes missing silently, but their figures are the model's reading, not your client's.
+- A row with `needs_review` `false` was read without any flag, corrected until no flag remained, or approved by your client after review.
+
+The CSV does not record the reason your client gave when approving a flagged row, and it does not distinguish "read cleanly" from "approved despite a flag". If that matters for a row, ask them; the app keeps the reason.
+
+In the ZIP, receipts with no open flags are in the month folder itself. Receipts not yet checked are only included if your client chose to send them anyway, and then they are in a `check-these` folder. Sales invoices your client issued, if they keep them in the app, are in a `sales` folder with their own index. Payments out with no receipt are listed in a file of their own, so a gap is visible rather than silent. The layout is in [Month package](/reference/month-package/).
+
+## Where the euro amount came from
+
+The `eur_source` column says it for every row:
+
+- `bank`: the euro amount that left your client's euro account for the matched payment. For a foreign-currency purchase this includes the card or bank's own rate and fees. `matched_bank_transaction` identifies the payment.
+- `native`: the receipt is in euros.
+- `ecb`: converted at the ECB reference rate (via the Frankfurter service). `fx_rate_date` is the date of the rate used: the latest published rate on or before the issue date. This is an estimate; it is not the rate the bank charged.
+- `manual`: your client typed it in, with a reason kept in the app.
+- `missing`: there is no euro amount yet, and the row is not in the euro total.
+
+If you need a different rate or a different date for foreign-currency items, the amount in the original currency and the currency code are in the same row.
+
+## What was checked, and what was not
+
+Checked in code:
+
+- Amount before VAT plus VAT equals the total, to within two cents.
+- The VAT amount fits the VAT rate, when a single rate was read.
+- The figures agree with the document's own labelled lines, where it has them.
+- The currency is one of the ten the app knows (EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY).
+- The same purchase was not sent twice (same seller, number, date, currency and total).
+- On sales invoices, the VAT treatment is consistent with the amounts, using Finnish VAT rates.
+
+Not checked:
+
+- Whether a document is a valid VAT invoice or receipt under your rules.
+- Whether the VAT rate is the right one for what was bought, or whether VAT is deductible.
+- Whether a seller or a VAT number exists or is registered.
+- Whether reverse charge applies to a purchase.
+- Whether the cost belongs to the business at all.
+- Whether every payment has a receipt beyond the bank statements your client imported.
+- Anything the AI misread in a way that still adds up. If the model picked up the wrong line as the total and the VAT lines happen to agree with it, nothing disagrees and nothing is flagged.
+
+## Product and expense type
+
+`product` is your client's own grouping of their business (for example by project or line of work). `type` is one of four rough categories: `infra`, `AI APIs`, `subscriptions` or `other`. They come from your client's own rules, or from an AI suggestion when no rule matched, and your client can change them. They are not accounts and not bookings; use them as a hint about what the cost was.
+
+## Which month a receipt is in
+
+A receipt belongs to the month of its **issue date** as read from the document. It is not the payment date, the date it was received or the due date. A receipt with no date is in no month until your client adds one. If you book by a different date, the issue date and the matched payment are both in the row, so you can re-sort.
+
+## When something changes after sending
+
+The app records which receipts were sent, at which revision. If your client later corrects a sent receipt, or adds or removes one in that month, the app tells them the month has changed and offers just the changed files. If a second, smaller package arrives for a month you already have, that is what it is.
+
+## What to check first
+
+1. Rows with `needs_review` `true`, and anything in `check-these`.
+2. Payments with no receipt.
+3. Rows with `eur_source` `ecb` or `missing`, if exact euro amounts matter for them.
+4. A sample of approved rows against the original files, especially large amounts and foreign-currency ones.
+
+The links in the `original_link` column open the original in your client's app, which needs their sign-in. Use the files in the ZIP instead. [Open a month package](/how-to/open-a-month-package/) walks through checking totals against the originals, and [Export CSV](/reference/export-csv/) lists every column.
+
+## Your decisions
+
+How each item is booked is your call: accounts, periods, deductibility, VAT treatment, and whether a reference rate is acceptable. The app prepares the month; it does not decide any of this. See [What it does not do](/explanation/what-it-does-not-do/).

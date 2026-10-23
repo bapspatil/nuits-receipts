@@ -1,0 +1,140 @@
+---
+title: Configuration
+description: Every Worker var, secret and binding, with its default, its rules and where it can be changed.
+sidebar:
+  order: 1
+---
+
+Configuration comes from three places. For any key that appears in more than one, the first one that holds a valid value wins:
+
+1. **App setting**: a value saved in **Settings** and stored in the D1 table `settings`.
+2. **Worker var**: a value in `vars` of the Wrangler config, or set in the Cloudflare dashboard.
+3. **Built-in default**: the value in `src/config.ts`.
+
+Every Worker var is parsed and validated by `src/config.ts` on each request. An invalid Worker var makes every request fail with HTTP 503 and a plain-text message naming the var. An invalid app setting is skipped (the Worker var or default applies) and Settings shows a warning. `bun run deploy` checks the same rules before deploying.
+
+## Bindings
+
+| Binding | Type | Template name | Purpose |
+| --- | --- | --- | --- |
+| `DB` | D1 database | `my-nuits-receipts` | Receipts, bank rows, imports, accounts, vendor rules, FX cache, settings, month sends, OneDrive state. Migrations from `schema/`, ledger table `template_migrations`. |
+| `ORIGINALS` | R2 bucket | `my-nuits-receipts-originals` | Original documents, raw emails and imported CSV files. Private. |
+| `AI` | Workers AI | | Clairic extraction and Clef classification. Called only when `AI_MODE` is `live`. Not present in `wrangler.local.jsonc`. |
+
+## Secrets
+
+| Secret | Required | Rules | Effect |
+| --- | --- | --- | --- |
+| `NUITS_PASSWORD` | Yes, unless Access mode is on | With `AI_MODE=live`: at least 16 characters, and not `local-dummy-password`, `change-me` or `password`. | The password for HTTP Basic sign-in. Without a valid value every request returns 401. Ignored in Access mode. Also the key for the HMAC that signs bank CSV import previews. |
+| `MS_CLIENT_SECRET` | No | At most 256 characters, no whitespace or control characters. | Client secret value of the Microsoft Entra app, for OneDrive upload. |
+| `ONEDRIVE_TOKEN_KEY` | No | Exactly 32 bytes, base64 encoded. | AES-GCM key that encrypts the stored Microsoft refresh token. A new key makes the stored sign-in unreadable. |
+
+`bun run deploy` refuses a config that puts `MS_CLIENT_SECRET` or `ONEDRIVE_TOKEN_KEY` in `vars`. `.dev.vars.example` lists only `NUITS_PASSWORD`, so the Deploy to Cloudflare button asks only for that secret.
+
+## Worker vars
+
+"Settings" in the last column names the section of the Settings page where the value can be saved as an app setting. "Deploy only" means the value is read from the Worker var alone; a row in the `settings` table for that key is never read.
+
+### Sign-in and address
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `AUTH_USERNAME` | `owner` | 1 to 64 characters, no `:`, no control characters. | User name for HTTP Basic sign-in. Unused in Access mode. | Deploy only |
+| `ACCESS_TEAM_DOMAIN` | empty | A host name such as `your-team.cloudflareaccess.com`, with or without `https://`. | Cloudflare Access team domain. With the next two vars set, turns on Access mode. | Deploy only |
+| `ACCESS_AUD` | empty | 64 lowercase hexadecimal characters. | Audience (AUD) tag of the Access application. | Deploy only |
+| `ACCESS_ALLOWED_EMAILS` | empty | 1 to 100 addresses, separated by commas, semicolons or whitespace. | Emails accepted from the Access token. | Deploy only |
+| `APP_BASE_PATH` | empty | Empty, or a path such as `/app` (segments of letters, digits, `.`, `_`, `-`). Trailing slashes are removed. At most 60 characters. | Serves the app under that path. Requests outside it return 404. Links, form actions and redirects get the prefix. Empty serves the app at the root. | Deploy only |
+
+The three `ACCESS_*` vars are set together or not at all. A partial set fails with HTTP 503. In Access mode the Worker checks the `Cf-Access-Jwt-Assertion` header and ignores HTTP Basic.
+
+### Reading
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `AI_MODE` | `live` in `wrangler.jsonc`, `mock` in `wrangler.local.jsonc` | `live` or `mock`. `bun run deploy` rejects any other value, including empty. | `live` calls Workers AI and Frankfurter. `mock` uses a fixed local extractor and FX fixture with no AI or network calls. The password strength rules apply only in `live`. | Deploy only |
+
+### Business
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `APP_NAME` | `Nuits Receipts` | At most 60 characters. | Name in the page title, header and sign-in prompt. | Settings > Business (**App name**) |
+| `SELLER_NAMES` | empty | Up to 20 names of at most 100 characters, separated by commas, semicolons or line breaks. | Your names as printed on your own sales invoices. A sales invoice whose seller is not one of them, or that names you as the buyer, gets `seller_mismatch`. Empty skips the check. | Settings > Business (**Your business names**) |
+| `PRODUCTS_JSON` | `[{"id":"general","label":"General"}]` | JSON list of 1 to 200 entries. Each is `{"id","label"}` or a plain string. Ids and labels 1 to 100 characters; ids unique. | The parts of the business a cost is filed under. | Settings > Business (**Parts of the business**) |
+| `DEFAULT_PRODUCT` | first id in `PRODUCTS_JSON` | One of the ids in `PRODUCTS_JSON`. | Product for new receipts and for costs that no rule or Clef answer places. | Settings > Business (**Default part**) |
+| `PAYMENT_TERMS_DAYS` | `30` | Whole number, 0 to 365. | Due date for a sales invoice that prints none: issue date plus this many days. | Settings > Business (**Payment terms, days**) |
+| `DEFAULT_CURRENCY` | `EUR` | One of EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY. | Currency preselected when you add a bank account. | Settings > Business (**New account currency**) |
+
+### Email
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `ALLOWED_SENDER_EMAILS` | empty | Up to 100 addresses of at most 254 characters, separated by commas, semicolons or whitespace. | Envelope senders whose mail is read. Mail from anyone else is dropped. Empty turns email ingestion off. | Settings > Email (**Allowed senders**), with a confirmation tick |
+| `RECEIPT_ADDRESS` | empty | One email address, at most 254 characters. | The address routed to the Worker. Shown in the app. Not used to filter mail. | Settings > Email (**Receipt address**), with a confirmation tick |
+| `INVOICES_ADDRESS` | empty | One email address, different from `RECEIPT_ADDRESS` and `FORWARD_COPY_TO`. | Mail whose envelope recipient is this address is filed as a sales invoice. Empty turns it off. After a change in Settings, the previous address is still read as an invoice address for 30 days. | Settings > Email (**Invoice address**), with a confirmation tick |
+| `FORWARD_COPY_TO` | empty | One email address, or empty. | Every message the Worker receives, from any sender, is also forwarded here. It must be a verified destination address in Email Routing. A copy to the receiving address itself is skipped. | Settings > Email (**Forward a copy to**), with a confirmation tick |
+
+### Export
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `ACCOUNTANT_LABEL` | `your accountant` | At most 100 characters. | Shown on the Month page's send step, as in "Send to your accountant". | Settings > Export (**Accountant**) |
+| `EXPORT_PREFIX` | `receipts` | 1 to 40 characters: letters, digits, `.`, `_`, `-`. | Start of export file names and of the month package folder, as in `receipts-2026-09.csv`. | Settings > Export (**Export file name**) |
+| `SEND_HINT` | empty | One line, at most 300 characters. | Text shown under the month download button. Empty shows nothing. | Settings > Export (**Note under the month download**) |
+| `SOURCE_REPOSITORY` | empty | An `https://` URL, at most 300 characters. | The footer links the version to `<url>/releases/tag/vX.Y.Z`. Empty hides the link. | Settings > Advanced (**Source code link**) |
+
+### Review and matching thresholds
+
+All are optional. A value outside its range fails closed like any other invalid var.
+
+| Var | Default | Range | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `REVIEW_MIN_CONFIDENCE` | `0.9` | 0.5 to 0.99 | A field Clairic returns with lower confidence is not trusted on the model's word alone. | Settings > Advanced > Review & matching |
+| `REVIEW_MAX_UNCERTAINTY` | `0.1` | 0.01 to 0.5 | A field whose chance of being absent (`p_null`) is above this is not trusted on the model's word alone. | Settings > Advanced > Review & matching |
+| `REVIEW_MIN_CATEGORY_CONFIDENCE` | `0.85` | 0.5 to 0.99 | A Clef product or expense type below this probability falls back to the default. | Settings > Advanced > Review & matching |
+| `MATCH_DAYS_BEFORE` | `3` | 0 to 30, whole number | A payment out may be booked this many days before the receipt date. | Settings > Advanced > Review & matching |
+| `MATCH_DAYS_AFTER` | `45` | 1 to 180, whole number | A payment out may be booked this many days after the receipt date. | Settings > Advanced > Review & matching |
+| `MATCH_NAME_SIMILARITY` | `0.6` | 0.3 to 1 | Share of name words the receipt seller and the bank merchant must have in common. | Settings > Advanced > Review & matching |
+| `SALES_MATCH_DAYS_BEFORE` | `7` | 0 to 60, whole number | Money in may arrive this many days before a sales invoice's issue date. | Settings > Advanced > Review & matching |
+| `SALES_MATCH_DAYS_AFTER_DUE` | `60` | 0 to 365, whole number | Money in may arrive this many days after a sales invoice's due date. | Settings > Advanced > Review & matching |
+
+### OneDrive upload
+
+| Var | Default | Rules | What it does | Where it can be changed |
+| --- | --- | --- | --- | --- |
+| `MS_CLIENT_ID` | empty | A GUID. | Application (client) ID of your Microsoft Entra app. OneDrive upload is on only when this var and both OneDrive secrets are set. With only this var set, Settings shows "Not set up". | Deploy only |
+
+## Not in the template
+
+`wrangler.jsonc` does not list `APP_BASE_PATH`, `DEFAULT_CURRENCY` or the threshold vars. They are read the same way when you add them to `vars`.
+
+## Settings page labels for deploy-only values
+
+Settings > Advanced > **Set at deploy** shows these read-only. Secrets show only "Set" or "Not set".
+
+| Label | Key |
+| --- | --- |
+| Access team | `ACCESS_TEAM_DOMAIN` |
+| Access audience | `ACCESS_AUD` |
+| Who can sign in | `ACCESS_ALLOWED_EMAILS` |
+| Password user name | `AUTH_USERNAME` |
+| Password | `NUITS_PASSWORD` |
+| Address | `APP_BASE_PATH` |
+| Reader | `AI_MODE` |
+| OneDrive app | `MS_CLIENT_ID` |
+| OneDrive secret | `MS_CLIENT_SECRET` |
+| OneDrive token key | `ONEDRIVE_TOKEN_KEY` |
+
+`AUTH_USERNAME` and `NUITS_PASSWORD` are hidden in Access mode. The OneDrive rows are hidden unless `MS_CLIENT_ID` is set.
+
+## Wrangler config files
+
+| File | Committed | Use |
+| --- | --- | --- |
+| `wrangler.jsonc` | Yes | Public template. No account or resource IDs. Used by the Deploy to Cloudflare button, and by `bun run deploy` when no private config exists. |
+| `wrangler.local.jsonc` | Yes | `bun run dev`, `bun run migrate` and tests. Local D1 and R2, no `AI` binding, `AI_MODE=mock`, synthetic `example.com` addresses. |
+| `wrangler.override.example.jsonc` | Yes | Example of a private config for an existing deployment. |
+| `wrangler.production.jsonc` | No (gitignored) | Your private deployment config. Written by `bun run setup`. Used by `bun run deploy` when present. |
+| `wrangler.resolved.jsonc` | No (gitignored) | Written by `bun run deploy` when the chosen config has no `database_id`. |
+| `.dev.vars` | No (gitignored) | Local secrets for `bun run dev`. Copy of `.dev.vars.example`. |
+
+Both committed configs set `compatibility_date` `2026-08-01`, the `nodejs_compat` flag and `send_metrics: false`. `wrangler.jsonc` also sets `workers_dev: true`, `preview_urls: false` and `observability` with `head_sampling_rate: 1`. There are no cron triggers.

@@ -1,0 +1,57 @@
+---
+title: Forward a copy of incoming mail
+description: Send a copy of every message that reaches your receipt address to one inbox, so one-time codes and other mail still reach you.
+sidebar:
+  order: 3
+  label: Forward a copy of incoming mail
+---
+
+Use this guide when services send things other than receipts to your receipt address, such as sign-in codes or account notices, and you want to see them. With `FORWARD_COPY_TO` set, the Worker forwards a copy of every message it receives, from any sender, to one address of yours.
+
+## Prerequisites
+
+- Email set up and working; see [Set up email](/how-to/set-up-email/).
+- An inbox that is not the receipt address itself, for example your personal mailbox.
+
+## Steps
+
+<Steps>
+  <Step title="Verify the destination address in Cloudflare">
+
+Cloudflare only forwards to verified destination addresses. In the Cloudflare dashboard, go to **Compute > Email Service > Email Routing > Destination Addresses**, enter the address and submit it. Open the email Cloudflare sends to that address and select **Verify email address**.
+
+  </Step>
+  <Step title="Set the address in the app">
+
+Open **Settings > Email**, fill in **Forward a copy to**, tick "This address is a verified destination in Email Routing", and press **Save email**.
+
+The app cannot check that the address is verified. If it is not, the copies are lost and each failure is logged as `forward_copy_failed`.
+
+To set it at deploy time instead, use the `FORWARD_COPY_TO` variable. A value saved in the app wins over the variable.
+
+  </Step>
+  <Step title="Send a test">
+
+Send a message to the receipt address from any address, allowed or not.
+
+  </Step>
+</Steps>
+
+## Check it worked
+
+The message arrives in the destination inbox, forwarded by Cloudflare. If it came from an allowed sender, it is also read as a receipt as usual.
+
+## What to expect
+
+- Only one address is supported, because Cloudflare forwards each message once.
+- Forwarding runs alongside receipt reading. A failed forward never stops a receipt being read, and a failed read still forwards.
+- The copy itself is not stored, and it is not read by AI unless its sender is on **Allowed senders**.
+- A destination equal to the address the message was sent to, the receipt address or the invoice address is skipped to avoid a loop, and logged as `forward_copy_loop`.
+- `FORWARD_COPY_TO` must differ from the invoice address if you use one.
+
+To turn forwarding off, clear the field and save, or press **Reset** next to it if the value came from the app.
+
+## Related
+
+- [Email and sender trust](/explanation/email-and-sender-trust/)
+- [Configuration](/reference/configuration/) for `FORWARD_COPY_TO`.

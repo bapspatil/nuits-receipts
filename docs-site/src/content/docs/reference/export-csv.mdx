@@ -1,0 +1,103 @@
+---
+title: Export CSV
+description: Every column of the monthly receipts CSV and the sales invoices CSV.
+sidebar:
+  order: 3
+  label: Export CSV
+---
+
+The app produces two CSV files per month. Both are UTF-8 with a byte order mark, comma separated, with a header row. Columns are listed in file order.
+
+| File | Path | File name | Rows |
+| --- | --- | --- | --- |
+| Receipts CSV | `/export.csv?month=YYYY-MM` | `<EXPORT_PREFIX>-YYYY-MM.csv` | Expense receipts whose issue date is in the month, excluding receipts marked as a duplicate. Ordered by issue date, then ID. |
+| Sales CSV | `/export-sales.csv?month=YYYY-MM` | `<EXPORT_PREFIX>-sales-YYYY-MM.csv` | Sales invoices whose issue date is in the month, excluding duplicates. Ordered by issue date, invoice number, then ID. |
+
+Rows that need review are included and marked in `needs_review`. Receipts with no issue date are in neither file.
+
+## Value formats
+
+| Kind | Format |
+| --- | --- |
+| Dates | `YYYY-MM-DD` |
+| Amounts | Decimal with a dot and the currency's minor digits, for example `24.99`; `JPY` has none. Negative amounts start with `-`. Empty when unknown. |
+| VAT rate | Percent with two decimals, for example `25.50`. Empty when unknown. |
+| Booleans | `true` or `false` |
+| Text | Any cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return (after optional whitespace) is prefixed with `'`, so spreadsheets do not run it as a formula. |
+
+## Receipts CSV columns
+
+| # | Column | Content |
+| --- | --- | --- |
+| 1 | `date` | Issue date of the receipt. |
+| 2 | `vendor` | Seller name. |
+| 3 | `invoice_no` | Receipt or invoice number. |
+| 4 | `net` | Amount before VAT, in the receipt currency. |
+| 5 | `vat_rate` | VAT rate in percent. |
+| 6 | `vat` | VAT amount, in the receipt currency. |
+| 7 | `total` | Total, in the receipt currency. |
+| 8 | `currency` | ISO currency code of the receipt. |
+| 9 | `eur_total` | Total in euros, from the source in `eur_source`. Empty when `eur_source` is `missing`. |
+| 10 | `product` | Product id (part of the business). |
+| 11 | `type` | Expense type: `infra`, `AI APIs`, `subscriptions` or `other`. |
+| 12 | `original_id` | Receipt ID: the SHA-256 of the original file. |
+| 13 | `original_link` | `<app URL>/originals/<id>`. Opening it requires sign-in. |
+| 14 | `matched_bank_transaction` | ID of the matched bank transaction, or empty. |
+| 15 | `needs_review` | `true` when the receipt status is not `ready`. |
+| 16 | `review_reasons` | JSON list of [review flag](/reference/receipt-fields-and-flags/) codes, for example `["missing_eur"]`. `[]` when there are none. |
+| 17 | `eur_source` | Where `eur_total` comes from. See below. |
+| 18 | `fx_rate_date` | Date of the ECB reference rate used, when `eur_source` is `ecb`. Otherwise empty. |
+| 19 | `matched_account_id` | ID of the bank account of the matched transaction, or empty. |
+| 20 | `matched_account_name` | Name of that bank account, or empty. |
+
+## Sales CSV columns
+
+| # | Column | Content |
+| --- | --- | --- |
+| 1 | `date` | Invoice date. |
+| 2 | `invoice_no` | Invoice number. |
+| 3 | `client` | Who the invoice is billed to. |
+| 4 | `client_country` | Two-letter country code of the client. |
+| 5 | `client_vat_id` | Client's VAT number. |
+| 6 | `vat_treatment` | `domestic`, `reverse_charge`, `export` or `exempt`. See below. |
+| 7 | `net` | Amount before VAT. |
+| 8 | `vat_rate` | VAT rate in percent. |
+| 9 | `vat` | VAT amount. |
+| 10 | `total` | Total invoiced. |
+| 11 | `currency` | ISO currency code of the invoice. |
+| 12 | `eur_total` | Total in euros, from the source in `eur_source`. |
+| 13 | `due_date` | Printed due date, or empty. |
+| 14 | `reference` | Payment reference. |
+| 15 | `paid_on` | Booking date of the matched payment in. If there is none, the date entered for a payment outside the bank import. Otherwise empty. |
+| 16 | `paid_how` | `bank` when matched to a payment in; the note entered for a payment outside the bank import; otherwise empty. |
+| 17 | `matched_bank_transaction` | ID of the matched payment in, or empty. |
+| 18 | `original_id` | Invoice ID: the SHA-256 of the original file. |
+| 19 | `original_link` | `<app URL>/originals/<id>`. |
+| 20 | `needs_review` | `true` when the status is not `ready`. |
+| 21 | `review_reasons` | JSON list of review flag codes. |
+| 22 | `eur_source` | Where `eur_total` comes from. |
+
+## `eur_source` values
+
+Checked in this order; the first that applies is used.
+
+| Value | Applies when | `eur_total` |
+| --- | --- | --- |
+| `manual` | An euro amount was entered on the receipt page (**Amount in euros**, with a reason). | The entered amount. |
+| `bank` | The document is matched to a bank transaction in EUR from a completed import. | The bank amount, as a positive number for a payment out. |
+| `native` | The document's currency is EUR. | The document total. |
+| `ecb` | A reference rate was found for the currency and issue date. | Total converted at the ECB rate on `fx_rate_date`. |
+| `missing` | None of the above. | Empty. |
+
+## `vat_treatment` values
+
+| Value | Label in the app |
+| --- | --- |
+| `domestic` | Finnish VAT charged |
+| `reverse_charge` | EU reverse charge (0 %) |
+| `export` | Outside the EU (0 %) |
+| `exempt` | VAT exempt (0 %) |
+
+## In the month package
+
+The [month package](/reference/month-package/) index files use the same columns in the same order, followed by `file_name` and `folder`.

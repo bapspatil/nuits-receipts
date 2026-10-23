@@ -1,0 +1,46 @@
+---
+title: Email and sender trust
+description: Why only allowlisted senders count, how SPF proves who sent a message, and why unproven mail is kept but not read.
+sidebar:
+  order: 6
+---
+
+An inbox address is convenient: you forward a receipt and it appears in the app. It is also an address anyone can write to. Every message that is read costs a little AI reading and puts a document into your books, so the app is strict about whose mail it reads. This page explains the three gates a message passes through and why each one exists.
+
+## Gate 1: the allowlist
+
+Only mail from an address in `ALLOWED_SENDER_EMAILS` is considered. Mail from anyone else is ignored: it is not stored, not read and not shown. With an empty allowlist, the inbox ignores all mail. That is the default, so a fresh deployment never reads mail from strangers.
+
+The allowlist checks the **envelope sender**, the address the sending server gave when it delivered the message. That is usually the address you see in "From", but not always. Some forwarding services and mailing systems rewrite the envelope sender to their own address. If a forwarded receipt never appears, check what actually arrived and allow that address. See [Set up email](/how-to/set-up-email/).
+
+If you set `FORWARD_COPY_TO`, every message that reaches the Worker is also forwarded there, from any sender, whether or not it is read. That is how one-time codes and other mail sent to the receipt address still reach a person. See [Forward a copy of incoming mail](/how-to/forward-a-copy-of-incoming-mail/).
+
+## Gate 2: proving the sender
+
+An envelope sender is just text. Anyone can claim to be your own address. On its own, the allowlist would let anyone who guessed an allowed address put documents into your books.
+
+SPF closes that gap. The domain behind an address publishes which mail servers may send for it, and the receiving server checks the message came from one of them. Cloudflare Email Routing does this check when the message arrives and records the result in an `Authentication-Results` header at the top of the message.
+
+The app reads only that header, and only the copy Cloudflare added. A sender can write their own `Authentication-Results` header further down the message, claiming anything, so headers below Cloudflare's are ignored. ARC headers are ignored too: without verifying their seal, a forged one looks the same as a real one.
+
+From Cloudflare's result the app reaches one of three verdicts:
+
+- **Pass.** SPF passed for the envelope sender. The message is read.
+- **Fail.** SPF failed or soft-failed, DMARC failed, or the address Cloudflare checked is not the one the Worker was handed. The message is dropped and a short reason code is logged. Nothing is stored.
+- **Unknown.** There is no clear SPF result. A common case is mail signed with DKIM but without SPF, where Cloudflare's summary does not say which domain signed it, so it cannot prove the envelope address.
+
+Cloudflare's own rules apply before the Worker sees anything: Email Routing rejects mail that fails the sender's DMARC policy, and mail that passes neither SPF nor DKIM. Those messages never reach the app.
+
+## Gate 3: unproven mail is kept, not read
+
+A message with an unknown verdict might be a genuine receipt from a sender with unusual mail settings. Dropping it would lose the receipt. Reading it would mean spending AI reading on, and putting into your books, a document nobody can vouch for.
+
+So the app keeps it and does nothing else. The whole message is stored and appears in review as "We couldn't verify who sent this email", unread. You can open the source email, decide it is genuine, and have it read. Nothing is sent to Workers AI until you do.
+
+This costs you a click now and then. In return, a spoofed message cannot trigger AI spend or slip a document into your month without you looking at it first.
+
+## What arrives after the gates
+
+A message that passes is stored whole. Up to 10 PDF or image attachments are read as separate receipts, with the email's text passed along as context. A message with no attachments is read from its body. A message over 20 MiB is dropped and logged. If some attachments were skipped, or the message could not be parsed, the stored email is flagged so you can check it yourself. See [Limits](/reference/limits/).
+
+Mail to `INVOICES_ADDRESS`, if you set one, goes through the same gates and is filed as a sales invoice rather than a receipt. See [Keep sales invoices](/how-to/keep-sales-invoices/).

@@ -1,0 +1,236 @@
+---
+title: Data model
+description: D1 tables, columns, indexes and triggers, and the R2 object keys, for contributors.
+sidebar:
+  order: 10
+---
+
+The D1 schema for a new installation is in `schema/`, applied in file order by `bun run deploy` and `bun run migrate` with the ledger table `template_migrations`. `scripts/schema.test.ts` checks the tables, constraints, indexes, triggers and foreign keys.
+
+| File | Adds |
+| --- | --- |
+| `schema/0001_template.sql` | `accounts`, `bank_presets`, `bank_transactions`, `fx_rates`, `imports`, `internal_transfers`, `receipts`, `vendor_rules`, indexes, triggers, seed rows |
+| `schema/0002_month_package.sql` | `month_sends`, `onedrive_connection`, `onedrive_uploads` |
+| `schema/0003_sales_invoices.sql` | Sales invoice columns on `receipts` |
+| `schema/0004_settings.sql` | `settings`, `settings_audit` |
+
+Conventions: money is an integer in minor units (`*_minor`). VAT rates are integers in hundredths of a percent (`*_bps`). Dates are `YYYY-MM-DD` text; timestamps are ISO 8601 text in UTC. JSON is stored as text in `*_json` columns.
+
+## `receipts`
+
+Receipts and sales invoices. One row per original file.
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | SHA-256 of the original file's bytes. |
+| `original_key` | TEXT | Not null, unique | R2 key of the original. |
+| `filename` | TEXT | Not null | File name as uploaded or attached, at most 200 characters. |
+| `media_type` | TEXT | Not null | `application/pdf`, `image/png`, `image/jpeg`, `image/webp`, `text/html`, `text/plain` or `message/rfc822`. |
+| `source` | TEXT | `email` or `upload` | How it arrived. |
+| `email_key` | TEXT | | R2 key of the email it came in, if any. |
+| `received_at` | TEXT | Not null | When it was stored. |
+| `status` | TEXT | `pending`, `processing`, `ready`, `needs_review` | See [statuses](/reference/receipt-fields-and-flags/#statuses). |
+| `attempt_id` | TEXT | | ID of the read that holds the lease. |
+| `lease_until` | TEXT | | End of the read lease. |
+| `revision` | INTEGER | Default 0 | Raised on each saved correction or kind change. Guards against stale writes. |
+| `vendor`, `invoice_number`, `issue_date`, `due_date`, `currency` | TEXT | | Read or corrected facts. |
+| `total_minor`, `net_minor`, `vat_minor` | INTEGER | | Amounts. |
+| `vat_rate_bps` | INTEGER | | VAT rate. |
+| `line_items_json` | TEXT | | Descriptions read from the document. |
+| `product` | TEXT | Not null, 1 to 100 characters, default `general` | Product id. |
+| `expense_type` | TEXT | `infra`, `AI APIs`, `subscriptions`, `other`; default `other` | Kind of cost. |
+| `classification_json` | TEXT | | Vendor rule ID, Clef answer, or mock marker. |
+| `ai_json` | TEXT | | Raw extraction response, evidence and classification. |
+| `manual_fields_json` | TEXT | Not null, default `{}` | Values typed in by you, and the approval reason and acknowledged flags. |
+| `review_reasons_json` | TEXT | Not null, default `[]` | Open review flag codes. |
+| `reviewed_at` | TEXT | | When it was approved. |
+| `fx_eur_minor` | INTEGER | | Total converted at the ECB rate. |
+| `fx_requested_date` | TEXT | | Date the rate was looked up for. |
+| `eur_override_minor` | INTEGER | | Euro amount you entered. |
+| `eur_override_reason` | TEXT | | Reason for it. |
+| `duplicate_of` | TEXT | References `receipts(id)`; not its own `id` | The document this one duplicates. |
+| `kind` | TEXT | `expense` or `sales`; default `expense` | Receipt or sales invoice. |
+| `client`, `client_country`, `client_vat_id` | TEXT | | Sales invoices. |
+| `vat_treatment` | TEXT | `domestic`, `reverse_charge`, `export`, `exempt` | Sales invoices. |
+| `reference_number` | TEXT | | Sales invoices. |
+| `paid_outside_on`, `paid_outside_note` | TEXT | | Sales invoice paid outside the bank import. |
+
+Triggers `receipt_duplicate_insert` and `receipt_duplicate_update` abort with `duplicate_chain` when a duplicate would point at another duplicate, or a document that others point at would become a duplicate.
+
+## `accounts`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | Account ID. Never changes. |
+| `label` | TEXT | Not null, unique ignoring case | Name shown in the app. |
+| `bank_name` | TEXT | Not null | Bank. |
+| `default_currency` | TEXT | Not null | Currency preselected for imports. |
+| `is_default` | INTEGER | 0 or 1; at most one row is 1 | Default account. |
+| `archived_at` | TEXT | | Archived accounts refuse imports. |
+| `created_at` | TEXT | Not null | |
+
+Seed row: `default-account`, label `Bank account`, currency `EUR`, default.
+
+## `imports`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | SHA-256 of the account ID and the file hash. |
+| `account_key` | TEXT | References `accounts(id)` | |
+| `original_key` | TEXT | Not null, unique | R2 key of the CSV file. |
+| `status` | TEXT | `pending` or `complete` | Rows of pending imports are ignored everywhere. |
+| `row_count` | INTEGER | Not null | Rows in the file. |
+| `imported_at` | TEXT | Not null | |
+| `snapshot_json` | TEXT | Valid JSON | Frozen manifest: mapping, decisions and the identity and facts hash of every row. |
+
+`(id, account_key)` is unique.
+
+## `bank_transactions`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | Hash of the account and the transaction ID or the row's facts. |
+| `account_key` | TEXT | References `accounts(id)` | |
+| `external_id` | TEXT | Unique per account when set | The bank's transaction ID. |
+| `import_id` | TEXT | With `account_key`, references `imports(id, account_key)` | The import that stored the row. |
+| `booking_date` | TEXT | Not null | |
+| `amount_minor` | INTEGER | Not null | Negative for money out. |
+| `currency` | TEXT | Not null | |
+| `original_amount_minor`, `original_currency` | | | Foreign amount, when the bank gives one. |
+| `merchant` | TEXT | Not null | Paid to, or paid by. |
+| `reference` | TEXT | | |
+| `raw_json` | TEXT | Not null | The CSV row as read. |
+| `receipt_required` | INTEGER | 0 or 1, default 1 | 0 for exempt rows and own-account transfers. |
+| `receipt_id` | TEXT | Unique; references `receipts(id)` | Matched document. |
+| `match_method` | TEXT | `automatic` or `manual` | |
+| `matched_at` | TEXT | | |
+
+## `internal_transfers`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `debit_id` | TEXT | Primary key; references `bank_transactions(id)` | Money out leg. |
+| `credit_id` | TEXT | Not null, unique; references `bank_transactions(id)`; differs from `debit_id` | Money in leg. |
+| `reason` | TEXT | Not null | Note entered when pairing. |
+| `confirmed_at` | TEXT | Not null | |
+
+## `bank_presets`
+
+Saved CSV layouts.
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | |
+| `bank_name` | TEXT | Not null, compared ignoring case | |
+| `name` | TEXT | Not null, compared ignoring case; unique with `bank_name` | |
+| `header_fingerprint` | TEXT | Not null | Hash of the normalised column names. |
+| `mapping_json` | TEXT | Valid JSON | The mapping. |
+| `revision` | INTEGER | Default 0 | |
+| `created_at`, `updated_at` | TEXT | Not null | |
+
+## `vendor_rules`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | INTEGER | Primary key | |
+| `priority` | INTEGER | Default 0 | Higher is checked first. |
+| `vendor_contains` | TEXT | Not null | Text the seller name must contain. |
+| `context_contains` | TEXT | Unique with `vendor_contains` | Text the document must also mention. |
+| `bank_alias` | TEXT | | Merchant name on the bank statement, for matching. |
+| `product` | TEXT | Not null | |
+| `expense_type` | TEXT | Not null | |
+
+Seed rules: `cloudflare` (infra), `openai` (AI APIs), `anthropic` (AI APIs), `amp frontier` (subscriptions), all with product `general`.
+
+## `fx_rates`
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `currency` | TEXT | Primary key with `requested_date`. |
+| `requested_date` | TEXT | Issue date the rate was asked for. |
+| `rate_date` | TEXT | Date of the ECB rate used (the latest on or before `requested_date`, at most 6 days earlier). |
+| `eur_per_unit` | TEXT | Rate as decimal text. |
+| `source` | TEXT | `ECB via Frankfurter`, or `mock ECB fixture`. |
+| `fetched_at` | TEXT | |
+
+## `month_sends`
+
+One row per **I've sent it**.
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `month` | TEXT | 7 characters; primary key with `sent_at` | `YYYY-MM` |
+| `sent_at` | TEXT | Not null | |
+| `method` | TEXT | `download` or `onedrive` | |
+| `file_count` | INTEGER | Not null | Documents dated in the month. |
+| `total_minor` | INTEGER | Not null | EUR total of expense receipts. |
+| `receipts_hash` | TEXT | Not null | SHA-256 of the sorted `id:revision` list. |
+| `receipts_json` | TEXT | Valid JSON | The list itself. |
+
+## `onedrive_connection`
+
+At most one row (`id` is always 1).
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | INTEGER | Always 1. |
+| `account_name`, `account_email` | TEXT | The connected Microsoft account. |
+| `refresh_token_enc` | TEXT | Refresh token, AES-GCM encrypted with `ONEDRIVE_TOKEN_KEY`. |
+| `connected_at` | TEXT | |
+| `folder_drive_id`, `folder_item_id`, `folder_name`, `folder_web_url` | TEXT | Chosen destination folder. |
+
+## `onedrive_uploads`
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `folder_item_id`, `month`, `receipt_id` | TEXT | Primary key. |
+| `revision` | INTEGER | Revision of the document that was uploaded. |
+| `file_name` | TEXT | |
+| `drive_item_id` | TEXT | The uploaded file in OneDrive. |
+| `uploaded_at` | TEXT | |
+
+## `settings`
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `key` | TEXT | Primary key, 1 to 64 characters | A setting key, or `INVOICES_ADDRESS_PREVIOUS`. |
+| `value_json` | TEXT | Valid JSON, at most 20,000 characters | The value as a JSON string. `INVOICES_ADDRESS_PREVIOUS` holds `{"address","until"}`. |
+| `updated_at` | TEXT | Not null | |
+| `updated_by` | TEXT | Not null | The Access email, or `password`. |
+
+Only keys listed in `FIELDS` in `src/settings.ts` are read.
+
+## `settings_audit`
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, autoincrement. The highest ID is the settings revision. |
+| `key` | TEXT | Setting key, or `_revision` for the marker row each save writes. |
+| `old_json`, `new_json` | TEXT | Values before and after. `NULL` means not set in the app. |
+| `changed_at` | TEXT | |
+| `changed_by` | TEXT | |
+
+## Indexes
+
+| Index | Table | Columns |
+| --- | --- | --- |
+| `accounts_one_default` | `accounts` | `is_default`, unique where 1 |
+| `bank_account_date` | `bank_transactions` | `account_key, booking_date, id` |
+| `bank_external_id` | `bank_transactions` | `account_key, external_id`, unique where set |
+| `bank_unmatched` | `bank_transactions` | `booking_date, currency, amount_minor` where `receipt_id` is null |
+| `presets_header` | `bank_presets` | `header_fingerprint` |
+| `receipts_month` | `receipts` | `issue_date, product, expense_type` |
+| `receipts_kind_issue` | `receipts` | `kind, issue_date` |
+| `settings_audit_changed` | `settings_audit` | `changed_at` |
+
+## R2 keys
+
+All objects are in the `ORIGINALS` bucket.
+
+| Key | Content type | Written when |
+| --- | --- | --- |
+| `receipts/<sha256>` | The document's media type | A document is uploaded, attached to an email, or an email body or held email is stored. `<sha256>` is the document ID. |
+| `emails/<sha256>.eml` | `message/rfc822` | An email from an allowed sender passes the sender check or is held as unverified. |
+| `imports/<sha256>.csv` | `text/csv` | A bank CSV is imported. |
+
+Objects are written once per content hash and are not deleted by the app.

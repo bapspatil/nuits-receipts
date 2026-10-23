@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the documentation
+    url: https://receipts.nuits.net/docs/
+    about: Setup, how-to guides, reference and troubleshooting.
+  - name: Report a security problem privately
+    url: https://github.com/bapspatil/nuits-receipts/blob/main/SECURITY.md
+    about: Do not open a public issue for security problems. Follow the steps in SECURITY.md.

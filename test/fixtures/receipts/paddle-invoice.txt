@@ -1,0 +1,21 @@
+Paddle.com Market Ltd
+Judd House, 18-29 Mora Street
+London EC1V 8BT
+United Kingdom
+VAT GB 000 0000 00
+INVOICE
+Invoice number: 9081726-1001
+Invoice date: 12 Oct 2026
+Billed to:
+Sample Buyer Oy
+Esimerkkikatu 1 A 2
+00100 Helsinki, Finland
+FI VAT FI00000000
+Paddle.com Market Ltd is the authorised reseller and merchant of record for Fontsmith Pro.
+Description Qty Unit price Total
+Fontsmith Pro (annual) 1 €79.68 €79.68
+Subtotal €79.68
+VAT (25.5%) €20.32
+Total €100.00
+Amount paid €100.00
+Paid with Visa ending 0000 on 12 Oct 2026

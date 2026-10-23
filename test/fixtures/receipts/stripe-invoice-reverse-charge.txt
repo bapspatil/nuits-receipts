@@ -1,0 +1,33 @@
+7QF0758D-0001234 · €90.00 due October 16, 2026 Page 1 of 1
+Invoice
+Invoice number 7QF0758D-0001234
+Date of issue October 16, 2026
+Date due October 16, 2026
+Northwind AI Ireland, Limited
+6th Floor, Sample House
+Sample Street
+Dublin 4
+D04 XX00
+Ireland
+support@northwind.example
+IE VAT IE0000001XX
+Bill to
+Sample Buyer
+Esimerkkikatu 1
+A 2
+FI-00100 Helsinki
+Finland
+buyer@example.com
+FI VAT FI00000000
+€90.00 due October 16, 2026
+Pay online
+Reverse charge applies - Customer to account for tax under Article 196 of Directive 2006/112/EC.
+Description Qty Unit price Tax Amount
+Team plan - 5 seats
+Oct 16-Nov 16, 2026
+1 €90.00 0% €90.00
+Subtotal €90.00
+Total €90.00
+Amount due €90.00
+-1- Tax to be paid on reverse charge basis
+-1-

@@ -1,0 +1,363 @@
+/* The second motion layer: illustrations, split headings, ambient loops,
+ * scroll-driven timelines and the ink sections' fallback print.
+ *
+ * Contract, same as the rest of the site: the static state is the finished
+ * page. Every animation below is gated on html[data-motion="on"], which only
+ * the inline head script sets, so no JavaScript, reduced motion and the switch
+ * set to off all get exactly the static rules. Scroll-driven timelines are
+ * gated a second time on @supports, because a browser without them must not
+ * be left at a keyframe's `from`.
+ */
+
+/* Illustrations. Colours come from classes, never from the file. */
+
+.ill {
+  display: block;
+  overflow: visible;
+  color: var(--color-ink);
+}
+
+/* Recraft line art: an ink silhouette split into subpaths (ik), with paper,
+   mint and stamp regions painted over it (scripts/clean-recraft.mjs). */
+.ill .ik { fill: currentColor; }
+.ill .pp { fill: var(--color-slip); }
+.ill .mt { fill: var(--color-mint); }
+.ill .sf { fill: var(--color-stamp); }
+
+/* Ink that sits on no paper region would vanish into an ink section. */
+.how .ill .ik-out,
+.close .ill .ik-out {
+  color: var(--color-paper);
+}
+
+.ill-inbox {
+  width: 10rem;
+  height: auto;
+  margin-top: 0.5rem;
+}
+
+.step {
+  position: relative;
+}
+
+.step .ill-icon {
+  position: absolute;
+  top: 1.25rem;
+  right: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+@media (min-width: 64rem) {
+  .how.is-reel .step .ill-icon {
+    width: 7rem;
+    height: 7rem;
+  }
+}
+
+.close .ill-export {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.slip-seal {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  width: 4rem;
+  height: 4rem;
+  pointer-events: none;
+}
+
+.ill-seal {
+  width: 100%;
+  height: 100%;
+}
+
+.ill-seal .ln-seal {
+  fill: none;
+  stroke: var(--color-mint);
+  stroke-width: 0.6;
+}
+
+.seal-turn {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+/* Typography. Split words stay inline-block for good so the wrap never
+   changes between the split and the reveal. */
+
+.title .w,
+.close-title .w {
+  display: inline-block;
+}
+
+.hero-title .hero-dot {
+  display: inline-block;
+  transform-origin: 50% 85%;
+}
+
+/* A caret after the closing line: the copy is still being typed. */
+.caret {
+  display: inline-block;
+  width: 0.08em;
+  height: 0.72em;
+  margin-left: 0.08em;
+  background: currentColor;
+}
+
+/* Reading progress, a hairline of ink with a paper edge so it reads on the
+   ink sections too. Shown only where a scroll timeline drives it. */
+.progress {
+  display: none;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  height: 3px;
+  background: var(--color-ink);
+  box-shadow: 0 1px 0 var(--color-paper);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+/* The ink sections. The fallback is the shader's own settled frame, rendered
+   by scripts/measure-ink.mjs at one pixel per CSS pixel, so it is shown
+   unscaled and pixelated and its two colours land exactly. */
+
+.how,
+.close {
+  position: relative;
+  isolation: isolate;
+  image-rendering: pixelated;
+  background: var(--color-ink) url("/ink-rows-narrow.png") right top / auto repeat-y;
+}
+
+.close {
+  overflow-x: clip;
+  background-image: url("/ink-bleed-narrow.png");
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+
+.how > *,
+.close > * {
+  image-rendering: auto;
+}
+
+@media (min-width: 64rem) {
+  .how { background-image: url("/ink-rows-wide.png"); }
+  .close { background-image: url("/ink-bleed-wide.png"); }
+}
+
+.ink-field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.ink-field:not([data-ready]) {
+  visibility: hidden;
+}
+
+.how-meter {
+  height: 2px;
+  margin: -2rem 0 2rem;
+  max-width: 18rem;
+  background: var(--color-paper);
+  transform-origin: 0 50%;
+}
+
+/* ---------------------------------------------------------------------------
+ * Time-based motion
+ * ------------------------------------------------------------------------- */
+
+@keyframes dot-land {
+  from { transform: scale(2.6) rotate(-14deg); }
+  to   { transform: none; }
+}
+
+@keyframes drift {
+  from { transform: translateY(0) rotate(0deg); }
+  to   { transform: translateY(-6px) rotate(0.8deg); }
+}
+
+@keyframes bob {
+  from { translate: 0 0; }
+  to   { translate: 0 -5px; }
+}
+
+@keyframes spin {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes blink {
+  50% { visibility: hidden; }
+}
+
+html[data-motion="on"] .hero-dot {
+  animation: dot-land 520ms cubic-bezier(0.3, 1.5, 0.5, 1) 600ms both;
+}
+
+/* Section titles, word by word, with the wipe from wipe.css: the clip region
+   sits outside each word's box, so no cap or descender is ever cut. */
+html[data-motion="on"] .is-revealing .w {
+  animation: wipe-rise 520ms var(--wipe-ease) both;
+  animation-delay: calc(var(--w) * 45ms);
+}
+
+/* Draw-on for filled line art: each ink shape's outline is traced along its
+   own length, then the shape fills in and the trace stroke goes away. The
+   paper and mint regions are painted throughout, so a half-drawn
+   illustration is never an empty box. Icons have no paper or mint regions,
+   so the ink starts as a faint ghost of the finished shape rather than
+   nothing: the first frame of a draw-on is already a recognisable icon. */
+@keyframes trace {
+  from { stroke-dashoffset: 1; fill-opacity: 0.22; stroke-width: var(--trace); }
+  70%  { stroke-dashoffset: 0; fill-opacity: 0.22; stroke-width: var(--trace); }
+  to   { stroke-dashoffset: 0; fill-opacity: 1; stroke-width: 0; }
+}
+
+html[data-motion="on"] .is-drawing .ik {
+  --trace: 1.2;
+  stroke: currentColor;
+  stroke-dasharray: 1 2;
+  stroke-linejoin: round;
+  animation: trace 1.1s var(--ease) both;
+  animation-delay: calc(var(--d, 0) * 45ms);
+}
+
+/* Ambient loops, paused whenever their element is off screen. */
+html[data-motion="on"] .slip-hero {
+  animation: drift 9s ease-in-out infinite alternate;
+}
+
+html[data-motion="on"] .scrap {
+  animation: bob 5.5s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -1.3s);
+}
+
+html[data-motion="on"] .seal-turn {
+  animation: spin 80s linear infinite;
+}
+
+html[data-motion="on"] .caret {
+  animation: blink 1.1s steps(1) infinite;
+}
+
+[data-offscreen],
+[data-offscreen] * {
+  animation-play-state: paused !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Scroll-driven, native. Each one moves content that is already painted.
+ * ------------------------------------------------------------------------- */
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes sink {
+  to { transform: translateY(16px); }
+}
+
+@keyframes lift {
+  to { translate: 0 -56px; }
+}
+
+@keyframes rise {
+  from { translate: 0 56px; }
+  to   { translate: 0 0; }
+}
+
+@keyframes rise-small {
+  from { translate: 0 28px; }
+  to   { translate: 0 0; }
+}
+
+@keyframes strike {
+  from { background-size: 0% 0%; }
+  to   { background-size: 100% 100%; }
+}
+
+/* Vertical only: words never travel into their neighbours. */
+@keyframes settle {
+  from { translate: 0 calc(0.15em + var(--w) * 0.12em); }
+  to   { translate: 0 0; }
+}
+
+@keyframes stamp-land {
+  from { transform: scale(1.9) rotate(-18deg); clip-path: inset(0 100% 0 0); }
+  to   { transform: none; clip-path: inset(0 0 0 0); }
+}
+
+@supports (animation-timeline: view()) {
+  html[data-motion="on"] .progress {
+    display: block;
+    animation: grow linear both;
+    animation-timeline: scroll(root);
+  }
+
+  /* The slip settles into the envelope as the problem scrolls past. */
+  html[data-motion="on"] .ill-inbox {
+    view-timeline: --inbox block;
+  }
+
+  html[data-motion="on"] .inbox-slip {
+    animation: sink linear both;
+    animation-timeline: --inbox;
+    animation-range: cover 35% cover 70%;
+  }
+
+  html[data-motion="on"] .slip-hero {
+    animation: drift 9s ease-in-out infinite alternate, lift linear both;
+    animation-timeline: auto, view();
+    animation-range: normal, exit 0% exit 100%;
+  }
+
+  html[data-motion="on"] .slip-cost {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 40%;
+  }
+
+  html[data-motion="on"] .fact {
+    animation: rise-small linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 100%;
+  }
+
+  html[data-motion="on"] .nope-list li::before {
+    background-repeat: no-repeat;
+    animation: strike linear both;
+    animation-timeline: view();
+    animation-range: entry 40% cover 45%;
+  }
+
+  html[data-motion="on"] .close-title {
+    view-timeline: --close block;
+  }
+
+  /* The closing words step down onto one baseline as the line arrives. */
+  html[data-motion="on"] .close-title .w {
+    animation: settle linear both;
+    animation-timeline: --close;
+    animation-range: entry 0% cover 50%;
+  }
+
+  /* The ledger stamps land row by row on screens the reel does not pin. The
+     rows stay printed throughout; only the stamp wipes in (DESIGN.md). */
+  @media (max-width: 63.99rem) {
+    html[data-motion="on"] .statement .stamp {
+      animation: stamp-land linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 35%;
+    }
+  }
+}

@@ -1,0 +1,88 @@
+---
+title: Change settings in the app
+description: Edit business, email, export and review settings on the Settings page without a redeploy, see where each value comes from, and reset a value.
+sidebar:
+  order: 8
+  label: Change settings in the app
+---
+
+Use this guide to change most of the app's settings from **Settings**, without editing a config file or deploying. A value saved in the app is stored in your D1 database and wins over the Worker variable of the same name: app setting, then Worker variable, then the built-in default.
+
+## Prerequisites
+
+- You can sign in to the app.
+- For the email fields: access to Cloudflare Email Routing, because the app cannot create or check routing rules.
+
+## What you can change here
+
+| Section | Fields |
+| --- | --- |
+| **Business** | App name, Your business names, Parts of the business, Default part, Payment terms (days), New account currency |
+| **Email** | Receipt address, Invoice address, Allowed senders, Forward a copy to |
+| **Export** | Accountant, Export file name, Note under the month download |
+| **Advanced > Review & matching** | The review and matching thresholds |
+| **Advanced > Integrations** | Source code link |
+
+Sign-in (Access settings, the password user name and the password), the base path, the reader mode, the OneDrive app and its secrets stay deploy-time. They are listed read-only under **Advanced > Set at deploy**, with secrets shown only as "Set" or "Not set". For every variable and where it can be changed, see [Configuration](/reference/configuration/).
+
+## Change a setting
+
+<Steps>
+  <Step title="Open the section">
+
+Open **Settings** and pick the section from the Settings menu. **Review & matching** and **Integrations** are folded under **Advanced**.
+
+  </Step>
+  <Step title="Edit the field">
+
+Each field shows a tag for where its current value comes from:
+
+- **App**: saved here.
+- **Deploy**: a Worker variable.
+- **Default**: built in.
+
+For **Parts of the business**, rename a part in place, tick **Remove** to drop one, or type a new one in "Add a part". A part used by any receipt or vendor rule can be renamed but not removed.
+
+  </Step>
+  <Step title="Tick the confirmation, if there is one">
+
+**Receipt address**, **Invoice address**, **Allowed senders** and **Forward a copy to** each have a tick box that must be ticked in the same save, for example "I’ve added the Email Routing rule for this address". **Why** next to it explains the risk.
+
+  </Step>
+  <Step title="Save">
+
+Press the section's save button, for example **Save business** or **Save email**. Values are checked with the same rules as the Worker variables; an invalid value is refused with the reason.
+
+  </Step>
+  <Step title="Finish email changes in Cloudflare">
+
+After changing the receipt or invoice address, the app shows "Saved. Now update Cloudflare Email Routing." Add a **Send to a Worker** rule for the new address, send a test from an allowed address, then remove the rule for the old one. See [Set up email](/how-to/set-up-email/).
+
+  </Step>
+</Steps>
+
+## Check it worked
+
+- The section shows "Saved." and the field's tag is now **App**.
+- Under the field you see when and by whom it was changed, and the deploy value if there is one.
+- **Advanced > Change history** lists the change with the old and new value. Saves are recorded under your Access email, or `password` with password sign-in.
+
+## Go back to the deploy value
+
+Press **Reset** under the field. This deletes the app value, so the Worker variable (or the default) applies again. The section says the setting "is back to the deploy value" or "is back to the default". Resets are also kept in the change history.
+
+Saving a value equal to the deploy value has the same effect: no app value is kept.
+
+## Things to know
+
+- **A later deploy does not override an app value.** If you change a Worker variable and deploy while an app value exists, the app value still wins. The field shows the deploy value next to it; press **Reset** to use it.
+- **Two tabs.** If someone saved in another tab since you opened the page, your save is refused with "Settings were changed in another tab or by someone else. Reload and try again."
+- **A saved value that stops being valid** (for example after a deploy changes another setting it depends on) is ignored with a warning on the field, and the deploy value or default is used. Press **Clear it** to remove it.
+- **Changing the invoice address.** Mail to the old address still counts as an invoice for 30 days.
+- **Changing a matching threshold** or the payment terms re-runs matching straight away, so waiting payments may be paired.
+
+## Related
+
+- [Configuration](/reference/configuration/) lists every setting, its variable and its default.
+- [Deploy from the command line](/how-to/deploy-from-the-command-line/) for the deploy-time settings.
+- [How matching works](/explanation/how-matching-works/) and [How reading works](/explanation/how-reading-works/) explain what the thresholds change.

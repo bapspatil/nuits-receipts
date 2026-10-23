@@ -1,0 +1,18 @@
+Rechnung / Invoice
+Datenwerk Hosting GmbH
+Musterstrasse 1, 10115 Berlin, Germany
+USt-IdNr. DE000000000
+Invoice to:
+Sample Buyer Oy
+Esimerkkikatu 1 A 2
+00100 Helsinki, Finland
+VAT ID FI00000000
+Invoice number: RE-2026-1042
+Invoice date: 15.10.2026
+Due date: 29.10.2026
+Pos Description Qty Price Amount
+1 Dedicated server DX-40 (October 2026) 1 249,00 EUR 249,00 EUR
+Net amount 249,00 EUR
+VAT 0% 0,00 EUR
+Total 249,00 EUR
+Reverse charge: VAT to be accounted for by the recipient (Art. 196 Council Directive 2006/112/EC).

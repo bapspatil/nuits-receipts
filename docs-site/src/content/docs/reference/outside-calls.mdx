@@ -1,0 +1,46 @@
+---
+title: Outside calls
+description: Every outbound call the Worker makes, who receives it, when, and what is sent.
+sidebar:
+  order: 9
+---
+
+Nuits Receipts runs in your own Cloudflare account. Nuits never sees your data. The app has no telemetry, analytics, update check, licence server or sign-up. With `AI_MODE=mock` it makes no AI or FX calls at all.
+
+The table lists every call the Worker makes. Calls to your own D1 database and R2 bucket are bindings in your account and are not listed.
+
+| Recipient | Endpoint | When | What is sent | What comes back |
+| --- | --- | --- | --- | --- |
+| Cloudflare Workers AI, Clairic | `@cf/cloudflare/clairic` via the `AI` binding | Each time a document is read, including **Read it again**. Not for mail held as `sender_unverified`. | The document text (up to 40,000 characters, including the forwarding email's text), the image for photos, the list of fields to read, and the date the document was received. | Field values with confidence and `p_null`. |
+| Cloudflare Workers AI, Clef | `@cf/cloudflare/clef` via the `AI` binding | After reading an expense receipt when no vendor rule matches. Not for sales invoices. | Seller name, line item descriptions, the document text and email context, your product ids and labels, and the four expense types. | A product and an expense type, with probabilities. |
+| Frankfurter | `https://api.frankfurter.dev/v2/rates` | When a non-EUR document with a total and issue date has no cached rate for that currency and date. | Currency code, `EUR`, provider `ecb`, and a date range from 6 days before the issue date to the issue date. No document content. | ECB reference rates. Cached in `fx_rates`. Timeout 10 seconds. |
+| Cloudflare Access | `https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs` | Access mode only, when no cached key matches the token. Keys are cached for one hour per isolate. | Nothing beyond the request. | The team's public signing keys. |
+| Microsoft identity platform | `https://login.microsoftonline.com/common/oauth2/v2.0/token` | Only after you press **Connect Microsoft account**: once to finish sign-in, then whenever an upload needs a fresh access token. | Client ID, client secret, the sign-in code with its PKCE verifier, or the stored refresh token, and the scopes `offline_access Files.ReadWrite.All User.Read`. | Access and refresh tokens. |
+| Microsoft Graph | `https://graph.microsoft.com/v1.0` | After connecting: to read your name and email (`/me`), resolve the folder link (`/shares/...`, `/me/drive/sharedWithMe`), and upload a month. | The folder link you paste, folder names, the month's original files and index spreadsheets. | Drive item IDs and upload results. |
+| Cloudflare Email Routing | `message.forward()` | When `FORWARD_COPY_TO` is set, for every incoming message. | The incoming message, unchanged, to that one address. | |
+
+Clairic is a Cloudflare preview model, so its availability, behaviour and price may change.
+
+The browser loads only resources from the app's own origin: self-hosted fonts at `/assets/fonts/` and the upload script at `/assets/add.js`. The page Content Security Policy allows no other origins.
+
+## Not called
+
+| Never contacted | Note |
+| --- | --- |
+| Nuits | No request goes to any Nuits server. |
+| Banks | Bank data comes only from CSV files you upload. |
+| Microsoft, before you connect | With OneDrive off or not connected, no request goes to Microsoft. **Disconnect Microsoft account** deletes the stored sign-in and upload records. |
+| Any service, for the month ZIP | Building the ZIP reads only R2 and D1. |
+
+## Logs
+
+Workers observability is on in `wrangler.jsonc` with `head_sampling_rate` 1 (every request). Logs stay in your Cloudflare account. The app writes short reason codes to the log, never document content:
+
+| Code | Meaning |
+| --- | --- |
+| `email_too_large` | An incoming email was over 20 MiB and was dropped. |
+| `sender_auth_failed` | An allowed sender failed SPF or DMARC, and the mail was dropped. |
+| `forward_copy_failed` | Forwarding to `FORWARD_COPY_TO` failed. Reading was not affected. |
+| `forward_copy_loop` | `FORWARD_COPY_TO` equals a receiving address, so no copy was sent. |
+| `forward_copy_invalid` | `FORWARD_COPY_TO` is not a valid address, so no copy was sent. |
+| `settings_unavailable` | The `settings` table could not be read; Worker vars were used. |

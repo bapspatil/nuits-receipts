@@ -1,0 +1,63 @@
+---
+title: Sort costs with vendor rules
+description: File every receipt from a seller under the same part of the business and kind of cost, and match sellers whose bank name differs.
+sidebar:
+  order: 16
+  label: Vendor rules
+---
+
+Use this guide to stop correcting the same seller's filing every month. A vendor rule says: when the seller's name contains this text, file the receipt under this part of the business and this kind of cost. Your rules always win; when no rule matches, Clef picks the filing and flags it when unsure.
+
+## Prerequisites
+
+- A receipt from the seller, read and with the seller's name right.
+- The parts of the business you want to file under, set in **Settings** > **Business**. See [Change settings in the app](/how-to/change-settings-in-the-app/).
+
+## Add a rule
+
+<Steps>
+  <Step title="Open a receipt from the seller">
+
+Open any receipt from the seller, for example from **Review** or from the list on **Month**.
+
+  </Step>
+  <Step title="Open the rule form">
+
+Near the bottom of the receipt page, open **Always file *seller* as...**, for example **Always file Hetzner Online as...**.
+
+  </Step>
+  <Step title="Fill in the rule">
+
+- **When the seller's name contains**: starts as the full seller name. Shorten it to the part that stays the same, for example `Hetzner`. Case, accents and endings such as "Ltd" or "Inc" are ignored.
+- **Part of the business** and **Kind of cost**: where these receipts belong.
+- **Only if the receipt also mentions** (optional): extra text that must appear in the receipt or its email, for example a project name, when one seller serves several parts of the business.
+- **Name on your bank statement** (optional): the payee name exactly as your bank shows it, when it differs from the seller name on the receipt. This lets payments match automatically.
+- **Priority**: when several rules match, the highest number wins.
+
+  </Step>
+  <Step title="Save">
+
+Select **Save rule**. You return to **Home**.
+
+  </Step>
+</Steps>
+
+## Apply it to receipts you already have
+
+Rules are used when a receipt is read. New receipts follow the rule straight away. A receipt already in the app keeps its filing until you either change **Which part of the business** and **Kind of cost** on it yourself, or open **Read it again** and select **Read it again**.
+
+## Check that it worked
+
+- **Settings** > **Vendor rules** lists the rule under **If the seller contains**, **File as**, **Also needs** and **Priority**.
+- The next receipt from the seller shows the rule's filing on its receipt page, under "Files it under", with no **Which part of the business?** or **What kind of cost is this?** flag.
+
+## Fix "Two of your rules disagree."
+
+This flag means two or more rules match the receipt with the same, highest priority but file it differently. The receipt waits in **Review** until you pick the filing on it.
+
+To stop it happening again, add a new rule for that seller with a higher **Priority** than the others and the filing you want. Vendor rules cannot currently be edited or deleted in the app, so a higher-priority rule is the way to override an old one. The flag itself says "tidy them in Settings", but Settings only lists the rules and lets you add new ones.
+
+## Related
+
+- How rules, Clef and conflicts fit together: [How costs are sorted](/explanation/how-costs-are-sorted/).
+- How **Name on your bank statement** affects matching: [How matching works](/explanation/how-matching-works/).

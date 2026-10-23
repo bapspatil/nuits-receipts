@@ -1,0 +1,23 @@
+Invoice
+Invoice number POHJ-2026-0042
+Date of issue October 1, 2026
+Date due October 15, 2026
+Pohjoistuuli Oy
+Esimerkkikatu 10
+00100 Helsinki
+Finland
+laskutus@pohjoistuuli.example
+FI VAT FI00000002
+Bill to
+Sample Buyer
+Esimerkkikatu 1 A 2
+FI-00100 Helsinki
+Finland
+€125.50 due October 15, 2026
+Description Qty Unit price Tax Amount
+Design retainer, October 1 €100.00 25.5% €100.00
+Subtotal €100.00
+Total excluding tax €100.00
+VAT - Finland (25.5% on €100.00) €25.50
+Total €125.50
+Amount due €125.50

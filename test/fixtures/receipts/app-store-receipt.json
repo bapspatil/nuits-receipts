@@ -1,0 +1,120 @@
+{
+  "about": "App Store receipt: seller at the foot, VAT included, ORDER ID / DOCUMENT NO.",
+  "expected": {
+    "vendor": "Apple Distribution International Ltd.",
+    "invoice_number": ["MV7C2XY9K1", "000123456789"],
+    "issue_date": "2026-10-20",
+    "currency": "EUR",
+    "total_minor": 999,
+    "net_minor": 796,
+    "vat_minor": 203,
+    "vat_rate_bps": 2550
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.016620276495814323,
+        "span": [280, 317],
+        "guess": "Apple Distribution International Ltd.",
+        "confidence": 0.9217590093612671,
+        "value": "Apple Distribution International Ltd."
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.02976921573281288,
+        "span": [154, 166],
+        "guess": "000123456789",
+        "confidence": 0.9789493083953857,
+        "value": "000123456789"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.015984700992703438,
+        "span": [220, 221],
+        "guess": "€",
+        "confidence": 0.7252535820007324,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.007059579249471426,
+        "guess": "2026-10-20",
+        "confidence": 0.9989424950644046,
+        "value": "2026-10-20"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9957003593444824,
+        "guess": "2026-11-20",
+        "confidence": 0.9747325784780161,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0005584860919043422,
+        "guess": 9.99,
+        "confidence": 0.8910060927961098,
+        "value": 9.99
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.011487338691949844,
+        "guess": 7.96,
+        "confidence": 0.9746787650549891,
+        "value": 7.96
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.00010414339340059087,
+        "guess": 2.03,
+        "confidence": 0.9996127852417159,
+        "value": 2.03
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.00013027693785261363,
+        "guess": 25.5,
+        "confidence": 0.997626235321459,
+        "value": 25.5
+      },
+      "line_items": {
+        "type": "list",
+        "value": [
+          "Apple Account",
+          "B",
+          "Sample Buyer",
+          "App Store\n",
+          "Pixelkit Pro (Monthly)",
+          "Renews",
+          "Sub",
+          "Apple Distribution International Ltd.",
+          "Hollyhill Industrial Estate"
+        ],
+        "spans": [
+          [8, 21],
+          [41, 42],
+          [51, 63],
+          [167, 177],
+          [177, 199],
+          [200, 206],
+          [226, 229],
+          [280, 317],
+          [318, 345]
+        ],
+        "confidence": 0.0007884124306706145
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 171,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1600,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

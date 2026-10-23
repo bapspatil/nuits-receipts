@@ -1,0 +1,90 @@
+---
+title: Protect the app with Cloudflare Access
+description: Replace the shared password with Cloudflare Access sign-in, with a real sign-out, on your own hostname.
+sidebar:
+  order: 5
+  label: Protect with Cloudflare Access
+---
+
+Use this guide to sign in through [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/) (a one-time PIN by email, Google, or another identity provider) instead of the browser's password prompt. In Access mode the app shows **Sign out**, and the shared password no longer opens it.
+
+## Prerequisites
+
+- The app on your own hostname, such as `receipts.example.com`, on a domain in your Cloudflare account. Access protects hostnames on your zones; requests to the `workers.dev` URL carry no token for your Access application and are refused in Access mode. See [Serve the app under a path](/how-to/serve-the-app-under-a-path/) to add a hostname.
+- A Cloudflare Zero Trust organisation. Its team domain looks like `your-team.cloudflareaccess.com`.
+- A way to change the app's Worker variables and deploy: your `wrangler.production.jsonc` with `bun run deploy`, or the `wrangler.jsonc` in your repository copy if you used the Deploy button. Access settings cannot be changed in the app.
+
+## Steps
+
+<Steps>
+  <Step title="Create the Access application">
+
+In the Cloudflare dashboard, go to **Zero Trust > Access controls > Applications**, select **Create new application**, then **Self-hosted and private**. Select **Add public hostname** and enter the app's hostname.
+
+If the app is served under a path with `APP_BASE_PATH` (for example `/app`), protect only that path, so the rest of the hostname stays public: add the hostname with the path `app`, and add it again with the path `app/*`.
+
+  </Step>
+  <Step title="Allow only yourself">
+
+Under **Access policies**, add an Allow policy that includes your own email address. Applications deny everyone by default, so without an Allow policy nobody gets in.
+
+Choose the login methods you want. One-time PIN needs no setup with an outside identity provider.
+
+Select **Create**.
+
+  </Step>
+  <Step title="Copy the audience tag">
+
+Back in **Applications**, select **Configure** on the new application. Under **Additional settings**, copy the **Application Audience (AUD) Tag**. It is 64 hexadecimal characters.
+
+  </Step>
+  <Step title="Set the three Access variables">
+
+Set all three together. Setting only one or two makes every request fail with HTTP 503.
+
+```jsonc title="wrangler.production.jsonc"
+"vars": {
+  // ...your other vars
+  "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
+  "ACCESS_AUD": "<the 64-character AUD tag>",
+  "ACCESS_ALLOWED_EMAILS": "you@example.com"
+}
+```
+
+Keep `ACCESS_ALLOWED_EMAILS` the same as the emails in your Access policy. The app checks both: a person must pass Access and be on this list.
+
+  </Step>
+  <Step title="Deploy">
+
+```sh
+bun run deploy
+```
+
+If you used the Deploy button, commit the change to your repository and push it; Workers Builds deploys it. A variable changed only in the Cloudflare dashboard is replaced by the config on the next deploy.
+
+  </Step>
+</Steps>
+
+## Check it worked
+
+1. Open the app's hostname in a private browser window. You see the Cloudflare Access login page, not the browser's password prompt.
+2. Sign in. The app opens and the header shows **Sign out**.
+3. Open the app's `workers.dev` URL. It answers "Sign in through Cloudflare Access to use this app." with HTTP 403.
+4. Press **Sign out**. You are signed out of Access and asked to sign in again on your next visit.
+
+In the app, **Settings > Advanced > Set at deploy** shows the Access team, audience and who can sign in.
+
+## After it works
+
+- `NUITS_PASSWORD` is ignored in Access mode. You can delete the secret: `bunx wrangler secret delete NUITS_PASSWORD --config wrangler.production.jsonc`. Keep it if you might switch back.
+- Consider turning off the `workers.dev` URL with `"workers_dev": false` in your config. It is refused in Access mode anyway.
+- Email intake does not use the web and is not affected.
+- In the change history, your saves are recorded under your Access email instead of `password`.
+
+To go back to the password, clear all three variables, make sure `NUITS_PASSWORD` is set, and deploy.
+
+## Related
+
+- [Configuration](/reference/configuration/) for `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD` and `ACCESS_ALLOWED_EMAILS`.
+- [Outside calls](/reference/outside-calls/): in Access mode the Worker fetches your team's public signing keys.
+- [Privacy and your data](/explanation/privacy-and-your-data/)

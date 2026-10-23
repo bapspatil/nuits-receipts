@@ -1,0 +1,58 @@
+---
+title: What it does not do
+description: Nuits Receipts is not bookkeeping, not advice and not an archive. What that means, and the no-warranty notice in plain words.
+sidebar:
+  order: 9
+---
+
+Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
+
+That sentence is the whole of this page in short. The rest explains where the edges are, so you can decide what the app is good for and what still needs a person.
+
+## It is not bookkeeping
+
+The app collects receipts, reads them, matches them to bank payments and hands you a month in a form your accountant can work with. It does not keep a ledger, post entries, assign accounts from a chart of accounts, close periods or produce financial statements. The product and expense-type labels are for your own overview; they are not bookings.
+
+Your accountant decides how each item is booked: whether it is deductible, which account it goes to, which VAT treatment applies, which period it belongs to. The app's choices, such as putting a receipt in the month of its issue date, or converting at an ECB reference rate when there is no bank match, are defaults to discuss with them, not rules. See [For accountants](/explanation/for-accountants/).
+
+## It is not advice
+
+Nothing in the app or these docs is tax, VAT, accounting, legal or financial advice. A flag saying VAT does not add up is a note that the numbers disagree, not a ruling on how VAT applies. The sales-invoice checks know a few Finnish VAT rates and the idea of reverse charge, and they flag what looks inconsistent; they do not know your situation. Ask your accountant or tax adviser about anything that matters.
+
+## It is not an archive
+
+Originals are stored in an R2 bucket in your account, and the month ZIP gives you copies. That is a convenience, not a records system. The app has no retention policy, no immutability, no audit trail of its own beyond what it records about your corrections and settings, and no backup beyond what Cloudflare provides for R2 and D1. You can lose data by deleting the bucket, the database or the account.
+
+Keep your original receipts the way your local accounting law requires. That may mean a dedicated archive, your accountant's system, or paper. If you rely on the app's copies, back them up yourself.
+
+## It does not file or submit anything
+
+It does not send VAT returns, tax filings or anything else to any authority. It does not send the month to your accountant on its own: you download it (or upload it to your own OneDrive folder) and you send it. Pressing the "I've sent" button only records that you did, so the app can tell you if anything changes afterwards.
+
+## It does not catch every mistake
+
+- **Reading can be wrong.** The AI model can misread or miss vendors, amounts, VAT, dates and currencies. The code checks the arithmetic and looks for disagreement with the document, but a mistake that is consistent with itself passes. See [How reading works](/explanation/how-reading-works/).
+- **Matching is a suggestion.** An automatic match means one receipt and one payment fit each other and nothing else fits either. It is not a reconciliation you can rely on without checking. Split payments, combined payments, refunds and currency differences need you.
+- **A missing receipt list is only as good as your import.** It lists payments from the statements you imported. Payments in accounts you did not import, or outside the dates you imported, are not on it.
+
+## Other limits
+
+- One owner, one sign-in, one inbox per deployment. No roles, no shared access, no multi-company setup.
+- No mobile app.
+- No built-in OCR: scanned PDFs need a photo or typing in.
+- No bank connection: statements come in as CSV files you export and upload. The import works with banks that export CSV: there are presets for some layouts and a column mapper for others, and you map the columns once. It has been tested with Holvi exports so far.
+
+The exact sizes and counts are in [Limits](/reference/limits/).
+
+## No warranty
+
+This is the notice from the project's README, in plain words.
+
+- **No warranty.** Nuits Receipts is free, open-source software, provided "as is", without warranties or conditions of any kind, as the Apache License 2.0 sets out in sections 7 and 8. It may not work, may stop working, and may get things wrong.
+- **Not financial, tax or accounting advice.** Nothing it produces is.
+- **The AI can be wrong.** It can misread or miss vendors, amounts, VAT, dates and currencies. Bank matching is a suggestion, not a reconciliation you can rely on without checking.
+- **You are responsible** for checking every figure, for your own bookkeeping, tax and VAT filings, and for keeping your original receipts as your local accounting law requires.
+- **You run it.** It runs in your own Cloudflare account. Nuits does not receive, store or have access to your documents or data. You are responsible for your deployment, its security, its costs and the personal data in your receipts.
+- **Liability.** To the extent permitted by applicable law, Bapusaheb Patil / Nuits is not liable for any loss arising from use of the software. Nothing in this notice limits liability that cannot be limited by law.
+
+The licence text is in the repository's `LICENSE` file and at [apache.org](https://www.apache.org/licenses/LICENSE-2.0).

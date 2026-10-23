@@ -1,0 +1,98 @@
+---
+title: Serve the app under a path
+description: Put the app on your own hostname, either as a custom domain or under a path such as /app next to other content, with APP_BASE_PATH.
+sidebar:
+  order: 7
+  label: Serve under a path
+---
+
+Use this guide to move the app from its `workers.dev` URL to your own hostname. Either the Worker gets a whole hostname (`https://receipts.example.com/`), or it shares a hostname with other content and answers only under a path (`https://example.com/app/`). The second case needs `APP_BASE_PATH`.
+
+## Prerequisites
+
+- A domain on Cloudflare DNS in the same account as the Worker.
+- The config file you deploy with (`wrangler.production.jsonc` if you used `bun run setup`, or `wrangler.jsonc` in your repository copy if you used the Deploy button). Routes and `APP_BASE_PATH` cannot be changed in the app.
+- If you use OneDrive upload or Cloudflare Access, be ready to update them afterwards (see the end of this page).
+
+## Give the app a whole hostname
+
+<Steps>
+  <Step title="Add a custom domain to the config">
+
+```jsonc title="wrangler.production.jsonc"
+"routes": [
+  { "pattern": "receipts.example.com", "custom_domain": true }
+]
+```
+
+The hostname must not already have a CNAME record. Cloudflare creates the DNS record and certificate for you.
+
+  </Step>
+  <Step title="Deploy">
+
+```sh
+bun run deploy
+```
+
+With the Deploy button, commit and push the change instead. You can also add the domain in the dashboard under your Worker's **Settings > Domains & Routes > Add > Custom domain**, but a later deploy replaces dashboard routes with the ones in your config, so keep the config as the source of truth.
+
+  </Step>
+</Steps>
+
+Leave `APP_BASE_PATH` empty in this case.
+
+## Share a hostname under a path
+
+<Steps>
+  <Step title="Set the base path">
+
+Add `APP_BASE_PATH` to `vars`. It must start with `/`, for example `/app`, and may use letters, digits, `.`, `_` and `-`. A trailing slash is removed.
+
+```jsonc title="wrangler.production.jsonc"
+"APP_BASE_PATH": "/app"
+```
+
+  </Step>
+  <Step title="Add two routes">
+
+Add a route for the path itself and one for everything under it:
+
+```jsonc title="wrangler.production.jsonc"
+"routes": [
+  { "pattern": "example.com/app", "zone_name": "example.com" },
+  { "pattern": "example.com/app/*", "zone_name": "example.com" }
+]
+```
+
+The hostname needs a proxied DNS record or another Worker on it already (for example your website). Routes take precedence over a custom domain on the same hostname, so the rest of the site keeps working.
+
+  </Step>
+  <Step title="Deploy">
+
+Run `bun run deploy`, or commit and push with the Deploy button.
+
+  </Step>
+</Steps>
+
+With a base path, the app prefixes every link, form, redirect and export link with it, and answers HTTP 404 to any path outside it. This also applies on the `workers.dev` URL, so the app is then at `https://<worker>.<subdomain>.workers.dev/app/`.
+
+## Check it worked
+
+1. Open `https://example.com/app/` (or your custom domain). The app asks you to sign in and then shows Home.
+2. Click through to **Settings**. The address bar keeps the `/app` prefix.
+3. In **Settings > Advanced > Set at deploy**, **Address** shows your base path, or "Site root" without one.
+4. Open a path on the same hostname outside the base path. It is served by your other content, not by the app.
+
+If every page answers 404, `APP_BASE_PATH` and the routes do not match. Fix one of them and deploy again.
+
+## Update what depends on the address
+
+- **Cloudflare Access**: protect the new hostname. With a base path, add the hostname with the paths `app` and `app/*`. See [Protect the app with Cloudflare Access](/how-to/protect-the-app-with-cloudflare-access/).
+- **OneDrive upload**: add the new redirect URI to your Microsoft Entra app. **Settings > OneDrive > Redirect URI for Microsoft Entra** shows it. See [Upload the month to OneDrive](/how-to/upload-the-month-to-onedrive/).
+- **Your bookmarks**: the old `workers.dev` address keeps working unless you set `"workers_dev": false`.
+
+## Related
+
+- [Configuration](/reference/configuration/) for `APP_BASE_PATH`.
+- [App pages](/reference/app-pages/) lists every path, relative to the base path.
+- Cloudflare's [Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) and [Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/).

@@ -1,0 +1,76 @@
+---
+title: Review and approve a receipt
+description: Check what the reader flagged against the original, correct it, and approve it with a note for your accountant.
+sidebar:
+  order: 11
+  label: Review and approve
+---
+
+Use this guide to clear the receipts waiting in **Review**. A receipt lands there when the reader is unsure about a field, when the numbers do not add up, or when something about the source needs a look. Only approved receipts can be matched to a payment and go in the month's main folder.
+
+## Prerequisites
+
+- At least one receipt in the app. See [Add receipts](/how-to/add-receipts/).
+- The original to hand, or a screen big enough to see the receipt page's preview beside the form.
+
+![A receipt page with the original on the left and two flagged fields on the right](../../../assets/screenshots/receipt-review.png)
+
+## Review a receipt
+
+<Steps>
+  <Step title="Open the queue">
+
+Select **Review** in the top bar. The page lists what needs checking, undated receipts first, then the oldest. Narrow it with **Missing info**, **Check the amount** or **Email not verified**, then select **Start reviewing**.
+
+  </Step>
+  <Step title="Compare the flags with the original">
+
+The heading says how many things to check, for example **2 things to check**. Each flag is a question, such as **What was the total?** or **The numbers don't add up.**, with the field to fix beside it. Images show inline on the left; for a PDF, select **Open the PDF** and keep it beside the page.
+
+Everything else the reader found is under **Everything else we read**. Correct any field there too, including **Which part of the business** and **Kind of cost**.
+
+  </Step>
+  <Step title="Fill in what approval needs">
+
+Approval needs the seller, date, currency, total, before-VAT and VAT amounts. Enter `0` in **VAT amount** if the receipt has no VAT. Leave an amount empty only if you truly do not know it; the receipt then cannot be approved.
+
+If your bank charged a different euro amount for a foreign-currency receipt, open **Paid in another currency?** and fill in **Amount in euros** and **Why this euro amount?**. Both are needed together.
+
+  </Step>
+  <Step title="Write the note and approve">
+
+**Note for your accountant** starts as "Checked against the original". Change it if you want to say more, such as why you accepted a refund. It cannot be empty when you approve. Then select **Approve receipt**.
+
+To keep your edits without approving, select **Save, decide later** instead.
+
+  </Step>
+  <Step title="Go to the next one">
+
+The top of the page shows where you are, for example **Receipt 1 of 4**. Select **Skip for now** to leave this one and open the next, or **Next to check** after approving.
+
+  </Step>
+</Steps>
+
+## Have it read again
+
+Open **Read it again** at the bottom of the receipt page and select **Read it again**. The reader runs on the saved original again; anything you typed in is kept and wins over the new reading. Flags such as **Reading failed.** and **The reader stopped early.** show the same button inside the flag.
+
+If the PDF has no readable text (usually a scan), open **Upload a better copy** and upload a photo of it. That adds a new receipt; mark the old one as its duplicate afterwards. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+
+## An email the app could not verify
+
+An email flagged **We couldn't verify who sent this email.** was kept but not read. Download it with **Download the original** and check that it is genuine. If it is, select **It's genuine, read it**. If it is not, leave it unapproved: it stays out of the month's main folder. If reading it does not work, see [Troubleshoot](/how-to/troubleshoot/).
+
+## Check that it worked
+
+- The receipt's stamp changes from **Needs you** to **Ready**, or to **Matched** once a bank payment is linked.
+- The heading changes to **Everything looks fine**, and the buttons change to **Save changes** and **Approve again**.
+- The **Review** count in the top bar goes down. On **Month**, the **Check receipts** step shows **Done** when nothing dated in that month needs you.
+
+Saving changes to a receipt later removes its link to a bank payment, then automatic matching runs again. Check **Payments** afterwards. See [Match payments and receipts](/how-to/match-payments-and-receipts/).
+
+## Related
+
+- Every flag and what raises it: [Receipt fields and flags](/reference/receipt-fields-and-flags/).
+- Why rows get flagged and how VAT arithmetic is checked: [How reading works](/explanation/how-reading-works/).
+- Filing future receipts from a seller automatically: [Sort costs with vendor rules](/how-to/sort-costs-with-vendor-rules/).

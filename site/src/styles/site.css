@@ -1,0 +1,1067 @@
+@import "./theme.css";
+@import "./wipe.css";
+
+@font-face {
+  font-family: "Bricolage";
+  src: url("/fonts/bricolage.woff2") format("woff2");
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/instrument-sans.woff2") format("woff2");
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+:root {
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --measure: 34rem;
+  --rule: 1px solid var(--color-ink);
+  --perforation: repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 12px);
+  color-scheme: light;
+  /* The root carries the background, so iOS overscroll paints paper, not white. */
+  background: var(--color-paper);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, p, ul, ol, dl, dd, figure {
+  margin: 0;
+}
+
+ul, ol {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+/* Focus is ink at 2px with an offset, never the accent: the stamp red is a
+   fill colour and a ring must never be the marginal indicator. */
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+.skip {
+  position: absolute;
+  left: var(--gutter);
+  top: -4rem;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.skip:focus {
+  top: 0.75rem;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 1.4rem + 3.6vw, var(--text-title));
+  line-height: var(--text-title--line-height);
+  font-weight: var(--text-title--font-weight);
+  letter-spacing: var(--text-title--letter-spacing);
+  text-wrap: balance;
+  max-width: 18ch;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--text-heading);
+  line-height: var(--text-heading--line-height);
+  font-weight: var(--text-heading--font-weight);
+  letter-spacing: var(--text-heading--letter-spacing);
+}
+
+.lede {
+  font-size: var(--text-lede);
+  line-height: var(--text-lede--line-height);
+  max-width: var(--measure);
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+}
+
+.todo {
+  color: var(--color-stamp);
+  font-weight: 600;
+}
+
+/* Bar */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem var(--gutter);
+  border-bottom: var(--rule);
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.75rem;
+  text-decoration: none;
+}
+
+.wordmark-mark {
+  width: 1.4rem;
+  height: 1.4rem;
+  align-self: center;
+}
+
+.wordmark-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.wordmark-desc {
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+.motion-switch {
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: var(--rule);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1rem;
+  min-height: 44px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Buttons. Colours swap instantly on hover: a transitioned inversion passes
+   through 1:1 text halfway, so only the press moves. */
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+/* The official Deploy to Cloudflare button is used as Cloudflare ships it: no
+   colour, crop or wrapper styling. It is scaled proportionally from its own
+   184x39 to 46px tall so it reads as the primary action; the aspect ratio is
+   declared so the row does not shift when the image arrives (CLS). */
+.ctas img {
+  display: block;
+  height: 46px;
+  width: auto;
+  aspect-ratio: 184 / 39;
+}
+
+.doc {
+  display: grid;
+  gap: 2.5rem;
+  max-width: 44rem;
+  padding: clamp(3rem, 8vh, 5rem) var(--gutter) 5rem;
+}
+
+.doc section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.doc p {
+  max-width: var(--measure);
+}
+
+.doc-date {
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  text-decoration: none;
+  transition: transform 90ms ease-out;
+}
+
+.button:active {
+  transform: translateY(2px);
+}
+
+.button-primary {
+  background: var(--color-stamp);
+  border-color: var(--color-stamp);
+  color: var(--color-on-stamp);
+}
+
+.button-secondary {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.button:hover {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-paper);
+}
+
+/* Hero */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 3rem;
+  min-height: calc(100svh - 4.6rem);
+  padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) 4rem;
+  overflow: clip;
+  /* The field pre-rendered by scripts/measure-field.mjs from the same shader.
+     No WebGPU, a software adapter or no JavaScript all keep this image. */
+  background: var(--color-paper) url("/field-fallback-narrow.png") center bottom / cover no-repeat;
+}
+
+.field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+/* Hidden until it has genuinely drawn a frame, so every failure lands on the
+   fallback image with no error path to remember. */
+.field:not([data-ready]) {
+  visibility: hidden;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: start;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(3.6rem, 1rem + 11vw, 10rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+}
+
+.hero-title span {
+  display: block;
+}
+
+.hero-sub {
+  font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+  line-height: 1.45;
+  max-width: 31rem;
+  text-wrap: pretty;
+}
+
+.hero-cost {
+  font-weight: 600;
+  max-width: 31rem;
+}
+
+.hero-note {
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+  max-width: 31rem;
+}
+
+/* Receipt slips: white paper, torn zigzag foot, the one shadow. */
+
+.slip {
+  position: relative;
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  border-radius: var(--radius-slip) var(--radius-slip) 0 0;
+  padding: 1.5rem 1.5rem 2.25rem;
+  --tooth: 10px;
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
+    conic-gradient(from -45deg at 50% 0, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
+}
+
+.slip-vendor {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--color-ink);
+}
+
+.slip-lines div,
+.slip-grand {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.2rem 0;
+}
+
+.slip-lines dt {
+  color: var(--color-ink-soft);
+}
+
+.slip-total {
+  border-top: var(--rule);
+  margin-top: 0.4rem;
+  padding-top: 0.5rem !important;
+  font-weight: 600;
+}
+
+.slip-match {
+  margin-top: 0.75rem;
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+.slip-hero {
+  width: min(19rem, 100%);
+  justify-self: end;
+  rotate: 2.5deg;
+}
+
+.slip-hero .stamp {
+  display: block;
+  width: fit-content;
+  margin: 0.75rem 0 0 auto;
+  font-size: 1.75rem;
+}
+
+.slip-caption {
+  position: absolute;
+  left: 1.5rem;
+  bottom: 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink-soft);
+}
+
+/* Stamps carry words every time; colour is never the only signal. */
+
+.stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.3em 0.55em 0.35em;
+  border: 2.5px solid currentColor;
+  border-radius: 0.3em;
+  rotate: -7deg;
+  white-space: nowrap;
+}
+
+.stamp-matched {
+  color: var(--color-ink);
+  background: var(--color-mint);
+}
+
+.stamp-missing {
+  color: var(--color-stamp);
+  background: var(--color-slip);
+}
+
+.stamp-review {
+  color: var(--color-ink-soft);
+  background: var(--color-slip);
+  border-style: dashed;
+}
+
+/* Scenes */
+
+.scene {
+  padding: clamp(4.5rem, 12vh, 8rem) var(--gutter);
+}
+
+.problem {
+  display: grid;
+  gap: 3rem;
+  border-top: var(--rule);
+}
+
+.problem-copy {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.scatter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.scrap {
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  padding: 0.85rem 1.1rem;
+  font-weight: 600;
+  rotate: calc((var(--i) - 2) * 3deg);
+}
+
+.how {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.how-title {
+  margin-bottom: 3rem;
+}
+
+.rail {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.step {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  max-width: 26rem;
+  padding-top: 1.25rem;
+  background: var(--perforation) top / 100% 1px no-repeat;
+}
+
+.step-n {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 5rem;
+  line-height: 0.9;
+}
+
+.ledger {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.ledger-head {
+  display: grid;
+  gap: 1rem;
+}
+
+.statement {
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  padding: 1.25rem clamp(1rem, 3vw, 2rem) 1.5rem;
+  overflow-x: auto;
+}
+
+.statement table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 34rem;
+}
+
+.statement caption {
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  padding-bottom: 0.75rem;
+}
+
+.statement th {
+  text-align: left;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: var(--rule);
+}
+
+.statement td {
+  padding: 0.85rem 0.75rem 0.85rem 0;
+  border-bottom: 1px solid var(--color-guilloche);
+}
+
+.statement .num {
+  text-align: right;
+  padding-right: 2rem;
+}
+
+.statement .stamp {
+  font-size: 1rem;
+}
+
+.statement-foot {
+  margin-top: 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.375rem;
+}
+
+.demo {
+  display: grid;
+  gap: 2rem;
+}
+
+.demo-player {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 64rem;
+}
+
+.demo-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--color-ink);
+  background: var(--color-ink);
+}
+
+.demo-player figcaption {
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+.transcript {
+  max-width: 48rem;
+  border-top: var(--rule);
+  border-bottom: var(--rule);
+}
+
+.transcript summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  min-height: 44px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.transcript-text {
+  display: grid;
+  gap: 0.75rem;
+  max-width: var(--measure);
+  padding-bottom: 1.25rem;
+}
+
+.cost {
+  display: grid;
+  gap: 3rem;
+  background: var(--color-guilloche);
+}
+
+.cost-copy {
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.cost .lede {
+  color: var(--color-ink);
+}
+
+.caveat {
+  max-width: var(--measure);
+  padding-left: 1rem;
+  border-left: 3px solid var(--color-stamp);
+}
+
+.credit {
+  font-weight: 600;
+}
+
+.slip-cost {
+  width: min(30rem, 100%);
+  rotate: -1.5deg;
+}
+
+.tally {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.tally caption {
+  text-align: left;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  padding-bottom: 0.25rem;
+}
+
+.tally th {
+  text-align: left;
+  font-weight: 400;
+  padding: 0.2rem 1rem 0.2rem 0;
+}
+
+.tally td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tally-sum th,
+.tally-sum td {
+  font-weight: 600;
+  border-top: 1px dashed var(--color-ink);
+  padding-top: 0.35rem;
+}
+
+.slip-grand {
+  border-top: 2px solid var(--color-ink);
+  padding-top: 0.6rem !important;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.375rem;
+}
+
+.proof {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.facts {
+  display: grid;
+  gap: 2rem 2.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.fact {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  padding-top: 1rem;
+  border-top: 2px solid var(--color-ink);
+}
+
+.fact-figure {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.fact[hidden] {
+  display: none;
+}
+
+.fact-todo {
+  border-top: 2px dashed var(--color-stamp);
+}
+
+.fact-todo .fact-figure {
+  font-size: 1.375rem;
+}
+
+.nope {
+  border-top: var(--rule);
+}
+
+.nope-letter {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 42rem;
+}
+
+.nope-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.nope-list li {
+  position: relative;
+  padding-left: 2rem;
+  font-size: 1.125rem;
+  max-width: 36rem;
+}
+
+/* A struck-through box per line: the list is things it won't do. */
+.nope-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.35em;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid var(--color-stamp);
+  background: linear-gradient(45deg, transparent 45%, var(--color-stamp) 45% 55%, transparent 55%);
+}
+
+/* The required disclaimer sits on a plate so it reads as a statement, not as
+   one more line of the letter around it. */
+.disclaimer {
+  max-width: 36rem;
+  padding: 1rem 1.25rem;
+  background: var(--color-slip);
+  border-left: 3px solid var(--color-ink);
+  font-weight: 500;
+}
+
+.signoff {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2rem;
+  rotate: -4deg;
+  justify-self: start;
+}
+
+.faq {
+  display: grid;
+  gap: 2rem;
+  border-top: var(--rule);
+}
+
+.faq-list {
+  max-width: 48rem;
+  border-top: var(--rule);
+}
+
+.faq details {
+  border-bottom: var(--rule);
+}
+
+.faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.15rem 0;
+  min-height: 44px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary::after {
+  content: "+";
+  font-size: 1.75rem;
+  line-height: 1;
+  transition: rotate 180ms var(--ease);
+}
+
+.faq details[open] summary::after {
+  rotate: 45deg;
+}
+
+.faq details p {
+  padding-bottom: 1.25rem;
+  max-width: var(--measure);
+}
+
+.close {
+  display: grid;
+  gap: 2rem;
+  justify-items: start;
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.close-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(3rem, 1rem + 8vw, 7.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  max-width: 12ch;
+}
+
+.close .button-secondary {
+  background: var(--color-ink);
+  border-color: var(--color-paper);
+  color: var(--color-paper);
+}
+
+.close .button:hover {
+  background: var(--color-paper);
+  border-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.close :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+/* Footer: the tail of the receipt. */
+
+.footer {
+  display: grid;
+  gap: 2.5rem;
+  padding: 3rem var(--gutter) 3.5rem;
+  background: var(--perforation) top / 100% 1px no-repeat;
+}
+
+.smallprint {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 48rem;
+  font-size: var(--text-small);
+  line-height: var(--text-small--line-height);
+}
+
+.smallprint-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-heading);
+}
+
+.footer-legal {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 48rem;
+  font-size: var(--text-small);
+}
+
+.footer-tail {
+  display: grid;
+  gap: 0.25rem;
+  font-size: var(--text-small);
+}
+
+.footer-joke {
+  color: var(--color-ink-soft);
+}
+
+/* Narrow: each statement row becomes two lines, so the amount and the stamp
+   stay on screen instead of behind a horizontal scroll. */
+@media (max-width: 47.99rem) {
+  .statement table {
+    min-width: 0;
+  }
+
+  .statement thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .statement tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-guilloche);
+  }
+
+  .statement td {
+    padding: 0;
+    border: 0;
+  }
+
+  .statement td:first-child {
+    grid-column: 1 / -1;
+    font-size: var(--text-small);
+    color: var(--color-ink-soft);
+  }
+
+  .statement td:nth-child(2) {
+    font-weight: 600;
+  }
+
+  .statement .num {
+    padding-right: 0;
+  }
+
+  .statement td:last-child {
+    grid-column: 1 / -1;
+    padding-top: 0.4rem;
+  }
+
+  .slip-cost {
+    rotate: 0deg;
+  }
+
+  .tally th {
+    padding-right: 0.5rem;
+  }
+
+  .slip-grand {
+    font-size: 1.125rem;
+  }
+}
+
+/* Wide layouts */
+
+@media (min-width: 48rem) {
+  .rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3rem;
+  }
+
+  .scatter {
+    position: relative;
+    display: block;
+    min-height: 22rem;
+  }
+
+  .scrap {
+    position: absolute;
+    left: calc(var(--x) * 1%);
+    top: calc(var(--y) * 1%);
+  }
+
+  .scrap:nth-child(1) { --x: 4; --y: 6; }
+  .scrap:nth-child(2) { --x: 46; --y: 0; }
+  .scrap:nth-child(3) { --x: 20; --y: 40; }
+  .scrap:nth-child(4) { --x: 58; --y: 52; }
+  .scrap:nth-child(5) { --x: 8; --y: 78; }
+}
+
+@media (min-width: 64rem) {
+  .hero {
+    background-image: url("/field-fallback-wide.png");
+    background-position: center;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .problem,
+  .cost {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .ledger {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: center;
+  }
+
+  .slip-cost {
+    justify-self: center;
+  }
+
+  .nope-letter {
+    max-width: none;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    column-gap: 4rem;
+    align-items: start;
+  }
+
+  .nope-letter > * {
+    grid-column: 1;
+  }
+
+  .nope-letter > .nope-list {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: center;
+  }
+
+  .faq {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    column-gap: 4rem;
+    align-items: start;
+  }
+
+  .footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .smallprint {
+    grid-column: 1 / -1;
+  }
+
+  .footer-tail {
+    text-align: right;
+  }
+}
+
+/* Motion off: the attribute stamped before first paint decides, and the media
+   query only answers while no attribute exists yet. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) *,
+  html:not([data-motion]) *::before,
+  html:not([data-motion]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* The reel. Only ever added by src/reel.ts, so no script, no pins. */
+@media (min-width: 64rem) {
+  .how.is-reel {
+    min-height: 100svh;
+    overflow: clip;
+    display: grid;
+    align-content: center;
+  }
+
+  .how.is-reel .rail {
+    display: flex;
+    width: max-content;
+    gap: 6vw;
+  }
+
+  .how.is-reel .step {
+    width: 44vw;
+    max-width: none;
+  }
+
+  .how.is-reel .step-n {
+    font-size: 11rem;
+  }
+
+  .how.is-reel .heading {
+    font-size: 2.5rem;
+  }
+
+  .how.is-reel .step p {
+    font-size: 1.375rem;
+    line-height: 1.45;
+    max-width: 30rem;
+  }
+
+  .ledger {
+    min-height: 100svh;
+  }
+}

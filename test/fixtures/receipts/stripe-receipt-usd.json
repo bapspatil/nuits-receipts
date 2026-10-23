@@ -1,0 +1,104 @@
+{
+  "about": "Stripe receipt in USD from a US company, no tax lines, subtotal equals total",
+  "expected": {
+    "vendor": "Quillstack Frontier Corporation",
+    "invoice_number": ["Q9TRM4EP-0001", "3301-7745"],
+    "issue_date": "2026-10-22",
+    "currency": "USD",
+    "total_minor": 2000,
+    "net_minor": 2000,
+    "vat_minor": 0,
+    "vat_rate_bps": 0
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.03373264521360397,
+        "span": [132, 163],
+        "guess": "Quillstack Frontier Corporation",
+        "confidence": 0.9971874356269836,
+        "value": "Quillstack Frontier Corporation"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.009328000247478485,
+        "span": [35, 48],
+        "guess": "Q9TRM4EP-0001",
+        "confidence": 0.5908052325248718,
+        "value": "Q9TRM4EP-0001"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.072995625436306,
+        "span": [394, 395],
+        "guess": "$",
+        "confidence": 0.9973958730697632,
+        "value": "$"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.0024797348305583,
+        "guess": "2026-10-22",
+        "confidence": 0.9999957084800144,
+        "value": "2026-10-22"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9999946355819702,
+        "guess": "2026-10-22",
+        "confidence": 0.08094708563689296,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0010236050002276897,
+        "guess": 20,
+        "confidence": 0.9956076191554469,
+        "value": 20
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.4224594235420227,
+        "guess": 20,
+        "confidence": 0.9884207650272564,
+        "value": 20
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.7871031165122986,
+        "guess": 0,
+        "confidence": 0.9649107594440879,
+        "value": null
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.9865375757217407,
+        "guess": 0,
+        "confidence": 0.8503808215230425,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Builder subscription", "Builder subscription 1", "Subtotal"],
+        "spans": [
+          [426, 446],
+          [481, 503],
+          [518, 526]
+        ],
+        "confidence": 0.0012620542911628127
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 292,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 2084,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

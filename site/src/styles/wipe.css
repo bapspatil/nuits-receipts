@@ -1,0 +1,168 @@
+/* Text wipes that cannot clip the text.
+ *
+ * Words move, they never fade (references/motion.md), so every text entrance is
+ * a mask. The obvious implementation of that mask cuts the type, and it does it
+ * silently on exactly the headings you care most about. This file is the
+ * implementation that does not.
+ *
+ * ===========================================================================
+ * THE FAILURE, because it is worth understanding rather than copying around
+ * ===========================================================================
+ *
+ * The obvious version is a wrapper with `overflow: hidden` and a child that
+ * translates up from 110%. It clips display type, for two independent reasons,
+ * and it looks like a font bug rather than a CSS one:
+ *
+ * 1. THE CLIP BOX IS THE LINE BOX, AND DISPLAY TYPE IS SET TIGHTER THAN ITS
+ *    OWN GLYPHS. A heading at `line-height: 0.95` has a line box 0.95em tall
+ *    while the face's ascent plus descent is 1.2em or more. Half-leading goes
+ *    negative, the ink overflows the box top and bottom, and `overflow: hidden`
+ *    cuts the caps off the top and the descenders off the bottom. Tighter
+ *    leading, which is exactly what makes display type look designed, makes the
+ *    clipping worse. Body text at 1.5 leading never shows it, so it survives
+ *    every review that only looked at paragraphs.
+ *
+ * 2. `overflow: hidden` CLIPS BOTH AXES. Negative tracking pulls the last glyph
+ *    past the box, italics and swashes overhang, and an `f` or a `j` in many
+ *    display faces has a sidebearing that reaches outside its advance width.
+ *    The right edge of a heading loses a sliver.
+ *
+ * There is a third, unrelated to type: `overflow: hidden` on an anchor or a
+ * button clips its focus ring, which is drawn 2px thick at a 3px offset and is
+ * therefore entirely outside the box.
+ *
+ * ===========================================================================
+ * THE FIX
+ * ===========================================================================
+ *
+ * Clip the element with `clip-path` instead of clipping a wrapper with
+ * `overflow`, and give the end state NEGATIVE insets so the clip region sits
+ * outside the border box on all four sides. Then:
+ *
+ *   - Every `em` resolves against the element that carries the type, so the
+ *     padding scales with the heading automatically. This is the reason not to
+ *     use a wrapper: a wrapper's `em` resolves against the INHERITED font size,
+ *     so a 0.4em allowance around a 6rem heading comes out as 6.4px.
+ *   - Ascenders, descenders, sidebearings, overhang and the focus ring are all
+ *     outside the clip and cannot be cut.
+ *   - No extra element, so nothing to get wrong at the call site.
+ *
+ * Both keyframe endpoints are the same shape (four calc-compatible lengths), so
+ * the interpolation is a plain per-side calc and needs no browser guesswork.
+ */
+
+:root {
+  --wipe-duration: 420ms;
+  --wipe-stagger: 60ms;
+  --wipe-lead: 80ms;
+  --wipe-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* The allowance around the ink. Generous on purpose: it costs nothing,
+     because the clip region is outside the box and does not affect layout.
+     Raise --wipe-side if the face has long swashes or the tracking is tight. */
+  --wipe-top: 0.22em;
+  --wipe-bottom: 0.4em;
+  --wipe-side: 0.6em;
+}
+
+/* Put this on the element that carries the type: the heading, the line span,
+   the paragraph. `--row` is the stagger index, and it is the one genuinely good
+   use of an inline style because the value really is per element. */
+.wipe {
+  animation: wipe-rise var(--wipe-duration) var(--wipe-ease) both;
+  animation-delay: calc(var(--wipe-lead) + var(--row, 0) * var(--wipe-stagger));
+}
+
+@keyframes wipe-rise {
+  from {
+    /* Top inset past the full height: the region is empty, nothing paints. The
+       reveal then runs bottom-up, so the line emerges from behind its own
+       baseline like a film credit. */
+    clip-path: inset(
+      calc(100% + var(--wipe-top)) calc(var(--wipe-side) * -1)
+      calc(var(--wipe-bottom) * -1) calc(var(--wipe-side) * -1)
+    );
+    transform: translateY(0.5em);
+  }
+  to {
+    clip-path: inset(
+      calc(var(--wipe-top) * -1) calc(var(--wipe-side) * -1)
+      calc(var(--wipe-bottom) * -1) calc(var(--wipe-side) * -1)
+    );
+    transform: translateY(0);
+  }
+}
+
+/* Illustrations carry no words, so they are allowed to fade. Keep this the only
+   opacity animation on the site. */
+.fade {
+  animation: fade-in 520ms var(--wipe-ease) both;
+  animation-delay: calc(160ms + var(--row, 0) * var(--wipe-stagger));
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Clamping animation-duration leaves animation-delay untouched, so a staggered
+   entrance still staggers: eight lines arriving one at a time over half a
+   second for a reader who asked for none. Both blocks, because the resolved
+   attribute has to win over the OS setting in both directions and
+   `html:not([data-motion])` keeps exactly one of them live. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) .wipe,
+  html:not([data-motion]) .fade {
+    animation-delay: 0s;
+  }
+}
+
+html[data-motion="off"] .wipe,
+html[data-motion="off"] .fade {
+  animation-delay: 0s;
+}
+
+/* ===========================================================================
+ * When you genuinely need a wrapper
+ * ===========================================================================
+ *
+ * A rail, a row of cards, anything where the moving thing is a box rather than
+ * a run of text. Then `overflow: hidden` is right, and the contract is:
+ *
+ *   THE WRAPPER CARRIES THE TYPE, THE CHILD INHERITS IT.
+ *
+ * because that is what makes the `em` allowance resolve against the real size.
+ * The travel is `calc(100% + var(--wipe-bottom))` rather than a guessed 110%:
+ * the child has to clear its own height AND the bottom padding, and 110% covers
+ * that only for leading above about 1.15. At 0.95 it leaves the top of the line
+ * visible below the mask, which reads as a rendering fault.
+ */
+.wipe-box {
+  display: block;
+  overflow: hidden;
+  /* Vertical allowance only. A negative horizontal margin here would push the
+     wrapper wider than its container and put the page into horizontal scroll on
+     a narrow viewport, and a box has no sidebearings to protect anyway. */
+  padding-block: var(--wipe-top) var(--wipe-bottom);
+  /* Take back exactly what the padding added, so the clip box is taller than
+     the content while the layout box is unchanged. */
+  margin-block: calc(var(--wipe-top) * -1) calc(var(--wipe-bottom) * -1);
+}
+
+.wipe-box > * {
+  display: block;
+  font-size: inherit;
+  animation: wipe-box-rise var(--wipe-duration) var(--wipe-ease) both;
+  animation-delay: calc(var(--wipe-lead) + var(--row, 0) * var(--wipe-stagger));
+}
+
+@keyframes wipe-box-rise {
+  from { transform: translateY(calc(100% + var(--wipe-bottom))); }
+  to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) .wipe-box > * { animation-delay: 0s; }
+}
+
+html[data-motion="off"] .wipe-box > * { animation-delay: 0s; }

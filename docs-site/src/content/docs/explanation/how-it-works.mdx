@@ -1,0 +1,51 @@
+---
+title: How it works
+description: One Worker, a private R2 bucket, a D1 database and Workers AI, with no queues or scheduled jobs.
+sidebar:
+  order: 1
+---
+
+Nuits Receipts is a receipt inbox that runs on Cloudflare Workers. Everything it does happens inside one Worker that you deploy into your own Cloudflare account. This page explains the parts, how a receipt moves through them, and why the design is this small.
+
+## The parts
+
+- **One Worker.** It serves every page as plain HTML from the server, handles form posts, and receives email. There is no single-page app and no separate API.
+- **An R2 bucket for originals.** Every file you upload or forward is stored as it arrived, before anything else happens. The file's SHA-256 hash is its name, so the same file sent twice is stored once.
+- **A D1 database for everything else.** What was read from each receipt, your corrections, bank rows, matches, vendor rules, exchange rates and settings.
+- **Workers AI for reading.** Clairic reads the receipt. Clef picks a product and an expense type when none of your vendor rules match. Both run under your Cloudflare account.
+
+Optional pieces sit around this core: Email Routing to give you an inbox address, Cloudflare Access in front of the sign-in, and an upload of the month to a OneDrive folder. None of them is needed for uploads, review, bank import or the monthly export.
+
+## What happens to a receipt
+
+1. **It arrives.** You upload a PDF or a photo, or Email Routing hands a message to the Worker. Email is checked first: only senders on your allowlist count, and their mail has to pass Cloudflare's SPF check before anything is read. See [Email and sender trust](/explanation/email-and-sender-trust/).
+2. **The original is saved.** It goes into R2 untouched. Every later step works from this copy, which is why reading it again later gives you a fresh result from the same file.
+3. **It is read.** The text of the PDF (or the image itself) goes to Clairic, and the code then checks the answer against the document's own labelled lines and the VAT arithmetic. Anything unsettled is flagged for review. See [How reading works](/explanation/how-reading-works/).
+4. **It is sorted.** Your vendor rules give it a product and an expense type. If none match, Clef suggests one. See [How costs are sorted](/explanation/how-costs-are-sorted/).
+5. **It is matched.** After every receipt is read and every bank CSV is imported, the app looks for payments that fit approved receipts. See [How matching works](/explanation/how-matching-works/).
+6. **It gets a euro amount.** From the matched bank payment if there is one, otherwise from the receipt itself if it is in euros, otherwise from an ECB reference rate. See [Currencies and reference rates](/explanation/currencies-and-reference-rates/).
+7. **It lands in a month.** The month is the receipt's issue date. You review the month, then download a CSV or a ZIP for your accountant.
+
+## Why there are no queues or scheduled jobs
+
+There are no cron triggers, no queues and no background workers. Every action starts from something you do (an upload, a form post, an import) or from an email arriving. Reading an uploaded file happens inside the upload request. Reading an emailed receipt happens just after the message is accepted, in the same Worker invocation.
+
+This keeps the app small and easy to reason about. There is nothing running when you are not using it, nothing to monitor, and no job that can quietly fall behind. The cost is that each request has to do its work within Cloudflare's CPU limits, which is the main reason PDF uploads need the Workers Paid plan (see [Running costs](/explanation/running-costs/)). It also means nothing retries on a timer: if a reading fails, the receipt is flagged and waits for you to have it read again.
+
+A receipt being read holds a short lease (two minutes). If a request dies halfway, the lease runs out and the next attempt can pick the receipt up again, so a crash never leaves a receipt stuck as "being read" for ever.
+
+## How your edits are protected
+
+Three rules keep your own work from being overwritten:
+
+- **What you saved wins.** Once you have saved a receipt's form, the values you saved are kept when the receipt is read again. A new reading can add review flags, but it does not replace your figures.
+- **Stale work is thrown away.** Every receipt has a revision number. A reading that started before you saved a correction cannot overwrite it, and a form saved from an old page is refused with a request to reload.
+- **Amounts are whole numbers.** Money is stored in cents (or the currency's smallest unit), never as floating-point numbers, so totals in the app and in the export add up to the cent.
+
+## One owner per deployment
+
+Each deployment has one owner and one sign-in. You sign in with HTTP Basic and a password you set, or put Cloudflare Access in front instead. There are no user roles or separate tenants. Bank accounts are labels for your statements, not separate users. If two people each need their own receipts, each deploys their own copy.
+
+## Settings
+
+Most behaviour is set by Worker variables at deploy time. Many of them can also be changed in the app under **Settings**, and a value saved there takes precedence over the Worker variable. Secrets, the sign-in method and the bindings stay deploy-time only. The full list is in [Configuration](/reference/configuration/), and [Change settings in the app](/how-to/change-settings-in-the-app/) shows how.

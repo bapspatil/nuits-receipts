@@ -1,0 +1,41 @@
+{
+  "synthetic": true,
+  "receipts": [
+    {
+      "file": "sample.pdf",
+      "vendor": "Sample Cloud Lantern Oy",
+      "invoice_number": "SAMPLE-1001",
+      "issue_date": "2026-09-04",
+      "due_date": "2026-09-18",
+      "currency": "EUR",
+      "net": "100.00",
+      "vat_rate": "25.5",
+      "vat_amount": "25.50",
+      "total": "125.50"
+    },
+    {
+      "file": "sample.png",
+      "vendor": "Sample Pixel Harbor Ltd",
+      "invoice_number": "SAMPLE-1002",
+      "issue_date": "2026-09-05",
+      "due_date": "2026-09-19",
+      "currency": "USD",
+      "net": "20.00",
+      "vat_rate": "0",
+      "vat_amount": "0.00",
+      "total": "20.00"
+    },
+    {
+      "file": "sample.html",
+      "vendor": "Sample Mail Meadow Oy",
+      "invoice_number": "SAMPLE-1003",
+      "issue_date": "2026-09-06",
+      "due_date": "2026-09-20",
+      "currency": "EUR",
+      "net": "40.00",
+      "vat_rate": "25.5",
+      "vat_amount": "10.20",
+      "total": "50.20"
+    }
+  ]
+}

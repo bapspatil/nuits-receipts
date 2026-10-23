@@ -1,0 +1,97 @@
+{
+  "about": "Subtotal + VAT does not equal the total: must be reviewed",
+  "expected": {
+    "vendor": "Sample Supplies Oy",
+    "invoice_number": "SS-778",
+    "issue_date": "2026-10-03",
+    "currency": "EUR",
+    "total_minor": 1300
+  },
+  "expect_review": true,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.0025531614664942026,
+        "span": [8, 26],
+        "guess": "Sample Supplies Oy",
+        "confidence": 0.9999887943267822,
+        "value": "Sample Supplies Oy"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.004588289186358452,
+        "span": [73, 79],
+        "guess": "SS-778",
+        "confidence": 0.9999964237213135,
+        "value": "SS-778"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.019885048270225525,
+        "span": [155, 156],
+        "guess": "€",
+        "confidence": 0.5668817162513733,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 3.600714626372792e-5,
+        "guess": "2026-10-03",
+        "confidence": 0.9999238305933644,
+        "value": "2026-10-03"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9999991655349731,
+        "guess": "2026-10-03",
+        "confidence": 0.5775256784884013,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 6.7194041548646055e-6,
+        "guess": 13,
+        "confidence": 0.9992637895331665,
+        "value": 13
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.0047117858193814754,
+        "guess": 10,
+        "confidence": 0.9794075949337852,
+        "value": 10
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.00020766459056176245,
+        "guess": 2.55,
+        "confidence": 0.9991897830378557,
+        "value": 2.55
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 6.045051850378513e-5,
+        "guess": 25.5,
+        "confidence": 0.9995805037888044,
+        "value": 25.5
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Office chair 1"],
+        "spans": [[124, 138]],
+        "confidence": 0.03460268049018353
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 91,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1280,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

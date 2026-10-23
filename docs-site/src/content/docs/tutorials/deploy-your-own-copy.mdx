@@ -1,0 +1,87 @@
+---
+title: Deploy your own copy
+description: Put Nuits Receipts into your own Cloudflare account with the Deploy to Cloudflare link, set your password and sign in.
+sidebar:
+  order: 1
+  label: Deploy your own copy
+---
+
+In this tutorial we deploy Nuits Receipts into your own Cloudflare account and sign in to it for the first time. At the end you will have your own copy running on a `workers.dev` address, showing its **Welcome** page and ready for your first receipt.
+
+It takes about ten minutes, most of it waiting for the first build.
+
+## Before you start
+
+You need:
+
+- A Cloudflare account.
+- R2 turned on in that account, with a payment method added. Cloudflare asks for one even if your use stays inside R2's free allowance. Without it, the deploy cannot create the bucket for your originals.
+- A GitHub or GitLab account. Cloudflare copies the code into it.
+- A new password of at least 16 characters that you use nowhere else. To make one, run this in a terminal and copy the output:
+
+  ```sh
+  openssl rand -base64 24
+  ```
+
+Keep the password somewhere safe, such as your password manager. You need it in a few minutes.
+
+:::note[Cloudflare plan]
+AI reading costs about 15 cents a month for a typical month of receipts, billed to your Cloudflare account. If you upload PDFs, plan on Workers Paid ($5 a month): reading a PDF uses far more than the Free plan's 10 ms CPU limit. See [Running costs](/explanation/running-costs/).
+:::
+
+## Open the deploy page
+
+Open this link: [Deploy Nuits Receipts to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts).
+
+Sign in to Cloudflare if it asks. You now see Cloudflare's deploy page for Nuits Receipts.
+
+## Connect your Git account
+
+Connect the GitHub or GitLab account you want the copy to live in, and pick a name for the new repository. Cloudflare will copy the Nuits Receipts code into it, and every later build comes from that copy.
+
+## Keep the suggested names
+
+The deploy page lists what it is about to create in your account:
+
+- a Worker called `my-nuits-receipts`
+- a D1 database called `my-nuits-receipts`
+- an R2 bucket called `my-nuits-receipts-originals`
+
+You can rename them, but for this tutorial we keep the names as they are.
+
+## Set your password
+
+The page asks for `NUITS_PASSWORD`. Paste the password you made earlier.
+
+Below it are optional variables such as `AUTH_USERNAME`, `PRODUCTS_JSON` and `ACCOUNTANT_LABEL`. Leave them all as they are. You can change most of them later in the app's **Settings**.
+
+## Deploy
+
+Start the deploy with the button at the bottom of the page.
+
+Cloudflare creates the database and the bucket, copies the code into your Git account and starts the first build. The build runs `bun run deploy`, which applies the database schema and then deploys the Worker. You can watch its log on the page.
+
+When the build finishes, Cloudflare shows your Worker's address. It looks like `https://my-nuits-receipts.<your-subdomain>.workers.dev`.
+
+:::caution[If the build stops at the database step]
+If the build fails while applying the D1 migrations with an authentication or permission error, the build's API token is missing the **D1 > Edit** permission. Nothing was deployed. Follow [Troubleshoot](/how-to/troubleshoot/) to add it, then retry the build.
+:::
+
+## Sign in
+
+Open your Worker's address in the browser. The browser asks for a user name and password:
+
+- **User name:** `owner`
+- **Password:** the password you set above
+
+The app opens on its **Welcome** page, with the heading **Let's get your first receipt in**, an **Upload receipt** button and a link to import a bank statement. The top bar shows **Home**, **Review**, **Payments**, **Invoices**, **Month** and **Settings**.
+
+:::note
+If the browser keeps asking for your password even though you typed it correctly, the password is shorter than 16 characters or is one of the example values the app refuses. Set a new one under your Worker's settings in the Cloudflare dashboard and sign in again.
+:::
+
+## What we did
+
+You now have your own copy of Nuits Receipts in your Cloudflare account, with a private database and a private bucket for originals, protected by your password.
+
+Next, put a month through it with sample files in [Your first month](/tutorials/your-first-month/). When you want receipts to arrive by email, follow [Set up email](/how-to/set-up-email/).

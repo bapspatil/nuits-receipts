@@ -1,0 +1,82 @@
+---
+title: Set up email
+description: Route a receipt address to your Worker with Cloudflare Email Routing, allow your senders, and send a test receipt.
+sidebar:
+  order: 2
+  label: Set up email
+---
+
+Use this guide to forward receipts to an address such as `receipts@example.com` and have them appear in the app. Email is optional: uploads work without it. The Deploy to Cloudflare button does not set up email, and neither does the app, because it holds no Cloudflare API token.
+
+## Prerequisites
+
+- A deployed copy of Nuits Receipts you can sign in to.
+- A domain on Cloudflare DNS. If the domain already receives mail somewhere else, use a subdomain such as `receipts.example.com`, so your existing MX records stay as they are.
+- The addresses you will forward receipts from, for example your own mailbox.
+
+## Route the address to the Worker
+
+<Steps>
+  <Step title="Turn on Email Routing for the domain">
+
+In the Cloudflare dashboard, go to **Compute > Email Service > Email Routing** and select **Onboard Domain** for your domain or subdomain. Cloudflare adds the MX, SPF and DKIM records it needs. Skip this step if Email Routing is already on.
+
+  </Step>
+  <Step title="Create the routing rule">
+
+On the **Routing Rules** tab, select **Create routing rule** and fill in:
+
+- **Email pattern**: the local part of your receipt address, for example `receipts`, and your domain.
+- **Action**: **Send to a Worker**.
+- **Destination**: your Nuits Receipts Worker (the Worker name you chose at deploy, `my-nuits-receipts` by default).
+
+Select **Save**. Only one rule should use this pattern: if two do, only the first one in the list is used.
+
+  </Step>
+  <Step title="Tell the app the address and the allowed senders">
+
+In the app, open **Settings > Email** and fill in:
+
+- **Receipt address**: the address you just routed. It is shown next to the upload form. Routing, not this field, decides what reaches the Worker.
+- **Allowed senders**: one address per line. Only mail whose envelope sender is on this list is read. With an empty list, all mail is ignored.
+
+Changing either field needs its confirmation tick in the same save: "I’ve added the Email Routing rule for this address" and "I’ve checked this list; mail from anyone else is ignored". Then press **Save email**.
+
+You can set the same values at deploy time with the `RECEIPT_ADDRESS` and `ALLOWED_SENDER_EMAILS` variables instead. A value saved in the app wins over the variable. See [Change settings in the app](/how-to/change-settings-in-the-app/).
+
+  </Step>
+  <Step title="Send a test receipt">
+
+From an allowed address, forward an email with a PDF or image receipt attached (or a receipt in the email body) to the receipt address.
+
+  </Step>
+</Steps>
+
+:::tip[Routing rules from your config]
+Recent Wrangler versions can also create **Send to a Worker** rules on deploy from an `addresses` list in your Wrangler config. The template does not use this. If you add it, a non-interactive deploy (such as a Workers Builds run) will not delete or take over a rule without confirmation. See Cloudflare's [Email Routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/#configure-rules-with-wrangler).
+:::
+
+## Check it worked
+
+Within a minute or so the receipt appears on **Home** and, if anything needs a look, under **Review**. The email itself is kept in your R2 bucket as the original.
+
+If nothing appears:
+
+- **The sender is not allowed.** Mail from anyone not on **Allowed senders** is dropped without being stored. Check the address that actually arrives: forwarding services and mailing lists can change the envelope sender.
+- **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
+- **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept in **Review** with "We couldn't verify who sent this email." It is not read by AI. Download the original, check it, and upload it if it is genuine.
+- **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).
+
+## Change the address later
+
+1. In Cloudflare, add a **Send to a Worker** rule for the new address.
+2. In **Settings > Email**, change **Receipt address**, tick the confirmation and press **Save email**. The app reminds you of the next steps.
+3. Send a test from an allowed address and check that it arrives.
+4. Remove the rule for the old address.
+
+## Related
+
+- [Email and sender trust](/explanation/email-and-sender-trust/) explains the allowlist and the SPF check.
+- [Forward a copy of incoming mail](/how-to/forward-a-copy-of-incoming-mail/), for one-time codes sent to the receipt address.
+- [Keep sales invoices](/how-to/keep-sales-invoices/) with a second routed address.
+- [Configuration](/reference/configuration/) for `RECEIPT_ADDRESS` and `ALLOWED_SENDER_EMAILS`.

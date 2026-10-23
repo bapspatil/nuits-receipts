@@ -1,0 +1,153 @@
+---
+title: Month package
+description: The month ZIP's layout, file naming, query options, index spreadsheets and limits.
+sidebar:
+  order: 4
+---
+
+The month package is one ZIP that holds one folder with the month's original documents and index spreadsheets. The optional OneDrive upload uses the same plan: the same files, names and subfolders, inside a subfolder of the chosen OneDrive folder.
+
+## Download
+
+| Item | Value |
+| --- | --- |
+| Path | `GET /month/package.zip?month=YYYY-MM` |
+| ZIP file name | `<folder>.zip`, or `<folder>-changes.zip` with `changes=1` |
+| Folder name | `<EXPORT_PREFIX>-YYYY-MM`, for example `receipts-2026-10` |
+| Compression | None (stored). Originals are copied byte for byte. |
+| `Content-Length` | Sent when the package has at most 400 files. |
+
+### Query options
+
+| Parameter | Button or control on the Month page | Effect |
+| --- | --- | --- |
+| `anyway=1` | **Download anyway** | Also includes documents that are not checked (needs review, still being read) and emails held for review, in `check-these/`. |
+| `undated=1` | **Also include … with no date** | Also includes documents with no issue date, from any month, in `check-these/`. |
+| `changes=1` | **Download only what changed** | Only documents added or corrected since the month was last marked as sent. |
+
+## Layout
+
+```text title="receipts-2026-10.zip"
+receipts-2026-10/
+  00-index-2026-10.csv
+  00-sales-index-2026-10.csv
+  00-missing-receipts-2026-10.csv
+  2026-10-02_Hetzner-Online_EUR-24.99_7f3a1c.pdf
+  2026-10-09_Stripe_USD-20.00_c0ffee.html
+  check-these/
+    2026-10-14_Some-Shop_EUR-12.00_3c4d5e.png
+  sales/
+    2026-10-05_2026-041_Example-Client_EUR-1240.00_9a8b7c.pdf
+```
+
+| Entry | Present when | Content |
+| --- | --- | --- |
+| `00-index-YYYY-MM.csv` | Always | One row per expense receipt in the package. |
+| `00-sales-index-YYYY-MM.csv` | At least one sales invoice is in the package | One row per sales invoice in the package. |
+| `00-missing-receipts-YYYY-MM.csv` | At least one payment out in the month has no receipt | One row per such payment. |
+| Files at the top of the folder | Expense receipts with status `ready` | The originals. |
+| `check-these/` | `anyway=1` or `undated=1` selects at least one document | Unchecked documents, emails held for review (`.eml`) and undated documents. |
+| `sales/` | At least one sales invoice with status `ready` | The originals of sales invoices. |
+
+## Which documents go in
+
+Documents are taken from those dated in the month (receipts and sales invoices), plus undated ones when `undated=1`.
+
+| Document | Placed in |
+| --- | --- |
+| Marked as a duplicate of another | Never included |
+| Email held for review (`message/rfc822`), with an issue date | `check-these/` with `anyway=1`, otherwise left out |
+| Email held for review, no issue date | `check-these/` with both `anyway=1` and `undated=1`, otherwise left out |
+| Any other document with no issue date | `check-these/` with `undated=1`, otherwise left out |
+| Expense receipt, status `ready` | Top of the month folder |
+| Sales invoice, status `ready` | `sales/` |
+| Any other status (`needs_review`, `pending`, `processing`) | `check-these/` with `anyway=1`, otherwise left out |
+
+## File names
+
+| Document | Pattern |
+| --- | --- |
+| Expense receipt | `<date>_<vendor>_<CUR>-<total>_<id>.<ext>` |
+| Sales invoice | `<date>_<invoice number>_<client>_<CUR>-<total>_<id>.<ext>` |
+
+| Part | Rule |
+| --- | --- |
+| `<date>` | Issue date `YYYY-MM-DD`, or `undated`. |
+| `<vendor>` | Seller name, at most 40 characters. `Unknown-vendor` when empty. |
+| `<invoice number>` | At most 24 characters. `no-number` when empty. |
+| `<client>` | At most 40 characters. `Unknown-client` when empty. |
+| `<CUR>-<total>` | Currency code and total with its minor digits, for example `EUR-24.99`. A negative total is written `EUR-minus-24.99`. `XXX` when the currency is unknown. `no-amount` replaces the whole part when the total is unknown. |
+| `<id>` | First 6 characters of the document ID. Lengthened to 8, 10 and so on (up to 64) when two names in the same folder would otherwise be equal, ignoring case. |
+| `<ext>` | From the media type, see below. |
+
+Each text part is folded to ASCII: accents are removed, letters such as `ß`, `æ`, `ø` and `ł` are spelled out, and any other run of characters becomes `-`. Parts never start or end with `.` or `-`. A whole name is at most 120 characters. A name whose first part is a Windows reserved name (`CON`, `PRN`, `AUX`, `NUL`, `COM0` to `COM9`, `LPT0` to `LPT9`) gets a leading `_`.
+
+| Media type | Extension |
+| --- | --- |
+| `application/pdf` | `pdf` |
+| `image/png` | `png` |
+| `image/jpeg` | `jpg` |
+| `image/webp` | `webp` |
+| `text/html` | `html` |
+| `text/plain` | `txt` |
+| `message/rfc822` | `eml` |
+| anything else | `bin` |
+
+## Index spreadsheets
+
+`00-index-YYYY-MM.csv` has the 20 columns of the [receipts CSV](/reference/export-csv/#receipts-csv-columns), then:
+
+| # | Column | Content |
+| --- | --- | --- |
+| 21 | `file_name` | Path of the file inside the month folder, for example `check-these/2026-10-14_Some-Shop_EUR-12.00_3c4d5e.png`. |
+| 22 | `folder` | `main` for the top of the month folder, or `check-these`. |
+
+`00-sales-index-YYYY-MM.csv` has the 22 columns of the [sales CSV](/reference/export-csv/#sales-csv-columns), then `file_name` and `folder` (`sales` or `check-these`).
+
+Both use the same value formats as the CSV exports.
+
+## Missing receipts spreadsheet
+
+Rows are payments out (negative amounts) from completed imports, booked in the month, that still need a receipt and have none matched. Ordered by booking date, account, then ID.
+
+| # | Column | Content |
+| --- | --- | --- |
+| 1 | `date` | Booking date. |
+| 2 | `paid_to` | Merchant as on the bank statement. |
+| 3 | `amount` | Amount paid, as a positive number. |
+| 4 | `currency` | Currency of the bank row. |
+| 5 | `account` | Bank account name. |
+| 6 | `reference` | Bank reference, or empty. |
+
+## Marking as sent
+
+| Item | Value |
+| --- | --- |
+| Button | **I've sent `<month>` to `<ACCOUNTANT_LABEL>`** |
+| Request | `POST /month/sent` |
+| Recorded | One row in `month_sends`: time, method (`download` or `onedrive`), number of documents, EUR total of expense receipts, and the sorted list of `id:revision` for every non-duplicate document dated in the month, with its SHA-256. |
+| Refused when | No documents are dated in the month, or the month changed since the page was opened (HTTP 409). |
+
+After a send, the Month page compares the current list with the last one and counts documents added, corrected (revision changed) and removed.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Files per package | 900. A larger month returns HTTP 413. |
+| Exact size and progress | Only for packages of at most 400 files. |
+| Empty package | HTTP 422, or 409 with `changes=1`. |
+| Missing original in R2 | HTTP 404 before streaming, for packages of at most 400 files. |
+
+## OneDrive upload
+
+| Item | Value |
+| --- | --- |
+| Request | `POST /month/onedrive-upload` |
+| Destination | Subfolder `<EXPORT_PREFIX>-YYYY-MM` inside the chosen OneDrive folder, created if missing. |
+| Files per request | 10. The page then shows how many are uploaded and a **Continue uploading** button. |
+| Single upload | Files up to 4 MiB. |
+| Upload session | Larger files, in chunks of 3,276,800 bytes. |
+| Repeat uploads | Files already uploaded at the same revision are skipped. A corrected document replaces its old copy. Index files are always replaced. |
+| When done | The month is recorded as sent with method `onedrive`. |
+| HTTP 429 or 503 from Microsoft | The batch stops and the page shows how many seconds to wait. |

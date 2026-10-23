@@ -1,0 +1,128 @@
+---
+title: Cut a release
+description: Write Conventional Commits, let the release workflow tag the version, or run the same steps locally.
+sidebar:
+  order: 22
+  label: Cut a release
+---
+
+Use this guide to publish a new version of Nuits Receipts. Nobody edits the version by hand: `scripts/version.mjs` reads the Conventional Commits since the last `v*` tag and decides the bump. Releasing only tags the code. Each deployment owner decides when to deploy it (see [Upgrade your deployment](/how-to/upgrade-your-deployment/)).
+
+## Prerequisites
+
+- Push access to `main` on GitHub.
+- For a local release: Bun 1.4 or later, an up-to-date `main` with tags fetched (`git fetch --tags`), and the GitHub CLI (`gh`) signed in.
+
+## Choose the commit type
+
+Pull requests are squash-merged, so the pull request title becomes the commit subject. Give it a Conventional Commits type:
+
+| Commit | Bump | Changelog section |
+| --- | --- | --- |
+| `fix(...)`, `hotfix(...)` | patch | Hotfixes |
+| `perf(...)`, `revert(...)` | patch | Hotfixes, or UI enhancements for a UI scope |
+| `style(...)` | patch | UI enhancements |
+| `feat(...)` | minor | Features, or UI enhancements for a UI scope |
+| `type!` or a `BREAKING CHANGE:` footer | major | Breaking changes |
+| `docs`, `test`, `chore`, `ci`, `build`, `refactor`, `copy`, `update` | none | not listed |
+
+UI scopes are `a11y`, `design`, `footer`, `style` and `ui`. The highest bump in the range wins. Subjects that are not Conventional Commits are ignored and reported under `unclassified`, and merge commits are skipped.
+
+## Release from GitHub
+
+<Steps>
+  <Step title="Check the code">
+
+Before merging, run the full check and a deploy dry run:
+
+```sh
+bun run check
+bun run deploy:dry-run
+```
+
+See [Run the tests](/how-to/run-the-tests/) for what `check` covers.
+
+  </Step>
+  <Step title="Merge to main">
+
+`.github/workflows/release.yml` runs on every push to `main`. It skips commits whose subject starts with `chore(release):`, so its own release commit does not trigger another run. It never runs on a schedule.
+
+The workflow runs `bun scripts/version.mjs apply`, which rewrites `package.json` and prepends an entry to `CHANGELOG.md`, then acts on the plan:
+
+- `release`: commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes `main` and the tag, and creates a GitHub Release from that version's changelog entry.
+- `baseline`: first run only, when no tag exists. Tags the current `package.json` version and creates a GitHub Release for it.
+- `skip`: no `feat`, `fix`, `perf`, `style` or breaking commits since the last tag. Nothing changes.
+
+If `main` is protected, add a `RELEASE_TOKEN` repository secret with a token that may push to it. Without it the workflow uses the default `GITHUB_TOKEN`.
+
+  </Step>
+  <Step title="Override the bump if needed">
+
+To force a bump, run the workflow by hand: **Actions**, **Release**, **Run workflow**, then choose `patch`, `minor` or `major` under **bump**. `auto` follows the commits.
+
+  </Step>
+</Steps>
+
+## Release from your machine
+
+The same steps run locally on an up-to-date `main`.
+
+<Steps>
+  <Step title="Preview the plan">
+
+```sh
+bun run version:next
+```
+
+This is read-only. It prints the plan as JSON: `action`, `currentVersion`, `bump`, `nextVersion`, `tag`, the grouped changelog lines and any `unclassified` subjects. To preview a forced bump:
+
+```sh
+bun run version:next -- --force minor
+```
+
+  </Step>
+  <Step title="Apply the plan">
+
+```sh
+bun run version:apply > plan.json
+```
+
+This rewrites `package.json` and prepends `CHANGELOG.md`. It does not touch git or the network. Read `action` and `nextVersion` in `plan.json`.
+
+  </Step>
+  <Step title="Commit, tag and publish">
+
+For `"action": "release"`, with `X.Y.Z` from `nextVersion`:
+
+```sh
+git add package.json CHANGELOG.md
+git commit -m "chore(release): vX.Y.Z"
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin main
+git push origin vX.Y.Z
+bun scripts/version.mjs notes X.Y.Z > notes.md
+gh release create vX.Y.Z --title vX.Y.Z --notes-file notes.md
+```
+
+For `"action": "baseline"`, tag the current version with `git tag -a vX.Y.Z -m "Release baseline vX.Y.Z"`, push the tag and create a GitHub Release for it. For `"action": "skip"`, there is nothing to do.
+
+  </Step>
+</Steps>
+
+Nothing is published to npm.
+
+## Check it worked
+
+- The new tag shows under **Releases** on GitHub with the grouped notes.
+- `CHANGELOG.md` on `main` starts with the new version.
+- After a deployment, the footer of every app page shows the new version. `src/ui.ts` reads it from `package.json` at build time, and if `SOURCE_REPOSITORY` is set the version links to `<SOURCE_REPOSITORY>/releases/tag/vX.Y.Z`.
+
+## If something goes wrong
+
+- **Push rejected:** no tag or release was created. Fix the cause and run it again; the plan is computed from scratch.
+- **Tag exists, release does not:** run `bun scripts/version.mjs notes X.Y.Z > notes.md`, then `gh release create vX.Y.Z --notes-file notes.md`.
+- **Wrong commit type:** land a correcting commit. Never move or delete a published tag.
+
+## Docs
+
+The docs site in `docs-site/` is not versioned by this process: a `docs(...)` commit does not bump the version. Build it before you merge a docs change, so broken internal links and copy rule hits fail locally rather than later. See the end of [Run the tests](/how-to/run-the-tests/) for the commands.

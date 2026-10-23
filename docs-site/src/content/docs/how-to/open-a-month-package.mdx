@@ -1,0 +1,91 @@
+---
+title: Open a month package
+description: For accountants. What to open first in a month ZIP or CSV from Nuits Receipts, and how to check the figures against the originals.
+sidebar:
+  order: 19
+  label: Open a month package
+---
+
+Use this guide if a client has sent you a month of receipts from Nuits Receipts, as a ZIP, a folder or a single CSV. The figures in it were read from the receipts by AI and checked by your client; the originals are included so you can check them yourself. How the rows are booked is your decision.
+
+## Prerequisites
+
+- The ZIP or folder your client sent, usually named like `receipts-2026-10`. Your client may have chosen a different start for the name.
+- A spreadsheet program. The CSV files are UTF-8 with a byte order mark, comma separated, with a dot as the decimal mark.
+
+## Open the package
+
+<Steps>
+  <Step title="Unzip it">
+
+Unzip the file (Mac: double-click; Windows: **Extract all**). OneDrive's web page cannot unzip, so download it first if it arrived there as a ZIP. If the name ends in `-changes`, see [A changes package](#a-changes-package) below.
+
+  </Step>
+  <Step title="Open the index first">
+
+Open `00-index-2026-10.csv`. It has one row per receipt in the package, with the date, seller, receipt number, net, VAT rate, VAT, total and currency as read, plus the euro total, the part of the business and kind of cost, and two columns at the end: `file_name` (where the original is in the folder) and `folder`.
+
+  </Step>
+  <Step title="Look for rows that need review">
+
+Filter on `needs_review`. In a ready month every row is `false`. Rows marked `true` were not checked by your client; their files are in the `check-these` subfolder, and `review_reasons` says why they were flagged. Treat these figures with extra care.
+
+  </Step>
+  <Step title="Check the other spreadsheets">
+
+- `00-missing-receipts-2026-10.csv`, if present, lists payments out on the bank statement that have no receipt yet: date, payee, amount, currency, account and reference.
+- `00-sales-index-2026-10.csv`, if present, lists sales invoices your client sent, with the files in the `sales` subfolder.
+
+  </Step>
+</Steps>
+
+## Check figures against the originals
+
+<Steps>
+  <Step title="Open the original for a row">
+
+The file named in `file_name` is the original receipt, byte for byte: a PDF, a photo, or an email saved as `.html` or `.txt` (these open in any browser). File names start with the date and seller, so the folder sorts by date.
+
+  </Step>
+  <Step title="Compare the amounts">
+
+Compare `total`, `net`, `vat`, `vat_rate` and `currency` with the original. Nuits Receipts checks in code that net plus VAT equals the total, but it can still misread a figure.
+
+  </Step>
+  <Step title="Check where the euro amount came from">
+
+`eur_total` is the amount in euros, and `eur_source` says where it came from:
+
+| `eur_source` | Meaning |
+| --- | --- |
+| `native` | The receipt is in euros. |
+| `bank` | Taken from the matched bank payment. |
+| `manual` | Typed in by your client, with a reason. |
+| `ecb` | Converted at the ECB reference rate for `fx_rate_date`, because no bank payment was matched. |
+| `missing` | No euro amount yet. |
+
+  </Step>
+  <Step title="Check the bank match">
+
+`matched_bank_transaction` and `matched_account_name` show which bank payment the receipt was matched to, if any. The app makes a match automatically only when one receipt and one payment fit each other; your client makes the rest by hand. Check them against the statement if it matters.
+
+  </Step>
+</Steps>
+
+To compare totals, add up `eur_total` in the index and compare it with the total your client sees on their Month page. Ask them for it, or for the **Costs by part of the business** table on the same page. Rows with no euro amount are not in that total.
+
+The `original_link` column points at your client's own copy of the app and needs their sign-in. Use the files in the folder instead.
+
+## A changes package
+
+A ZIP whose name ends in `-changes` holds only the receipts added or corrected since the last package, with an index of just those files. Copy the new files into your existing folder, but keep the full index from the earlier package and add the new rows to it. A corrected receipt may have a new file name; the old file then still sits in your folder.
+
+## A CSV on its own
+
+Your client may send only the CSV (named like `receipts-2026-10.csv`). It has the same columns as the index without `file_name` and `folder`, and lists every receipt dated in the month, including ones still marked `needs_review`. Ask for the originals for any row you need to check.
+
+## Related
+
+- How the figures were produced, what to trust and what to check: [For accountants](/explanation/for-accountants/).
+- Every column of the CSV and index: [Export CSV](/reference/export-csv/).
+- Folder layout and file naming: [Month package](/reference/month-package/).

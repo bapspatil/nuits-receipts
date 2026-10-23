@@ -1,0 +1,189 @@
+---
+title: Bank CSV import
+description: Mapping fields, accepted formats, built-in layouts, duplicate rules and limits of the bank CSV import.
+sidebar:
+  order: 5
+  label: Bank CSV import
+---
+
+The import reads a CSV export of booked payments. There are presets for some layouts and a column mapper for others, and it has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
+
+## Flow
+
+| Step | Page | Request | Writes |
+| --- | --- | --- | --- |
+| 1. Choose file | **Import a bank statement** (`/import`) | `POST /imports/csv` | Nothing |
+| 2. Check | **Check the file** | `POST /imports/csv/preview` (button **Check again**) | Nothing |
+| 3. Import | | `POST /imports/csv/confirm` (button **Import N payments**) | R2 original, D1 import and bank rows |
+
+Preview reads the whole file and shows up to 50 rows and up to 100 row problems. Any row problem blocks the import. A preview is valid for 30 minutes and is signed; changing the mapping, the account or a decision after the preview needs a new preview. After import the browser goes to **Payments** for the month of the first row.
+
+## Step 1 fields
+
+| Label | Field | Values |
+| --- | --- | --- |
+| Bank statement (CSV file) | `file` | `.csv` or `.txt` file |
+| Which account is this? | `account` | An existing account |
+| Import into | `account_action` | `existing`: the account chosen here; `new`: a new account |
+| Account name | `account_label` | New account only |
+| Bank | `bank_name` | New account only |
+| Currency | `account_currency` | New account only. One of the ten supported currencies. |
+| Text encoding | `encoding` | **Detect BOM or UTF-8** (`auto`), UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252 / ISO-8859-1 |
+
+A new account is created only when the import is confirmed.
+
+## Mapping fields
+
+Shown under **The columns look wrong? Adjust how we read the file**. Column numbers in the app start at 1; row numbers for **Which row has the column names?** start at 0.
+
+### The file
+
+| Label | Mapping key | Values |
+| --- | --- | --- |
+| Layout | | **Choose layout**, **Custom mapping**, or a saved or built-in layout that matches the column names |
+| Text encoding | `encoding` | `utf-8`, `utf-16le`, `utf-16be`, `windows-1252` |
+| Column separator | `delimiter` | Comma, Semicolon, Tab, Pipe |
+| Which row has the column names? | `headerRecord` | 0 to 100. Rows above it are left out. |
+| Rows to skip at the end | `trailingRecords` | 0 to 100 |
+
+### Dates
+
+| Label | Mapping key | Values |
+| --- | --- | --- |
+| Date column | `date.column` | Required |
+| Date format | `date.format` | `ISO` (`YYYY-MM-DD`), `DD.MM.YYYY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `ISO_OR_DOTTED` (either `YYYY-MM-DD` or `DD.MM.YYYY` per row) |
+| Dates include a time | `date.time` | **No** (`none`), **Sometimes** (`optional`) |
+
+With **Sometimes**, a date may be followed by `T` or a space and `HH:MM`, optional seconds and fractions, and an optional `Z` or `+HH:MM` offset. The printed calendar day is kept. A date format with slashes needs the tick **The day and month order above is right for dates written with slashes.**
+
+### Amounts
+
+| Label | Mapping key | Values |
+| --- | --- | --- |
+| Decimal mark | `number.decimal` | `.`, `,`, `dot-or-comma` |
+| Thousands separator | `number.grouping` | none, `.`, `,`, `space`, `'` |
+| How amounts are shown | `amount.kind` | **One amount column** (`signed`), **Separate money out and money in columns** (`split`), **An amount column plus an in or out column** (`direction`) |
+| Amount column | `amount.column` or `amount.amount` | For `signed` and `direction` |
+| Money out is shown as | `amount.outgoing` | **Negative numbers**, **Positive numbers**. For `signed`. |
+| Money out column | `amount.debit` | For `split` |
+| Money in column | `amount.credit` | For `split` |
+| In or out column | `amount.direction` | For `direction` |
+| Words that mean money out | `amount.debit` | For `direction`. Exact text; several separated by `\|`. Default `OUT`. |
+| Words that mean money in | `amount.credit` | For `direction`. Default `IN`. |
+
+`dot-or-comma` takes whichever of `.` or `,` appears and cannot be combined with a thousands separator. `space` accepts a space, a no-break space or a narrow no-break space. Groups must be 3 digits after a first group of 1 to 3. Money out is stored as a negative amount.
+
+### Currency and names
+
+| Label | Mapping key | Values |
+| --- | --- | --- |
+| Currency | `currency.kind` | **The same for every row** (`default`), **Read from a column** (`column`) |
+| Currency for every row | `currency.currency` | For `default` |
+| Currency column | `currency.column` | For `column` |
+| Currency when that column is empty | `currency.blankDefault` | For `column`. Empty means a blank cell is an error. |
+| Paid to column | `merchant` | Required. A blank cell is an error. |
+| Reference column | `reference` | Optional |
+| Transaction ID column | `externalId` | Optional. The bank's own ID for the row. |
+| Original amount column | `original.amount` | Optional. Must be paired with the next. |
+| Original currency column | `original.currency` | Optional. Must be paired with the previous. |
+
+### Already imported?
+
+| Label | Field | Values |
+| --- | --- | --- |
+| If a payment was already imported | `collision` | **Ask me** (empty), **Skip the ones already imported** (`keep_existing`), **Import them as extra payments** (`additional`) |
+| I checked the account. Similar payments in my other accounts are separate payments. | `acknowledge_other_account` | Tick |
+
+### Save this layout for next time
+
+| Label | Field | Rules |
+| --- | --- | --- |
+| Bank | `preset_bank` | 1 to 100 characters |
+| Layout name | `preset_name` | 1 to 100 characters, unique per bank. Optional; empty saves nothing. |
+
+A saved layout is stored with a fingerprint of the normalised column names and is offered for files whose column names give the same fingerprint. A failure to save the layout does not undo the import.
+
+## Accepted formats
+
+| Item | Accepted |
+| --- | --- |
+| Encodings | UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252. A byte order mark selects the UTF encoding. Without one, the file must be valid in the chosen encoding. |
+| Separators | `,` `;` tab `\|`. Detected from the column names row when not chosen. |
+| Currencies | EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY |
+| Amounts | Integer minor units. More decimals than the currency has are allowed only when they are zero. |
+| Not accepted | XLSX, bank API connections, filtering of pending rows |
+
+## Built-in layouts
+
+Built-in layouts are matched by column names. They were tested with synthetic files only and are named after the CSV layout, not the bank. Presets match common CSV export layouts; Nuits Receipts is not affiliated with any bank.
+
+| Layout | Matches column names | Date | Decimal | Separator |
+| --- | --- | --- | --- | --- |
+| Holvi (CSV layout) | Recognised aliases for date, payee, amount or debit and credit, and optional currency, reference, transaction ID and original amount and currency | `ISO_OR_DOTTED` | `dot-or-comma` | `;` |
+| Nordea (CSV layout) | `Kirjauspäivä`, `Saaja`, `Summa`, `Valuutta`, `Viite` | `DD.MM.YYYY` | `,` with space grouping | `;` |
+| OP (CSV layout) | Same as Nordea | `DD.MM.YYYY` | `,` with space grouping | `;` |
+| Revolut (CSV layout) | `Started Date`, `Completed Date`, `Description`, `Amount`, `Currency`, `ID` | `ISO`, date from `Completed Date` | `.` | `,` |
+| Wise (CSV layout) | `ID`, `Date`, `Amount`, `Currency`, `Description`, `Reference` | `ISO` | `.` | `,` |
+| N26 (CSV layout) | `Date`, `Payee`, `Payment reference`, `Amount (EUR)`, `Currency` | `ISO` | `.` | `,` |
+
+When exactly one layout matches, it is applied automatically. When several match, you choose one or **Custom mapping**.
+
+### Column name aliases (Holvi layout)
+
+Column names are compared after normalisation (lower case, accents removed, punctuation as spaces).
+
+| Value | Aliases |
+| --- | --- |
+| Transaction ID | `transaction id`, `transaction number`, `tapahtumatunnus`, `tapahtuma id` |
+| Date | `booking date`, `date`, `kirjauspaiva`, `tapahtumapaiva` |
+| Amount | `amount`, `summa`, `maara` |
+| Currency | `currency`, `valuutta` |
+| Paid to | `payee`, `recipient`, `counterparty`, `name`, `saaja`, `maksaja`, `nimi` |
+| Reference | `reference`, `message`, `description`, `viite`, `viitenumero`, `viesti`, `selite` |
+| Original amount | `original amount` |
+| Original currency | `original currency` |
+| Money out | `debit` |
+| Money in | `credit` |
+
+## Row problem codes
+
+Shown in the preview as "Row N, field: message (code)".
+
+| Code | Meaning |
+| --- | --- |
+| `csv_syntax` | The CSV parser could not read the row. |
+| `column_count` | The row has a different number of columns from the column names row. |
+| `mapping_column` | A mapped column is not in the column names row. |
+| `invalid_date` | The date does not match the format, or a time is present when not allowed. |
+| `invalid_merchant` | The paid-to cell is empty. |
+| `invalid_currency` | Unsupported or empty currency. |
+| `invalid_amount` | The amount does not parse, the debit and credit cells conflict, or the sign conflicts with the direction word. |
+| `invalid_original_currency` | Unsupported original currency. |
+| `invalid_original_amount` | Original amount does not parse, or its sign differs from the amount. |
+
+## Duplicates and re-imports
+
+| Situation | Result |
+| --- | --- |
+| Same file bytes, same account, import complete | Nothing new is imported. Existing matches and exemptions stay. |
+| Same file bytes, same account, import pending | The import resumes with the settings it was started with. |
+| Same file bytes, another account | Refused with HTTP 409. |
+| Row with a transaction ID already stored in this account with the same facts | Skipped. |
+| Row with a transaction ID already stored in this account with different facts | Import refused with HTTP 409. |
+| Row without a transaction ID equal to one from another file in the same account | You choose: skip it (`keep_existing`) or import it as an extra payment (`additional`). |
+| Equal rows without a transaction ID inside one file | Kept as separate payments. |
+| Same date and amount, or same transaction ID, in another account | Needs the account tick. Rows are never merged across accounts. |
+
+A row's identity is a hash of the account and either the transaction ID or its facts: booking date, amount, currency, normalised merchant, reference, original amount and original currency, plus a count of equal rows before it in the file.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| File size | 2 MiB |
+| Rows | 1 to 5,000, not counting the column names row and skipped rows |
+| Columns | 100 |
+| Cell size | 64 KiB decoded |
+| Stored raw row | 256 KiB of JSON |
+| Saved mapping | 32 KiB |
+| Import record (manifest) | 1 MiB |

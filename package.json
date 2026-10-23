@@ -1,0 +1,134 @@
+{
+  "name": "nuits-receipts",
+  "version": "1.0.1",
+  "description": "Self-hosted receipt and invoice reader that runs on Cloudflare Workers: reads receipts with Workers AI, matches them to bank CSV exports and prepares a monthly CSV for your accountant.",
+  "license": "Apache-2.0",
+  "author": "Bapusaheb Patil / Nuits",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.4"
+  },
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "dev": "XDG_CONFIG_HOME=.cache/config WRANGLER_LOG_PATH=.wrangler/logs WRANGLER_SEND_METRICS=false wrangler dev --local --config wrangler.local.jsonc",
+    "migrate": "XDG_CONFIG_HOME=.cache/config WRANGLER_LOG_PATH=.wrangler/logs WRANGLER_SEND_METRICS=false wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
+    "typecheck": "tsc --noEmit",
+    "test": "XDG_CONFIG_HOME=.cache/config WRANGLER_LOG_PATH=.wrangler/logs WRANGLER_SEND_METRICS=false vitest run",
+    "samples": "bun scripts/generate-samples.ts",
+    "eval": "bun scripts/eval-extraction.ts",
+    "smoke": "bash scripts/smoke.sh && bash scripts/smoke-email.sh",
+    "format": "prettier --write src test scripts/generate-samples.ts scripts/setup.mjs scripts/deploy.mjs scripts/deploy-lib.mjs scripts/deploy.test.ts scripts/schema.test.ts scripts/eval-extraction.ts scripts/eval-extraction.test.ts vitest.config.ts tsconfig.json package.json",
+    "version:next": "bun scripts/version.mjs next",
+    "version:apply": "bun scripts/version.mjs apply",
+    "test:release": "bun test scripts/version.test.ts",
+    "setup": "node scripts/setup.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:dry-run": "node scripts/deploy.mjs --dry-run",
+    "lint": "prettier --check src test scripts/generate-samples.ts scripts/setup.mjs scripts/deploy.mjs scripts/deploy-lib.mjs scripts/deploy.test.ts scripts/schema.test.ts scripts/eval-extraction.ts scripts/eval-extraction.test.ts vitest.config.ts tsconfig.json package.json",
+    "test:scripts": "bun test scripts/",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run test:scripts"
+  },
+  "dependencies": {
+    "client-zip": "2.5.0",
+    "papaparse": "5.7.0",
+    "postal-mime": "4.0.11",
+    "unpdf": "1.9.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.23.0",
+    "@cloudflare/workers-types": "5.20261019.1",
+    "@types/node": "26.6.5",
+    "@types/papaparse": "5.5.2",
+    "@types/pngjs": "6.0.5",
+    "pdf-lib": "1.17.1",
+    "pngjs": "7.0.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.0",
+    "wrangler": "4.149.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "NUITS_PASSWORD": {
+        "description": "Your sign-in password. Use at least 16 characters and a value unique to this install, for example from `openssl rand -base64 24`. Example values are refused."
+      },
+      "AUTH_USERNAME": {
+        "description": "User name for signing in. Defaults to `owner`."
+      },
+      "ALLOWED_SENDER_EMAILS": {
+        "description": "Comma-separated addresses allowed to email receipts in. Leave empty to use uploads only. Email also needs an Email Routing **Send to a Worker** rule, which the button does not create."
+      },
+      "RECEIPT_ADDRESS": {
+        "description": "The address you route to this Worker in Email Routing, on your own domain. Shown in the app. Optional."
+      },
+      "FORWARD_COPY_TO": {
+        "description": "Optional. Forward a copy of every email the Worker receives, from any sender, to this one address (for example one-time codes). It must be a verified destination address in Email Routing. Leave empty to turn it off."
+      },
+      "INVOICES_ADDRESS": {
+        "description": "Optional. A second address, routed to this Worker like the receipt address, for copies of sales invoices you send. Must differ from the receipt address. Leave empty to turn it off."
+      },
+      "SELLER_NAMES": {
+        "description": "Optional. Your business names as they appear on your own invoices, comma separated. Sales invoices that name someone else as the seller are flagged."
+      },
+      "PRODUCTS_JSON": {
+        "description": "Products or projects to group costs by, as JSON, for example `[{\"id\":\"general\",\"label\":\"General\"}]`."
+      },
+      "DEFAULT_PRODUCT": {
+        "description": "The product id new receipts start with. Must be in `PRODUCTS_JSON`."
+      },
+      "ACCOUNTANT_LABEL": {
+        "description": "Who receives the month's files, shown on the Send step. Defaults to `your accountant`."
+      },
+      "AI_MODE": {
+        "description": "`live` reads receipts with Workers AI. `mock` uses a fixed test extractor with no AI or network calls, for trying the app only. Defaults to `live`."
+      },
+      "APP_NAME": {
+        "description": "Name shown in the page title, header and sign-in prompt. Defaults to `Nuits Receipts`."
+      },
+      "EXPORT_PREFIX": {
+        "description": "File name prefix for exports, as in `receipts-2026-09.csv` and the month ZIP `receipts-2026-09.zip`. Letters, digits, `.`, `_` and `-`. Defaults to `receipts`."
+      },
+      "SOURCE_REPOSITORY": {
+        "description": "Optional `https://` URL of your copy of the code. If set, the footer links the version to its release notes. Leave empty to hide the link."
+      },
+      "ACCESS_TEAM_DOMAIN": {
+        "description": "Optional. Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`. Set it with `ACCESS_AUD` and `ACCESS_ALLOWED_EMAILS` to sign in through Access instead of the password. Needs your own domain; see docs/ENVIRONMENT.md. Leave empty to use the password."
+      },
+      "ACCESS_AUD": {
+        "description": "Optional. The Access application's Audience (AUD) tag. Leave empty to use the password."
+      },
+      "ACCESS_ALLOWED_EMAILS": {
+        "description": "Optional. Emails the app accepts from Cloudflare Access, comma separated. Leave empty to use the password."
+      },
+      "SEND_HINT": {
+        "description": "Optional. One line shown under the month's download button, for example where your accountant wants the files. Leave empty to show nothing."
+      },
+      "MS_CLIENT_ID": {
+        "description": "Optional. Application (client) ID of your Microsoft Entra app, to upload each month straight into a OneDrive folder. Needs the `MS_CLIENT_SECRET` and `ONEDRIVE_TOKEN_KEY` secrets too; see docs/ENVIRONMENT.md. Leave empty to keep it off."
+      },
+      "MS_CLIENT_SECRET": {
+        "description": "Optional secret for OneDrive upload: the client secret value of your Microsoft Entra app."
+      },
+      "ONEDRIVE_TOKEN_KEY": {
+        "description": "Optional secret for OneDrive upload: 32 random bytes in base64 (`openssl rand -base64 32`), used to encrypt the stored Microsoft sign-in."
+      },
+      "DB": {
+        "description": "D1 database for receipts, bank rows and rules. Created for you; the schema is applied on deploy."
+      },
+      "ORIGINALS": {
+        "description": "Private R2 bucket for original documents and emails. Never made public."
+      },
+      "AI": {
+        "description": "Workers AI, used for Cloudflare's Clairic extraction model (preview) and categorisation. Usage is billed to your account."
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bapspatil/nuits-receipts.git"
+  },
+  "homepage": "https://github.com/bapspatil/nuits-receipts#readme",
+  "bugs": {
+    "url": "https://github.com/bapspatil/nuits-receipts/issues"
+  }
+}

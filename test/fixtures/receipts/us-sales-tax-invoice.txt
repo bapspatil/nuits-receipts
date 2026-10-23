@@ -1,0 +1,17 @@
+Invoice
+Gridpoint Cloud LLC
+200 Example Avenue, Floor 3
+New York, NY 10001
+United States
+Invoice number GPC-55120
+Invoice date 2026-10-05
+Bill to
+Sample Studio
+Esimerkkikatu 1 A 2
+00100 Helsinki, Finland
+Description Qty Unit price Amount
+Managed database (October) 1 $50.00 $50.00
+Subtotal $50.00
+Sales tax (8.875%) $4.44
+Total $54.44
+Amount paid $54.44

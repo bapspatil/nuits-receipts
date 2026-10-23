@@ -1,0 +1,100 @@
+{
+  "about": "German B2B hosting invoice, VAT 0% reverse charge, dotted dates, amounts with EUR suffix",
+  "expected": {
+    "vendor": "Datenwerk Hosting GmbH",
+    "invoice_number": "RE-2026-1042",
+    "issue_date": "2026-10-15",
+    "currency": "EUR",
+    "total_minor": 24900,
+    "net_minor": 24900,
+    "vat_minor": 0,
+    "vat_rate_bps": 0
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.0010462406789883971,
+        "span": [19, 41],
+        "guess": "Datenwerk Hosting GmbH",
+        "confidence": 0.9993769526481628,
+        "value": "Datenwerk Hosting GmbH"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 5.375396995077608e-6,
+        "span": [209, 221],
+        "guess": "RE-2026-1042",
+        "confidence": 0.9999997615814209,
+        "value": "RE-2026-1042"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.13797147572040558,
+        "span": [350, 353],
+        "guess": "EUR",
+        "confidence": 0.631797194480896,
+        "value": "EUR"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 9.711522579891607e-5,
+        "guess": "2026-10-15",
+        "confidence": 0.9999934435258026,
+        "value": "2026-10-15"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 2.761467385425931e-6,
+        "guess": "2026-10-29",
+        "confidence": 0.9999922514553102,
+        "value": "2026-10-29"
+      },
+      "total": {
+        "type": "number",
+        "p_null": 7.787504728185013e-5,
+        "guess": 249,
+        "confidence": 0.9996379236409881,
+        "value": 249
+      },
+      "net": {
+        "type": "number",
+        "p_null": 6.796699744882062e-5,
+        "guess": 249,
+        "confidence": 0.9999825956434504,
+        "value": 249
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.00013766986376140267,
+        "guess": 0,
+        "confidence": 0.9996999210943246,
+        "value": 0
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.9360925555229187,
+        "guess": 0,
+        "confidence": 0.9949023845146933,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Dedicated server DX-40 (October 2026)"],
+        "spans": [[303, 340]],
+        "confidence": 0.0888234638668671
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 237,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1864,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

@@ -1,0 +1,134 @@
+---
+title: Upgrade your deployment
+description: Back up your database, bring in a newer release, and deploy it, from the command line or through your Deploy button repository.
+sidebar:
+  order: 9
+  label: Upgrade your deployment
+---
+
+Use this guide to move your copy of Nuits Receipts to a newer release. A release only tags the code; nothing updates your deployment until you deploy it. Read the [Changelog](/reference/changelog/) first to see what changed, especially under **Breaking changes**.
+
+## Prerequisites
+
+- Wrangler signed in to the account that runs the Worker (`bunx wrangler login`).
+- A local clone of the code you deploy from: the repository you cloned for `bun run setup`, or the repository the Deploy button created in your GitHub or GitLab account.
+- Bun 1.4.2 or later.
+
+## Back up first
+
+Pending database migrations are applied during the deploy. Take a backup before every upgrade.
+
+<Steps>
+  <Step title="Export the database">
+
+```sh
+bunx wrangler d1 export <database name> --remote --output backup.sql --config wrangler.production.jsonc
+```
+
+Use your D1 database name (`my-nuits-receipts` unless you changed it). With the Deploy button, run it from your clone and leave out `--config` if you have no private config. Keep `backup.sql` somewhere private: it holds your receipt data.
+
+  </Step>
+  <Step title="Note a Time Travel point">
+
+```sh
+bunx wrangler d1 time-travel info <database name> --config wrangler.production.jsonc
+```
+
+This prints the current bookmark, which you can restore to with D1 Time Travel if the upgrade goes wrong. D1 also takes a backup when migrations are applied.
+
+  </Step>
+</Steps>
+
+Your original files live in R2 and are not changed by an upgrade.
+
+## Upgrade from the command line
+
+<Steps>
+  <Step title="Get the new code">
+
+Pull the release into your clone, for example `git pull`, or `git checkout v1.2.3` for a specific tag. Your `wrangler.production.jsonc` is gitignored and is not touched.
+
+  </Step>
+  <Step title="Install the dependencies">
+
+```sh
+bun install --frozen-lockfile
+```
+
+  </Step>
+  <Step title="Check the config">
+
+```sh
+bun run deploy -- --dry-run
+```
+
+A newer release can add variables or tighten checks. The dry run lists any variable that needs fixing without touching your account.
+
+  </Step>
+  <Step title="Deploy">
+
+```sh
+bun run deploy
+```
+
+The script lists pending migrations, applies them (Wrangler asks you to confirm in an interactive shell), then deploys. If anything fails, the Worker is not deployed.
+
+If your config uses its own migrations folder or table (an older private install), the script stops and asks for a backup. After taking one, run `bun run deploy -- --apply-migrations`.
+
+  </Step>
+</Steps>
+
+## Upgrade a Deploy button copy
+
+The Deploy button created a separate repository in your account, not a fork, so it does not follow new releases by itself. Every push to its production branch builds and deploys through Workers Builds, which runs `bun run deploy`.
+
+<Steps>
+  <Step title="Add the original repository as a remote">
+
+In your clone, once:
+
+```sh
+git remote add upstream https://github.com/bapspatil/nuits-receipts.git
+```
+
+  </Step>
+  <Step title="Merge the release">
+
+```sh
+git fetch upstream --tags
+git merge v1.2.3
+```
+
+Replace `v1.2.3` with the release you want. If Git refuses with "refusing to merge unrelated histories", your copy was created without the original history; add `--allow-unrelated-histories` to the first merge. If `wrangler.jsonc` conflicts, keep your own names, `vars` and routes, and take the release's other changes.
+
+  </Step>
+  <Step title="Check, then push">
+
+```sh
+bun install --frozen-lockfile
+bun run deploy -- --dry-run
+git push
+```
+
+The push starts a build. Follow it in your Worker's **Deployments** or **Builds** page in the Cloudflare dashboard.
+
+  </Step>
+</Steps>
+
+:::note
+Variables changed only in the Cloudflare dashboard are replaced by `wrangler.jsonc` on every deploy. Keep them in `wrangler.jsonc`, or set them in the app where possible; app settings are stored in the database and survive deploys. Secrets are never removed by a deploy.
+:::
+
+## Check it worked
+
+1. The deploy or build log ends without errors, after "Deployed" or the build's success message.
+2. Open the app and sign in. The footer shows the new version number.
+3. Open **Settings** and check that your values are still there, with their **App**, **Deploy** and **Default** tags.
+
+If the build fails at the D1 migrations step with an authentication or permission error, see [Troubleshoot](/how-to/troubleshoot/).
+
+## Related
+
+- [Changelog](/reference/changelog/)
+- [Deploy from the command line](/how-to/deploy-from-the-command-line/) for how the deploy script picks its config and resolves the database.
+- [Data model](/reference/data-model/) for the D1 tables a migration may change.

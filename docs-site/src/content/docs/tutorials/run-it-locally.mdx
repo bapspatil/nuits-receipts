@@ -1,0 +1,106 @@
+---
+title: Run it locally
+description: For contributors. Clone the code, run Nuits Receipts on your machine with a local database and test AI, upload a sample receipt and run the tests.
+sidebar:
+  order: 3
+  label: Run it locally
+---
+
+In this tutorial we run Nuits Receipts on your own computer, the way you would to work on its code. We clone the repository, install it, set a local password, create the local database, start the app, upload a sample receipt and run the test suite.
+
+At the end you will have the app running at `http://localhost:8787` with one receipt in it, and a passing test run.
+
+The local app needs no Cloudflare account and no sign-in to Cloudflare. It keeps its database and files under `.wrangler/` in the repository, and it reads receipts with a fixed test extractor instead of Workers AI, so nothing leaves your machine.
+
+## Before you start
+
+You need:
+
+- [Bun](https://bun.sh) 1.4.2 or later. Check with `bun --version`.
+- Git.
+- A terminal and a web browser.
+
+## Get the code
+
+Clone the repository and go into it:
+
+```sh
+git clone https://github.com/bapspatil/nuits-receipts.git
+cd nuits-receipts
+```
+
+Run `ls` and you see `src/`, `schema/`, `scripts/` and `package.json`, among others.
+
+## Install the dependencies
+
+```sh
+bun install --frozen-lockfile
+```
+
+Bun installs the exact versions in `bun.lock` and finishes without errors. You now have a `node_modules/` folder.
+
+## Set a local password
+
+Copy the example secrets file:
+
+```sh
+cp .dev.vars.example .dev.vars
+```
+
+Open `.dev.vars` in your editor and put any password after `NUITS_PASSWORD=`, for example:
+
+```sh title=".dev.vars"
+NUITS_PASSWORD=my-local-password
+```
+
+Save the file. Git ignores `.dev.vars`, so the password is never committed.
+
+## Create the local database
+
+```sh
+bun run migrate
+```
+
+Wrangler applies every migration in `schema/` to a local D1 database and lists them as it goes. Run it again and it reports that there are no migrations to apply.
+
+## Start the app
+
+```sh
+bun run dev
+```
+
+Wrangler starts the Worker with `wrangler.local.jsonc` and prints that it is ready on `http://localhost:8787`. Leave this terminal running.
+
+Open `http://localhost:8787` in your browser. It asks for a user name and password:
+
+- **User name:** `owner`
+- **Password:** the one you put in `.dev.vars`
+
+The app opens on its **Welcome** page, with the heading **Let's get your first receipt in**.
+
+## Upload a sample receipt
+
+The repository ships synthetic receipts in `scripts/sample-receipts/`.
+
+1. On the Welcome page, under **PDF or photo of the receipt**, choose `scripts/sample-receipts/sample.pdf` from your clone.
+2. Press **Upload receipt**.
+
+The app opens the receipt's page. Its title is **Sample Cloud Lantern Oy**, it shows **EUR 125.50**, and the stamp reads **Ready**. The test extractor read the seller, date, amounts and VAT from the PDF's text.
+
+Open **Home** in the top bar, choose September 2026 in the month picker at the top right and press **Go**. **September so far** counts one receipt dated September, one ready, and **Spent** shows **EUR 125.50**.
+
+## Run the tests
+
+Go back to the terminal running `bun run dev` and stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. Then run:
+
+```sh
+bun run test
+```
+
+Vitest runs the Worker tests inside `workerd`, with AI and exchange rates mocked and the network turned off. After about half a minute it prints a summary in which every test file and every test passed.
+
+## What we did
+
+You cloned Nuits Receipts, installed it, gave it a local password, created its local database, ran it at `http://localhost:8787`, uploaded a sample receipt that the test extractor read, and ran the test suite.
+
+To check a change before you open a pull request, follow [Run the tests](/how-to/run-the-tests/), which adds the typecheck, the formatter check and the script tests. To understand how the pieces fit together, read [How it works](/explanation/how-it-works/).

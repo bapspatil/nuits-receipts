@@ -1,0 +1,32 @@
+Page 1 of 1
+Receipt
+Invoice number LUMN7Q2K-0003
+Receipt number 4410-2283
+Date paid October 22, 2026
+Lumen Labs Ireland Limited
+2nd Floor, 14 Sample Quay
+Dublin
+Co. Dublin
+D02 XX00
+Ireland
+billing@lumenlabs.example
+IE VAT IE0000000XX
+Bill to
+Sample Buyer
+Esimerkkikatu 1 A 2
+FI-00100 Helsinki
+Finland
+buyer@example.com
+FI VAT FI00000000
+€82.07 paid as of October 22, 2026
+Description Qty Unit price Tax Amount
+Lumen Pro Subscription (per seat)
+Oct 22-Nov 22, 2026
+1 €82.07 0% €82.07
+Subtotal €82.07
+Total €82.07
+Payment history
+Payment method Date Amount paid Receipt number
+Mastercard - 0000 October 22, 2026 €82.07 4410-2283
+-1- Tax to be paid on reverse charge basis
+-1-

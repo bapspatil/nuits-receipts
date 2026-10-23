@@ -1,0 +1,42 @@
+---
+title: How costs are sorted
+description: Vendor rules decide first, Clef suggests when no rule matches, and disagreeing rules send the receipt to review.
+sidebar:
+  order: 3
+---
+
+Every cost gets two labels: a **product** (which part of your business it belongs to) and an **expense type**. The monthly view adds costs up by both, and the export carries both columns. This page explains how the labels are chosen and why your rules come first.
+
+## Products and expense types
+
+Products are yours to define. They come from the `PRODUCTS_JSON` setting, with one of them as the default for shared or unknown costs. A fresh deployment has a single product, "General".
+
+Expense types are fixed: `infra`, `AI APIs`, `subscriptions` and `other`. They are a rough grouping for your own overview, not a chart of accounts. Your accountant books costs to their own accounts; the type only helps them see what kind of cost it was.
+
+## Your rules come first
+
+A vendor rule says "receipts from this seller go to this product, as this type". It matches when the seller's name contains the text you gave, ignoring case, accents and company suffixes such as "Oy", "Ltd" or "Inc". A rule can also require some text elsewhere in the receipt or its email, which lets you split one seller across products (for example by the project name printed on the invoice).
+
+When rules match, the one with the highest priority decides, and the model is not asked at all. The easiest way to make a rule is the "Always file this seller as..." fold on a receipt page. You can see and tidy all of them in **Settings**. See [Sort costs with vendor rules](/how-to/sort-costs-with-vendor-rules/).
+
+Rules come first because they are your decision, made once, and they behave the same way every month. A model's guess can drift between readings or between model versions. A rule cannot.
+
+### When rules disagree
+
+If two rules with the same priority match a receipt and say different things, the app does not pick one for you. The receipt is flagged "Two of your rules disagree", and you choose on the receipt page. Then tidy the rules in Settings so it does not happen again, either by making one more specific or by giving it a higher priority. A higher-priority rule always beats a lower one without a flag.
+
+## Clef, when no rule matches
+
+When none of your rules match, Cloudflare's Clef model (`@cf/cloudflare/clef`) picks which of your products and which expense type the receipt belongs to. It is given the vendor name, the line descriptions and the text of the receipt, along with your product names and the four types. It is told that shared or unknown costs belong to your default product.
+
+Clef returns a probability for every option. The app accepts its choice only when that probability is at least 0.85 (you can change this in Settings). Product and type are judged separately, so a confident product and a doubtful type do not cancel each other out.
+
+When Clef is unsure, the receipt keeps the fallback: your default product, or `other` for the type. It is flagged "We guessed, but we're not sure" only when Clef leaned towards something different from that fallback. If Clef leaned towards the default anyway, there is nothing for you to decide, so there is no flag. If the call fails or returns something malformed, the receipt is flagged so you can file it yourself.
+
+Clef only runs for receipts you paid. Sales invoices you sent are not sorted this way.
+
+## The trade-off
+
+Clef saves you from filing every new seller by hand, and its answer is usually reasonable. It is still a guess about your business made from a receipt, and it cannot know that a hosting bill belongs to one client project rather than another. The intended pattern is that Clef handles the first receipt from a new seller, you correct it if needed, and you add a rule so the question never comes up again. Over a few months, most of your regular costs end up decided by rules, which are cheaper, faster and predictable.
+
+A rule can also carry a bank alias: the name the seller uses on your bank statement, when it differs from the name on the receipt. That helps matching rather than sorting; see [How matching works](/explanation/how-matching-works/).

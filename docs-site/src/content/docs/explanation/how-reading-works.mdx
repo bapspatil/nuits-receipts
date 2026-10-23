@@ -1,0 +1,79 @@
+---
+title: How reading works
+description: How Clairic reads a receipt, what the code checks afterwards, and why some rows are flagged for review.
+sidebar:
+  order: 2
+---
+
+Every receipt is read twice: once by an AI model and once by plain code. The model is good at finding the vendor, date and amounts on a page it has never seen. The code is good at arithmetic and at noticing when the page says something different from the model. A value is only accepted without review when the two agree, or when one of them settles it without contradiction. Everything else is flagged for you.
+
+## The model: Clairic
+
+Reading is done by Clairic (`@cf/cloudflare/clairic`) on Workers AI. Clairic is a Cloudflare **preview** model: its availability, behaviour and price may change, and it can misread or miss vendors, amounts, VAT, dates and currencies. Treat every figure it produces as a reading to check, not a fact.
+
+The app asks Clairic for a fixed set of fields: vendor, receipt or invoice number, currency, issue date, due date, total, amount before VAT, VAT amount, VAT rate, and up to 20 line descriptions. The instructions are deliberately strict. The total is "the final amount due or paid, not the subtotal". Amounts are to be read as printed and "never calculated". The vendor is the printed issuer, not whoever forwarded the email.
+
+For each field Clairic returns a value, a confidence, and an estimate of how likely it is that the field is not on the page at all. The app only trusts a value when the confidence is at least 0.9 and the "not there" estimate is at most 0.1. Those two thresholds can be changed under **Settings**, within limits.
+
+### What Clairic sees
+
+- **Text PDFs:** the PDF's text layer, not a picture of the page. There is no built-in OCR, so a scanned PDF with no text has nothing to read and is flagged straight away. Upload a photo of the page instead.
+- **Photos:** the image itself (PNG, JPEG or WebP), one image per reading.
+- **Forwarded email:** the attachment, plus the text of the email it came in, labelled as forwarded context. A receipt sent as the email body is read from the body.
+
+The input is capped at 40,000 characters. A longer document is cut and flagged, so you know to check the amounts against the original.
+
+## The code: checking the answer
+
+After Clairic answers, the code reads the same text with fixed rules. It looks for labelled lines such as "Total", "Amount paid", "Subtotal", "VAT 25.5 %", "Date paid" and "Invoice number", for the seller and buyer blocks, and for reverse-charge notes. It never guesses: a value counts only when the document states it once, without contradiction.
+
+Then the two readings are compared, field by field:
+
+- When the document states a value and the model agrees, the value is settled.
+- When the document states a value and the model was unsure, the document's value is used.
+- When the model is confident and the document disagrees with it, the model's value is kept but **flagged**, because a person needs to look.
+- When the document says nothing, a confident model answer is accepted on its own.
+
+### VAT arithmetic
+
+The arithmetic is checked in code, never by the model. Amount before VAT plus VAT must equal the total, to within two cents. If it does not, the receipt is flagged "The numbers don't add up". When the VAT rate is known, the VAT must also match that percentage of the amount before VAT. When two of the three amounts are settled and they add up, the third is treated as settled too.
+
+The code also notices:
+
+- a negative amount, which usually means a refund or credit note;
+- VAT charged with no rate printed;
+- a VAT table with several rates, where a single rate does not apply;
+- a "0 %" or reverse-charge statement, which settles the VAT at zero.
+
+### Currency
+
+Clairic returns text exactly as it appears on the page, so it often answers "€" or "$" rather than a currency code. The code maps symbols to codes. "€" and "£" are unambiguous. A bare "$" or "kr" could be several currencies, so it stays unsettled and is flagged unless something else on the page (an ISO code, a country) settles it. The app knows ten currencies: EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD and JPY. Anything else is flagged, because it cannot be converted to euros.
+
+### Duplicates
+
+The same file sent twice is stored once, so it never appears twice. A different file for the same purchase (a PDF and a forwarded copy, say) is caught by its content: when the seller, receipt number, issue date, currency and total all match another receipt, the new one is flagged as a probable duplicate. You decide which one to keep. A receipt marked as a duplicate stays out of totals and exports.
+
+## Why rows get flagged
+
+A flag means the app could not settle something on its own. It is not an error, and it is not the app being cautious for show. Common reasons:
+
+- A required field (vendor, date, currency, total) is missing or was read with low confidence.
+- The model and the document disagree.
+- The amounts do not add up, or the VAT does not fit the rate.
+- The file could not be read at all: a scan with no text, a PDF that is too large or has too many pages, a corrupt email.
+- The model stopped early or returned something malformed.
+- The sender of an email could not be verified, so it was not read (see [Email and sender trust](/explanation/email-and-sender-trust/)).
+
+The receipt page shows one card per problem, in plain words, with the fields to fix. The full list of flags and what triggers each one is in [Receipt fields and flags](/reference/receipt-fields-and-flags/).
+
+## Approving and reading again
+
+You can fix a flagged receipt by correcting the fields, or approve it as it is. Approving a flagged receipt needs a written reason, and it needs the vendor, date, a known currency, the total, the amount before VAT and the VAT amount. The reason is kept with the receipt, so there is a record of why a flag was set aside.
+
+**Read it again** sends the saved original through the same reading again. It is useful after a temporary failure, or for a sender whose email was held for review. Values you have saved stay as you saved them. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
+
+## What this does not catch
+
+The checks catch disagreement and bad arithmetic. They cannot catch a mistake that is consistent with itself. If Clairic reads the wrong line as the total and that wrong line also adds up with the VAT lines, nothing disagrees and nothing is flagged. A receipt that is not flagged has passed these checks; it has not been proven right. That is why approved receipts are still for you, and your accountant, to compare with the originals. [For accountants](/explanation/for-accountants/) says what to look at first.
+
+To measure how well reading works on your own documents, contributors can run the extraction evaluation; see [Measure extraction quality](/how-to/measure-extraction-quality/).

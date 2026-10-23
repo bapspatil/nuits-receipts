@@ -1,0 +1,103 @@
+{
+  "about": "Stripe invoice, EU reverse charge (Article 196), \"Amount due\"",
+  "expected": {
+    "vendor": "Northwind AI Ireland, Limited",
+    "invoice_number": "7QF0758D-0001234",
+    "issue_date": "2026-10-16",
+    "currency": "EUR",
+    "total_minor": 9000,
+    "net_minor": 9000,
+    "vat_minor": 0,
+    "vat_rate_bps": 0
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.0059129297733306885,
+        "span": [156, 185],
+        "guess": "Northwind AI Ireland, Limited",
+        "confidence": 0.999395489692688,
+        "value": "Northwind AI Ireland, Limited"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.00013029719411861151,
+        "span": [0, 16],
+        "guess": "7QF0758D-0001234",
+        "confidence": 0.9752967357635498,
+        "value": "7QF0758D-0001234"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.014184963889420033,
+        "span": [19, 20],
+        "guess": "€",
+        "confidence": 0.9082162976264954,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.00026696230634115636,
+        "guess": "2026-10-16",
+        "confidence": 0.9999653112343296,
+        "value": "2026-10-16"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 6.168982508825138e-5,
+        "guess": "2026-10-16",
+        "confidence": 0.9999781851636276,
+        "value": "2026-10-16"
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0014949127798900008,
+        "guess": 90,
+        "confidence": 0.9917645849650368,
+        "value": 90
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.31037622690200806,
+        "guess": 90,
+        "confidence": 0.9803765791654121,
+        "value": 90
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.017504751682281494,
+        "guess": 0,
+        "confidence": 0.9789829192525262,
+        "value": 0
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.6934943795204163,
+        "guess": 0,
+        "confidence": 0.9610094225511687,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Team plan - 5 seats", "Tax to"],
+        "spans": [
+          [572, 591],
+          [682, 688]
+        ],
+        "confidence": 1.9030796327324523e-6
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 325,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 2216,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

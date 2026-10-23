@@ -1,0 +1,65 @@
+/* Generated from tokens.json by generate-tokens.mjs. Do not edit by hand.
+   Change the source and run the generator again. */
+
+:root {
+  /* Colour */
+  /* #0D3A36. Petrol ink. All primary text, rules, the focus ring. */
+  --color-ink: #0D3A36;
+  /* #355650. Secondary text. Measured against the field's worst pick, so it may sit on the hero. */
+  --color-ink-soft: #355650;
+  /* #E6EFE9. Cheque-paper mint. The page surface. */
+  --color-paper: #E6EFE9;
+  /* #FFFFFF. Receipt slips and plates. The only raised surface. */
+  --color-slip: #FFFFFF;
+  /* #C2D8CB. The security-print line colour. A fill, never text. */
+  --color-guilloche: #C2D8CB;
+  /* #9FD3BC. Matched stamp fill, under ink text. */
+  --color-mint: #9FD3BC;
+  /* #A8123F. Rubber-stamp red. Missing marks and the primary button fill, always with words. */
+  --color-stamp: #A8123F;
+  /* #FFFFFF. Text on the stamp fill. */
+  --color-on-stamp: #FFFFFF;
+
+  /* Families */
+  --font-display: "Bricolage", "Arial Narrow", system-ui, sans-serif;
+  --font-ui: "Instrument Sans", system-ui, sans-serif;
+
+  /* Type scale. Size, leading, weight and tracking travel together. */
+  --text-display: 5.5rem;
+  --text-display--line-height: 0.9091;
+  --text-display--font-weight: 800;
+  --text-display--letter-spacing: -0.03em;
+  --text-title: 3rem;
+  --text-title--line-height: 1.0000;
+  --text-title--font-weight: 750;
+  --text-title--letter-spacing: -0.02em;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 1.1667;
+  --text-heading--font-weight: 700;
+  --text-heading--letter-spacing: -0.01em;
+  --text-lede: 1.25rem;
+  --text-lede--line-height: 1.5000;
+  --text-lede--font-weight: 400;
+  --text-lede--letter-spacing: 0em;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.5882;
+  --text-body--font-weight: 400;
+  --text-body--letter-spacing: 0em;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5000;
+  --text-small--font-weight: 500;
+  --text-small--letter-spacing: 0.01em;
+
+  /* Spacing. Everything is a multiple of 4px.
+     The ramp is 4, 8, 12, 16, 24, 32, 48, 64, 96, 128px, which is 1, 2, 3, 4, 6, 8, 12, 16, 24, 32 on this scale,
+     and a step off the ramp is a decision, not a default. */
+  --spacing: 0.25rem;
+
+  /* Radius */
+  --radius-slip: 0.125rem;
+  --radius-pill: 999px;
+
+  /* The one shadow in the system. If something needs separation and does
+     not qualify for this, it gets a hairline. */
+  --shadow-system: 0 18px 40px -18px rgb(13 58 54 / 0.35);
+}

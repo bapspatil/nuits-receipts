@@ -1,0 +1,81 @@
+---
+title: App pages
+description: Every page and download in the app, with its path, query parameters and what it shows.
+sidebar:
+  order: 7
+---
+
+Paths are relative to the app's root. With `APP_BASE_PATH` set (for example `/app`), every path starts with that prefix. Every page needs sign-in. Where a page takes `month`, the value is `YYYY-MM` and defaults to the current month (UTC).
+
+## Main navigation
+
+The header shows these links, in this order. **Invoices** appears only when `INVOICES_ADDRESS` is set or at least one sales invoice exists.
+
+| Link | Path | Badge |
+| --- | --- | --- |
+| Home | `/` | |
+| Review | `/review` | Number of documents waiting |
+| Payments | `/payments` | Number of payments missing a receipt |
+| Invoices | `/invoices` | |
+| Month | `/month` | |
+| Settings | `/settings` | |
+
+In Access mode the header also shows **Sign out**, which goes to `/cdn-cgi/access/logout`.
+
+## Pages
+
+| Path | Page title | Query parameters | What it shows |
+| --- | --- | --- | --- |
+| `/` | Home | `month` | Heading "Welcome" on first run, "Here's what needs you" with open tasks, or "All caught up". Tasks that need you and a summary of the month with a link to close it. After the first receipt, also an **Add a receipt** upload form. |
+| `/review` | Review | `reason`: `info`, `amount` or `sender` | Documents with status `needs_review`, filtered by **Missing info**, **Check the amount** or **Email not verified**. Documents still being read are counted in a banner. |
+| `/receipts/<id>` | The document's seller or file name | | The original (image preview, or a link to the PDF or email) beside the form: review flag cards, all fields, part of the business and kind of cost, due date, euro amount, duplicate choice, **Note for your accountant** and the approve, save and **Read it again** buttons. Also bank match suggestions and a form to add a vendor rule. Sales invoices also show **Move to receipts** and the paid-outside form. |
+| `/add` | Add documents | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or sales invoices, and the email addresses to forward to. |
+| `/payments` | Payments for `<month>` | `month`, `offset`, `show`: `missing`; `inserted`, `skipped`, `replayed` (import result) | Bank rows booked in the month from completed imports, 100 per page: matches, suggestions, payments with no receipt, exemption controls (**Not a purchase (no receipt needed)**, **Needs a receipt after all**) and own-account transfers. |
+| `/import` | Import a bank statement | | Step 1 of the [bank CSV import](/reference/bank-csv-import/): file, account and encoding. |
+| `/imports/csv`, `/imports/csv/preview` (POST) | Check the file | | Step 2 of the import: rows read, problems, mapping editor and the import button. |
+| `/invoices` | Invoices `<month>` | `month`, `show`: `all`, `review`, `unpaid`, `overdue`, `paid` | Sales invoices dated in the month with totals invoiced and received. `unpaid` and `overdue` list invoices from every month. |
+| `/month` | Month `<month>` | `month`, `offset`, `anyway`, `undated`, `changes`, `sent`, `upload`, `wait` | The three steps to close the month: **Check receipts**, **Match payments**, **Send to `<ACCOUNTANT_LABEL>`**. Then "Money in: invoices dated `<month>`" when there are sales invoices, and "All receipts dated `<month>`". |
+| `/settings` | Settings | `onedrive`, `saved`, `reset`, `routing` (result banners) | Sections listed below. |
+
+### Settings sections
+
+In page order. Each links from the side menu.
+
+| Section | Anchor | Contains |
+| --- | --- | --- |
+| Business | `#setup-business` | App name, business names, parts of the business, default part, payment terms, new account currency. |
+| Email | `#setup-email` | Receipt address, invoice address, allowed senders, forward copy address. |
+| Export | `#setup-accountant` | Accountant, export file name, note under the month download. |
+| OneDrive | `#onedrive` | Shown only when `MS_CLIENT_ID` is set. Connect or disconnect a Microsoft account, the redirect URI for Microsoft Entra, and the destination folder. |
+| Bank accounts | `#accounts` | Accounts with bank, currency and ID; rename; **Add a bank account**. |
+| Imports | `#imports` | Recent imports with date, account and row count. |
+| Transfers | `#transfers` | Own-account transfer pairs; **Pair a transfer**; **Undo transfer**. |
+| Vendor rules | `#rules` | Rules with seller text, product and type, extra conditions and priority. |
+| Advanced | `#advanced` | Review & matching thresholds, the source code link, **Set at deploy** (read-only deploy values) and **Change history** (the last 20 setting changes). |
+
+Each setting shows where its value comes from: **App** (set here), **Deploy** (Worker variable) or **Default** (built in). See [Configuration](/reference/configuration/).
+
+## Downloads
+
+| Path | Query parameters | Returns |
+| --- | --- | --- |
+| `/export.csv` | `month` | [Receipts CSV](/reference/export-csv/) for the month. |
+| `/export-sales.csv` | `month` | [Sales CSV](/reference/export-csv/#sales-csv-columns) for the month. |
+| `/month/package.zip` | `month`, `anyway`, `undated`, `changes` | [Month package](/reference/month-package/) ZIP. |
+| `/originals/<id>` | `variant=email`: the source email instead of the document. `view=inline`: show a PNG, JPEG or WebP image in the browser. | The original, as a download unless `view=inline`. |
+
+## Sign-in and OneDrive routes
+
+| Path | Purpose |
+| --- | --- |
+| `/settings/onedrive/connect` | Starts the Microsoft sign-in. |
+| `/settings/onedrive/callback` | Microsoft returns here after sign-in. This is the redirect URI to register in Microsoft Entra, prefixed with the app's origin and `APP_BASE_PATH`. |
+
+## Responses without sign-in
+
+| Mode | Response |
+| --- | --- |
+| Password (HTTP Basic) | 401 with a `Basic` challenge whose realm is `APP_NAME`. Sign-in also fails over plain `http` except on `localhost`, `127.0.0.1` and `[::1]`. |
+| Cloudflare Access | 403 "Sign in through Cloudflare Access to use this app." |
+
+Every form post must carry an `Origin` header equal to the app's origin, or it is refused with 403. Unknown paths return 404.

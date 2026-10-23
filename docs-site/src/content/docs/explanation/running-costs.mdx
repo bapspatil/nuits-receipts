@@ -1,0 +1,52 @@
+---
+title: Running costs
+description: What you pay Cloudflare for when you run Nuits Receipts, how the AI reading estimate is worked out, and when you need Workers Paid.
+sidebar:
+  order: 8
+---
+
+Nuits Receipts is open-source software with no subscription and no licence fee. Running it still costs money. It runs in your Cloudflare account, and Cloudflare bills you for what it uses. You pay your own Cloudflare bill, and Nuits receives none of it.
+
+In short: AI reading costs about 15 cents a month at the volume described below. Plan on Workers Paid ($5 a month) if you upload PDFs, because a PDF upload uses far more than the Free plan's 10 ms CPU limit. Forwarded email bodies may fit in Free.
+
+## What Cloudflare bills for
+
+- **Workers**, the plan the app runs on. Free or Paid; see below.
+- **Workers AI**, for reading (Clairic) and, when no vendor rule matches, sorting (Clef). Billed per input token.
+- **R2**, for the originals. Small at this scale, but it needs a payment method on the account.
+- **D1**, for everything else. Small at this scale.
+- **Email Routing**, if you use the inbox address. At this size it fits Cloudflare's free allowances.
+
+## The AI reading estimate
+
+This is an estimate, not a measured bill. It assumes 200 receipts a month, at about 5,000 billed Clairic input tokens each, and 50 Clef calls at 2,000 tokens each.
+
+- Clairic, at $0.10 per million input tokens: 200 × 5,000 tokens is 1,000,000 tokens, so $0.10.
+- Clef, at $0.24 per million input tokens: 50 × 2,000 tokens is 100,000 tokens, so $0.024.
+
+That is about $0.12, which with some headroom is the "about 15 cents a month" figure for AI reading.
+
+The 5,000 tokens per receipt is deliberately generous. In tests, a text PDF or an email used 1,300 to 1,600 tokens and a photo about 2,900. The allowance covers photos, longer documents and the occasional second reading. Clef only runs for receipts no vendor rule matches, so the more rules you have, the fewer Clef calls you make.
+
+
+## Why PDFs need Workers Paid
+
+The Workers Free plan allows 10 ms of CPU time per request. Reading a PDF means parsing it inside the Worker to get its text, and that takes far longer: one PDF upload measured about 186 ms of CPU in production. Requests that go over the limit fail with Cloudflare's Error 1102 ("Worker exceeded resource limits").
+
+So if you upload PDFs, plan on Workers Paid. It costs $5 a month as a minimum for the whole Cloudflare account, not per Worker, and its included usage (10 million requests and 30 million CPU milliseconds a month) is far more than one person's receipts need. If you already pay for Workers Paid for something else, the AI reading is the only increase.
+
+Forwarded receipts whose content is in the email body need much less CPU, and may fit in Free. Large bank CSV imports can also go over the Free limit. Free has other ceilings too: Workers AI calls fail for the rest of the day once the daily free Neurons are used up, until 00:00 UTC. The figures are listed in [Limits](/reference/limits/).
+
+## Storage and everything else
+
+The estimate assumes about 1 GB of stored originals, well inside R2's included 10 GB-month, so no storage overage. D1 use for one person's receipts should fit the included allowances. R2 still has to be enabled with a payment method before the bucket can be created, even if you never go over the free amounts.
+
+Workers Logs are on by default and sample every request. They are well within the included allowance at this scale, but if you want to keep them smaller, lower the sampling rate (see [Privacy and your data](/explanation/privacy-and-your-data/)).
+
+## What changes the numbers
+
+Your volume, how many receipts are photos, how often you have receipts read again, how long you keep originals, other things running on your Cloudflare account, taxes, and Cloudflare's prices, which can change, including the price of Clairic.
+
+Your real monthly bill depends on your volume and plan, so it will differ from the estimate above. These pages give no measured production total. Your Cloudflare billing dashboard is the only reliable figure for your own account.
+
+Check the current prices before you rely on any of this: [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/). Cloudflare's billing dashboard shows what you actually used.

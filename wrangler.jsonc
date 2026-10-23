@@ -1,0 +1,53 @@
+// Nuits Receipts: public template configuration. See https://receipts.nuits.net/docs/reference/configuration/.
+//
+// No account or resource IDs live here. The Deploy to Cloudflare button, or
+// `bun run setup` / `bun run deploy`, creates or resolves the D1 database and
+// R2 bucket named below in your own account. The only secret, NUITS_PASSWORD,
+// is set at deploy time and never stored in this file.
+// No cron triggers: every action is driven by mail, uploads or the UI.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-nuits-receipts",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "workers_dev": true,
+  "preview_urls": false,
+  // Logs stay in your own Cloudflare account. Lower the rate if you prefer.
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "AI_MODE": "live",
+    "AUTH_USERNAME": "owner",
+    "ALLOWED_SENDER_EMAILS": "",
+    "RECEIPT_ADDRESS": "",
+    "FORWARD_COPY_TO": "",
+    // Optional: a second Email Routing address for sales invoices you sent,
+    // and your business names as they appear on them. See https://receipts.nuits.net/docs/reference/configuration/.
+    "INVOICES_ADDRESS": "",
+    "SELLER_NAMES": "",
+    "PRODUCTS_JSON": "[{\"id\":\"general\",\"label\":\"General\"}]",
+    "DEFAULT_PRODUCT": "general",
+    "ACCOUNTANT_LABEL": "your accountant",
+    "APP_NAME": "Nuits Receipts",
+    "EXPORT_PREFIX": "receipts",
+    "SOURCE_REPOSITORY": "https://github.com/bapspatil/nuits-receipts",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "ACCESS_ALLOWED_EMAILS": "",
+    "SEND_HINT": "",
+    // Optional OneDrive upload: also needs the MS_CLIENT_SECRET and
+    // ONEDRIVE_TOKEN_KEY secrets. Empty keeps it off. See https://receipts.nuits.net/docs/reference/configuration/.
+    "MS_CLIENT_ID": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-nuits-receipts",
+      "migrations_dir": "schema",
+      "migrations_table": "template_migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "ORIGINALS", "bucket_name": "my-nuits-receipts-originals" }],
+  "ai": { "binding": "AI" }
+}

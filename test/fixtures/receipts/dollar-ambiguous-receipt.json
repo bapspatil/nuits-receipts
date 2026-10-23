@@ -1,0 +1,100 @@
+{
+  "about": "Bare \"$\" with no country or ISO code: the currency is genuinely unknown, so it must be reviewed",
+  "expected": {
+    "vendor": "Brightloop Inc.",
+    "invoice_number": "2026-8812",
+    "issue_date": "2026-10-09",
+    "total_minor": 4900
+  },
+  "expect_review": true,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.28640982508659363,
+        "span": [13, 28],
+        "guess": "Brightloop Inc.",
+        "confidence": 0.9952768087387085,
+        "value": "Brightloop Inc."
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.025341572239995003,
+        "span": [37, 47],
+        "guess": "#2026-8812",
+        "confidence": 0.9970242381095886,
+        "value": "#2026-8812"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.5871872901916504,
+        "span": [115, 116],
+        "guess": "$",
+        "confidence": 0.7910783886909485,
+        "value": null
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.0009064392652362585,
+        "guess": "2026-10-09",
+        "confidence": 0.9912949305159243,
+        "value": "2026-10-09"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9999947547912598,
+        "guess": "2026-10-02",
+        "confidence": 0.24045790585610716,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 0.0002625793276820332,
+        "guess": 49,
+        "confidence": 0.9966764056748433,
+        "value": 49
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.9351639747619629,
+        "guess": 49,
+        "confidence": 0.9692765418535723,
+        "value": null
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.8993290662765503,
+        "guess": 0,
+        "confidence": 0.9872437296945743,
+        "value": null
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.9984248876571655,
+        "guess": 0,
+        "confidence": 0.8081423370549335,
+        "value": null
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Brightloop", "Sample Buyer", "Brightloop Starter plan"],
+        "spans": [
+          [13, 23],
+          [78, 90],
+          [91, 114]
+        ],
+        "confidence": 0.295142960185549
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 65,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1176,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

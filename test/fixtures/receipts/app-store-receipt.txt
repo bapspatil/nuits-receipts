@@ -1,0 +1,19 @@
+Receipt
+Apple Account: buyer@example.com
+Billed To
+Sample Buyer
+Esimerkkikatu 1 A 2
+00100 Helsinki
+FIN
+DATE Oct 20, 2026
+ORDER ID MV7C2XY9K1
+DOCUMENT NO. 000123456789
+App Store
+Pixelkit Pro (Monthly)
+Renews Nov 20, 2026
+€9.99
+Subtotal €7.96
+VAT charged at 25.5% €2.03
+TOTAL €9.99
+Apple Distribution International Ltd.
+Hollyhill Industrial Estate, Hollyhill, Cork, Republic of Ireland. VAT No. IE 0000000X

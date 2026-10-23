@@ -1,0 +1,120 @@
+name: Release
+
+# Semantic versioning from Conventional Commits. See docs/RELEASING.md.
+# Triggers are push to main and manual dispatch only, never a schedule. The same steps can run locally (docs/RELEASING.md).
+#
+#   fix / hotfix / perf / style / revert  -> patch   (hotfixes, UI polish)
+#   feat                                  -> minor   (features, UI enhancements)
+#   type! or a BREAKING CHANGE footer      -> major
+#
+# On every push to main the release job bumps package.json, prepends CHANGELOG.md,
+# commits, tags vX.Y.Z and publishes a GitHub Release with the grouped notes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Override the computed bump (auto follows the commits)
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag and publish
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && !startsWith(github.event.head_commit.message, 'chore(release):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # A PAT lets the release commit land on a protected main. Without it the
+          # default token is used, which also prevents this push from re-triggering CI.
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Compute and apply the version
+        id: plan
+        env:
+          FORCED_BUMP: ${{ github.event.inputs.bump || 'auto' }}
+        run: |
+          if [ "$FORCED_BUMP" = "auto" ]; then
+            bun scripts/version.mjs apply > plan.json
+          else
+            bun scripts/version.mjs apply --force "$FORCED_BUMP" > plan.json
+          fi
+          cat plan.json
+          {
+            echo "action=$(node -p 'require("./plan.json").action')"
+            echo "tag=$(node -p 'require("./plan.json").tag')"
+            echo "version=$(node -p 'require("./plan.json").nextVersion')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
+        if: steps.plan.outputs.action != 'skip'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Plant the baseline tag
+        if: steps.plan.outputs.action == 'baseline'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          # First run only: the package.json version becomes the starting point and
+          # history before it is not re-counted. Later pushes bump from this tag.
+          git tag -a "$TAG" -m "Release baseline $TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --title "$TAG" \
+            --notes "Baseline for automated semantic versioning. Later releases list their changes here."
+          echo "Planted baseline $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit, tag, and push the release
+        if: steps.plan.outputs.action == 'release'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          git add package.json CHANGELOG.md
+          git commit -m "chore(release): $TAG"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin HEAD:main
+          git push origin "$TAG"
+
+      - name: Publish the GitHub Release
+        if: steps.plan.outputs.action == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          bun scripts/version.mjs notes "$VERSION" > notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file notes.md
+          {
+            echo "## Released $TAG"
+            echo
+            cat notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nothing to release
+        if: steps.plan.outputs.action == 'skip'
+        run: echo "No feat, fix, perf, style or breaking commits since the last tag. Version unchanged." >> "$GITHUB_STEP_SUMMARY"

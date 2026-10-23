@@ -1,0 +1,130 @@
+---
+title: Commands
+description: Every bun run script in the root package.json, with its flags and environment variables.
+sidebar:
+  order: 2
+---
+
+Scripts are defined in the root `package.json`. Pass flags to a script after `--`, as in `bun run deploy -- --dry-run`. The project requires Bun 1.4 or later (`packageManager` is `bun@1.4.2`). `setup` and `deploy` run with Node.
+
+Scripts that call Wrangler set `WRANGLER_SEND_METRICS=false`. `dev`, `migrate` and `test` also set `XDG_CONFIG_HOME=.cache/config` and `WRANGLER_LOG_PATH=.wrangler/logs`.
+
+## Run and develop
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `dev` | `wrangler dev --local --config wrangler.local.jsonc` | Local server at `http://localhost:8787` with local D1 and R2 and `AI_MODE=mock`. Needs no Cloudflare sign-in. Reads secrets from `.dev.vars`. |
+| `migrate` | `wrangler d1 migrations apply DB --local --config wrangler.local.jsonc` | Applies `schema/` to the local D1 database only. |
+| `samples` | `bun scripts/generate-samples.ts` | Regenerates the synthetic files in `scripts/sample-receipts/` (`sample.pdf`, `sample.png`, `sample.html`, `bank.csv`, `ground-truth.json`). |
+
+## Check
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `typecheck` | `tsc --noEmit` | TypeScript check. |
+| `lint` | `prettier --check` | Formatting check over `src`, `test`, the scripts and config files. |
+| `format` | `prettier --write` | Rewrites the same files with Prettier. |
+| `test` | `vitest run` | Worker tests in workerd through `@cloudflare/vitest-pool-workers`. AI and FX are mocked; outbound network is forbidden. |
+| `test:scripts` | `bun test scripts/` | Tests for the setup, deploy, schema and release scripts. |
+| `test:release` | `bun test scripts/version.test.ts` | Tests for the release script only. |
+| `check` | `typecheck`, `lint`, `test`, `test:scripts` in order | Stops at the first failure. |
+| `smoke` | `bash scripts/smoke.sh && bash scripts/smoke-email.sh` | Drives a running `bun run dev` server with `curl`: sign-in, upload, import, matching, export and email. |
+| `eval` | `bun scripts/eval-extraction.ts` | Runs recorded Clairic answers through the extraction pipeline and reports field accuracy and review counts. No network. |
+
+### `smoke` environment variables
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SMOKE_URL` | `http://localhost:8787` | Base URL of the server under test. |
+| `SMOKE_USER` | `owner` | Sign-in user name. |
+| `NUITS_PASSWORD` | `local-dummy-password` | Sign-in password. |
+
+Output is written to `.audit/smoke/` and `.audit/smoke-email/`.
+
+### `eval` flags
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--dir <dir>` | `test/fixtures/receipts` | Fixture folder. Each fixture is `<name>.txt` or `<name>.pdf` plus `<name>.json` with the expected values and a recorded Clairic response. |
+| `--src <dir>` | `src` | Source folder to evaluate, for comparing two checkouts. |
+| `--json` | off | Machine-readable output. |
+
+## Deploy
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `setup` | `node scripts/setup.mjs` | Interactive install. Checks `wrangler whoami`, asks for names and vars, writes `wrangler.production.jsonc`, finds or creates the D1 database, runs `scripts/deploy.mjs`, then asks for `NUITS_PASSWORD` and stores it with `wrangler secret put`. A blank password is replaced by a generated one, shown once. |
+| `deploy` | `node scripts/deploy.mjs` | Non-interactive deploy, also run by the Deploy to Cloudflare button. Validates vars, resolves the D1 database, applies pending migrations to binding `DB`, then runs `wrangler deploy`. Any failure stops before deploying. |
+| `deploy:dry-run` | `node scripts/deploy.mjs --dry-run` | Same as `deploy -- --dry-run`. |
+
+### `setup` questions
+
+Asked in this order, with the default in brackets where there is one: Worker name, Cloudflare account ID, D1 database name, private R2 bucket name, sign-in user name, allowed senders, receipt address, and (only with a receipt address) `FORWARD_COPY_TO` and `INVOICES_ADDRESS`, then (only with an invoices address) `SELLER_NAMES`, then products, then who receives the CSV export. Products are entered as a comma-separated list of labels; ids are derived from the labels and the first becomes `DEFAULT_PRODUCT`.
+
+### `setup` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--no-deploy` | Stop after writing `wrangler.production.jsonc` and resolving the database. Nothing is deployed and no password is asked. |
+
+### `deploy` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--dry-run` | Validate vars and bundle to `.wrangler/dry-run`. Touches nothing in your account. |
+| `--config <file>` | Use this Wrangler config. |
+| `--apply-migrations` | Apply pending migrations to a database whose ledger is not the template ledger (`schema/` with table `template_migrations`). Without it, `deploy` stops when such a database has pending migrations. |
+
+### `deploy` config selection
+
+The first match is used, and printed:
+
+1. `--config <file>`
+2. `NUITS_WRANGLER_CONFIG`
+3. `wrangler.production.jsonc`, if it exists
+4. `wrangler.jsonc`
+
+### `deploy` database resolution
+
+| Situation | Result |
+| --- | --- |
+| `DB` has a valid `database_id` | Used as configured. A placeholder ID fails. |
+| No database with `database_name` exists | Created with that name. |
+| A database with that name exists and is empty, or already holds the config's migrations table (`template_migrations` in the template) | Used. |
+| A database with that name exists and its ID equals `NUITS_D1_DATABASE_ID` | Used. |
+| Any other existing database with that name | Stops. Nothing is deployed. |
+
+When the config has no `database_id`, the resolved ID is written to `wrangler.resolved.jsonc` and that file is deployed.
+
+### `setup` and `deploy` environment variables
+
+| Variable | Used by | Meaning |
+| --- | --- | --- |
+| `NUITS_WRANGLER_CONFIG` | `deploy` | Config file to use when `--config` is not given. |
+| `NUITS_D1_DATABASE_ID` | `deploy` | Confirms that an existing, non-empty database with the configured name belongs to this app. |
+| `CLOUDFLARE_ACCOUNT_ID` | `setup` | Default answer for the account ID question. |
+| `NUITS_WRANGLER_BIN` | both | Path to the Wrangler binary. Defaults to `node_modules/.bin/wrangler`. Used by tests. |
+
+## Release
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `version:next` | `bun scripts/version.mjs next` | Reads Conventional Commits since the last `v*` tag, decides the bump and prints it as JSON. Writes nothing. |
+| `version:apply` | `bun scripts/version.mjs apply` | Decides the bump and writes `package.json` and a new `CHANGELOG.md` entry. Does not tag, commit or push. |
+| `snapshot:public` | `bash scripts/public-snapshot.sh` | Maintainer tool that builds a public repository candidate from an allowlist of files and scans it. |
+
+`scripts/version.mjs` also has a `notes <version>` command, which prints one changelog entry. It has no `bun run` alias.
+
+### `version` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--force <bump>` | Use this bump instead of the one derived from commits: `major`, `minor` or `patch`. |
+
+### Commit types
+
+| Effect on version | Types |
+| --- | --- |
+| Minor | `feat` |
+| Patch | `fix`, `hotfix`, `perf`, `style`, `revert` |
+| None on their own | `build`, `chore`, `ci`, `copy`, `docs`, `refactor`, `test`, `update` |

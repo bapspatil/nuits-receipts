@@ -1,0 +1,10 @@
+---
+/* The Nuits Receipts mark, the receipt glyph from the marketing site's
+   favicon, inline so it takes the text colour in light and dark. The drawing
+   lives in logo.ts, which the social cards read too. */
+import { logo } from "./logo";
+
+interface Props { class?: string }
+const { class: cls = "h-5 w-8" } = Astro.props;
+---
+<svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${logo.width} ${logo.height}`} class={cls} aria-hidden="true">{logo.paths.map((d) => <path d={d} fill="currentColor" />)}<path d={logo.cutouts} fill="none" stroke="var(--nb-card)" stroke-width="1.6" stroke-linecap="round" /></svg>

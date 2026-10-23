@@ -1,0 +1,30 @@
+Page 1 of 1
+Receipt
+Invoice number Q9TRM4EP-0001
+Receipt number 3301-7745
+Date paid October 22, 2026
+User ID user_00SAMPLE000000000
+Quillstack Frontier Corporation
+100 Sample Street
+Ste 100 PMB 000000
+San Francisco, California 94105
+United States
+-1 415-555-0100
+billing@quillstack.example
+Bill to
+Sample Studio
+Esimerkkikatu 1 A 2
+FI-00100 Helsinki
+Finland
+buyer@example.com
+FI VAT FI00000000
+$20.00 paid on October 22, 2026
+Builder subscription
+Description Qty Unit price Amount
+Builder subscription 1 $20.00 $20.00
+Subtotal $20.00
+Total $20.00
+Amount paid $20.00
+Payment history
+Payment method Date Amount paid Receipt number
+Mastercard - 0000 October 22, 2026 $20.00 3301-7745

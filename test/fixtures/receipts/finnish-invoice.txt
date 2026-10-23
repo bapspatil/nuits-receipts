@@ -1,0 +1,16 @@
+LASKU
+Tilitoimisto Esimerkki Oy
+Esimerkkikatu 3, 00100 Helsinki
+Y-tunnus 7654321-0
+Laskutetaan
+Sample Buyer Oy
+Esimerkkikatu 1 A 2
+00100 Helsinki
+Laskun numero 2026-118
+Laskun päivämäärä 1.10.2026
+Eräpäivä 15.10.2026
+Viitenumero 12344
+Kirjanpito syyskuu 2026 1 kpl 100,00 €
+Veroton yhteensä 100,00 €
+ALV 25,5 % 25,50 €
+Yhteensä 125,50 €

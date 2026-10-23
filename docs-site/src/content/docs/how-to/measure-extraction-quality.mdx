@@ -1,0 +1,116 @@
+---
+title: Measure extraction quality
+description: Run the extraction eval over recorded receipts, compare a change against another checkout, and add a fixture.
+sidebar:
+  order: 21
+  label: Measure extraction quality
+---
+
+Use this guide when you change how receipts are read (`src/ai.ts`, `src/parse.ts`, `src/domain.ts` or `src/receipts.ts`) and want to know whether field accuracy or the review decision moved. For why receipts get flagged in the first place, see [How reading works](/explanation/how-reading-works/).
+
+## Prerequisites
+
+- Bun 1.4 or later and `bun install` run in the repository root.
+- No Workers AI access is needed. The eval replays recorded Clairic answers and makes no network calls.
+
+## Run the eval
+
+```sh
+bun run eval
+```
+
+This runs `scripts/eval-extraction.ts` over every fixture in `test/fixtures/receipts/`. For each receipt it builds the document text, parses the recorded Clairic answer with the same code the Worker uses, applies the cross-checks and review rules, and compares the result with the expected values.
+
+Each receipt gets one line:
+
+```text
+ok  finnish-invoice                    ready   -
+ok  inconsistent-totals-invoice        review  vat_mismatch
+```
+
+- `ok` means the review decision matched the fixture's `expect_review`; `BAD` means it did not.
+- `ready` or `review` is the decision, followed by the review reasons.
+- A `wrong:` line lists any field whose value differs from the expected one.
+
+The last line sums up: receipt count, field accuracy over the scored fields, how many need review, clean receipts approved without review, false reviews, missed reviews, and an estimated Clairic cost per receipt from the recorded input tokens.
+
+## Choose what to evaluate
+
+| Flag | What it does |
+| --- | --- |
+| `--dir <dir>` | Read fixtures from another folder instead of `test/fixtures/receipts/`. |
+| `--src <dir>` | Evaluate another checkout's `src/` folder with the same fixtures. |
+| `--json` | Print the summary and every row as JSON. |
+
+Pass flags after `--`:
+
+```sh
+bun run eval -- --json
+```
+
+## Compare a change with the code before it
+
+<Steps>
+  <Step title="Check out the base in a second worktree">
+
+```sh
+git worktree add ../nuits-receipts-base main
+(cd ../nuits-receipts-base && bun install)
+```
+
+The base code imports its own dependencies, so it needs its own install.
+
+  </Step>
+  <Step title="Run the eval against both">
+
+```sh
+bun run eval -- --src ../nuits-receipts-base/src
+bun run eval
+```
+
+The first run scores the base code, the second your working tree, both on your fixtures. Compare the two summary lines.
+
+  </Step>
+  <Step title="Remove the worktree">
+
+```sh
+git worktree remove ../nuits-receipts-base
+```
+
+  </Step>
+</Steps>
+
+## Add a fixture
+
+A fixture is two files with the same name in `test/fixtures/receipts/`:
+
+- `<name>.txt` with the document text, or `<name>.pdf` with the document itself.
+- `<name>.json` with:
+  - `about`: one line saying what the receipt tests.
+  - `expected`: the values to score, any of `vendor`, `invoice_number`, `issue_date`, `currency`, `total_minor`, `net_minor`, `vat_minor` and `vat_rate_bps`. Amounts are in minor units (cents), rates in basis points (`2550` for 25.5 %). A value may be a list of accepted alternatives. Fields you leave out are not scored.
+  - `expect_review`: `true` if the receipt should go to review.
+  - `clairic`: the recorded response from `@cf/cloudflare/clairic` for this document.
+
+The repository has no script that records answers yet, so the `clairic` response is added by hand. Run the document through `@cf/cloudflare/clairic` yourself, for example with the same request the app makes (see `src/ai.ts`), and paste the response into the fixture's JSON. Only do this with synthetic documents.
+
+Use synthetic vendors and amounts only. Never commit a real receipt.
+
+## Check it worked
+
+The eval also runs as a test, so a regression fails the build:
+
+```sh
+bun test scripts/eval-extraction.test.ts
+```
+
+It passes when every fixture keeps its review decision and every scored field, field accuracy is 100 %, and there are at least 13 fixtures. `bun run test:scripts` and `bun run check` include it (see [Run the tests](/how-to/run-the-tests/)).
+
+## Regenerate the sample receipts
+
+`scripts/sample-receipts/` holds the sample files used by the smoke tests and the first-month tutorial, not the eval fixtures. To rebuild them:
+
+```sh
+bun run samples
+```
+
+This runs `scripts/generate-samples.ts`, which writes `sample.pdf`, `sample.png`, `sample.html`, `bank.csv` and `ground-truth.json` (the expected values for the three samples) into `scripts/sample-receipts/`, and `blank.pdf` and `too-many-pages.pdf` into `test/fixtures/`. The output is deterministic, so `git status` shows no change unless you edited the generator.

@@ -1,0 +1,124 @@
+---
+title: Your first month
+description: Upload two sample receipts, check and approve them, import a sample bank statement, see the match and send September to your accountant.
+sidebar:
+  order: 2
+  label: Your first month
+---
+
+In this tutorial we take one month through Nuits Receipts from start to finish, using synthetic sample files. We upload two receipts, check and approve them, import a bank statement, see a payment matched to its receipt, download the month's ZIP and mark it as sent.
+
+At the end, September 2026 in your copy shows **Sent**, and you have the ZIP your accountant would receive.
+
+You need a copy of the app you can sign in to. If you do not have one yet, follow [Deploy your own copy](/tutorials/deploy-your-own-copy/) first.
+
+## Get the sample files
+
+The sample files are in the repository, in [`scripts/sample-receipts/`](https://github.com/bapspatil/nuits-receipts/tree/main/scripts/sample-receipts). Download these three to your computer:
+
+- `sample.pdf`: a receipt from Sample Cloud Lantern Oy
+- `sample.png`: a photo-style receipt from Sample Pixel Harbor Ltd
+- `bank.csv`: a bank statement with two payments out
+
+None of them is real financial data. Both receipts are dated September 2026, so that is the month we work on.
+
+These are the values printed on the two receipts. We check the app's reading against them in a moment.
+
+| Field | `sample.pdf` | `sample.png` |
+| --- | --- | --- |
+| Seller | Sample Cloud Lantern Oy | Sample Pixel Harbor Ltd |
+| Receipt number | SAMPLE-1001 | SAMPLE-1002 |
+| Date | 4 Sep 2026 | 5 Sep 2026 |
+| Currency | EUR | USD |
+| Before VAT | 100.00 | 20.00 |
+| VAT % | 25.5 | 0 |
+| VAT amount | 25.50 | 0.00 |
+| Total | 125.50 | 20.00 |
+
+## Upload the receipts
+
+Sign in to your copy. On the Home page, follow the **Add several at once** link. The **Add receipts or invoices** page opens.
+
+![The Add receipts or invoices page, with Receipts and bills selected and an empty file drop area](../../../assets/screenshots/upload.png)
+
+1. Leave **Receipts and bills** selected.
+2. Choose `sample.pdf` and `sample.png` together.
+3. Press **Add files**.
+
+Each file shows **Added** with an **Open** link, and the page says **2 of 2 added. They are being read now.**
+
+## Check and approve each receipt
+
+Open **Review** in the top bar. It lists every receipt the app wants you to check. Press **Start reviewing** to open the first one.
+
+The receipt page shows the original on the left and what the app read on the right. Anything it is unsure of is marked in red under a heading such as **7 things to check**.
+
+![A receipt page for sample.png marked Needs you, with the original on the left and the seller, date, currency, total, amount before VAT, VAT amount and receipt number flagged on the right](../../../assets/screenshots/receipt-review.png)
+
+In this screenshot the app could not read anything from the photo, so every field is flagged. Your copy may have read more of it.
+
+For each receipt in Review:
+
+1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. Set **Which currency?** from the list.
+2. Leave **Which part of the business** and **Kind of cost** as they are.
+3. Leave **Note for your accountant** as **Checked against the original**.
+4. Press **Approve receipt**.
+
+The receipt page reloads with the seller's name as its title, the stamp **Ready**, and **Everything looks fine**. For the USD receipt, the line under the title also shows a euro amount converted at the ECB reference rate.
+
+Go back to **Review** until it says **Nothing to check**.
+
+:::note
+If the app read a receipt correctly, it is already **Ready** and does not appear in Review. Open it from the Month page later if you want to compare it with the table anyway.
+:::
+
+## Import the bank statement
+
+Open **Payments** in the top bar and press **Import bank statement**. The **Import a bank statement** page opens.
+
+1. Under **Bank statement (CSV file)**, choose `bank.csv`.
+2. Leave **Which account is this?** set to **Bank account**.
+3. Press **Check the file**.
+
+The **Check the file** page shows what the app read before anything is saved. It recognises the sample's layout and lists two payments: Sample Cloud Lantern Oy for -125.50 and Sample Missing Vendor for -9.99.
+
+![The Check the file page, listing two payments read from bank.csv with their dates, amounts and currency, and an Import 2 payments button](../../../assets/screenshots/import-preview.png)
+
+Press **Import 2 payments**.
+
+## See the match
+
+The app takes you to **Payments** for September 2026, with **Import done: 2 inserted** at the top.
+
+![The Payments page for September 2026: Sample Cloud Lantern Oy is Matched, Sample Missing Vendor is marked Missing receipt](../../../assets/screenshots/payments.png)
+
+The Sample Cloud Lantern Oy payment shows **Matched**: the app paired it with the PDF receipt by amount, date and name. Sample Missing Vendor shows **Missing receipt**, because none of your receipts fits it.
+
+This sample payment has no receipt on purpose. Under it, press **Not a purchase (no receipt needed)**. It now shows **Not a purchase**, and the page says **All matched**.
+
+## Send the month
+
+On the Payments page, press **Close September**. The **Month** page for September 2026 opens, with three steps: **Check receipts**, **Match payments** and **Send to your accountant**.
+
+![The Month page for September 2026, showing the three steps and the list of files that go in the month's ZIP](../../../assets/screenshots/month.png)
+
+The screenshot was taken before the missing payment was marked, so the third step still says **Not ready**. In your copy, the first two steps are done and the third shows **Ready**, with the files that go in the ZIP:
+
+```
+receipts-2026-09/
+  00-index-2026-09.csv
+  2026-09-04_Sample-Cloud-Lantern-Oy_EUR-125.50_690c8a.pdf
+  2026-09-05_Sample-Pixel-Harbor-Ltd_USD-20.00_12cf96.png
+```
+
+1. Press **Download September ZIP**. Your browser saves `receipts-2026-09.zip`. Open it and you find the two originals and the index spreadsheet.
+2. Open **Then, send it to your accountant**. In real use, this is when you send the folder to your accountant.
+3. Press **I've sent September to your accountant**.
+
+The page says **Marked September as sent.** and the third step's stamp now reads **Sent** with today's date.
+
+## What we did
+
+You put a whole month through Nuits Receipts: two receipts read and approved, a bank statement imported, one payment matched to its receipt, one marked as not needing one, and the month packaged and marked as sent. If a receipt dated September changes later, the Month page tells you and offers just the changed files.
+
+From here, the [how-to guides](/how-to/) cover each part of the monthly routine with your own files, starting with [Add receipts](/how-to/add-receipts/) and [Import a bank CSV](/how-to/import-a-bank-csv/).

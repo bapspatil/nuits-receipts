@@ -1,0 +1,11 @@
+Invoice
+Sample Supplies Oy
+Esimerkkitie 5, 00100 Helsinki
+Invoice number SS-778
+Invoice date 3.10.2026
+Bill to
+Sample Buyer
+Office chair 1 €10.00
+Subtotal €10.00
+VAT 25.5% €2.55
+Total €13.00

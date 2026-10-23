@@ -1,0 +1,128 @@
+---
+title: Deploy from the command line
+description: Install Nuits Receipts into your own Cloudflare account with bun run setup, deploy later changes with bun run deploy, and check a config with a dry run.
+sidebar:
+  order: 1
+  label: Deploy from the command line
+---
+
+Use this guide to install Nuits Receipts without the Deploy to Cloudflare button, or to deploy a copy you already run from your own machine. If you would rather click through a browser, follow [Deploy your own copy](/tutorials/deploy-your-own-copy/) instead.
+
+## Prerequisites
+
+- A Cloudflare account with R2 enabled. R2 needs a payment method on the account even if your use stays inside the free allowance, or the originals bucket cannot be created.
+- Bun 1.4.2 or later. The setup and deploy scripts also run on Node 20 or later.
+- A clone of the repository, with dependencies installed:
+
+  ```sh
+  bun install --frozen-lockfile
+  ```
+
+- Wrangler signed in to your account. Wrangler is installed with the project, so run it through `bunx`:
+
+  ```sh
+  bunx wrangler login
+  ```
+
+## Install a new copy
+
+<Steps>
+  <Step title="Run setup">
+
+```sh
+bun run setup
+```
+
+Setup checks `wrangler whoami` first and stops with "Sign in first" if Wrangler is not signed in. If `wrangler.production.jsonc` already exists, it asks before overwriting it.
+
+  </Step>
+  <Step title="Answer the questions">
+
+Press Enter to accept the value in brackets. Setup asks for:
+
+- **Worker name** (default `my-nuits-receipts`).
+- **Cloudflare account ID**. Leave it blank if your login has only one account.
+- **D1 database name** (default: the Worker name) and **Private R2 bucket name** (default: the Worker name plus `-originals`).
+- **Sign-in user name** (default `owner`).
+- **Email addresses allowed to send receipts**. Leave it blank to use uploads only.
+- **Receipt address** you will route to this Worker. If you give one, setup also asks for an address to forward a copy of every email to, and an address for copies of the sales invoices you send (then your business names as they appear on those invoices).
+- **Products or projects to group costs by**, comma separated (default `General`). The first one becomes the default.
+- **Who receives the CSV export** (default `your accountant`).
+
+Setup checks the answers with the same rules the Worker uses and stops on the first invalid value. You can change most of these later in the app; see [Change settings in the app](/how-to/change-settings-in-the-app/).
+
+  </Step>
+  <Step title="Let setup find or create the database">
+
+Setup writes your answers to `wrangler.production.jsonc` (gitignored, readable only by you) and looks for a D1 database with the name you chose. It creates one if none exists. It reuses an existing one only if it is empty or already holds this app's tables. If the database holds other data, setup stops: pick another name, or set `NUITS_D1_DATABASE_ID` to that database's exact ID if it really belongs to this app.
+
+  </Step>
+  <Step title="Choose the password">
+
+Setup asks for `NUITS_PASSWORD` without showing what you type. Use at least 16 characters that you use nowhere else, and type it twice. Leave it blank to have setup generate one; it is printed once, so store it in your password manager straight away.
+
+  </Step>
+  <Step title="Wait for the deploy">
+
+Setup runs `bun run deploy` (see below), then stores the password as a Worker secret. The password is never written to disk. If the deploy fails, the password is not stored and you can run setup again.
+
+  </Step>
+</Steps>
+
+To write the config and resolve the database without deploying, run `bun run setup -- --no-deploy`. Setup still finds or creates the D1 database in that case.
+
+## Deploy a change
+
+After the first install, deploy with:
+
+```sh
+bun run deploy
+```
+
+The deploy script prints the config it uses. It picks the first of: `--config <file>`, the `NUITS_WRANGLER_CONFIG` environment variable, `wrangler.production.jsonc` if it exists, then the public `wrangler.jsonc`. It then:
+
+1. Checks the Worker variables and stops with a list if any are invalid.
+2. Resolves the D1 database the same way setup does.
+3. Lists pending D1 migrations and applies them. In an interactive shell Wrangler asks you to confirm the list.
+4. Runs `wrangler deploy`. Wrangler creates the R2 bucket if it does not exist yet.
+
+Any failure stops before the Worker is deployed. To deploy another config file, pass it after `--`:
+
+```sh
+bun run deploy -- --config wrangler.other.jsonc
+```
+
+:::caution[Existing private databases]
+If your config uses its own `migrations_dir` or `migrations_table` (an older private install), the script refuses to apply pending migrations. Back up the database first, then rerun with `bun run deploy -- --apply-migrations`. See [Upgrade your deployment](/how-to/upgrade-your-deployment/).
+:::
+
+## Check a config without deploying
+
+```sh
+bun run deploy -- --dry-run
+```
+
+`bun run deploy:dry-run` does the same. A dry run validates the config and variables and bundles the Worker into `.wrangler/dry-run`. It does not look up the database, apply migrations or upload anything.
+
+## Check it worked
+
+1. The deploy ends with "Deployed" and Wrangler prints your `workers.dev` URL.
+2. Open that URL. Your browser asks for a user name and password.
+3. Sign in with the user name you chose (`owner` by default) and your password. You see the empty Home page, with the version in the footer.
+
+If the browser keeps asking for the password, check that you are on the `https://` URL and that the password has at least 16 characters. Shorter passwords and the example values from the docs are refused.
+
+## Keep your config safe
+
+`wrangler.production.jsonc` holds your account ID, database ID and settings. It is gitignored. Back it up somewhere private, and never commit it. To change the password later:
+
+```sh
+bunx wrangler secret put NUITS_PASSWORD --config wrangler.production.jsonc
+```
+
+## Related
+
+- [Commands](/reference/commands/) lists every `bun run` script and flag.
+- [Configuration](/reference/configuration/) lists every variable, secret and binding.
+- [Set up email](/how-to/set-up-email/) to forward receipts.
+- If the first build or deploy fails at the D1 migrations step, see [Troubleshoot](/how-to/troubleshoot/).

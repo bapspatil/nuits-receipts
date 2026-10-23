@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real receipts, bank statements, account IDs, API tokens or passwords.** Describe formats with made-up examples.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like to happen? Alternatives you considered are welcome.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checks
+      options:
+        - label: I removed real receipts, personal data, account IDs and secrets from everything above.
+          required: true

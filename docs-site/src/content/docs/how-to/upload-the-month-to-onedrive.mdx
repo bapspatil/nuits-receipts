@@ -1,0 +1,139 @@
+---
+title: Upload the month to OneDrive
+description: Register a Microsoft Entra app, store its secrets, connect your Microsoft account and choose a folder, then upload a month straight into OneDrive.
+sidebar:
+  order: 6
+  label: Upload to OneDrive
+---
+
+Use this guide to send each month's files straight into a OneDrive or SharePoint folder, such as one your accountant shared with you, instead of downloading and unzipping the ZIP. The upload uses your own Microsoft sign-in through Microsoft Graph. Nothing is sent to Microsoft until you connect, and the feature stays off unless all three values below are set.
+
+## Prerequisites
+
+- A deployed copy of Nuits Receipts on a hostname you will keep. The sign-in redirect address includes the hostname, so changing it later means updating the Entra app.
+- A Microsoft account with OneDrive, and edit rights on the destination folder.
+- A Microsoft Entra tenant to register the app in. A work or school account already has one. What Microsoft requires to register an app, and whether a personal account can do it, can change, so follow [Microsoft's current guide to registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app) rather than relying on these pages for that part.
+- Wrangler signed in to the account that runs the Worker, and the config file you deploy with (`wrangler.production.jsonc` if you used `bun run setup`).
+- `openssl`, to create the encryption key.
+
+## Register the app in Microsoft Entra
+
+<Steps>
+  <Step title="Find your redirect URI">
+
+The redirect URI is `https://<your host><APP_BASE_PATH>/settings/onedrive/callback`, for example `https://receipts.example.com/settings/onedrive/callback`, or `https://receipts.example.com/app/settings/onedrive/callback` with `APP_BASE_PATH=/app`.
+
+Once `MS_CLIENT_ID` and both secrets are set, **Settings > OneDrive > Redirect URI for Microsoft Entra** shows the exact value for your deployment.
+
+  </Step>
+  <Step title="Create the registration">
+
+Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com), go to **Entra ID > App registrations** and select **New registration**.
+
+- **Name**: anything, for example "Receipts upload".
+- **Supported account types**: **Any Entra ID Tenant + Personal Microsoft accounts**. The app signs in through Microsoft's `common` endpoint, so it needs this option.
+- **Redirect URI**: platform **Web**, with the value from the previous step.
+
+Select **Register**.
+
+  </Step>
+  <Step title="Copy the client ID">
+
+On the app's **Overview** page, copy the **Application (client) ID**. It is a GUID.
+
+  </Step>
+  <Step title="Create a client secret">
+
+Go to **Certificates & secrets > Client secrets > New client secret**. Copy the **Value** (not the Secret ID) straight away; it is shown only once. Note the expiry date.
+
+  </Step>
+  <Step title="Add the API permissions">
+
+Go to **API permissions > Add a permission > Microsoft Graph > Delegated permissions** and add `Files.ReadWrite.All`, `offline_access` and `User.Read`. `Files.ReadWrite.All` is needed to write into a folder in someone else's OneDrive. Personal accounts consent at sign-in; a work or school tenant may need an administrator to grant consent.
+
+  </Step>
+</Steps>
+
+## Give the values to the Worker
+
+<Steps>
+  <Step title="Store the client secret">
+
+```sh
+bunx wrangler secret put MS_CLIENT_SECRET --config wrangler.production.jsonc
+```
+
+Paste the secret **Value** when asked.
+
+  </Step>
+  <Step title="Create and store the encryption key">
+
+```sh
+openssl rand -base64 32 | bunx wrangler secret put ONEDRIVE_TOKEN_KEY --config wrangler.production.jsonc
+```
+
+This key encrypts the stored Microsoft sign-in. If you change it later, the stored sign-in can no longer be read and you connect again.
+
+  </Step>
+  <Step title="Set the client ID and deploy">
+
+Add the client ID to `vars` in your config:
+
+```jsonc title="wrangler.production.jsonc"
+"MS_CLIENT_ID": "<your Application (client) ID>"
+```
+
+Then deploy with `bun run deploy`. If you used the Deploy button, change `MS_CLIENT_ID` in your repository's `wrangler.jsonc` and push instead, and run the two `secret put` commands with `--name <your Worker name>` in place of `--config`.
+
+Never put `MS_CLIENT_SECRET` or `ONEDRIVE_TOKEN_KEY` in `vars`. The deploy script refuses a config that does.
+
+  </Step>
+</Steps>
+
+## Connect and choose the folder
+
+<Steps>
+  <Step title="Connect your Microsoft account">
+
+In the app, open **Settings > OneDrive** and press **Connect Microsoft account**. Sign in to Microsoft and accept the permissions. You come back to Settings with "Microsoft account connected."
+
+  </Step>
+  <Step title="Choose the folder">
+
+In OneDrive, open the destination folder's **Share** menu and choose **Copy link**. Paste it into **Link to the shared folder** and press **Use this folder**.
+
+For a folder shared from another organisation, open the link once in your browser while signed in first. If the link still does not resolve, also type the folder's name in **Folder's name**.
+
+  </Step>
+</Steps>
+
+## Upload a month
+
+1. Open **Month**, pick the month, and go to the **Send to** step.
+2. Press **Upload N files to** your folder. The files go into a subfolder named like the ZIP, for example `receipts-2026-10`.
+3. Ten files go up per request. If more remain, the page shows how many are done; press **Continue uploading** until all are up.
+
+When everything is up, the page says "Everything is in" your folder and the month is marked as sent.
+
+## Check it worked
+
+- **Settings > OneDrive** shows **Connected as** your account and the chosen **Folder**.
+- The subfolder in OneDrive holds the originals and the index spreadsheet, with the same names and `check-these/` rules as the ZIP.
+
+If Microsoft asks the app to slow down, the page says how many seconds to wait before you continue. Files already uploaded are skipped next time; corrected ones replace their old copy.
+
+## When something stops working
+
+- **"Not set up"** under **Settings > OneDrive**: `MS_CLIENT_ID` is set but one of the two secrets is missing.
+- **Sign-in fails after months of working**: the client secret has expired. Create a new one in Entra and store it with `wrangler secret put MS_CLIENT_SECRET` again.
+- **Asked to reconnect**: Microsoft ends a sign-in after 90 days without use. Press **Connect Microsoft account** again.
+- **The other organisation blocks outside accounts**: only the ZIP works for that folder, and Settings says so.
+
+To stop, press **Disconnect Microsoft account**. This deletes the stored sign-in and the upload records from the app.
+
+## Related
+
+- [Send the month to your accountant](/how-to/send-the-month-to-your-accountant/)
+- [Month package](/reference/month-package/) for the file names and folder layout.
+- [Outside calls](/reference/outside-calls/) for what goes to Microsoft and when.
+- [Configuration](/reference/configuration/) for `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `ONEDRIVE_TOKEN_KEY`.

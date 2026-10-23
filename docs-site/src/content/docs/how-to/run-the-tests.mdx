@@ -1,0 +1,144 @@
+---
+title: Run the tests
+description: Typecheck, lint and test the Worker and the scripts, then smoke test a running dev server.
+sidebar:
+  order: 20
+  label: Run the tests
+---
+
+Use this guide before you open a pull request or cut a release. Every command runs from the repository root unless a step says otherwise.
+
+## Prerequisites
+
+- Bun 1.4 or later (the repository pins `bun@1.4.2`).
+- Dependencies installed with `bun install`.
+- For the smoke tests only: a local dev server (see [Run it locally](/tutorials/run-it-locally/)), plus `curl`, `python3` and ripgrep (`rg`) on your `PATH`. The smoke scripts call `rg` directly and fail without it.
+
+## Run everything at once
+
+```sh
+bun run check
+```
+
+`check` runs the typecheck, the format check, the Worker tests and the script tests in that order, and stops at the first failure. It does not run the smoke tests. Run it before every push.
+
+## Run one part
+
+<Steps>
+  <Step title="Typecheck">
+
+```sh
+bun run typecheck
+```
+
+Runs `tsc --noEmit` over the project.
+
+  </Step>
+  <Step title="Check formatting">
+
+```sh
+bun run lint
+```
+
+Runs `prettier --check` over `src/`, `test/`, the setup, deploy and eval scripts, `vitest.config.ts`, `tsconfig.json` and `package.json`. If it reports files, fix them with:
+
+```sh
+bun run format
+```
+
+  </Step>
+  <Step title="Run the Worker tests">
+
+```sh
+bun run test
+```
+
+Runs Vitest with `@cloudflare/vitest-pool-workers`, so the tests in `test/**/*.test.ts` execute inside workerd, the same runtime as a deployed Worker. The pool reads `wrangler.local.jsonc`, applies the schema in `schema/` to a local D1 database, and uses synthetic bindings set in `vitest.config.ts` (password `local-dummy-password`, `example.com` senders). Remote bindings are off and `test/setup.ts` replaces `fetch` with a stub that throws, so no test reaches the network. Test files run one at a time.
+
+To run one file, or the tests whose name matches a pattern, pass Vitest arguments after `--`:
+
+```sh
+bun run test -- test/csv.test.ts
+bun run test -- -t "pending imports"
+```
+
+  </Step>
+  <Step title="Run the script tests">
+
+```sh
+bun run test:scripts
+```
+
+Runs `bun test scripts/`. This covers the deploy helpers, the schema check, the release versioning (`scripts/version.test.ts`) and the extraction eval (`scripts/eval-extraction.test.ts`, see [Measure extraction quality](/how-to/measure-extraction-quality/)). To run only the release tests:
+
+```sh
+bun run test:release
+```
+
+  </Step>
+</Steps>
+
+## Smoke test a running dev server
+
+The smoke tests send real HTTP requests to a running app. They upload `scripts/sample-receipts/sample.pdf`, import `scripts/sample-receipts/bank.csv`, check the match on the Payments page and the monthly CSV, then send synthetic emails to the local email endpoint and check which are kept, held for review or dropped.
+
+<Steps>
+  <Step title="Start the dev server">
+
+In one terminal:
+
+```sh
+bun run migrate
+bun run dev
+```
+
+`wrangler.local.jsonc` sets `AI_MODE` to `mock`, so no Workers AI calls are made.
+
+  </Step>
+  <Step title="Run the smoke scripts">
+
+In a second terminal, pass the password from your `.dev.vars`:
+
+```sh
+NUITS_PASSWORD='your-local-password' bun run smoke
+```
+
+`smoke` runs `scripts/smoke.sh` and then `scripts/smoke-email.sh`. Both read these environment variables:
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `SMOKE_URL` | `http://localhost:8787` | The app to test |
+| `NUITS_PASSWORD` | `local-dummy-password` | The sign-in password |
+| `SMOKE_USER` | `owner` | The sign-in user name |
+
+Responses are saved under `.audit/smoke/` and `.audit/smoke-email/`, which git ignores.
+
+
+  </Step>
+</Steps>
+
+## Check it worked
+
+- `bun run check` exits with status 0 and the last Vitest and Bun summaries report no failures.
+- `bun run smoke` prints two lines that start with `PASS`, one per script.
+
+If a smoke step fails, open the saved response for that step in `.audit/smoke/` to see what the app returned.
+
+## Build the docs site
+
+The docs live in `docs-site/`, a separate Bun project. To preview and build them:
+
+```sh
+cd docs-site
+bun install
+bun run dev
+bun run build
+```
+
+`bun run dev` serves the site locally with live reload. `bun run build` builds the site, nests it under the `/docs/` base, then runs `scripts/check-copy.mjs`, which fails the build on banned phrases and long dashes. To run only the copy check on the page sources:
+
+```sh
+bun run check:copy
+```
+
+The rules for what to write, and the page map that internal links must follow, are in `docs-site/WRITING.md`.

@@ -1,0 +1,103 @@
+{
+  "about": "Finnish B2B invoice with Finnish labels, ALV 25.5 %, comma decimals and D.M.YYYY dates.",
+  "expected": {
+    "vendor": "Tilitoimisto Esimerkki Oy",
+    "invoice_number": "2026-118",
+    "issue_date": "2026-10-01",
+    "currency": "EUR",
+    "total_minor": 12550,
+    "net_minor": 10000,
+    "vat_minor": 2550,
+    "vat_rate_bps": 2550
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.01324715930968523,
+        "span": [6, 31],
+        "guess": "Tilitoimisto Esimerkki Oy",
+        "confidence": 0.8194935321807861,
+        "value": "Tilitoimisto Esimerkki Oy"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.027949701994657516,
+        "span": [160, 168],
+        "guess": "2026-118",
+        "confidence": 0.9989312291145325,
+        "value": "2026-118"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.015881957486271858,
+        "span": [298, 299],
+        "guess": "€",
+        "confidence": 0.5386361479759216,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.00535333389416337,
+        "guess": "2026-10-01",
+        "confidence": 0.98440236782249,
+        "value": "2026-10-01"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.02127949520945549,
+        "guess": "2026-10-15",
+        "confidence": 0.9994731017957621,
+        "value": "2026-10-15"
+      },
+      "total": {
+        "type": "number",
+        "p_null": 1.0779960575746372e-5,
+        "guess": 125.5,
+        "confidence": 0.9992045710524434,
+        "value": 125.5
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.0068907602690160275,
+        "guess": 100,
+        "confidence": 0.9799662253873135,
+        "value": 100
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 1.896352114272304e-5,
+        "guess": 25.5,
+        "confidence": 0.9995937291151653,
+        "value": 25.5
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.0024484407622367144,
+        "guess": 25.5,
+        "confidence": 0.9970036599853446,
+        "value": 25.5
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Kirjanpito syyskuu 20", "100,0"],
+        "spans": [
+          [235, 256],
+          [265, 270]
+        ],
+        "confidence": 3.794501064895889e-12
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 199,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1712,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

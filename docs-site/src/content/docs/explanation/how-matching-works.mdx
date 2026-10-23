@@ -1,0 +1,52 @@
+---
+title: How matching works
+description: How bank rows are paired with approved receipts, when the app only suggests, and how exemptions and own-account transfers fit in.
+sidebar:
+  order: 4
+---
+
+Matching answers two questions: which receipt belongs to this payment, and which payments still have no receipt. The second question is the useful one. A payment with no receipt is what your accountant will ask about, and the app lists it so you can find the receipt before they ask.
+
+The app is conservative here. It links a payment to a receipt on its own only when there is exactly one sensible answer. Everything else is a suggestion that you confirm. Matching is a suggestion about your records, not a reconciliation you can rely on without checking.
+
+## What has to fit
+
+A bank row and a receipt can be matched when all of these hold:
+
+- **The payment is money out.** Money in is matched to sales invoices instead (see below).
+- **The receipt is approved.** A receipt with open flags is not matched until you have dealt with them. The one exception is a receipt whose only flag is that it has no euro amount yet, because a bank match is exactly what can give it one.
+- **The amount and currency agree.** Same currency, and the same amount to within two cents. If your bank's CSV shows the original foreign amount and currency of a card payment, that is what is compared.
+- **The dates are close.** The payment is booked between 3 days before and 45 days after the receipt's issue date. The window allows for card payments that settle late and invoices paid near their due date.
+- **The names are alike.** The receipt's seller and the merchant on the bank row share enough words (60 % by default), after the same clean-up used for vendor rules. If the bank uses a different name, a vendor rule's bank alias bridges the gap.
+
+Payment processors are a special case. A bank row that just says "Stripe" or "PayPal" says nothing about the seller behind it, so those names never match on their own. Add a bank alias if one seller always appears that way.
+
+The window and the name threshold can be changed under **Settings**.
+
+## Automatic matches and suggestions
+
+A match is made automatically only when the receipt has exactly one fitting payment **and** the payment has exactly one fitting receipt. Two subscriptions with the same price from the same seller in the same month, for example, are never paired by the app, because it cannot know which is which. You get suggestions instead and pick yourself.
+
+Suggestions cast a slightly wider net. A foreign-currency receipt paid from a euro account is suggested when its ECB-converted amount is within 3 % or one euro, whichever is larger, of the euro payment. Card schemes and banks use their own rates and fees, so an exact match would almost never happen; a near one is a good hint but not proof. On the receipt page these appear as "Is this the payment?". You can also link a payment and a receipt that do not fit the rules at all, after confirming that you mean it.
+
+Matching runs again after every reading, correction and import, so a new receipt or a new statement is picked up straight away. If you change a matched receipt's seller, date, currency or total, its match is removed and worked out again from the corrected facts. Importing the same bank file twice changes nothing.
+
+## Payments that need no receipt
+
+Not every payment is a purchase. Tax payments, loan repayments, salary and money you move to yourself have no receipt, and listing them as missing would hide the real gaps. Two tools handle this:
+
+- **Exemptions.** Mark a payment "Not a purchase (no receipt needed)". It drops out of the missing list and the month's missing-receipt file. You can undo it with "Needs a receipt after all".
+- **Own-account transfers.** When you import statements from more than one of your accounts, money moved between them shows up twice: once leaving one account, once arriving in the other. Pairing the two sides, with a short reason, marks both as needing no receipt. The pair must be in different accounts, in the same currency, with equal and opposite amounts. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
+
+## Sales invoices and money in
+
+If you keep the sales invoices you send, money coming in is matched to them. The rule is stricter in one way: the amount fitting is not enough for an automatic match. The bank row's reference must carry the invoice's reference or number, or the payer's name must be the client. An amount on its own is only a suggestion. An invoice paid somewhere your statements do not show (a card payout, cash, another bank) can be marked as paid outside, with a note.
+
+## What matching does not do
+
+- It does not split or combine payments. One receipt is linked to at most one payment. A receipt paid in instalments, or one payment covering three receipts, needs your judgement and a note for your accountant.
+- It does not handle refunds as such. A refund is money in; a credit note is flagged when read. Pair them up in your own notes.
+- It does not see pending card transactions differently. If your bank exports pending rows, they are imported like booked ones.
+- It does not decide what a payment was for. A match says "these two look like the same purchase". Whether that purchase is deductible, and how it is booked, is your accountant's call.
+
+For the steps, see [Match payments and receipts](/how-to/match-payments-and-receipts/). For what is accepted in a bank file, see [Bank CSV import](/reference/bank-csv-import/).

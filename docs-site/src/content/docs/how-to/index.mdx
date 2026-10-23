@@ -1,0 +1,50 @@
+---
+title: How-to guides
+description: Recipes for real tasks with Nuits Receipts, from deploying and configuring it to sending the month to your accountant.
+sidebar:
+  label: How-to guides
+---
+
+How-to guides are short recipes for one task each. They assume you already have a copy running and know what you want to do; for a first walk-through, start with the [tutorials](/tutorials/), and for background, see the [explanation](/explanation/) pages.
+
+## Deploy and configure
+
+<CardGrid>
+  <Card title="Deploy from the command line" href="/how-to/deploy-from-the-command-line/">Install with `bun run setup`, deploy with `bun run deploy`, and check a config with a dry run.</Card>
+  <Card title="Set up email" href="/how-to/set-up-email/">Route a receipt address to the Worker, allow your senders and send a test.</Card>
+  <Card title="Forward a copy of incoming mail" href="/how-to/forward-a-copy-of-incoming-mail/">Get every message sent to the receipt address in your own inbox too.</Card>
+  <Card title="Keep sales invoices" href="/how-to/keep-sales-invoices/">File the invoices you send and match them to money coming in.</Card>
+  <Card title="Protect the app with Cloudflare Access" href="/how-to/protect-the-app-with-cloudflare-access/">Sign in through Access instead of the shared password.</Card>
+  <Card title="Upload the month to OneDrive" href="/how-to/upload-the-month-to-onedrive/">Register a Microsoft Entra app, connect, and choose a folder.</Card>
+  <Card title="Serve the app under a path" href="/how-to/serve-the-app-under-a-path/">Use your own hostname, or a path such as `/app` next to other content.</Card>
+  <Card title="Change settings in the app" href="/how-to/change-settings-in-the-app/">Edit settings without a redeploy, see where values come from, and reset them.</Card>
+  <Card title="Upgrade your deployment" href="/how-to/upgrade-your-deployment/">Back up, bring in a newer release and deploy it.</Card>
+</CardGrid>
+
+## Use it every month
+
+<CardGrid>
+  <Card title="Add receipts" href="/how-to/add-receipts/">Upload a PDF or photo, or forward the email.</Card>
+  <Card title="Review and approve a receipt" href="/how-to/review-and-approve-a-receipt/">Fix what is flagged, give a reason when needed, or read it again.</Card>
+  <Card title="Import a bank CSV" href="/how-to/import-a-bank-csv/">Map the columns once, preview, and confirm.</Card>
+  <Card title="Resolve duplicate warnings" href="/how-to/resolve-duplicate-warnings/">Decide what to do with a receipt that looks like one you already have.</Card>
+  <Card title="Match payments and receipts" href="/how-to/match-payments-and-receipts/">Accept suggested matches and mark payments that need no receipt.</Card>
+  <Card title="Pair an own-account transfer" href="/how-to/pair-an-own-account-transfer/">Link money moved between your own accounts.</Card>
+  <Card title="Sort costs with vendor rules" href="/how-to/sort-costs-with-vendor-rules/">File a seller's receipts under the same part and type every time.</Card>
+  <Card title="Send the month to your accountant" href="/how-to/send-the-month-to-your-accountant/">Download the ZIP or CSV and mark the month as sent.</Card>
+  <Card title="Troubleshoot" href="/how-to/troubleshoot/">Fix common problems with deploys, email, reading and imports.</Card>
+</CardGrid>
+
+## For accountants
+
+<CardGrid>
+  <Card title="Open a month package" href="/how-to/open-a-month-package/">What to open first, and how to check totals against the originals.</Card>
+</CardGrid>
+
+## For contributors
+
+<CardGrid>
+  <Card title="Run the tests" href="/how-to/run-the-tests/">Typecheck, lint and test the Worker and scripts.</Card>
+  <Card title="Measure extraction quality" href="/how-to/measure-extraction-quality/">Run the extraction eval over recorded receipts with `bun run eval`.</Card>
+  <Card title="Cut a release" href="/how-to/cut-a-release/">Version, changelog and tag from Conventional Commits.</Card>
+</CardGrid>

@@ -1,0 +1,77 @@
+---
+title: Match payments and receipts
+description: Confirm suggested matches, match a payment by hand, and mark payments that need no receipt.
+sidebar:
+  order: 14
+  label: Match payments
+---
+
+Use this guide to make sure every payment out in a month has a receipt, or a reason not to. The app matches payments automatically when exactly one approved receipt fits; this guide covers the rest.
+
+## Prerequisites
+
+- A bank statement imported for the month. See [Import a bank CSV](/how-to/import-a-bank-csv/).
+- The receipts for that month approved. Only approved receipts can be matched. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
+
+![The Payments page with matched payments and one payment missing a receipt](../../../assets/screenshots/payments.png)
+
+## Match the missing payments
+
+<Steps>
+  <Step title="Open the missing payments">
+
+Select **Payments** in the top bar and pick the month. Select **Missing** to show only payments out with no receipt. Home links here too, from **Find receipts** or, when a receipt looks like it fits, **Check matches**.
+
+  </Step>
+  <Step title="Pick the receipt">
+
+Each missing payment has **Find the receipt** (the first one is open). In **Which receipt is it?**, likely matches are listed first under **Likely**, and every other approved, unmatched receipt under **Other ready receipts**. Choose one.
+
+To use a receipt ID instead, open **Paste a receipt ID instead** and fill in **Receipt ID**.
+
+  </Step>
+  <Step title="Confirm exceptions if needed">
+
+If the amount or date does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), tick **The amount or date doesn't line up exactly, and that's fine**. Without it, the app refuses a match that does not fit.
+
+  </Step>
+  <Step title="Match">
+
+Select **Match**. The payment's stamp changes to **Matched**.
+
+  </Step>
+</Steps>
+
+You can also match from the receipt side. A receipt page shows **Is this the payment?** when an unmatched payment fits it; select **Yes, match**.
+
+If no approved receipt exists yet, the payment shows **Add the receipt**. Upload it, approve it, then come back.
+
+## Mark payments that need no receipt
+
+Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Open **Find the receipt** on the payment and select **Not a purchase (no receipt needed)**. The stamp changes to **Not a purchase** and the payment no longer counts as missing.
+
+To reverse it, select **Needs a receipt after all**.
+
+For money moved between two of your own accounts, pair the two sides instead, so both are explained together. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
+
+## Undo a match
+
+On a matched payment, select **Remove match**. The payment counts as missing again.
+
+## Check that it worked
+
+- The summary at the top of **Payments** shows, for example, "12 payments out", "12 with a receipt" and "0 missing", and the page says **Every payment has a receipt.**
+- On **Month**, the **Match payments** step shows **Done**.
+- If other months still have gaps, **Payments** lists them under "Also missing receipts in".
+
+:::caution[Editing a matched receipt]
+Saving any change to a receipt removes its link to a bank payment, then automatic matching runs again. A match you made by hand, or one with an exception, has to be made again. Check **Payments** after correcting a matched receipt.
+:::
+
+A seller that appears on your bank statement under a different name (for example through a payment processor) may never match automatically. A vendor rule with **Name on your bank statement** fixes that; see [Sort costs with vendor rules](/how-to/sort-costs-with-vendor-rules/).
+
+## Related
+
+- When a match is automatic, when it is only suggested, and the date and amount windows: [How matching works](/explanation/how-matching-works/).
+- How a bank match sets the euro amount: [Currencies and reference rates](/explanation/currencies-and-reference-rates/).
+- Money in matched to invoices you sent: [Keep sales invoices](/how-to/keep-sales-invoices/).

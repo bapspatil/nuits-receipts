@@ -1,0 +1,100 @@
+{
+  "about": "Stripe invoice from a Finnish company with 25.5% VAT",
+  "expected": {
+    "vendor": "Pohjoistuuli Oy",
+    "invoice_number": "POHJ-2026-0042",
+    "issue_date": "2026-10-01",
+    "currency": "EUR",
+    "total_minor": 12550,
+    "net_minor": 10000,
+    "vat_minor": 2550,
+    "vat_rate_bps": 2550
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.0020721466280519962,
+        "span": [94, 109],
+        "guess": "Pohjoistuuli Oy",
+        "confidence": 0.9935958981513977,
+        "value": "Pohjoistuuli Oy"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 1.957208223757334e-5,
+        "span": [23, 37],
+        "guess": "POHJ-2026-0042",
+        "confidence": 0.9999998807907104,
+        "value": "POHJ-2026-0042"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.04152114689350128,
+        "span": [265, 266],
+        "guess": "€",
+        "confidence": 0.7420462965965271,
+        "value": "€"
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.0019570793956518173,
+        "guess": "2026-10-01",
+        "confidence": 0.9960405409670305,
+        "value": "2026-10-01"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 2.0265699276933447e-5,
+        "guess": "2026-10-15",
+        "confidence": 0.999998569490117,
+        "value": "2026-10-15"
+      },
+      "total": {
+        "type": "number",
+        "p_null": 1.2407543181325309e-5,
+        "guess": 125.5,
+        "confidence": 0.9975687758828673,
+        "value": 125.5
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.00034963368671014905,
+        "guess": 100,
+        "confidence": 0.942542575664797,
+        "value": 100
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.000434695539297536,
+        "guess": 25.5,
+        "confidence": 0.9547772986684153,
+        "value": 25.5
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.0001952907332452014,
+        "guess": 25.5,
+        "confidence": 0.9988026493841089,
+        "value": 25.5
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Design retainer, October 1"],
+        "spans": [[332, 358]],
+        "confidence": 0.010031745007288366
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 242,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1884,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

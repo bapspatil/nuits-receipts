@@ -1,0 +1,78 @@
+---
+title: Import a bank CSV
+description: Check a bank statement CSV before anything is saved, map its columns once, and import it into a bank account.
+sidebar:
+  order: 12
+  label: Import a bank CSV
+---
+
+Use this guide to bring a bank statement into the app so each payment out can be checked for a receipt. Nuits Receipts imports CSV exports from banks that provide one: there are presets for some layouts and a column mapper for other layouts, so you map the columns once. It has been tested with Holvi exports so far. Nothing is saved until you confirm the preview.
+
+## Prerequisites
+
+- A CSV export of booked transactions from your bank, at most 2 MiB and 5,000 rows. No XLSX and no pending transactions.
+- Optional: a bank account set up under **Settings** > **Bank accounts**. You can also create one during the import.
+
+![The Check the file page with a recognised layout, the payments read from the file and the Import button](../../../assets/screenshots/import-preview.png)
+
+## Import a statement
+
+<Steps>
+  <Step title="Open the import page">
+
+Select **Import bank statement** on **Payments** or on the **Match payments** step of **Month**, or **Import another statement** at the bottom of **Payments**. The page is called **Import a bank statement**.
+
+  </Step>
+  <Step title="Choose the file and the account">
+
+Under **Bank statement (CSV file)**, choose the file. Pick the account in **Which account is this?** and keep **Import into** on **The account chosen here**.
+
+For a new account, set **Import into** to **A new account (fill in below)** and fill in **Account name**, **Bank** and **Currency** under **Only for a new account**. The account is created only when you import.
+
+If accented letters come out wrong later, open **File options** and pick the **Text encoding** your bank uses. Then select **Check the file**.
+
+  </Step>
+  <Step title="Read the preview">
+
+The **Check the file** page names the layout if it recognised one (for example "We recognised a Revolut export."), counts the payments and their date range, and shows the net total per currency. Up to 50 rows are shown; the whole file is checked.
+
+Compare the count, dates and net total with your bank. Money out must show as negative amounts.
+
+  </Step>
+  <Step title="Fix the mapping if needed">
+
+If the page lists problems, or the columns look wrong, open **The columns look wrong? Adjust how we read the file**. Choose a layout under **Layout**, or **Custom mapping**, and set the columns, date format, decimal mark and how amounts are shown. If the column names are not on the first row, set **Which row has the column names?** (0 is the first row). Use **Rows to skip at the end** for a footer.
+
+Select **Check again** after every change. A row with an error blocks the whole import, and each message names the row and field.
+
+  </Step>
+  <Step title="Answer the questions it asks">
+
+- For dates written with slashes, tick **The day and month order above is right for dates written with slashes.**
+- If payments without a bank ID look the same as ones from another file, choose under **If a payment was already imported**. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+- If similar payments exist in your other accounts, check the account and tick **I checked the account. Similar payments in my other accounts are separate payments.**
+
+Then select **Check again**.
+
+  </Step>
+  <Step title="Import">
+
+With no problems left, the page shows **Import into** and the account name. To reuse this mapping for files with the same columns, open **Save this layout for next time** and fill in **Layout name**. Select **Import N payments** (for example **Import 42 payments**).
+
+The preview is valid for 30 minutes. If it expires, start again from the import page.
+
+  </Step>
+</Steps>
+
+## Check that it worked
+
+You land on **Payments** for the month of the first row, with a banner such as "Import done: 42 inserted, 0 skipped, 0 replayed." The summary line counts payments out, how many have a receipt and how many are missing. **Settings** > **Imports** lists the import with its row count.
+
+Importing the same file into the same account again changes nothing: the banner reports the rows as replayed and no payment is added twice. The same file cannot be imported into a different account.
+
+Next: [Match payments and receipts](/how-to/match-payments-and-receipts/).
+
+## Related
+
+- Every mapping field, format, built-in layout and dedupe rule: [Bank CSV import](/reference/bank-csv-import/).
+- How payments are paired with receipts after import: [How matching works](/explanation/how-matching-works/).

@@ -1,0 +1,106 @@
+{
+  "about": "US invoice with 8.875% sales tax",
+  "expected": {
+    "vendor": "Gridpoint Cloud LLC",
+    "invoice_number": "GPC-55120",
+    "issue_date": "2026-10-05",
+    "currency": "USD",
+    "total_minor": 5444,
+    "net_minor": 5000,
+    "vat_minor": 444,
+    "vat_rate_bps": 888
+  },
+  "expect_review": false,
+  "clairic": {
+    "model": "clairic",
+    "answers": {
+      "vendor": {
+        "type": "text",
+        "p_null": 0.00537124602124095,
+        "span": [8, 27],
+        "guess": "Gridpoint Cloud LLC",
+        "confidence": 0.9999849796295166,
+        "value": "Gridpoint Cloud LLC"
+      },
+      "invoice_number": {
+        "type": "text",
+        "p_null": 0.00012743832485284656,
+        "span": [104, 113],
+        "guess": "GPC-55120",
+        "confidence": 0.9999998807907104,
+        "value": "GPC-55120"
+      },
+      "currency": {
+        "type": "text",
+        "p_null": 0.9979458451271057,
+        "span": [75, 88],
+        "guess": "United States",
+        "confidence": 0.11929532885551453,
+        "value": null
+      },
+      "issue_date": {
+        "type": "date",
+        "p_null": 0.001700322492979467,
+        "guess": "2026-10-05",
+        "confidence": 0.9990833465805965,
+        "value": "2026-10-05"
+      },
+      "due_date": {
+        "type": "date",
+        "p_null": 0.9999988079071045,
+        "guess": "2026-10-05",
+        "confidence": 0.2661191108708049,
+        "value": null
+      },
+      "total": {
+        "type": "number",
+        "p_null": 3.6152121083432576e-6,
+        "guess": 54.44,
+        "confidence": 0.998981660929448,
+        "value": 54.44
+      },
+      "net": {
+        "type": "number",
+        "p_null": 0.0018911887891590595,
+        "guess": 50,
+        "confidence": 0.9977455033144287,
+        "value": 50
+      },
+      "vat_amount": {
+        "type": "number",
+        "p_null": 0.00011561952123884112,
+        "guess": 4.44,
+        "confidence": 0.9987019581225919,
+        "value": 4.44
+      },
+      "vat_rate": {
+        "type": "number",
+        "p_null": 0.020392706617712975,
+        "span": [308, 313],
+        "source": "input",
+        "guess": 8.88,
+        "confidence": 0.9363564598074561,
+        "value": 8.88
+      },
+      "line_items": {
+        "type": "list",
+        "value": ["Gridpoint Cloud LLC", "Managed database (October) ", "Subtotal"],
+        "spans": [
+          [8, 27],
+          [238, 265],
+          [281, 289]
+        ],
+        "confidence": 0.008798161753133133
+      }
+    },
+    "truncated": false,
+    "usage": {
+      "state_tokens": 149,
+      "image_tokens": 0,
+      "schema_tokens": 916,
+      "input_tokens": 1512,
+      "output_tokens": 0,
+      "passes": 4
+    }
+  }
+}

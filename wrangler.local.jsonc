@@ -1,0 +1,32 @@
+// Local development and tests only: `bun run dev`, `bun run test`. Mock AI,
+// local D1/R2 under .wrangler/, synthetic example.com identities.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nuits-receipts-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "vars": {
+    "AI_MODE": "mock",
+    "AUTH_USERNAME": "owner",
+    "ALLOWED_SENDER_EMAILS": "owner@example.com, bookkeeping@example.org",
+    "RECEIPT_ADDRESS": "receipts@example.com",
+    "INVOICES_ADDRESS": "invoices@example.com",
+    "SELLER_NAMES": "Example Studio Oy",
+    "PRODUCTS_JSON": "[{\"id\":\"general\",\"label\":\"General\"},{\"id\":\"app\",\"label\":\"App\"},{\"id\":\"website\",\"label\":\"Website\"},{\"id\":\"hosting\",\"label\":\"Hosting\"}]",
+    "DEFAULT_PRODUCT": "general",
+    "ACCOUNTANT_LABEL": "your accountant",
+    "APP_NAME": "Nuits Receipts",
+    "EXPORT_PREFIX": "receipts"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nuits-receipts-local",
+      "migrations_dir": "schema",
+      "migrations_table": "template_migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "ORIGINALS", "bucket_name": "nuits-receipts-local" }]
+}
