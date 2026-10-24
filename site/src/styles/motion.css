@@ -367,7 +367,7 @@ html[data-motion="on"] .caret {
   /* The ledger stamps land row by row on screens the reel does not pin. The
      rows stay printed throughout; only the stamp wipes in (DESIGN.md). */
   @media (max-width: 63.99rem) {
-    html[data-motion="on"] .statement .stamp {
+    html[data-motion="on"] .statement tbody .stamp {
       animation: stamp-land linear both;
       animation-timeline: view();
       animation-range: entry 20% cover 35%;

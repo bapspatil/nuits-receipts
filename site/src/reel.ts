@@ -51,7 +51,7 @@ export function startReel(): () => void {
 
     // The ledger: rows already printed, stamps land one by one as you scroll.
     const ledger = document.querySelector<HTMLElement>(".ledger")!;
-    const stamps = gsap.utils.toArray<HTMLElement>(".statement .stamp");
+    const stamps = gsap.utils.toArray<HTMLElement>(".statement tbody .stamp");
     const foot = ledger.querySelector<HTMLElement>(".statement-foot")!;
     gsap
       .timeline({
