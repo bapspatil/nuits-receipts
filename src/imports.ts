@@ -427,16 +427,21 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
     hidden('csv', encoded) +
     hidden('account_choice', JSON.stringify(account)) +
     hidden('mapping', JSON.stringify(mapping));
-  const errors = preview.issues.length + problems.length;
+  // No layout chosen yet: the columns come first. Row errors from a guessed mapping would only mislead.
+  const unmapped = !provided && !selected && !autoPreset && problems.length > 0;
+  const issues = unmapped ? [] : preview.issues;
+  const errors = issues.length + problems.length;
   const totals = new Map<string, bigint>();
   for (const { value: r } of preview.rows)
     totals.set(r.currency, (totals.get(r.currency) ?? 0n) + BigInt(r.amount_minor));
   const dates = preview.rows.map((r) => r.value.booking_date).sort();
   const preset = suggestions.find((p) => p.id === shownPresetId);
-  const status = `<p class="lede"><strong>${preset ? `We recognised a ${escape(presetLabel(preset).replace(' (CSV layout)', ''))} export. ` : ''}${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}${dates.length ? ` from ${day(dates[0])} to ${day(dates.at(-1))}` : ''}.</strong> ${errors ? `${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.` : 'No problems found.'} <span class="small">Net total ${[...totals].map(([c, v]) => `${escape(c)} ${money(v, c)}`).join(' · ') || '0'}.</span></p>`;
+  const status = unmapped
+    ? `<p class="lede">${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.</p>`
+    : `<p class="lede"><strong>${preset ? `We recognised a ${escape(presetLabel(preset).replace(' (CSV layout)', ''))} export. ` : ''}${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}${dates.length ? ` from ${day(dates[0])} to ${day(dates.at(-1))}` : ''}.</strong> ${errors ? `${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.` : 'No problems found.'} <span class="small">Net total ${[...totals].map(([c, v]) => `${escape(c)} ${money(v, c)}`).join(' · ') || '0'}.</span></p>`;
   const warnings =
     errors > 0
-      ? `<div class="alert" role="alert">${problems.map((e) => `<p class="warning">${escape(e)}</p>`).join('')}${preview.issues
+      ? `<div class="alert" role="alert">${problems.map((e) => `<p class="warning">${escape(e)}</p>`).join('')}${issues
           .slice(0, 100)
           .map(
             (e) =>
@@ -486,7 +491,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
         : await env.DB.prepare('SELECT label FROM accounts WHERE id=?').bind(account.id).first('label');
     confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><details><summary>Save this layout for next time</summary><div class="body"><div class="fields">${input('preset_bank', savedAccount.bank_name, 'text', 'Bank')}${input('preset_name', '', 'text', 'Layout name', { hint: 'Optional. Used for files with the same columns.' })}</div></div></details><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
   }
-  const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${table}${exclusions}${confirm}${editor}</form>`;
+  const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${unmapped ? editor : `${table}${exclusions}${confirm}${editor}`}</form>`;
   return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
     detail: 'Check the file',
     head: pageHead('Check the file'),

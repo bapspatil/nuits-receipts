@@ -129,6 +129,25 @@ test('a payment whose receipt still needs review sends you to it and offers no M
   expect(row).toContain(`Its receipt needs you first. <a href="/receipts/${id}">Check it.</a>`);
   expect(row).not.toContain('action="/matches"');
   expect(row).not.toContain('Match');
+  // Its receipt is in Review, not missing: Missing is only for real gaps.
+  expect(row).toContain('<span class="stamp needs">Needs you</span>');
+  expect(row).not.toContain('Missing');
+  expect(row).toMatch(/^<li class="pay"/);
+  const html = await bank();
+  expect(html).toContain('1 out, 0 matched, <span>0 missing</span>, 1 needs you');
+  expect(html).not.toContain('>Missing (');
+  expect(html).not.toContain('Every payment has a receipt.');
+  // A real gap next to it still says Missing.
+  await importBankCsv(env, {
+    bytes: new TextEncoder().encode(csv + 'b;2026-09-06;-7,00;EUR;Nothing Like It Oy\n'),
+    parsed: parsePreset(csv + 'b;2026-09-06;-7,00;EUR;Nothing Like It Oy\n', 'race', 'EUR'),
+    collision: 'keep_existing',
+  });
+  const both = await bank();
+  expect(rowOf(both, 'Nothing Like It Oy')).toContain('<span class="stamp missing">Missing</span>');
+  expect(rowOf(both, 'Sample Cloud Lantern Oy')).toContain('<span class="stamp needs">Needs you</span>');
+  expect(both).toContain('2 out, 0 matched, <span class="red">1 missing</span>, 1 needs you');
+  expect(both).toContain('>Missing (1)<');
 });
 
 test('a payment with nothing like it says so, and the search box resolves a typed date or amount', async () => {
