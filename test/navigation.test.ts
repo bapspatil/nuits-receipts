@@ -44,6 +44,14 @@ test('a flagged month names what needs you, and Bank opens on the same month', a
     review_reasons_json: '["missing_total"]',
   });
   expect(await home()).toContain("March isn't sent yet.</strong> 1 receipt needs you.");
+  // An undated receipt waits in the same Review, so the count names it too.
+  await seed({
+    bytes: 'undated',
+    issue_date: null,
+    status: 'needs_review',
+    review_reasons_json: '["missing_issue_date"]',
+  });
+  expect(await home()).toContain("March isn't sent yet.</strong> 1 receipt needs you, plus 1 undated receipt.");
   const bank = await home('/payments');
   expect(bank).toContain('<title>Bank · March 2020 ·');
   await missingPayment('2019-12');

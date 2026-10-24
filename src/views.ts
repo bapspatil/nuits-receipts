@@ -953,10 +953,13 @@ async function settled(env: Env, selected: string): Promise<string> {
 }
 
 // ---------- Home: close the month ----------
-// What a month still lacks, in one phrase: "3 receipts need you".
-function lacks(s: MonthState): string {
+// What a month still lacks, in one phrase: "3 receipts need you". Undated receipts
+// belong to no month yet but wait in the same Review, so they are counted alongside.
+function lacks(s: MonthState, undated = 0): string {
+  const also = undated ? `, plus ${plural(undated, 'undated receipt')}` : '';
   if (s.flagged.length)
-    return `${plural(s.flagged.length, 'receipt')} ${s.flagged.length === 1 ? 'needs' : 'need'} you.`;
+    return `${plural(s.flagged.length, 'receipt')} ${s.flagged.length === 1 ? 'needs' : 'need'} you${also}.`;
+  if (undated) return `${plural(undated, 'undated receipt')} ${undated === 1 ? 'needs' : 'need'} a date.`;
   if (s.missing.length)
     return `${plural(s.missing.length, 'payment')} ${s.missing.length === 1 ? 'needs' : 'need'} a receipt.`;
   if (!s.imported) return 'It needs its bank statement.';
@@ -1039,7 +1042,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
   // Why Home opened here, when it is not the current month.
   const why =
     arrival && arrival.month !== arrival.current
-      ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
+      ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s, undated ?? 0)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
       : '';
   return page(
     'home',
