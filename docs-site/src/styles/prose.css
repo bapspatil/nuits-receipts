@@ -263,6 +263,16 @@
   white-space: nowrap;
 }
 
+/* Phones: a table of four or more columns already scrolls, and the unbroken
+   code in its cells squeezes the prose columns to a word a line (rows 500px
+   tall). A floor per column keeps a sentence readable; the table scrolls a
+   little further instead. Narrower tables keep fitting the screen. */
+@media (max-width: 47.999rem) {
+  .docs-content :where(table:not([class]):has(th:nth-child(4))) :where(th:not([class]), td:not([class])) {
+    min-width: 11rem;
+  }
+}
+
 .docs-content :where(tbody:not([class]) tr:not([class]):last-child td:not([class])) {
   border-bottom: none;
 }

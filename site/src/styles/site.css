@@ -76,6 +76,9 @@ a {
   left: var(--gutter);
   top: -4rem;
   z-index: 70;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   padding: 0.5rem 1rem;
   background: var(--color-ink);
   color: var(--color-paper);
@@ -730,9 +733,12 @@ a {
 .film {
   container-type: inline-size;
   padding-block: 28px;
+  /* Each 32px tile centres its 14px hole, and the tiles are spaced to fit
+     the strip, so the row ends on a whole hole with even margins at every
+     width instead of a hole cut in half against the edge. */
   background:
-    linear-gradient(90deg, var(--color-paper) 0 14px, transparent 14px) 9px 8px / 32px 12px repeat-x,
-    linear-gradient(90deg, var(--color-paper) 0 14px, transparent 14px) 9px calc(100% - 8px) / 32px 12px repeat-x,
+    linear-gradient(90deg, transparent 9px, var(--color-paper) 9px 23px, transparent 23px) 0 8px / 32px 12px space no-repeat,
+    linear-gradient(90deg, transparent 9px, var(--color-paper) 9px 23px, transparent 23px) 0 calc(100% - 8px) / 32px 12px space no-repeat,
     var(--color-ink-soft);
 }
 
@@ -919,6 +925,11 @@ a {
   font-size: 1.625rem;
 }
 
+/* The amount is one figure: it never breaks between "about" and the sum. */
+.slip-grand > :last-child {
+  white-space: nowrap;
+}
+
 /* So far. A spec sheet, not a card row: one full-width ruled line per fact,
    its index in the gutter and the figure set at display size. */
 
@@ -1056,13 +1067,19 @@ a {
   letter-spacing: -0.02em;
 }
 
-.faq summary::after {
-  content: "+";
+/* The ruled square stays square; only the plus inside it turns. Turning the
+   whole box made a 62px diamond that poked past the column edge and the
+   row's padding whenever a question was open. */
+.faq-mark {
   display: grid;
   place-items: center;
   width: 2.75rem;
   height: 2.75rem;
   border: 1px solid var(--color-ink);
+}
+
+.faq-mark::before {
+  content: "+";
   font-family: var(--font-ui);
   font-size: 1.5rem;
   font-weight: 400;
@@ -1071,12 +1088,12 @@ a {
 }
 
 /* Colours swap instantly, as on the buttons. */
-.faq summary:hover::after {
+.faq summary:hover .faq-mark {
   background: var(--color-ink);
   color: var(--color-paper);
 }
 
-.faq details[open] summary::after {
+.faq details[open] .faq-mark::before {
   rotate: 45deg;
 }
 
@@ -1176,8 +1193,21 @@ a {
     padding-top: 0.4rem;
   }
 
+  /* The slip's own inset matches the hero slip here, and the seal shrinks to
+     its default size, so the tally keeps a usable label column on a phone
+     and the heading stops short of the seal instead of running under it. */
   .slip-cost {
     rotate: 0deg;
+    padding: 1.5rem 1.25rem 2.5rem;
+  }
+
+  .slip-cost .slip-seal {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .slip-cost .slip-vendor {
+    padding-right: 4rem;
   }
 
   .tally th {
@@ -1192,11 +1222,6 @@ a {
 /* Wide layouts */
 
 @media (min-width: 48rem) {
-  .rail {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 3rem;
-  }
-
   /* Perforated separators between the tickets on the static grid. */
   .rail {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -26,6 +26,12 @@
     text-decoration-color: var(--nb-border-strong);
     text-underline-offset: 3px;
   }
+  /* The two nav links stand alone: pad them to a 44px tap height without
+     moving the row (the negative margin gives the space back). */
+  .nuits-footer nav a {
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
   .nuits-footer a:hover {
     text-decoration-color: var(--nb-brand);
   }

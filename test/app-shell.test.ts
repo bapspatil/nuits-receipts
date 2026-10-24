@@ -405,7 +405,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   await flaggedImage(1);
   const html = await (await request('/?month=2026-09')).text();
   expect(html).toContain(
-    '<div class="head"><div class="months" role="group" aria-label="Month"><a href="/?month=2026-08" aria-label="August 2026">‹ Aug</a><h1>September 2026</h1><a href="/?month=2026-10" aria-label="October 2026">Oct ›</a></div></div>',
+    '<div class="head"><div class="months" role="group" aria-label="Month"><a href="/?month=2026-08"><span aria-hidden="true">‹</span>Aug<span class="vh"> 2026</span></a><h1>September 2026</h1><a href="/?month=2026-10">Oct<span class="vh"> 2026</span><span aria-hidden="true">›</span></a></div></div>',
   );
   // Three status rows, one word each; the current step's action is the one primary.
   const steps = html.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)?.[1];

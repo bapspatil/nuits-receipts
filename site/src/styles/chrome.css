@@ -350,7 +350,7 @@
 .menu-nav .nav-index {
   align-self: start;
   padding-top: 0.5em;
-  font-size: 0.875rem;
+  font-size: var(--text-small);
   letter-spacing: 0.04em;
   color: inherit;
 }

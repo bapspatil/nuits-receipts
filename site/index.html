@@ -316,14 +316,14 @@
         <h2 class="title" id="faq-title">Questions, answered plainly.</h2>
         <div class="faq-list">
           <details>
-            <summary>Which banks does it work with?</summary>
+            <summary>Which banks does it work with?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
               It imports CSV exports. There are presets for some banks and a column mapper for other layouts, so you map
               the columns once. Tested with Holvi exports so far.
             </p>
           </details>
           <details>
-            <summary>Does Nuits see my data?</summary>
+            <summary>Does Nuits see my data?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
               No. It runs in your own Cloudflare account, with files in your R2 and data in your D1. Nuits never sees your
               data. Two calls go outside the Worker: Cloudflare Workers AI, where Clairic reads each receipt, and frankfurter.dev for exchange rates,
@@ -331,7 +331,7 @@
             </p>
           </details>
           <details>
-            <summary>What do I need from Cloudflare?</summary>
+            <summary>What do I need from Cloudflare?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
               An account, and a domain on Cloudflare so Email Routing can give you an inbox address. PDF uploads measured
               about 186 ms of CPU in production against the Workers Free plan's 10 ms limit, so plan on Workers Paid
@@ -339,11 +339,11 @@
             </p>
           </details>
           <details>
-            <summary>Is this tax advice?</summary>
+            <summary>Is this tax advice?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>No. It organises receipts and prepares a CSV for your accountant. Figures are AI-extracted, so check them.</p>
           </details>
           <details>
-            <summary>Is it a SaaS?</summary>
+            <summary>Is it a SaaS?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>No. You deploy your own copy and nobody else runs it for you.</p>
           </details>
         </div>
