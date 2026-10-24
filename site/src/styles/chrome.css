@@ -396,57 +396,173 @@ html[data-motion="off"] .menu {
   }
 }
 
-/* Footer: the tail of the receipt. */
+/* Footer: the stub, torn off the end of the roll. */
 
 .footer {
+  position: relative;
   display: grid;
-  gap: 2.5rem;
-  padding: 3rem var(--gutter) 3.5rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
+  gap: 3rem;
+  padding: 3.5rem var(--gutter) 2rem;
+  background: var(--color-paper) var(--perforation) top / 100% 1px no-repeat;
+  container-type: inline-size;
 }
 
-.smallprint {
+/* The torn edge. Paper teeth biting up into whatever sits above, which on the
+   home page is the ink close; on paper it disappears and the perforation
+   alone carries the tear. */
+.footer::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: 10px;
+  background: conic-gradient(from 135deg at 50% 0, var(--color-paper) 90deg, transparent 0) 0 0 / 20px 10px repeat-x;
+  pointer-events: none;
+}
+
+.stub-head {
   display: grid;
-  gap: 0.75rem;
-  max-width: 48rem;
+  gap: 2rem;
+}
+
+.stub-name {
+  display: flex;
+  align-items: center;
+  gap: 0.1em;
+  font-family: var(--font-display);
+  font-weight: 800;
+  /* Edge to edge: the name and its mark measure 5.45em wide, so this fills
+     the footer's measure at every width. */
+  font-size: calc(100cqi / 5.55);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.stub-mark {
+  flex: none;
+  width: 0.62em;
+  height: 0.62em;
+}
+
+.stub-nav {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: start;
+}
+
+.stub-nav .nav-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  width: 100%;
+}
+
+.stub-nav .nav-item {
+  border-top: 1px dashed var(--color-ink);
+}
+
+.stub-nav .nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.stub-nav .nav-line {
+  display: grid;
+  white-space: nowrap;
+  grid-template-columns: 1.75rem auto;
+  align-items: baseline;
+}
+
+.stub-nav .nav-index {
+  font-size: 0.75rem;
+}
+
+.stub-nav .nav-page .nav-label {
+  grid-column: 2;
+}
+
+/* The terms, ruled like the back of a receipt. */
+.smallprint {
   font-size: var(--text-small);
   line-height: var(--text-small--line-height);
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--color-ink);
+}
+
+.smallprint p {
+  margin-bottom: 0.75rem;
+}
+
+.smallprint p:last-child {
+  margin-bottom: 0;
 }
 
 .smallprint-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-heading);
+  line-height: var(--text-heading--line-height);
+  margin-bottom: 1.25rem;
 }
 
 .footer-legal {
   display: grid;
   gap: 0.5rem;
-  max-width: 48rem;
+  padding-top: 1.25rem;
+  border-top: var(--rule);
   font-size: var(--text-small);
 }
 
+/* The last printed line of the till roll: the one centred element on the
+   site, between two perforations. */
 .footer-tail {
   display: grid;
+  justify-items: center;
   gap: 0.25rem;
+  padding: 1.25rem 0;
+  text-align: center;
   font-size: var(--text-small);
+  background:
+    var(--perforation) top / 100% 1px no-repeat,
+    var(--perforation) bottom / 100% 1px no-repeat;
 }
 
 .footer-joke {
   color: var(--color-ink-soft);
 }
 
+@media (min-width: 48rem) {
+  .stub-nav .nav-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .footer-legal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 3rem;
+  }
+}
+
 @media (min-width: 64rem) {
-  .footer {
+  .stub-nav {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
+    column-gap: 2rem;
   }
 
   .smallprint {
-    grid-column: 1 / -1;
+    columns: 2;
+    column-gap: 3rem;
+    column-rule: 1px dashed var(--color-ink);
   }
 
-  .footer-tail {
-    text-align: right;
+  .smallprint-title {
+    column-span: all;
+  }
+
+  .smallprint p {
+    break-inside: avoid;
   }
 }
