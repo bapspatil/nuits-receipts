@@ -225,6 +225,7 @@ class Recorder {
     this.screens = [];
     this.silentPosts = [];
     this.deadEnds = [];
+    this.inlineErrors = [];
     this.notes = [];
     this.posted = false;
     this.status = 200;
@@ -241,7 +242,9 @@ class Recorder {
   screen() {
     const url = new URL(this.page.url());
     const path =
-      url.pathname.replace(/[a-f0-9]{64}/g, ':id') + (url.search ? url.search.replace(/[a-f0-9]{64}/g, ':id') : '');
+      url.pathname.replace(/[a-f0-9]{64}/g, ':id') +
+      // The signature on a feedback link changes every run; leave it out of the report.
+      (url.search ? url.search.replace(/[a-f0-9]{64}/g, ':id').replace(/&(iat|sig)=[^&]*/g, '') : '');
     if (this.screens.at(-1) !== path) this.screens.push(path);
   }
   async settle() {
@@ -252,7 +255,16 @@ class Recorder {
     const banner = await this.page
       .locator('[role=status], [role=alert]')
       .evaluateAll((els) => els.some((e) => e.textContent.trim() && e.getClientRects().length));
-    if (this.status >= 400) this.deadEnds.push(`${this.screens.at(-1)} (${this.status})`);
+    if (this.status >= 400) {
+      // A refusal that keeps the form on screen with an alert summary is fixed in place; any other 4xx is a dead end.
+      const inline = await this.page.evaluate(() => {
+        const alert = [...document.querySelectorAll('main [role=alert]')].some(
+          (e) => e.textContent.trim() && e.getClientRects().length,
+        );
+        return alert && !!document.querySelector('main form [name]');
+      });
+      (inline ? this.inlineErrors : this.deadEnds).push(`${this.screens.at(-1)} (${this.status})`);
+    }
     // A POST that answers with its own page (an import preview) is its own feedback.
     else if (this.redirected && !banner) this.silentPosts.push(this.screens.at(-1));
   }
@@ -289,6 +301,7 @@ class Recorder {
       screens: this.screens,
       silentPosts: this.silentPosts,
       deadEnds: this.deadEnds,
+      inlineErrors: this.inlineErrors,
       notes: this.notes,
     };
   }
@@ -344,12 +357,12 @@ function report(results, screens) {
     lines.push(
       '## Journeys',
       '',
-      '| Journey | Clicks | Field edits | Screens | POSTs with no feedback | Dead-end error pages |',
-      '| --- | --- | --- | --- | --- | --- |',
+      '| Journey | Clicks | Field edits | Screens | POSTs with no feedback | Dead-end error pages | Errors fixed in place |',
+      '| --- | --- | --- | --- | --- | --- | --- |',
     );
     for (const r of results)
       lines.push(
-        `| ${r.journey} | ${r.clicks} | ${r.edits} | ${r.screens.length} | ${r.silentPosts.length} | ${r.deadEnds.length} |`,
+        `| ${r.journey} | ${r.clicks} | ${r.edits} | ${r.screens.length} | ${r.silentPosts.length} | ${r.deadEnds.length} | ${r.inlineErrors.length} |`,
       );
     lines.push('');
     for (const r of results) {
@@ -357,6 +370,8 @@ function report(results, screens) {
       if (r.silentPosts.length)
         lines.push(`No feedback after: ${r.silentPosts.map((s) => '`' + s + '`').join(', ')}`, '');
       if (r.deadEnds.length) lines.push(`Dead ends: ${r.deadEnds.map((s) => '`' + s + '`').join(', ')}`, '');
+      if (r.inlineErrors.length)
+        lines.push(`Fixed in place: ${r.inlineErrors.map((s) => '`' + s + '`').join(', ')}`, '');
       for (const n of r.notes) lines.push(`- ${n}`);
       lines.push('');
     }
