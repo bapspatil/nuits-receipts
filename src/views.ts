@@ -1013,8 +1013,9 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const empty = s.docs === 0;
   // 4 means nothing is left: the month was sent and hasn't changed since.
   const current = empty ? 1 : !s.done.review ? 1 : !s.done.match ? 2 : s.sent ? 4 : 3;
-  const row = (n: number, label: string, status: string, href = '', red = false) => {
-    const state = n === current ? 'now' : n < current ? 'done' : 'todo';
+  // A step's marker follows its own state: a later step can be done before an earlier one.
+  const row = (n: number, label: string, status: string, href = '', red = false, done = false) => {
+    const state = n === current ? 'now' : n < current || done ? 'done' : 'todo';
     const inner = `${stepWord(state)}<b>${label}</b><span${red ? ' class="red"' : ''}>${status}</span>`;
     return `<li class="step ${state}"${n === current ? ' aria-current="step"' : ''}>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
   };
@@ -1024,12 +1025,12 @@ export async function home(env: Env, requested: string | null, params = new URLS
       ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
       : undated
         ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'Done', `/receipts?month=${selected}`);
+        : row(1, 'Check', 'Done', `/receipts?month=${selected}`, false, true);
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
       ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
-      : row(2, 'Match', 'Done', `/payments?month=${selected}`);
+      : row(2, 'Match', 'Done', `/payments?month=${selected}`, false, true);
   const send = await sendStep(env, s, selected, current, params);
   const step = nextStep(s, selected);
   const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';

@@ -58,6 +58,20 @@ test('a flagged month names what needs you, and Bank opens on the same month', a
   expect(await home('/payments')).toContain('<title>Bank · December 2019 ·');
 });
 
+test('a later step that is done shows done, even before an earlier one is', async () => {
+  await seed({
+    bytes: 'flag',
+    issue_date: open('2020-03'),
+    status: 'needs_review',
+    review_reasons_json: '["missing_total"]',
+  });
+  // Money in only: the statement is there and nothing is missing a receipt.
+  await missingPayment('2020-03', 'Client Oy', 4200);
+  const html = await home('/?month=2020-03');
+  expect(html).toContain('<li class="step now" aria-current="step"><a href="/review">');
+  expect(html).toContain('<li class="step done"><a href="/payments?month=2020-03">');
+});
+
 test('Mark as sent can be undone, and only the latest send', async () => {
   await seed({ bytes: 'one', issue_date: open('2020-03') });
   const sent = await markSent('2020-03');
