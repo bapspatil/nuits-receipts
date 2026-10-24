@@ -3,6 +3,8 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import type { Env } from './env';
 import { previousInvoicesAddress } from './settings';
 import { extract, ExtractionFailure, FORWARDED_CONTEXT } from './ai';
+import { settleEmailRows } from './dedupe';
+import { forwardedSender, senderName } from './vendor';
 import { cacheFx, reconcile } from './banking';
 import { authenticatedSender, senderVerdict, type SenderVerdict } from './sender';
 import { holdUnknown, logMail, mailFacts } from './inbound';
@@ -35,6 +37,7 @@ import {
   type SalesFacts,
 } from './domain';
 import { SALES_DERIVED, salesReview } from './sales';
+import { parseDocument } from './parse';
 
 export async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
   requireInput(stream, 'Empty request', 400);
@@ -87,6 +90,12 @@ export async function visibleText(html: string): Promise<string> {
         text += '\n';
       },
     })
+    // Table cells keep a gap so "Yhteensä" and "15,90 €" stay two words.
+    .on('td,th', {
+      element() {
+        text += ' ';
+      },
+    })
     .on('*', {
       text(t) {
         text += t.text;
@@ -94,7 +103,27 @@ export async function visibleText(html: string): Promise<string> {
     })
     .transform(new Response(cleaned))
     .text();
-  return text;
+  return decodeEntities(text);
+}
+const ENTITIES: Record<string, string> = {
+  nbsp: ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  euro: '€',
+  pound: '£',
+};
+// HTMLRewriter hands over text as written, so "15,90&nbsp;&euro;" is decoded here.
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+    if (name[0] === '#') {
+      const code = name[1] === 'x' || name[1] === 'X' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code === 0xa0 ? 0x20 : code) : whole;
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
 }
 // PDF text layers without a usable ToUnicode map (seen on Stripe receipts) turn
 // hyphens and dashes into U+0000: "2937\u00006899", "Oct 22\u0000Nov 22". Map NUL
@@ -196,12 +225,19 @@ export async function processReceipt(
     requireInput(original, 'original_missing');
     const bytes = new Uint8Array(await original.arrayBuffer());
     const text = await documentText(bytes, claim.media_type);
-    let context = options.context;
-    if (!context && claim.email_key && !claim.media_type.startsWith('text/')) {
+    let context = options.context,
+      sender: string | null = null;
+    if (claim.email_key) {
       const email = await env.ORIGINALS.get(claim.email_key);
       if (email) {
         const parsed = await PostalMime.parse(await email.arrayBuffer());
-        context = parsed.text || (await visibleText(parsed.html || ''));
+        const bodyText = parsed.text || (await visibleText(parsed.html || ''));
+        if (!context && !claim.media_type.startsWith('text/')) context = bodyText;
+        // Who the receipt is from when nothing in it says: the forwarded
+        // header, else the sender itself unless that is the owner forwarding.
+        const from = parsed.from?.address?.toLowerCase() ?? '';
+        sender =
+          forwardedSender(bodyText) ?? (config(env).allowedSenders.has(from) ? null : senderName(parsed.from ?? null));
       }
     }
     const state = text + (context ? `${FORWARDED_CONTEXT}${cleanText(context)}` : '');
@@ -218,6 +254,7 @@ export async function processReceipt(
       receivedAt: claim.received_at,
       images,
       kind: claim.kind,
+      senderName: sender,
     });
     const overrides = object(JSON.parse(claim.manual_fields_json));
     const facts: Facts = { ...extracted.facts };
@@ -433,22 +470,37 @@ export async function importEmail(
   ctx: Pick<ExecutionContext, 'waitUntil'>,
 ): Promise<void> {
   const jobs: string[] = [];
-  let context = '';
+  let context = '',
+    body: Body = null;
   try {
     const email = await PostalMime.parse(bytes);
     context = email.text || (await visibleText(email.html || ''));
-    const supported = email.attachments.filter((a) =>
-      ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(a.mimeType),
-    );
+    if (email.html || email.text)
+      body = {
+        bytes: new TextEncoder().encode(email.html || email.text),
+        media: email.html ? 'text/html' : 'text/plain',
+        text: context,
+      };
+    const supported = email.attachments.filter((a) => {
+      if (SUPPORTED_MEDIA.includes(a.mimeType)) return true;
+      // Some senders label PDFs application/octet-stream; trust the bytes.
+      if (!GENERIC_MEDIA.includes(a.mimeType.toLowerCase()) && !/\.(pdf|png|jpe?g|webp)$/i.test(a.filename ?? ''))
+        return false;
+      try {
+        return SUPPORTED_MEDIA.includes(detect(bytesOf(a.content)));
+      } catch {
+        return false;
+      }
+    });
     let skipped = supported.length > MAX_ATTACHMENTS;
     for (const attachment of supported.slice(0, MAX_ATTACHMENTS)) {
-      const content =
-        typeof attachment.content === 'string'
-          ? new TextEncoder().encode(attachment.content)
-          : new Uint8Array(attachment.content);
+      const content = bytesOf(attachment.content);
       try {
         const media = detect(content);
-        requireInput(media === attachment.mimeType, 'Attachment signature mismatch');
+        requireInput(
+          media === attachment.mimeType || !SUPPORTED_MEDIA.includes(attachment.mimeType),
+          'Attachment signature mismatch',
+        );
         if (media === 'image/png' && content.length >= 24) {
           const view = new DataView(content.buffer, content.byteOffset, content.byteLength);
           if (view.getUint32(16) <= 2 || view.getUint32(20) <= 2) continue;
@@ -497,8 +549,39 @@ export async function importEmail(
   ctx.waitUntil(
     (async () => {
       for (const id of jobs) await processReceipt(env, id, { context });
+      await settleEmail(env, { jobs, emailKey, kind, body });
     })(),
   );
+}
+const SUPPORTED_MEDIA = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+const GENERIC_MEDIA = ['application/octet-stream', 'binary/octet-stream', 'application/x-pdf', 'application/download'];
+function bytesOf(content: string | ArrayBuffer | Uint8Array): Uint8Array {
+  return typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
+}
+type Body = { bytes: Uint8Array; media: 'text/html' | 'text/plain'; text: string } | null;
+// One email, one receipt per charge. When no attachment read a total, the
+// body (an order confirmation, a bill notice) is read as well.
+async function settleEmail(env: Env, input: { jobs: string[]; emailKey: string; kind: Kind; body: Body }) {
+  const ids = [...input.jobs];
+  if (input.kind === 'expense' && input.body && ids.length) {
+    const read = await env.DB.prepare(
+      `SELECT count(*) n FROM receipts WHERE id IN (${ids.map(() => '?').join(',')}) AND total_minor IS NOT NULL`,
+    )
+      .bind(...ids)
+      .first<number>('n');
+    if (!read && parseDocument(cleanText(input.body.text)).total !== null) {
+      const row = await preserve(env, {
+        bytes: input.body.bytes,
+        media: input.body.media,
+        filename: input.body.media === 'text/html' ? 'body.html' : 'body.txt',
+        source: 'email',
+        emailKey: input.emailKey,
+      });
+      await processReceipt(env, row.id);
+      ids.push(row.id);
+    }
+  }
+  await settleEmailRows(env, input.emailKey, ids);
 }
 async function emailReview(env: Env, bytes: Uint8Array, emailKey: string, kind: Kind, reason: string) {
   const row = await preserve(env, {

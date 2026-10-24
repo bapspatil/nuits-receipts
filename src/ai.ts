@@ -18,6 +18,7 @@ import {
 } from './domain';
 import { isBuyer, parseDocument, sellerMatches } from './parse';
 import { readSales } from './sales';
+import { cleanVendor, isOwnName } from './vendor';
 import { emptySales, type Kind, type SalesFacts } from './domain';
 
 type FieldSpec = {
@@ -138,6 +139,9 @@ export function parseExtraction(
   document = '',
   rules: readonly Pick<Rule, 'vendor_contains'>[] = [],
   tuning: Pick<Tuning, 'minFieldConfidence' | 'maxFieldPNull'> = DEFAULT_TUNING,
+  // ownNames: the user's business names, never the vendor of an expense.
+  // senderName: who sent the email, a last resort when nothing names the seller.
+  hints: { ownNames?: readonly string[]; senderName?: string | null } = {},
 ): Extraction {
   const response = object(raw),
     answers = object(response.answers),
@@ -345,14 +349,20 @@ export function parseExtraction(
   if (doc.conflicts.includes('issue_date') && !(doc.issueDate && settled.issue_date)) settled.issue_date = false;
 
   // Vendor: the seller block or a vendor rule confirms the model; the buyer never counts.
-  let vendor = text('vendor');
+  const own = hints.ownNames ?? [];
+  const candidates = doc.sellerCandidates.filter((c) => !isOwnName(c, own));
+  let vendor = cleanVendor(text('vendor'));
   const ruled = (name: string) => {
     const n = normalize(name);
     return rules.some((r) => normalize(r.vendor_contains) && n.includes(normalize(r.vendor_contains)));
   };
-  if (vendor && isBuyer(doc, vendor)) {
-    vendor = doc.sellerCandidates.length === 1 ? doc.sellerCandidates[0]! : vendor;
-    settled.vendor = doc.sellerCandidates.length === 1;
+  if (vendor && isOwnName(vendor, own)) {
+    vendor = candidates.length === 1 ? candidates[0]! : null;
+    settled.vendor = candidates.length === 1;
+    evidence.vendor = vendor ? 'document' : 'none';
+  } else if (vendor && isBuyer(doc, vendor)) {
+    vendor = candidates.length === 1 ? candidates[0]! : vendor;
+    settled.vendor = candidates.length === 1;
     evidence.vendor = 'document';
   } else if (vendor && sellerMatches(doc, vendor)) {
     settled.vendor = true;
@@ -360,13 +370,20 @@ export function parseExtraction(
   } else if (vendor && (confident.vendor || ruled(vendor))) {
     settled.vendor = true;
     evidence.vendor = 'model';
-  } else if (doc.sellerCandidates.length === 1) {
-    vendor = doc.sellerCandidates[0]!;
+  } else if (candidates.length === 1) {
+    vendor = candidates[0]!;
     settled.vendor = true;
     evidence.vendor = 'document';
   } else {
     settled.vendor = false;
     evidence.vendor = vendor ? 'model' : 'none';
+  }
+  // Nothing named the seller: show the sender's name, still flagged for a look.
+  const sender = cleanVendor(hints.senderName);
+  if (!vendor && sender && !isOwnName(sender, own)) {
+    vendor = sender;
+    settled.vendor = false;
+    evidence.vendor = 'sender';
   }
 
   const invoiceNumber = doc.invoiceNumber ?? doc.receiptNumber ?? text('invoice_number');
@@ -482,6 +499,7 @@ export async function extract(
     receivedAt: string;
     images?: { content_type: string; base64: string }[];
     kind?: Kind;
+    senderName?: string | null;
   },
 ): Promise<{
   facts: Facts;
@@ -514,7 +532,10 @@ export async function extract(
   const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC, id').all<Rule>()).results;
   let parsed: Extraction;
   try {
-    parsed = parseExtraction(raw, input.state.split(FORWARDED_CONTEXT)[0], rules, config(env).tuning);
+    parsed = parseExtraction(raw, input.state.split(FORWARDED_CONTEXT)[0], rules, config(env).tuning, {
+      ownNames: config(env).sellerNames,
+      senderName: input.senderName,
+    });
   } catch {
     throw new ExtractionFailure(raw);
   }

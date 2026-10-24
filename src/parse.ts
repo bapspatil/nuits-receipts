@@ -168,12 +168,47 @@ function label(text: string): Label | null {
   if (/^(amount paid|total paid|paid|maksettu)(?![\p{L}\d])/u.test(t)) return 'paid';
   if (/^(amount due|total due|balance due|due|maksettava)(?![\p{L}\d])/u.test(t)) return 'due';
   if (
-    /^(grand total|total|order total|invoice total|total amount|yhteensä|yhteensa|loppusumma|summa|kokonaissumma)(?![\p{L}\d])/u.test(
+    /^(grand total|total|order total|invoice total|total amount|total charged|amount charged|yhteensä|yhteensa|loppusumma|summa|kokonaissumma|laskun summa|laskun loppusumma)(?![\p{L}\d])/u.test(
       t,
     )
   )
     return 'total';
   return null;
+}
+
+const PAID_DATE = /^(?:date paid|paid on|payment date|date of payment|maksupäivä)(?![\p{L}\d])/u;
+const DUE_DATE = /^(?:date due|due date|due on|due|eräpäivä)(?![\p{L}\d])/u;
+const ISSUE_DATE =
+  /^(?:invoice date|date of issue|issue date|issued on|issued|receipt date|order date|order placed|ordered on|placed on|transaction date|purchase date|billing date|date|dated|päiväys|päivämäärä|pvm|laskun päivämäärä|laskupäivä|laskutuspäivä|tilauspäivä|ostopäivä|datum|rechnungsdatum)(?![\p{L}\d])/u;
+
+// Email bodies often print a label and its value on separate lines
+// ("Laskun summa" / "139,79 €"): join a bare label with a short value line.
+function joinLabels(lines: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!,
+      next = lines[i + 1];
+    const bare = l.length <= 30 && !/\d/.test(l);
+    if (next && bare && next.length <= 30) {
+      const lower = l
+        .toLowerCase()
+        .replace(/[:*]+$/, '')
+        .trim();
+      // The value line is one amount and nothing else: "139,79 €", "USD 28.71".
+      const money =
+        label(l) &&
+        amounts(next).length === 1 &&
+        /^(?:[A-Z]{3}|US\$|A\$|C\$|[€£$])?\s?-?[\d .,\u00a0]+\s?(?:[A-Z]{3}|[€£$])?$/.test(next);
+      const when = [PAID_DATE, DUE_DATE, ISSUE_DATE].some((re) => lower.match(re)?.[0] === lower) && leadingDate(next);
+      if (money || when) {
+        out.push(`${l} ${next}`);
+        i++;
+        continue;
+      }
+    }
+    out.push(l);
+  }
+  return out;
 }
 
 function single<T>(values: T[]): T | null {
@@ -246,7 +281,7 @@ export function parseDocument(text: string): ParsedDocument {
     paid: string[] = [],
     due: string[] = [];
   const anyDates = new Set<string>();
-  for (const l of lines) {
+  for (const l of joinLabels(lines)) {
     const found = amounts(l);
     for (const a of found) {
       const code = markerCode(a.marker, usdHint);
@@ -284,13 +319,11 @@ export function parseDocument(text: string): ParsedDocument {
       const m = lower.match(re);
       return m ? leadingDate(l.slice((m.index ?? 0) + m[0].length)) : null;
     };
-    const p = dateAfter(/^(?:date paid|paid on|payment date|date of payment|maksupäivä)(?![\p{L}\d])/u);
+    const p = dateAfter(PAID_DATE);
     if (p) paid.push(p);
-    const d = dateAfter(/^(?:date due|due date|due on|due|eräpäivä)(?![\p{L}\d])/u);
+    const d = dateAfter(DUE_DATE);
     if (d) due.push(d);
-    const i = dateAfter(
-      /^(?:invoice date|date of issue|issue date|issued on|issued|receipt date|order date|date|dated|päiväys|päivämäärä|pvm|laskun päivämäärä|laskupäivä|datum|rechnungsdatum)(?![\p{L}\d])/u,
-    );
+    const i = dateAfter(ISSUE_DATE);
     if (i && !/^date (?:paid|due)/.test(lower)) issue.push(i);
     for (const m of l.matchAll(
       /\b(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{1,2} [A-Za-z]{3,9}\.? \d{4})\b/g,

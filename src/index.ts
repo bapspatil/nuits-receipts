@@ -1,4 +1,5 @@
 import type { Env } from './env';
+import { mergeDuplicates } from './dedupe';
 import { hash, InputError, MAX_PDF_BYTES, MAX_CSV_BYTES, EXPENSE_TYPES, normalize, requireInput } from './domain';
 import {
   changeKind,
@@ -162,6 +163,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const reason = url.searchParams.get('reason') ?? '';
     return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
   }
+  if (request.method === 'POST' && path === '/review/merge')
+    return redirect(`/review?merged=${await mergeDuplicates(env)}`);
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {

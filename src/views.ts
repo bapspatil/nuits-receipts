@@ -9,6 +9,7 @@ import { config, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts } from './setup';
 import { heldMail, ignoredSenders } from './inbound';
 import { heldSection, senderBanner } from './all';
+import { mergePlan } from './dedupe';
 import { FIELD, type SettingKey } from './settings';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
@@ -198,6 +199,10 @@ export async function reviewPage(
   const reading = await env.DB.prepare(
     "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL",
   ).first<number>('n');
+  const mergeable = (await mergePlan(env)).length;
+  const merge = mergeable
+    ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
+    : '';
   const chips = chipRow('Filter', [
     { href: '/review', label: 'All', count: all.length, current: !filter },
     ...(Object.keys(REVIEW_FILTERS) as ReviewFilter[]).map((k) => ({
@@ -222,7 +227,7 @@ export async function reviewPage(
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'Review',
-    `${senderBanner(params)}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${senderBanner(params)}${merge}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -321,6 +326,12 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       .all<Receipt>()
   ).results;
 
+  // Other files of the same charge (the receipt PDF next to the invoice PDF).
+  const files = (
+    await env.DB.prepare('SELECT id,filename FROM receipts WHERE duplicate_of=? ORDER BY received_at,id LIMIT 20')
+      .bind(r.id)
+      .all<{ id: string; filename: string }>()
+  ).results;
   const codes = reasonCodes(r.review_reasons_json);
   const needs = r.status === 'needs_review',
     reading = r.status === 'pending' || r.status === 'processing';
@@ -519,7 +530,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
     ? ''
     : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
   const tech = `<details class="tech"><summary>Technical details</summary><div class="body"><p class="hint">Status <code>${escape(r.status)}</code>. Reason codes:</p><pre tabindex="0">${escape(r.review_reasons_json)}</pre><p class="hint">Euro amount: ${escape(eur.source)}${eur.transaction ? `. Bank transaction <code>${escape(eur.transaction)}</code> · Account ${escape(eur.accountName)}` : '. No bank match.'}</p><pre tabindex="0">${escape(r.ai_json)}\n${escape(r.manual_fields_json)}</pre><p class="hint">Receipt ID <code>${r.id}</code></p></div></details>`;
-  const extras = `<details class="more" id="upload"${uploadFlag ? ' open' : ''}><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p><details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}${tech}</div></details>`;
+  const extras = `<details class="more" id="upload"${uploadFlag ? ' open' : ''}><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}${tech}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   const doc = previewable(r)
     ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`

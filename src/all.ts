@@ -129,6 +129,7 @@ export function senderBanner(params: URLSearchParams): string {
   } else if (params.get('deleted') === '1') text = 'Email deleted.';
   else if (params.get('senders') === 'removed') text = 'Sender removed.';
   else if (params.get('senders') === 'unignored') text = 'No longer ignored.';
+  else if (params.has('merged')) text = `${n('merged')} merged.`;
   return text ? `<p class="banner" role="status">${escape(text)}</p>` : '';
 }
 
