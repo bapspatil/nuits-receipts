@@ -228,3 +228,44 @@ test('live FX lookup requests ECB-only historical observations and ignores futur
     rateDate: '2026-09-04',
   });
 });
+test('saving a receipt keeps its manual match unless the matched facts change', async () => {
+  const row = await receipt();
+  await importCsv(
+    'Transaction ID;Booking date;Amount;Currency;Payee;Reference\nm;2026-09-07;-126,00;EUR;Card payment;card\n',
+  );
+  const id = await hash('holvi:id:m');
+  const link = new URLSearchParams({
+    transaction_id: id,
+    receipt_id: row.id,
+    action: 'link',
+    confirm_exception: 'yes',
+  });
+  expect((await request('/matches', { method: 'POST', body: link })).status).toBe(303);
+  const linked = () =>
+    env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(id).first('receipt_id');
+  expect(await linked()).toBe(row.id);
+  const save = async (extra: Record<string, string>) => {
+    const current = await getReceipt(env, row.id);
+    const body = new URLSearchParams({
+      revision: String(current.revision),
+      vendor: current.vendor ?? '',
+      invoice_number: current.invoice_number ?? '',
+      issue_date: current.issue_date ?? '',
+      due_date: current.due_date ?? '',
+      currency: current.currency ?? '',
+      total: '125.50',
+      net: '100.00',
+      vat: '25.50',
+      vat_rate: '25.5',
+      product: 'app',
+      expense_type: 'infra',
+      action: 'save',
+      ...extra,
+    });
+    expect((await request('/receipts/' + row.id, { method: 'POST', body })).status).toBe(303);
+  };
+  await save({ expense_type: 'subscriptions' });
+  expect(await linked()).toBe(row.id);
+  await save({ total: '125.60', net: '100.10' });
+  expect(await linked()).toBeNull();
+});

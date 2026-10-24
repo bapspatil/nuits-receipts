@@ -699,10 +699,15 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     facts.currency !== current.currency ||
     facts.issue_date !== current.issue_date ||
     facts.total_minor !== current.total_minor;
+  const status = approved || !reasons.length ? 'ready' : 'needs_review';
+  // A manual match stays unless the facts it was made on change or the receipt stops being matchable.
+  // Automatic matches are dropped and re-run by reconcile below.
+  const unlinks =
+    invalidatesFx || duplicate !== null || (status !== 'ready' && JSON.stringify(reasons) !== '["missing_eur"]');
   const result = await env.DB.batch([
     env.DB.prepare(
-      'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=? AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=?)',
-    ).bind(id, id, revision),
+      "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=? AND (?=1 OR match_method IS NOT 'manual') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=?)",
+    ).bind(id, unlinks ? 1 : 0, id, revision),
     env.DB.prepare(
       `UPDATE receipts SET ${entries.map(([k]) => `${k}=?`).join(',')},product=?,expense_type=?,eur_override_minor=?,eur_override_reason=?,duplicate_of=?,status=?,manual_fields_json=?,review_reasons_json=?,reviewed_at=?,revision=revision+1,attempt_id=NULL,lease_until=NULL,fx_eur_minor=CASE WHEN ? THEN NULL ELSE fx_eur_minor END
       WHERE id=? AND revision=?`,
@@ -713,7 +718,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
       override,
       override === null ? null : eurReason,
       duplicate,
-      approved || !reasons.length ? 'ready' : 'needs_review',
+      status,
       JSON.stringify(manual),
       JSON.stringify(approved ? [] : reasons),
       approved ? now : null,
