@@ -46,6 +46,8 @@ export const PAGES = {
   bank: { nav: 'bank', title: 'Bank' },
   import: { nav: 'bank', title: 'Bank' },
   settings: { nav: 'settings', title: 'Settings' },
+  // Help is linked from Settings, the footer and the setup checklist, not a tab.
+  help: { title: 'Help' },
   // Errors keep the nav quiet: no tab is current.
   rejected: { title: "That didn't work" },
   failed: { title: 'Something went wrong' },
@@ -202,6 +204,10 @@ tfoot th,tfoot td{border-bottom:0;border-top:1.5px solid var(--border-strong);fo
 .steps b{font:700 var(--text-lg)/1.2 var(--font-display);flex:1}
 .steps span{color:var(--text-muted);font-weight:600}.steps span.red{color:var(--danger)}
 .steps a::after{content:"›";color:var(--text-muted);font-weight:600}
+.setup{margin:0 0 var(--space-5)}.setup h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-3);margin:0 0 var(--space-2)}.setup h2 span{font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}
+.setup .steps{margin-bottom:var(--space-2)}.setup .steps a{display:grid;grid-template-columns:16px minmax(0,1fr) auto;column-gap:var(--space-3);row-gap:2px;align-items:center}
+.setup .steps a::before,.setup .steps a::after{grid-row:1/3}.setup .steps a::after{grid-column:3}.setup .steps b{grid-column:2}.setup .steps span:not(.vh){grid-column:2;font-weight:400;font-size:var(--text-sm)}.setup .steps .done b{font-weight:600;color:var(--text-muted)}
+.setup .small a,.settings>.small a{display:inline-flex;align-items:center;min-height:44px}
 .sentq{margin:var(--space-4) 0 0;padding-top:var(--space-3);border-top:1.5px dashed var(--border)}.sentq h3{margin:0 0 var(--space-2)}.why strong{color:var(--text)}.why a{font-weight:600}
 .next{margin:0 0 var(--space-4)}.send .btns{margin:var(--space-3) 0}.dated{margin:var(--space-4) 0 0}.dated a{display:inline-flex;align-items:center;min-height:44px}
 .checks li:first-child a.btn{justify-self:start;margin:var(--space-1) 0}
@@ -552,7 +558,7 @@ export async function page(
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
     {
       status: requestState.getStore()?.failure?.status ?? status,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },

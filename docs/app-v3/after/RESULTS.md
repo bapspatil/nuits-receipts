@@ -6,7 +6,7 @@ Instance: fresh local database, mock AI, 2026-10-24.
 
 | Journey | Clicks | Field edits | Screens | POSTs with no feedback | Dead-end error pages | Errors fixed in place |
 | --- | --- | --- | --- | --- | --- | --- |
-| d. First run to first receipt read | 2 | 1 | 2 | 0 | 0 | 0 |
+| d. First run to first receipt read | 5 | 2 | 5 | 0 | 0 | 0 |
 | a. Mail arrives, every receipt approved | 6 | 9 | 5 | 0 | 0 | 0 |
 | b. Bank statement imported, every payment settled | 6 | 1 | 6 | 0 | 0 | 0 |
 | e. Sales invoice added, money in matched | 5 | 1 | 4 | 0 | 0 | 0 |
@@ -14,17 +14,18 @@ Instance: fresh local database, mock AI, 2026-10-24.
 
 ### d. First run to first receipt read
 
-Screens: `/` → `/receipts/:id?done=uploaded`
+Screens: `/` → `/receipts/:id?done=uploaded` → `/` → `/settings` → `/settings?done=settingsSaved&group=accountant`
 
-- Welcome screen says: Welcome Done: Business Done Done: Email Done To do: Accountant Set up Receipt (PDF or photo) Upload Add several Or forward to receipts@example.com
+- Welcome screen says: Welcome Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare The
 - Landed on /receipts/:id with title "Sample Cloud Lantern Oy"
-- No accountant step on Home after the first receipt.
+- Home after the first receipt: Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c
+- Saved: Saved your accountant.
 
 ### a. Mail arrives, every receipt approved
 
 Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast&month=2026-09&step=import`
 
-- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you, plus 1 undated receipt. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Chec
+- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done Done: Business name added So invoices you send are told apart from receipts. Done: Email Routing confirmed A receipt arrived by email, so it wo
 - Review lists 3 receipts.
 - Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review.
 
@@ -34,7 +35,7 @@ Screens: `/payments` → `/import` → `/imports/csv` → `/payments?month=2026-
 
 - After import: 5 out, 3 matched, 2 missing
 - Import banner: Added 6 payments. We matched 3 for you. See them
-- DOMAINDESK offers: Match anyway. This pair isn't exact: the names don't look alike. "Match anyway" says that is fine.
+- DOMAINDESK offers: Match anyway. This pair isn't exact: the names don't look alike. "Match anyway" says that is fine. What is this?
 - Finally: 5 out, 4 matched, 0 missing
 
 ### e. Sales invoice added, money in matched
@@ -46,7 +47,7 @@ Screens: `/receipts` → `/invoices` → `/add?kind=sales` → `/payments`
 
 ### c. September closed and marked sent
 
-Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A40%3A17.617Z`
+Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A57%3A58.207Z`
 
 - Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October Done: Check Done Done: Match Done Next: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be
 - Downloaded receipts-2026-09.zip
@@ -83,3 +84,9 @@ Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A40%3A17.617Z`
 | [settings](screens/settings-390.png) | 390 | 1 | 0 |
 | [bank-likely](screens/bank-likely-1440.png) | 1440 | 2.77 | 0 |
 | [bank-likely](screens/bank-likely-390.png) | 390 | 2.98 | 0 |
+| [help](screens/help-1440.png) | 1440 | 1.66 | 0 |
+| [help](screens/help-390.png) | 390 | 2.2 | 0 |
+| [help-flags](screens/help-flags-1440.png) | 1440 | 1.86 | 0 |
+| [help-flags](screens/help-flags-390.png) | 390 | 2.5 | 0 |
+| [home-setup](screens/home-setup-1440.png) | 1440 | 1.72 | 0 |
+| [home-setup](screens/home-setup-390.png) | 390 | 1.93 | 0 |

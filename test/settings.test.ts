@@ -142,7 +142,7 @@ test('Reset posts its own small form, so Enter in a field still means Save', asy
   expect(await rows()).toEqual([]);
   expect(
     await (await request(await signed('/settings?done=settingReset&label=App+name&group=business&to=deploy'))).text(),
-  ).toContain('App name is back to the deploy value.');
+  ).toContain('App name is back to the value set when deployed.');
 });
 
 test('the page is one fold per section, one Save per group and history tucked away', async () => {
@@ -183,7 +183,7 @@ test('the page is one fold per section, one Save per group and history tucked aw
     expect(own.map(([, , text]) => text)).toEqual(['Save']);
   }
   // Deploy-only values and history start collapsed.
-  expect(html).toContain('<details class="group" id="setup-deploy"><summary>Set at deploy</summary>');
+  expect(html).toContain('<details class="group" id="setup-deploy"><summary>Set when deployed</summary>');
   expect(html).toContain('<details class="group" id="setup-history"><summary>Change history (1)</summary>');
   // Allowed senders are edited in Senders only, not as a second list in Email.
   expect(html).not.toContain('name="ALLOWED_SENDER_EMAILS"');

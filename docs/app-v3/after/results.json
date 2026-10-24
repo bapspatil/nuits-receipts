@@ -2,19 +2,23 @@
   "results": [
     {
       "journey": "d. First run to first receipt read",
-      "clicks": 2,
-      "edits": 1,
+      "clicks": 5,
+      "edits": 2,
       "screens": [
         "/",
-        "/receipts/:id?done=uploaded"
+        "/receipts/:id?done=uploaded",
+        "/",
+        "/settings",
+        "/settings?done=settingsSaved&group=accountant"
       ],
       "silentPosts": [],
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Welcome screen says: Welcome Done: Business Done Done: Email Done To do: Accountant Set up Receipt (PDF or photo) Upload Add several Or forward to receipts@example.com",
+        "Welcome screen says: Welcome Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare The",
         "Landed on /receipts/:id with title \"Sample Cloud Lantern Oy\"",
-        "No accountant step on Home after the first receipt."
+        "Home after the first receipt: Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c",
+        "Saved: Saved your accountant."
       ]
     },
     {
@@ -32,7 +36,7 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you, plus 1 undated receipt. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Chec",
+        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done Done: Business name added So invoices you send are told apart from receipts. Done: Email Routing confirmed A receipt arrived by email, so it wo",
         "Review lists 3 receipts.",
         "Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review."
       ]
@@ -55,7 +59,7 @@
       "notes": [
         "After import: 5 out, 3 matched, 2 missing",
         "Import banner: Added 6 payments. We matched 3 for you. See them",
-        "DOMAINDESK offers: Match anyway. This pair isn't exact: the names don't look alike. \"Match anyway\" says that is fine.",
+        "DOMAINDESK offers: Match anyway. This pair isn't exact: the names don't look alike. \"Match anyway\" says that is fine. What is this?",
         "Finally: 5 out, 4 matched, 0 missing"
       ]
     },
@@ -83,7 +87,7 @@
       "edits": 0,
       "screens": [
         "/",
-        "/?month=2026-09&done=sent&at=2026-10-24T15%3A40%3A17.617Z"
+        "/?month=2026-09&done=sent&at=2026-10-24T15%3A57%3A58.207Z"
       ],
       "silentPosts": [],
       "deadEnds": [],
@@ -209,7 +213,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/e6a9218a95b95b4f0cb27a77a401b7e8e8e41439685d401eb2901160d51f8d18",
+      "path": "/receipts/896ce018bb532e17f156740ba4ce692ffc4d5056f971e248dc64db0a91fc1f5d",
       "viewport": "1440",
       "viewports": 1.06,
       "file": "screens/invoice-paid-1440.png",
@@ -217,7 +221,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/e6a9218a95b95b4f0cb27a77a401b7e8e8e41439685d401eb2901160d51f8d18",
+      "path": "/receipts/896ce018bb532e17f156740ba4ce692ffc4d5056f971e248dc64db0a91fc1f5d",
       "viewport": "390",
       "viewports": 1.59,
       "file": "screens/invoice-paid-390.png",
@@ -317,6 +321,54 @@
       "viewport": "390",
       "viewports": 2.98,
       "file": "screens/bank-likely-390.png",
+      "axe": []
+    },
+    {
+      "name": "help",
+      "path": "/help",
+      "viewport": "1440",
+      "viewports": 1.66,
+      "file": "screens/help-1440.png",
+      "axe": []
+    },
+    {
+      "name": "help",
+      "path": "/help",
+      "viewport": "390",
+      "viewports": 2.2,
+      "file": "screens/help-390.png",
+      "axe": []
+    },
+    {
+      "name": "help-flags",
+      "path": "/help#flag-missing_vendor",
+      "viewport": "1440",
+      "viewports": 1.86,
+      "file": "screens/help-flags-1440.png",
+      "axe": []
+    },
+    {
+      "name": "help-flags",
+      "path": "/help#flag-missing_vendor",
+      "viewport": "390",
+      "viewports": 2.5,
+      "file": "screens/help-flags-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-setup",
+      "path": "/?month=2026-09",
+      "viewport": "1440",
+      "viewports": 1.72,
+      "file": "screens/home-setup-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-setup",
+      "path": "/?month=2026-09",
+      "viewport": "390",
+      "viewports": 1.93,
+      "file": "screens/home-setup-390.png",
       "axe": []
     }
   ]

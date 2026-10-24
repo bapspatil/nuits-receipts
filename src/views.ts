@@ -6,7 +6,9 @@ import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts } from './setup';
+import { setupParts, SETTINGS_CSP } from './setup';
+import { setupChecklist, setupSteps } from './checklist';
+import { helpBody } from './help';
 import { heldMail, ignoredSenders } from './inbound';
 import { heldSection } from './all';
 import { mergePlan } from './dedupe';
@@ -648,7 +650,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
           .map((t) => {
             // Only a pair that isn't an exact fit asks for the exception, and says why.
             const facts = pairFacts(r, t, rules, config(env).tuning);
-            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>${matchError(t.id)}`;
+            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)} <a href="/help#match-anyway">What is this?</a></p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>${matchError(t.id)}`;
           })
           .join('')}</section>`
       : '';
@@ -801,7 +803,9 @@ export async function payments(
     const scope = `match:${t.id}`;
     const line = (label: string, bank: string, other: string, cell: Cell) =>
       `<tr><th scope="row">${label}</th><td data-l="Bank">${bank}</td><td data-l="${noun}">${other}</td><td class="${cell.same ? 'same' : 'diff'}">${escape(cell.text)}</td></tr>`;
-    const why = facts.exact ? '' : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`;
+    const why = facts.exact
+      ? ''
+      : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)} <a href="/help#match-anyway">What is this?</a></p>`;
     const described = [
       facts.exact ? '' : `e-why-${t.id}`,
       failureFor(scope)?.field === 'confirm_exception' ? errorId(scope) : '',
@@ -981,20 +985,15 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const ever = await env.DB.prepare(
     "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
   ).first<{ r: number; i: number }>();
-  if (!ever?.r && !ever?.i) {
-    const setup: [string, string, boolean][] = [
-      ['#setup-business', 'Business', settings.sellerNames.length > 0],
-      ['#setup-email', 'Email', !!settings.receiptAddress],
-      ['#setup-accountant', 'Accountant', settings.accountantLabel !== 'your accountant'],
-    ];
+  const checklist = setupChecklist(await setupSteps(env));
+  if (!ever?.r && !ever?.i)
     return page(
       'home',
-      `<ol class="steps" aria-label="Set up">${setup.map(([href, label, done]) => `<li class="step ${done ? 'done' : 'todo'}"><a href="/settings${href}">${stepWord(done ? 'done' : 'todo')}<b>${label}</b><span>${done ? 'Done' : 'Set up'}</span></a></li>`).join('')}</ol><div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
+      `${checklist ?? ''}<div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
       200,
       env,
       { head: pageHead('Welcome') },
     );
-  }
   // No month in the address: open on the oldest one that is not sent.
   const arrival: Arrival | null = requested ? null : await arrivalMonth(env);
   const selected = requested ?? arrival!.month;
@@ -1047,7 +1046,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
       : '';
   return page(
     'home',
-    `${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
+    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
     200,
     env,
     { detail: monthName(selected), head: monthHead('/', selected) },
@@ -1124,7 +1123,7 @@ async function sendStep(
     : '';
   const rowsByKey = [...s.matrix].filter(([, v]) => v !== 0n);
   const parts = rowsByKey.length
-    ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col">Part</th><th scope="col">Kind</th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
+    ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
         .map(([key, v]) => {
           const [product = '', type = ''] = key.split('\u0000');
           return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
@@ -1238,7 +1237,7 @@ async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<st
         )
       : '';
   const conn = await connection(env);
-  const tech = `<details class="tech"><summary>Redirect URI</summary><div class="body"><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
+  const tech = `<details class="tech"><summary>Redirect URI for Microsoft Entra</summary><div class="body"><p>Microsoft sends you back to this app after you sign in. Add this address to your Microsoft Entra app, under Authentication, as a Web redirect URI.</p><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
     return sect(
       'onedrive',
@@ -1279,6 +1278,8 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
   return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
 }
 
+// The form that adds a bank account in Settings, as a failure scope names it.
+export const NEW_ACCOUNT = 'account:new';
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
@@ -1303,7 +1304,8 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             )
             .join('')}</ul>`
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
-    }<details class="add"${accounts.length ? '' : ' open'}><summary>Add account</summary><div class="body"><form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { attrs: ' placeholder="Main account"' })}${input('bank_name', '', 'text', 'Bank')}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency')}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
+    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { attrs: ' placeholder="Main account"', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
+    opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
   );
   const rulesPart = sect(
     'rules',
@@ -1339,9 +1341,20 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
-  return page('settings', `<div class="settings">${body}</div>`, 200, env, {
-    head: pageHead('Settings', signOutLink(env)),
-  });
+  const response = await page(
+    'settings',
+    `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
+    200,
+    env,
+    { head: pageHead('Settings', signOutLink(env)) },
+  );
+  response.headers.set('Content-Security-Policy', SETTINGS_CSP);
+  return response;
+}
+
+// ---------- Help ----------
+export async function helpPage(env: Env): Promise<Response> {
+  return page('help', helpBody(), 200, env, { head: pageHead('Help') });
 }
 
 // ---------- Import, step 1 ----------

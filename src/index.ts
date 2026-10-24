@@ -20,6 +20,8 @@ import {
   payments,
   previewable,
   queueAround,
+  helpPage,
+  NEW_ACCOUNT,
   receiptPage,
   reviewPage,
   settingsPage,
@@ -34,11 +36,11 @@ import { importPreview, confirmImport } from './imports';
 import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
-import { withSettings } from './settings';
+import { FIELD, withSettings, type SettingKey } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
-import { resetSetting, saveSetup } from './setup';
+import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
 import { withDone, type EventKey } from './events';
@@ -254,6 +256,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
+  if (request.method === 'GET' && path === '/help') return helpPage(env);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
   if (request.method === 'POST' && path === '/settings/setup')
     return redirect(await saveSetup(env, await formData(request, 64 * 1024), who));
@@ -280,6 +283,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   if (request.method === 'GET' && path === '/assets/add.js')
     return new Response(ADD_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  if (request.method === 'GET' && path === '/assets/settings.js')
+    return new Response(SETTINGS_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/invoices')
@@ -732,6 +739,17 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
         refused(`setup:${String(form.get('group') ?? '')}`, error.field === 'product_new' ? 'part-new' : undefined),
         () => settingsPage(env, new URLSearchParams(), url.origin + base),
       );
+    else if (url.pathname === '/accounts')
+      shown = requestState.run(refused(NEW_ACCOUNT, 'f-label'), () =>
+        settingsPage(env, new URLSearchParams(), url.origin + base),
+      );
+    else if (url.pathname === '/settings/setup/reset') {
+      const group = FIELD.get(String(form.get('reset') ?? '') as SettingKey)?.group;
+      if (group)
+        shown = requestState.run(refused(`setup:${group}`), () =>
+          settingsPage(env, new URLSearchParams(), url.origin + base),
+        );
+    }
     if (!shown) return null;
     const response = await shown;
     return base ? rebase(response, base) : response;
