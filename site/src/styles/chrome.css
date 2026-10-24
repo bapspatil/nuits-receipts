@@ -1,11 +1,10 @@
 /* The chrome: the bar and the footer, shared by every page.
 
    The page is one receipt roll. The bar is the printer it comes out of, with
-   the serrated cutter as its bottom edge, and the narrow menu is a slip that
-   prints down from under that cutter. The footer is the stub torn off at the
-   end. One nav list (src/partials/nav.html) is set three ways: inline in the
-   bar on wide screens, as the menu's numbered rows on narrow ones, and as the
-   stub's index. */
+   the serrated cutter as its bottom edge, and the menu is a full-screen ink
+   sheet that prints down out of it. The footer is the stub torn off at the
+   end. One nav list (src/partials/nav.html) is set twice: as the menu's
+   display-size rows and as the stub's index. */
 
 /* Shared nav list. Marked twice when current, never by colour alone: the
    label underlines and the index turns ink and bold. */
@@ -34,10 +33,24 @@
   font-weight: 700;
 }
 
-/* Bar */
+/* Bar: the wordmark, one primary action and the menu. Everything else lives
+   in the full-screen menu, so the bar is the same three things at every
+   width.
+
+   Sticky, in CSS alone, so it holds with and without script. It is an opaque
+   paper plate (no blur, no translucency under text), so whatever scrolls
+   under it never shows through. --bar-h is its height plus the cutter, for
+   scroll-margin-top on anchors and for anything else sticky below it. */
+
+:root {
+  --bar-h: calc(44px + 1.75rem + 5px);
+}
 
 .bar {
-  position: relative;
+  --bar-controls: 50;
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -47,8 +60,7 @@
 }
 
 /* The cutter: a row of ink teeth hanging from the bar's rule, the edge a
-   receipt is torn against. Raised above the menu panel so the slip reads as
-   coming out from under it. */
+   receipt is torn against. */
 .bar::after {
   content: "";
   position: absolute;
@@ -60,6 +72,15 @@
   pointer-events: none;
 }
 
+/* The bar's own controls ride above the open menu, so the wordmark, Deploy
+   and Close stay where they were. */
+.wordmark,
+.bar-deploy,
+.menu-trigger {
+  position: relative;
+  z-index: var(--bar-controls);
+}
+
 .wordmark {
   display: flex;
   align-items: center;
@@ -67,6 +88,7 @@
   margin-inline-end: auto;
   min-height: 44px;
   text-decoration: none;
+  transition: color 160ms linear;
 }
 
 .wordmark-mark {
@@ -83,23 +105,14 @@
   white-space: nowrap;
 }
 
-.wordmark-desc {
-  display: none;
-  font-size: var(--text-small);
-  color: var(--color-ink-soft);
-  white-space: nowrap;
-}
-
-.bar-nav {
-  display: none;
-}
-
-.bar-github,
+.bar-deploy,
 .motion-switch,
 .menu-trigger {
+  display: inline-flex;
+  gap: 0.3em;
   align-items: center;
   min-height: 44px;
-  padding: 0 1rem;
+  padding: 0 1.1rem;
   border: var(--rule);
   border-radius: var(--radius-pill);
   font: inherit;
@@ -107,114 +120,38 @@
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  cursor: pointer;
-  transition: transform 90ms ease-out;
-}
-
-.bar-github,
-.motion-switch {
-  color: var(--color-ink);
-  background: var(--color-paper);
-}
-
-.bar-github {
-  display: inline-flex;
   text-decoration: none;
+  cursor: pointer;
+  transition: transform 90ms ease-out, background-color 160ms linear, color 160ms linear, border-color 160ms linear;
 }
 
-/* No display here: the switch stays `hidden` until main.ts runs, and the
-   privacy page and the 404 never run it. */
-.motion-switch {
-  flex: none;
+.bar-deploy {
+  color: var(--color-on-stamp);
+  background: var(--color-stamp);
+  border-color: var(--color-stamp);
 }
 
-.bar-github:hover,
-.motion-switch:hover {
+.bar-deploy:hover {
   background: var(--color-ink);
-  color: var(--color-paper);
+  border-color: var(--color-ink);
 }
-
-.bar-github:active,
-.motion-switch:active,
-.menu-trigger:active {
-  transform: translateY(2px);
-}
-
-/* Wide: the nav inline, as a numbered index. */
-
-@media (min-width: 64rem) {
-  .bar {
-    gap: 1rem;
-  }
-
-  .bar-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .bar-nav .nav-list {
-    display: flex;
-    align-items: center;
-  }
-
-  .bar-nav .nav-link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 0.6rem;
-    font-size: var(--text-small);
-    font-weight: 600;
-  }
-
-  .bar-nav .nav-line {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.4rem;
-  }
-
-  .bar-nav .nav-index {
-    font-size: 0.75rem;
-  }
-
-  /* The hairline between the page's own sections and the other pages. */
-  .bar-nav .nav-item:not(.nav-page) + .nav-page {
-    display: flex;
-    align-items: center;
-    margin-inline-start: 0.5rem;
-    padding-inline-start: 0.5rem;
-  }
-
-  .bar-nav .nav-item:not(.nav-page) + .nav-page::before {
-    content: "";
-    width: 1px;
-    height: 1.25rem;
-    margin-inline-end: 0.5rem;
-    background: var(--color-ink);
-  }
-
-  .menu {
-    display: none;
-  }
-}
-
-@media (min-width: 80rem) {
-  .wordmark-desc {
-    display: inline;
-  }
-}
-
-/* Narrow: the menu. A native disclosure, so it opens, closes and announces
-   itself with no script on every page. The panel is absolute, not fixed: with
-   no script, following an in-page link from a fixed overlay would leave it
-   painted over the section, while an absolute panel stays at the top of the
-   document and the jump scrolls away from it. */
 
 .menu-trigger {
-  display: inline-flex;
   list-style: none;
   color: var(--color-paper);
   background: var(--color-ink);
+}
+
+/* Menu and Close share one cell, so the button keeps one width and the bar
+   never shifts. */
+.menu-trigger {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.menu-closed,
+.menu-opened {
+  grid-area: 1 / 1;
 }
 
 .menu-trigger::-webkit-details-marker {
@@ -223,71 +160,140 @@
 
 .menu[open] .menu-closed,
 .menu:not([open]) .menu-opened {
-  display: none;
+  visibility: hidden;
 }
+
+.bar-deploy:active,
+.motion-switch:active,
+.menu-trigger:active {
+  transform: translateY(2px);
+}
+
+/* Open: the bar's controls sit on the ink sheet. */
+.bar:has(.menu[open]:not([data-closing])) .wordmark {
+  color: var(--color-paper);
+}
+
+.bar:has(.menu[open]:not([data-closing])) .menu-trigger {
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border-color: var(--color-paper);
+}
+
+/* Closing: the controls turn back to ink as the sheet's torn foot passes
+   them, near the end of --menu-hold plus --menu-out. */
+.bar:has(.menu[data-closing]) .wordmark {
+  transition-delay: 480ms;
+}
+
+.bar:has(.menu[data-closing]) .menu-trigger {
+  transition-delay: 0s, 480ms, 480ms, 480ms;
+}
+
+.bar:has(.menu[open]) .bar-deploy:hover {
+  background: var(--color-paper);
+  border-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.bar:has(.menu[open]) :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+/* The menu: a full-screen ink sheet that prints down out of the bar, with a
+   torn foot, and the links rising behind their perforations.
+
+   A native disclosure, so it opens, closes and announces itself with no
+   script on every page. src/nav.ts locks the page, traps focus, animates the
+   close and scrolls after closing. */
 
 .menu {
-  --menu-lead: 120ms;
-  --menu-step: 45ms;
+  --menu-ease: cubic-bezier(0.7, 0, 0.2, 1);
+  --menu-in: 560ms;
+  --menu-out: 440ms;
+  --menu-lead: 220ms;
+  --menu-step: 50ms;
+  --menu-hold: 140ms;
+  --tooth: 12px;
 }
 
-/* A white slip with a torn foot, printed down out of the bar: the cut opens
-   it, the rows rise behind their rules. Closing cuts, because a closed
-   <details> stops rendering its content at once. */
 .menu-panel {
-  position: absolute;
-  inset-inline: 0;
-  top: 100%;
-  z-index: 15;
+  inset: 0 0 auto;
+  z-index: 40;
   display: grid;
-  gap: 1.75rem;
-  max-height: calc(100svh - 4.5rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 1.25rem var(--gutter) 2.75rem;
-  background: var(--color-slip);
-  --tooth: 10px;
+  grid-template-rows: 1fr auto;
+  gap: 2.5rem;
+  padding: calc(44px + 1.75rem + clamp(1.5rem, 5svh, 3.5rem)) var(--gutter) calc(1.75rem + var(--tooth));
+  color: var(--color-paper);
+  background: var(--color-ink);
   mask:
     linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
     conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
-  animation: menu-cut 240ms var(--wipe-ease) both;
 }
 
-@keyframes menu-cut {
-  from { clip-path: inset(0 0 100% 0); }
-  to   { clip-path: inset(0 0 0 0); }
+/* Fixed, also with no script: the bar is sticky, so an absolute sheet would
+   travel with it anyway. With no script, following an in-page link lands
+   under the open sheet, and Close (still on the bar) shows it. */
+.menu-panel {
+  position: fixed;
+  height: calc(100dvh + var(--tooth));
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.menu-panel .nav-list {
+.menu[open] .menu-panel {
+  animation: menu-print var(--menu-in) var(--menu-ease) both;
+}
+
+.menu[open][data-closing] .menu-panel {
+  animation: menu-tear var(--menu-out) var(--menu-ease) var(--menu-hold) both;
+}
+
+@keyframes menu-print {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes menu-tear {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-100%); }
+}
+
+.menu-panel :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.menu-nav .nav-list {
   display: grid;
+  align-content: start;
 }
 
-.menu-panel .nav-item {
+.menu-nav .nav-item {
   position: relative;
 }
 
-.menu-panel .nav-item:nth-child(1) { --row: 0; }
-.menu-panel .nav-item:nth-child(2) { --row: 1; }
-.menu-panel .nav-item:nth-child(3) { --row: 2; }
-.menu-panel .nav-item:nth-child(4) { --row: 3; }
-.menu-panel .nav-item:nth-child(5) { --row: 4; }
-.menu-panel .nav-item:nth-child(6) { --row: 5; }
+.menu-nav .nav-item:nth-child(1) { --row: 0; }
+.menu-nav .nav-item:nth-child(2) { --row: 1; }
+.menu-nav .nav-item:nth-child(3) { --row: 2; }
+.menu-nav .nav-item:nth-child(4) { --row: 3; }
+.menu-nav .nav-item:nth-child(5) { --row: 4; }
+.menu-nav .nav-item:nth-child(6) { --row: 5; }
+.menu-nav .nav-item:nth-child(7) { --row: 6; }
 
-/* The rule each row rises from behind, a pseudo-element so it can draw on
-   without moving the row. Dashed for the other pages, solid for the index. */
-.menu-panel .nav-item + .nav-item::before {
+/* The perforation each row rises from behind, drawn on left to right. */
+.menu-nav .nav-item::before {
   content: "";
   position: absolute;
   inset-inline: 0;
   top: 0;
-  border-top: var(--rule);
+  border-top: 1px dashed currentColor;
   transform-origin: left center;
-  animation: menu-rule 420ms var(--wipe-ease) both;
-  animation-delay: calc(var(--menu-lead) + var(--row, 0) * var(--menu-step));
 }
 
-.menu-panel .nav-item + .nav-page::before {
-  border-top-style: dashed;
+.menu[open] .menu-nav .nav-item::before {
+  animation: menu-rule 520ms var(--wipe-ease) both;
+  animation-delay: calc(var(--menu-lead) + var(--row, 0) * var(--menu-step) - 80ms);
 }
 
 @keyframes menu-rule {
@@ -295,90 +301,188 @@
   to   { transform: scaleX(1); }
 }
 
-/* No overflow on the link: the focus ring sits outside its box. The reveal is
-   the wipe on the line inside, which carries the display size so the wipe's
-   em allowance tracks the type. */
-.menu-panel .nav-link {
+.menu-nav .nav-link {
   display: block;
-  padding: 0.7rem 0;
+  padding: 0.65rem 0;
 }
 
-.menu-panel .nav-line {
+.menu-nav .nav-line {
   display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr);
+  grid-template-columns: 2.75rem minmax(0, 1fr);
   align-items: baseline;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(2.25rem, 1.6rem + 3vw, 3rem);
+  font-size: clamp(2.5rem, min(1.25rem + 5.5vw, 10svh), 6.25rem);
   line-height: 1;
-  letter-spacing: -0.025em;
-  --wipe-duration: 320ms;
+  letter-spacing: -0.03em;
+}
+
+.menu[open] .menu-nav .nav-line {
+  --wipe-duration: 480ms;
   animation: wipe-rise var(--wipe-duration) var(--wipe-ease) both;
   animation-delay: calc(var(--menu-lead) + var(--row, 0) * var(--menu-step));
 }
 
-.menu-panel .nav-index {
+/* Closing: every line sinks back behind its rule at once, then the sheet
+   tears away upward. */
+.menu[open][data-closing] .menu-nav .nav-line,
+.menu[open][data-closing] .menu-foot > * {
+  animation: menu-sink 200ms cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+@keyframes menu-sink {
+  from {
+    clip-path: inset(
+      calc(var(--wipe-top) * -1) calc(var(--wipe-side) * -1)
+      calc(var(--wipe-bottom) * -1) calc(var(--wipe-side) * -1)
+    );
+    transform: translateY(0);
+  }
+  to {
+    clip-path: inset(
+      calc(100% + var(--wipe-top)) calc(var(--wipe-side) * -1)
+      calc(var(--wipe-bottom) * -1) calc(var(--wipe-side) * -1)
+    );
+    transform: translateY(0.5em);
+  }
+}
+
+.menu-nav .nav-index {
+  align-self: start;
+  padding-top: 0.5em;
   font-size: 0.875rem;
   letter-spacing: 0.04em;
+  color: inherit;
 }
 
-.menu-panel .nav-page .nav-line {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: var(--text-lede);
-  letter-spacing: 0;
+.menu-nav .nav-link[aria-current] .nav-index {
+  color: inherit;
 }
 
-.menu-panel .nav-page .nav-label {
+.menu-nav .nav-page .nav-line {
+  font-size: clamp(1.75rem, min(1rem + 2.5vw, 6svh), 2.75rem);
+  letter-spacing: -0.02em;
+}
+
+.menu-nav .nav-page .nav-label {
   grid-column: 2;
 }
 
-.menu-panel .nav-page .nav-link {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0.25rem 0;
+.menu-nav .nav-link:hover .nav-label,
+.menu-nav .nav-link[aria-current] .nav-label {
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.12em;
 }
 
-/* No mask on the foot: the badge link presses on tap and a mask would clip
-   it. The block travels instead. */
 .menu-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1rem;
-  padding-inline-start: 2.25rem;
-  animation: menu-foot 320ms var(--wipe-ease) both;
-  animation-delay: calc(var(--menu-lead) + 6 * var(--menu-step));
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-top: 1.25rem;
+  background: var(--perforation) top / 100% 1px no-repeat;
 }
 
-@keyframes menu-foot {
-  from { transform: translateY(0.75rem); }
-  to   { transform: translateY(0); }
+.menu[open] .menu-foot > * {
+  animation: wipe-rise 420ms var(--wipe-ease) both;
+  animation-delay: calc(var(--menu-lead) + 7 * var(--menu-step));
 }
 
-/* The badge is used as Cloudflare ships it, scaled proportionally. */
-.menu-deploy img,
-.stub-deploy img {
-  display: block;
-  height: 44px;
-  width: auto;
-  aspect-ratio: 184 / 39;
+.menu-desc {
+  font-size: var(--text-small);
 }
 
-/* Reduced motion zeroes the delays as well as the durations, or the rows
-   still arrive one by one with nothing visibly moving. Twice, so the on-page
-   switch wins in both directions. */
+/* No display here: the switch stays `hidden` until main.ts runs, and the
+   privacy page and the 404 never run it. */
+.motion-switch {
+  flex: none;
+  min-height: 44px;
+  color: var(--color-paper);
+  background: transparent;
+  border-color: var(--color-paper);
+}
+
+.motion-switch[hidden] {
+  display: none;
+}
+
+.motion-switch:hover {
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+/* Wide: the page's own sections in one tall column, the other pages beside
+   them. */
+@media (min-width: 64rem) {
+  .bar {
+    gap: 1rem;
+  }
+
+  .menu-nav .nav-list {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: repeat(4, auto);
+    grid-auto-flow: column;
+    column-gap: clamp(2rem, 6vw, 6rem);
+  }
+
+  .menu-nav .nav-line {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+  }
+
+  .menu-nav .nav-page .nav-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .menu-nav .nav-page .nav-label {
+    grid-column: 1;
+  }
+
+  .menu-nav .nav-page .nav-link {
+    padding: 1.1rem 0;
+  }
+}
+
+/* Reduced motion and the switch set to off: the sheet appears and goes at
+   once. Durations are already clamped site-wide; the delays are zeroed here,
+   or the lines would still arrive one by one with nothing visibly moving.
+   Twice, so the on-page switch wins in both directions. */
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion]) .menu {
     --menu-lead: 0s;
     --menu-step: 0s;
+    --menu-hold: 0s;
+  }
+
+  html:not([data-motion]) .menu .nav-item::before {
+    animation-delay: 0s;
   }
 }
 
 html[data-motion="off"] .menu {
   --menu-lead: 0s;
   --menu-step: 0s;
+  --menu-hold: 0s;
+}
+
+html[data-motion="off"] .menu .nav-item::before {
+  animation-delay: 0s;
+}
+
+/* The page under the open menu does not scroll. src/nav.ts sets --menu-gutter
+   to the scrollbar's width (0 for overlay scrollbars), so the layout does not
+   jump when the scrollbar goes. */
+html.menu-locked {
+  overflow: hidden;
+  padding-inline-end: var(--menu-gutter, 0px);
+}
+
+/* The badge is used as Cloudflare ships it, scaled proportionally. */
+.stub-deploy img {
+  display: block;
+  height: 44px;
+  width: auto;
+  aspect-ratio: 184 / 39;
 }
 
 @media (max-width: 23.99rem) {
@@ -390,11 +494,13 @@ html[data-motion="off"] .menu {
     font-size: 1.125rem;
   }
 
-  .motion-switch,
+  .bar-deploy,
   .menu-trigger {
-    padding: 0 0.75rem;
+    padding: 0 0.8rem;
   }
+
 }
+
 
 /* Footer: the stub, torn off the end of the roll. */
 
@@ -565,4 +671,10 @@ html[data-motion="off"] .menu {
   .smallprint p {
     break-inside: avoid;
   }
+}
+
+/* The reading-progress line sits above the sticky bar, but not over the open
+   menu. */
+html:has(.menu[open]) .progress {
+  visibility: hidden;
 }

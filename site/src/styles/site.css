@@ -66,11 +66,16 @@ a {
   outline-offset: 3px;
 }
 
+/* Anchors land below the sticky bar, not under it. */
+[id] {
+  scroll-margin-top: calc(var(--bar-h) + 0.5rem);
+}
+
 .skip {
   position: absolute;
   left: var(--gutter);
   top: -4rem;
-  z-index: 10;
+  z-index: 70;
   padding: 0.5rem 1rem;
   background: var(--color-ink);
   color: var(--color-paper);
@@ -1262,16 +1267,16 @@ a {
     grid-column: 1;
   }
 
-  /* The slip lands over the tail of the title: its top edge tucks under the
-     descender of the first line, so the two share space instead of sitting
-     in separate boxes. */
+  /* The slip hangs beside the short second line, right-aligned, with its
+     top clear of the first line's descenders by a fixed margin: the title
+     never runs under it at any width. */
   .slip-hero {
     grid-column: 2;
     grid-row: 1 / span 4;
     align-self: start;
-    justify-self: start;
-    width: min(22rem, 100%);
-    margin-top: calc(var(--title-size) * 0.78);
+    justify-self: end;
+    width: min(20rem, 100%);
+    margin-top: calc(var(--title-size) * 0.84 + 4rem);
     rotate: 3deg;
   }
 
@@ -1355,7 +1360,7 @@ a {
      sticky, not a pin, so it costs nothing without JavaScript. */
   .faq .title {
     position: sticky;
-    top: 2rem;
+    top: calc(var(--bar-h) + 2rem);
     font-size: var(--title-xl);
   }
 
@@ -1371,11 +1376,7 @@ a {
 
 }
 
-@media (min-width: 80rem) {
-  .slip-hero {
-    margin-left: -2.5rem;
-  }
-}
+
 
 /* Motion off: the attribute stamped before first paint decides, and the media
    query only answers while no attribute exists yet. */

@@ -126,7 +126,7 @@
   display: none;
   position: fixed;
   inset: 0 0 auto;
-  z-index: 20;
+  z-index: 60;
   height: 3px;
   background: var(--color-ink);
   box-shadow: 0 1px 0 var(--color-paper);

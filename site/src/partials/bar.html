@@ -2,27 +2,23 @@
   <a class="wordmark" href="/#top" aria-label="Nuits Receipts, home">
     <svg class="wordmark-mark" viewBox="0 0 24 24" aria-hidden="true"><use href="#mark" /></svg>
     <span class="wordmark-name">Nuits Receipts</span>
-    <span class="wordmark-desc">a receipt inbox that runs on Cloudflare Workers</span>
   </a>
-  <nav class="bar-nav" aria-label="Site">
-    <ul class="nav-list">
-      <!-- partial:nav -->
-    </ul>
-    <a class="bar-github" href="https://github.com/bapspatil/nuits-receipts">GitHub</a>
-  </nav>
-  <button class="motion-switch" type="button" aria-pressed="true" hidden>
-    Motion <span class="motion-state">on</span>
-  </button>
+  <a class="bar-deploy" href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts">Deploy</a>
   <details class="menu">
-    <summary class="menu-trigger"><span class="menu-closed">Menu</span><span class="menu-opened">Close</span></summary>
-    <nav class="menu-panel" aria-label="Site">
-      <ul class="nav-list">
-        <!-- partial:nav -->
-      </ul>
+    <summary class="menu-trigger" aria-controls="menu-panel"><span class="menu-closed">Menu</span><span class="menu-opened">Close</span></summary>
+    <div class="menu-panel" id="menu-panel">
+      <nav class="menu-nav" aria-label="Site">
+        <ul class="nav-list">
+          <!-- partial:nav -->
+          <li class="nav-item nav-page"><a class="nav-link" href="https://github.com/bapspatil/nuits-receipts"><span class="nav-line"><span class="nav-label">GitHub</span></span></a></li>
+        </ul>
+      </nav>
       <div class="menu-foot">
-        <a class="menu-deploy" href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare" width="184" height="39" /></a>
-        <a class="bar-github" href="https://github.com/bapspatil/nuits-receipts">GitHub</a>
+        <p class="menu-desc">A receipt inbox that runs on Cloudflare Workers</p>
+        <button class="motion-switch" type="button" aria-pressed="true" hidden>
+          Motion <span class="motion-state">on</span>
+        </button>
       </div>
-    </nav>
+    </div>
   </details>
 </header>
