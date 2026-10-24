@@ -54,7 +54,7 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   const res = await post('/discard', { id: [id(1), id(2)], reason: 'personal', back: '/review' });
   expect(res.status).toBe(303);
   const location = res.headers.get('Location')!;
-  expect(location).toMatch(/^\/review\?discarded=2&discarded_at=/);
+  expect(location).toMatch(/^\/review\?done=discarded&n=2&at=/);
   const discarded = (await row(1))!;
   expect(discarded.discarded_at).toBeTruthy();
   expect(discarded.discard_reason).toBe('personal');
@@ -76,9 +76,9 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(page).toContain('Discarded · Personal');
   expect(page).not.toContain('action="/discard"');
 
-  const at = decodeURIComponent(location.split('discarded_at=')[1]!);
+  const at = new URL(location, 'http://localhost').searchParams.get('at')!;
   const undo = await post('/restore', { at, back: '/review' });
-  expect(undo.headers.get('Location')).toBe('/review?restored=2');
+  expect(undo.headers.get('Location')).toBe('/review?done=restored&n=2');
   expect((await row(1))!.discarded_at).toBeNull();
   expect((await monthRows(env, '2026-10')).map((r) => r.id)).toEqual([id(1), id(2)]);
   expect(await (await request('/receipts?show=discarded')).text()).toContain('Nothing discarded.');
@@ -128,9 +128,9 @@ test('from the queue, discard moves on to the next receipt like Skip', async () 
   }
   const r = (await row(1))!;
   const res = await post('/discard', { id: id(1), revision: String(r.revision), back: 'queue' });
-  expect(res.headers.get('Location')).toMatch(new RegExp(`^/receipts/${id(2)}\\?discarded=1&`));
+  expect(res.headers.get('Location')).toMatch(new RegExp(`^/receipts/${id(2)}\\?done=discarded&n=1&`));
   const last = await post('/discard', { id: id(2), back: 'queue' });
-  expect(last.headers.get('Location')).toMatch(/^\/review\?discarded=1&/);
+  expect(last.headers.get('Location')).toMatch(/^\/review\?done=discarded&n=1&/);
 });
 
 test('the same file sent again stays discarded', async () => {

@@ -8,11 +8,11 @@ import type { Env } from './env';
 import { config, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts } from './setup';
 import { heldMail, ignoredSenders } from './inbound';
-import { heldSection, senderBanner } from './all';
+import { heldSection } from './all';
 import { mergePlan } from './dedupe';
-import { discardBanner, discardControl, restoreForm } from './discard';
+import { discardControl, restoreForm } from './discard';
+import { feedback } from './events';
 import { DISCARD_REASONS } from './domain';
-import { FIELD, type SettingKey } from './settings';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
 import { invoiceName, overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
@@ -250,7 +250,7 @@ export async function reviewPage(
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'review',
-    `${senderBanner(params)}${discardBanner(params, '/review')}${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -316,7 +316,7 @@ export async function queueAround(
   return { position, total: queue.length, next };
 }
 
-export async function receiptPage(env: Env, r: Receipt, params = new URLSearchParams()): Promise<Response> {
+export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const sales = r.kind === 'sales';
   const eur = await eurValue(env, r);
   const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100').all<Rule>())
@@ -573,12 +573,6 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       : !needs && next
         ? `<a href="/receipts/${next}">Next to check ›</a>`
         : '';
-  const banner =
-    params.get('moved') === '1'
-      ? '<p class="banner" role="status">Moved back to Review.</p>'
-      : params.get('approved') === '1'
-        ? '<p class="banner" role="status">Approved.</p>'
-        : '';
   const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
     .bind(r.id)
     .first());
@@ -593,7 +587,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       : stamp(r, !!eur.transaction);
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
-    `${banner}${discardBanner(params, `/receipts/${r.id}`)}<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
+    `<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
     200,
     env,
     {
@@ -610,13 +604,6 @@ export async function payments(
   offset: number,
   params = new URLSearchParams(),
 ): Promise<Response> {
-  const result = ['inserted', 'skipped', 'replayed']
-    .map((key) => {
-      const value = params.get(key);
-      return value !== null && /^\d{1,4}$/.test(value) ? `${Number(value)} ${key}` : null;
-    })
-    .filter(Boolean)
-    .join(', ');
   const rows = (
     await env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
@@ -750,16 +737,10 @@ export async function payments(
         `No statement for ${escape(monthName(selected))} yet.`,
         '<a class="btn primary" href="/import">Import statement</a>',
       );
-  return page(
-    'bank',
-    `<p role="status" class="banner">${result ? `Import done: ${escape(result)}.` : ''}</p>${others}${body}${await statements(env)}`,
-    200,
-    env,
-    {
-      detail: monthName(selected),
-      head: monthHead('/payments', selected),
-    },
-  );
+  return page('bank', `${others}${body}${await statements(env)}`, 200, env, {
+    detail: monthName(selected),
+    head: monthHead('/payments', selected),
+  });
 }
 
 // ---------- Home: close the month ----------
@@ -863,8 +844,7 @@ async function sendStep(
   current: number,
   params: URLSearchParams,
 ): Promise<{ status: string; body: string }> {
-  const settings = config(env),
-    short = escape(monthName(selected, false));
+  const settings = config(env);
   const empty = s.docs === 0,
     ready = s.done.review && s.done.match && !empty,
     changed = !!s.send.last && s.send.changed && !empty;
@@ -872,7 +852,8 @@ async function sendStep(
   const kind = current === 3 ? 'primary' : 'secondary';
   const defaults: PackageOptions = { anyway: !ready, undated: false, changes: changed };
   // While an upload runs, the URL carries its options so "Continue" repeats them.
-  const chosen = params.has('upload') ? options(params) : defaults;
+  const uploading = ['driveDone', 'driveMore'].includes(params.get('done') ?? '');
+  const chosen = uploading ? options(params) : defaults;
   const plan = await planPackage(
     env,
     selected,
@@ -918,17 +899,9 @@ async function sendStep(
         )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
     : '';
   const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
-  const status =
-    params.get('upload') === 'done'
-      ? `<p class="banner" role="status">Uploaded to ${folder}. Marked as sent.</p>`
-      : params.get('upload') === 'more' && upload
-        ? `<p class="banner" role="status">${upload.plan.files.length - upload.pending.length} of ${upload.plan.files.length} uploaded.${/^\d+$/.test(params.get('wait') ?? '') ? ` Continue in ${Number(params.get('wait'))} s.` : ''}</p>`
-        : params.get('sent') === '1' && s.sent
-          ? `<p class="banner" role="status">Marked ${short} as sent.</p>`
-          : '';
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
-    `<div class="card active send">${status}${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${manifest}${parts}</div>`;
+    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${manifest}${parts}</div>`;
 
   if (changed) {
     const what = [
@@ -954,7 +927,7 @@ async function sendStep(
     const next = shiftMonth(selected, 1);
     return {
       status: `Sent ${escape(sentOn)}`,
-      body: `<div class="card">${status}${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
+      body: `<div class="card">${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
     };
   }
   if (ready) {
@@ -974,7 +947,7 @@ async function sendStep(
   }`;
   return {
     status: 'Not ready',
-    body: `<details class="send"${status ? ' open' : ''}><summary>Download anyway</summary><div class="body">${status}${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${markSent}${line}${manifest}${parts}</div></details>`,
+    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${markSent}${line}${manifest}${parts}</div></details>`,
   };
 }
 
@@ -1014,17 +987,11 @@ function sect(id: string, title: string, summary: string, body: string, open = f
 }
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
-async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): Promise<string> {
+async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<string> {
   const settings = config(env);
   const docs = settings.sourceRepository
     ? `<a href="${escape(settings.sourceRepository)}/blob/main/docs/ENVIRONMENT.md#onedrive-upload-optional">docs/ENVIRONMENT.md</a>`
     : '<code>docs/ENVIRONMENT.md</code>';
-  const done: Record<string, string> = {
-    connected: 'Microsoft account connected.',
-    folder: 'Folder saved.',
-    disconnected: 'Disconnected. Its sign-in was deleted from this app.',
-  };
-  const open = params.has('onedrive');
   if (!settings.oneDrive)
     return settings.oneDriveIncomplete
       ? sect(
@@ -1036,14 +1003,13 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
         )
       : '';
   const conn = await connection(env);
-  const banner = `<p class="banner" role="status">${escape(done[params.get('onedrive') ?? ''] ?? '')}</p>`;
   const tech = `<details class="tech"><summary>Redirect URI</summary><div class="body"><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
     return sect(
       'onedrive',
       'OneDrive',
       'Not connected',
-      `${banner}<p class="cta"><a class="btn secondary" href="/settings/onedrive/connect">Connect</a></p>${tech}`,
+      `<p class="cta"><a class="btn secondary" href="/settings/onedrive/connect">Connect</a></p>${tech}`,
       open,
     );
   const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"' })}</div><button class="btn secondary">Use folder</button></form>`;
@@ -1054,7 +1020,7 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
     'onedrive',
     'OneDrive',
     escape(conn.account_email ?? conn.account_name),
-    `${banner}<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
+    `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
       conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
     }<form action="/settings/onedrive/disconnect" method="post" class="cta"><button class="linkbtn">Disconnect</button></form>${tech}`,
     open,
@@ -1062,7 +1028,7 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
 }
 
 // Settings > Senders: who is read automatically and who is ignored.
-async function sendersPart(env: Env, params: URLSearchParams): Promise<string> {
+async function sendersPart(env: Env, open: boolean): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const ignored = await ignoredSenders(env);
   const row = (address: string, action: string, button: string) =>
@@ -1075,28 +1041,20 @@ async function sendersPart(env: Env, params: URLSearchParams): Promise<string> {
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
   const add = `<form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address" placeholder="billing@example.com"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  const open = ['approved', 'ignored', 'deleted', 'senders'].some((k) => params.has(k));
-  return sect(
-    'senders',
-    'Senders',
-    `${allowed.length} allowed`,
-    `${senderBanner(params)}${approved}${add}${ignoredList}`,
-    open,
-  );
+  return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
 }
 
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
-  const oneDrive = await oneDrivePart(env, params, origin);
-  const setup = await setupParts(env, params);
+  // The section the last action touched opens; the rest stay folded.
+  const opened = feedback(params)?.section ?? '';
+  const oneDrive = await oneDrivePart(env, opened === 'onedrive', origin);
+  const setup = await setupParts(env, params, opened);
   const [accounts, rules] = await Promise.all([
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
   ]);
-  // The section a save, reset or banner returns to opens; the rest stay folded.
-  const resetGroup = params.get('reset') ? FIELD.get(params.get('reset') as SettingKey)?.group : undefined;
-  const saved = params.get('saved') ?? resetGroup ?? '';
-  const opens = (group: string) => saved === group || (group === 'email' && params.has('routing'));
+  const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
   const accountsPart = sect(
     'accounts',
     'Bank accounts',
@@ -1112,12 +1070,11 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
     }<details class="add"${accounts.length ? '' : ' open'}><summary>Add account</summary><div class="body"><form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { attrs: ' placeholder="Main account"' })}${input('bank_name', '', 'text', 'Bank')}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency')}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
   );
-  const rulesBanner = { saved: 'Rule saved.', deleted: 'Rule deleted.' }[params.get('rules') ?? ''];
   const rulesPart = sect(
     'rules',
     'Vendor rules',
     String(rules.results.length),
-    `${rulesBanner ? `<p class="banner" role="status">${rulesBanner}</p>` : ''}${
+    `${
       rules.results.length
         ? `<ul class="plain rowlist rules">${rules.results
             .map(
@@ -1127,7 +1084,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
     }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}<button class="btn secondary">Add</button></form></div></details>`,
-    !!rulesBanner,
+    opened === 'rules',
   );
   const parts = settings.products.length;
   const body = [
@@ -1139,12 +1096,12 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
       opens('business'),
     ),
     sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    await sendersPart(env, params),
+    await sendersPart(env, opened === 'senders'),
     accountsPart,
     rulesPart,
     sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
     oneDrive,
-    sect('advanced', 'Advanced', '', setup.advanced, opens('review') || opens('integrations')),
+    sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
   return page('settings', `<div class="settings">${body}</div>`, 200, env, {

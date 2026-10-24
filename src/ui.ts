@@ -5,6 +5,8 @@ import type { Env } from './env';
 import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
+import { feedback } from './events';
+import { requestState } from './request';
 
 export function escape(value: unknown): string {
   return String(value ?? '').replace(
@@ -449,6 +451,19 @@ export function signOutLink(env: Env): string {
   return config(env).access ? '<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>' : '';
 }
 
+// The one status banner: what the last action did, with a next step or an Undo.
+function feedbackBanner(): string {
+  const params = requestState.getStore()?.params;
+  const said = params && feedback(params);
+  if (!said) return '';
+  const link = said.link ? ` <a href="${escape(said.link.href)}">${escape(said.link.label)}</a>` : '';
+  if (!said.undo) return `<p class="banner" role="status">${escape(said.text)}${link}</p>`;
+  const fields = Object.entries(said.undo.fields)
+    .map(([k, v]) => `<input type="hidden" name="${escape(k)}" value="${escape(v)}">`)
+    .join('');
+  return `<div class="banner undo" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
+}
+
 export async function page(
   view: PageKey,
   body: string,
@@ -467,7 +482,7 @@ export async function page(
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
     { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
   );
 }

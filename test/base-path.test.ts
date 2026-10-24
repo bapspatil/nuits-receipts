@@ -55,7 +55,7 @@ test('links, form actions and redirects carry the base path', async () => {
   const uploaded = await upload();
   expect(uploaded.status).toBe(303);
   const location = uploaded.headers.get('Location')!;
-  expect(location).toMatch(/^\/app\/receipts\/[a-f0-9]{64}$/);
+  expect(location).toMatch(/^\/app\/receipts\/[a-f0-9]{64}\?done=uploaded$/);
   const receipt = await (await at(location)).text();
   expect(receipt).toMatch(/href="\/app\/originals\/[a-f0-9]{64}"/);
   expect(receipt).toMatch(/action="\/app\/receipts\/[a-f0-9]{64}\/retry"/);
@@ -76,4 +76,11 @@ test('export links point at the base path', async () => {
   const csv = await (await at(`/app/export.csv?month=${(issue ?? month).slice(0, 7)}`)).text();
   expect(csv).toContain('http://localhost/app/originals/');
   expect(csv).not.toMatch(/http:\/\/localhost\/originals\//);
+});
+
+test('the feedback banner and its Undo form carry the base path', async () => {
+  const tx = 'a'.repeat(64);
+  const html = await (await at(`/app/review?done=notPurchase&tx=${tx}&name=Acme`)).text();
+  expect(html).toContain(`<form method="post" action="/app/payments/${tx}">`);
+  expect(html).toContain('Acme is not a purchase');
 });

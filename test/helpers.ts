@@ -55,3 +55,7 @@ export function htmlForm(html: string, action: string): FormData {
   }
   return result;
 }
+// The receipt id in a redirect to /receipts/<id>, ignoring the ?done= feedback params.
+export function idFrom(response: Response): string {
+  return new URL(response.headers.get('Location')!, 'http://localhost').pathname.split('/').at(-1)!;
+}

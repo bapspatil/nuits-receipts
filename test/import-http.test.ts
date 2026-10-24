@@ -232,12 +232,13 @@ test('confirmation reports inserted, skipped and replayed counts', async () => {
   const first = await preview(),
     body = confirmForm(await first.text());
   const inserted = await confirm(body);
+  expect(inserted.headers.get('Location')).toContain('done=imported');
   expect(inserted.headers.get('Location')).toContain('inserted=1');
   expect(inserted.headers.get('Location')).toContain('skipped=0');
   const replay = await confirm(body);
   expect(replay.headers.get('Location')).toContain('replayed=1');
   expect(replay.headers.get('Location')).toContain('inserted=0');
-  expect(await (await request(inserted.headers.get('Location')!)).text()).toContain('1 inserted');
+  expect(await (await request(inserted.headers.get('Location')!)).text()).toContain('Added 1 payment.');
 });
 
 test('file ownership is checked even when the second account has not mapped its headers', async () => {

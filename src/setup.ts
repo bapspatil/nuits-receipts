@@ -29,6 +29,7 @@ import {
 } from './settings';
 import { reconcile } from './banking';
 import { day, escape } from './ui';
+import { withDone } from './events';
 
 const tuningField = (key: SettingKey) =>
   (Object.entries(TUNING_VARS).find(([, v]) => v.name === key)?.[0] ?? null) as keyof Tuning | null;
@@ -104,7 +105,7 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
     if (value === null && !row) continue;
     changes.push({ key: field.key, value, old: row?.value ?? null });
   }
-  if (!changes.length) return `/settings?saved=${group}#setup-${group}`;
+  if (!changes.length) return withDone('settingsSame', `/settings#setup-${group}`, { group });
   let next;
   try {
     next = parseConfig(candidate as Partial<Env>);
@@ -138,7 +139,7 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
   await saveChanges(env, changes, who, revision);
   await afterSave(base, changes);
   const routing = changes.some((c) => c.key === 'RECEIPT_ADDRESS' || c.key === 'INVOICES_ADDRESS');
-  return `/settings?saved=${group}${routing ? '&routing=1' : ''}#setup-${group}`;
+  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${group}`, { group });
 }
 export async function resetSetting(env: Env, form: FormData, who: string): Promise<string> {
   const key = String(form.get('reset') ?? '') as SettingKey,
@@ -148,7 +149,7 @@ export async function resetSetting(env: Env, form: FormData, who: string): Promi
   requireInput(Number.isSafeInteger(revision) && revision >= 0, 'Reload the page and try again');
   const state = applied(env);
   const stored = state.app.get(key)?.value ?? state.invalid.get(key)?.value;
-  if (stored === undefined) return `/settings#setup-${field!.group}`;
+  if (stored === undefined) return withDone('settingsSame', `/settings#setup-${field!.group}`, { group: field!.group });
   const changes: Change[] = [{ key, value: null, old: stored }];
   if (key === 'INVOICES_ADDRESS') {
     const before = config(env).invoicesAddress,
@@ -164,7 +165,11 @@ export async function resetSetting(env: Env, form: FormData, who: string): Promi
   // whenever the app is running at all.
   await saveChanges(env, changes, who, revision);
   await afterSave(deployEnv(env), changes);
-  return `/settings?reset=${encodeURIComponent(key)}#setup-${field!.group}`;
+  return withDone('settingReset', `/settings#setup-${field!.group}`, {
+    label: field!.label,
+    group: field!.group,
+    to: deployValue(env, key).trim() ? 'deploy' : 'default',
+  });
 }
 // Wider or narrower matching windows can pair payments that were waiting.
 async function afterSave(base: Env, changes: readonly Change[]): Promise<void> {
@@ -277,12 +282,11 @@ function auditValue(json: string | null, key: string): string {
 export async function setupParts(
   env: Env,
   params: URLSearchParams,
+  opened = '',
 ): Promise<{ business: string; email: string; accountant: string; advanced: string }> {
   const settings = config(env),
     state = applied(env),
     rows = await history(env);
-  const reset = params.get('reset'),
-    saved = params.get('saved') ?? (reset ? (FIELD.get(reset as SettingKey)?.group ?? null) : null);
   const notice = (group: Group) =>
     group === 'email' && params.get('routing') === '1'
       ? `<div class="alert" role="status"><p><strong>Saved. Now update Cloudflare Email Routing.</strong> The app can’t do this for you.</p><ol><li>In Cloudflare, Email &gt; Email Routing &gt; Routing rules, add a custom address with the action <strong>Send to a Worker</strong> for ${[
@@ -294,14 +298,12 @@ export async function setupParts(
           .join(
             ' and ',
           )}.</li><li>Send a test from an allowed address and check it arrives.</li><li>Remove the rule for the old address. ${previousInvoicesAddress(env) ? `Mail to <code>${escape(previousInvoicesAddress(env))}</code> still counts as an invoice for ${GRACE_DAYS} days.` : ''}</li></ol></div>`
-      : saved === group
-        ? `<p class="banner" role="status">${reset ? `${escape(FIELD.get(reset as SettingKey)?.label ?? 'Setting')} is back to the ${sourceOf(env, reset as SettingKey) === 'deploy' ? 'deploy value' : 'default'}.` : 'Saved.'}</p>`
-        : '';
+      : '';
   const group = (id: Group) => GROUPS.find((g) => g.id === id)!;
   const top = (id: Group) => `${notice(id)}${groupForm(env, group(id), false)}`;
   const fold = (id: Group) => {
     const changed = FIELDS.some((f) => f.group === id && (state.app.has(f.key) || state.invalid.has(f.key)));
-    return `<details class="group" id="setup-${id}"${changed || saved === id ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
+    return `<details class="group" id="setup-${id}"${changed || opened === `setup-${id}` ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
   };
   const base = deployEnv(env) as unknown as Record<string, unknown>;
   const shown = (key: string, secret?: boolean): string => {

@@ -236,7 +236,7 @@ test('Merge duplicates folds existing per-attachment rows, keeps files, and is s
 
   const response = await request('/review/merge', { method: 'POST' });
   expect(response.status).toBe(303);
-  expect(response.headers.get('Location')).toContain('merged=2');
+  expect(response.headers.get('Location')).toContain('done=merged&n=2');
   const dup = async (id: string) => (await getReceipt(env, id)).duplicate_of;
   expect(await dup(i1)).toBeNull();
   expect(await dup(r1)).toBe(i1);
@@ -247,7 +247,7 @@ test('Merge duplicates folds existing per-attachment rows, keeps files, and is s
 
   expect(await mergeDuplicates(env)).toBe(0);
   expect(await (await request('/review')).text()).not.toContain('action="/review/merge"');
-  expect(await (await request('/review?merged=2')).text()).toContain('2 merged');
+  expect(await (await request('/review?done=merged&n=2')).text()).toContain('Merged 2 duplicates.');
 });
 
 test('Merge keeps a row you edited or matched as the one that counts', async () => {

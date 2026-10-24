@@ -161,7 +161,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a2@amazonses.com>', subject: 'Second' }, 'vendor: Other Shop'));
   const response = await post('/senders/approve', { address: 'Notifications@Link.com' });
   expect(response.status).toBe(303);
-  expect(response.headers.get('Location')).toBe('/review?approved=2');
+  expect(response.headers.get('Location')).toBe('/review?done=mailAllowed&n=2');
   expect(await receipts()).toBe(2);
   expect(await held()).toHaveLength(0);
   const saved = await env.DB.prepare("SELECT value_json FROM settings WHERE key='ALLOWED_SENDER_EMAILS'").first<string>(
@@ -179,7 +179,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a3@amazonses.com>' }, 'vendor: Third Shop'));
   expect(await receipts()).toBe(3);
   expect(await held()).toHaveLength(0);
-  expect(await (await request('/review?approved=2')).text()).toContain('Allowed. Reading 2 emails.');
+  expect(await (await request('/review?done=mailAllowed&n=2')).text()).toContain('Allowed. Reading 2 emails.');
   // Settings lists it next to the defaults, with no source badges.
   const settings = await (await request('/settings')).text();
   expect(settings).toMatch(/notifications@link\.com<\/span><\/div>/);
@@ -206,7 +206,7 @@ test('Ignore sender deletes their waiting mail and keeps none of it later', asyn
   await deliver(mail({ id: '<a2@amazonses.com>' }));
   expect((await env.ORIGINALS.list()).objects.length).toBeGreaterThan(0);
   const response = await post('/senders/ignore', { address: 'notifications@link.com' });
-  expect(response.headers.get('Location')).toBe('/review?ignored=2');
+  expect(response.headers.get('Location')).toBe('/review?done=mailIgnored&n=2');
   expect(await held()).toHaveLength(0);
   expect((await env.ORIGINALS.list()).objects).toHaveLength(0);
   await deliver(mail({ id: '<a3@amazonses.com>' }));
@@ -228,13 +228,13 @@ test('Delete removes one email; Remove takes a sender off the list', async () =>
   await deliver(mail({ id: '<a2@amazonses.com>' }, 'different body'));
   const [first] = await held();
   const response = await post('/senders/delete', { id: String(first!.id) });
-  expect(response.headers.get('Location')).toBe('/review?deleted=1');
+  expect(response.headers.get('Location')).toBe('/review?done=mailDeleted');
   expect(await held()).toHaveLength(1);
   expect(await env.ORIGINALS.get(String(first!.email_key))).toBeNull();
   expect((await post('/senders/delete', { id: String(first!.id) })).status).toBe(404);
 
   const removed = await post('/senders/remove', { address: 'sender@example.net', back: 'settings' });
-  expect(removed.headers.get('Location')).toBe('/settings?senders=removed#senders');
+  expect(removed.headers.get('Location')).toBe('/settings?done=senderRemoved&from=settings#senders');
   const saved = await env.DB.prepare("SELECT value_json FROM settings WHERE key='ALLOWED_SENDER_EMAILS'").first<string>(
     'value_json',
   );

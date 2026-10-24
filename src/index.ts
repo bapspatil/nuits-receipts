@@ -28,6 +28,8 @@ import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup } from './setup';
 import { markSent, options, packageZip, query } from './package';
+import { withDone, type EventKey } from './events';
+import { requestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
 // Who is signed in: the Access email, "password" for HTTP Basic, or null.
@@ -73,22 +75,25 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
   const form = await formData(request, 4096);
   const back = ({ settings: '/settings', receipts: '/receipts' } as Record<string, string>)[String(form.get('back'))];
   const address = form.get('address');
-  let done: string;
-  if (path === '/senders/approve') done = `approved=${await approveSender(env, address, who, ctx)}`;
-  else if (path === '/senders/ignore') done = `ignored=${await ignoreSender(env, address, who)}`;
+  let event: EventKey, n: number | undefined;
+  if (path === '/senders/approve') [event, n] = ['mailAllowed', await approveSender(env, address, who, ctx)];
+  else if (path === '/senders/ignore') [event, n] = ['mailIgnored', await ignoreSender(env, address, who)];
   else if (path === '/senders/delete') {
     const id = String(form.get('id') ?? '');
     requireInput(/^[0-9a-f-]{36}$/.test(id), 'Invalid email', 400);
     await deleteHeld(env, id);
-    done = 'deleted=1';
+    event = 'mailDeleted';
   } else if (path === '/senders/remove') {
     await removeApproved(env, address, who);
-    done = 'senders=removed';
+    event = 'senderRemoved';
   } else if (path === '/senders/unignore') {
     await unignoreSender(env, address);
-    done = 'senders=unignored';
+    event = 'senderUnignored';
   } else return new Response('Not found', { status: 404 });
-  return redirect(back === '/settings' ? `/settings?${done}#senders` : `${back ?? '/review'}?${done}`);
+  const settings = back === '/settings';
+  return redirect(
+    withDone(event, settings ? '/settings#senders' : (back ?? '/review'), { n, from: settings ? 'settings' : null }),
+  );
 }
 // The fields of a vendor rule, checked the same way for a new rule and an edit.
 function ruleFrom(env: Env, form: FormData): [string, string | null, string | null, string, string, number] {
@@ -125,12 +130,15 @@ function redirect(location: string): Response {
 export function moved(location: string, search = ''): Response {
   return new Response(null, { status: 302, headers: { Location: location + search } });
 }
-// The first transfer row on Bank, in the month the money left.
-async function transfersPage(env: Env, debitId: string): Promise<string> {
-  const date = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
+// The first transfer row on Bank, in the month the money left, and who was paid.
+async function transferRow(env: Env, debitId: string): Promise<{ to: string; name: string }> {
+  const row = await env.DB.prepare('SELECT booking_date,merchant FROM bank_transactions WHERE id=?')
     .bind(debitId)
-    .first<string>('booking_date');
-  return `/payments?${date ? `month=${date.slice(0, 7)}&` : ''}show=all#transfers`;
+    .first<{ booking_date: string; merchant: string }>();
+  return {
+    to: `/payments?${row ? `month=${row.booking_date.slice(0, 7)}&` : ''}show=all#transfers`,
+    name: row?.merchant ?? '',
+  };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
@@ -181,23 +189,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         : form.get('back') === 'queue'
           ? '/review'
           : backPath(form.get('back'));
-    return redirect(`${to}?discarded=${ids.length}&discarded_at=${encodeURIComponent(at)}`);
+    return redirect(withDone('discarded', to, { n: ids.length, at, back: to }));
   }
   if (request.method === 'POST' && path === '/restore') {
     const form = await formData(request, 16 * 1024);
     const at = form.get('at');
     const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, receiptIds(form.getAll('id')));
-    return redirect(`${backPath(form.get('back'))}?restored=${n}`);
+    return redirect(withDone('restored', backPath(form.get('back')), { n }));
   }
   if (request.method === 'POST' && path === '/review/merge')
-    return redirect(`/review?merged=${await mergeDuplicates(env)}`);
+    return redirect(withDone('merged', '/review', { n: await mergeDuplicates(env) }));
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {
     const form = await formData(request, 4096),
       selected = month(String(form.get('month') ?? ''));
     await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
-    return redirect(`/?month=${selected}&sent=1#send`);
+    return redirect(withDone('sent', `/?month=${selected}#send`));
   }
   if (request.method === 'POST' && path === '/month/onedrive-upload') {
     const form = await formData(request, 4096),
@@ -205,7 +213,11 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       chosen = options(form);
     const result = await uploadBatch(env, selected, chosen, url.origin + base);
     return redirect(
-      `/?${query(selected, chosen)}&upload=${result.finished ? 'done' : 'more'}${result.wait ? `&wait=${result.wait}` : ''}#send`,
+      withDone(result.finished ? 'driveDone' : 'driveMore', `/?${query(selected, chosen)}#send`, {
+        n: result.total - result.remaining,
+        of: result.total,
+        wait: result.wait || null,
+      }),
     );
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
@@ -221,12 +233,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/settings/onedrive/disconnect') {
     oneDrive(env);
     await disconnect(env);
-    return redirect('/settings?onedrive=disconnected#onedrive');
+    return redirect(withDone('oneDriveDisconnected', '/settings#onedrive'));
   }
   if (request.method === 'POST' && path === '/settings/onedrive/folder') {
     const form = await formData(request, 8192);
     await chooseFolder(env, String(form.get('folder_link') ?? ''), String(form.get('folder_name') ?? ''));
-    return redirect('/settings?onedrive=folder#onedrive');
+    return redirect(withDone('oneDriveFolder', '/settings#onedrive'));
   }
   if (request.method === 'GET' && path === '/import') return importPage(env);
   if (request.method === 'GET' && path === '/add') {
@@ -268,7 +280,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       bank_name: String(form.get('bank_name') ?? ''),
       default_currency: String(form.get('default_currency') ?? ''),
     });
-    return redirect('/settings#accounts');
+    return redirect(withDone('accountCreated', '/settings#accounts'));
   }
   const account = path.match(/^\/accounts\/([^/]+)$/);
   if (request.method === 'POST' && account?.[1]) {
@@ -280,7 +292,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       throw new InputError('Invalid account ID');
     }
     await renameAccount(env.DB, accountId, String(form.get('label') ?? ''));
-    return redirect('/settings#accounts');
+    return redirect(withDone('accountRenamed', '/settings#accounts', { name: String(form.get('label') ?? '').trim() }));
   }
   if (request.method === 'POST' && path === '/transfers') {
     const form = await formData(request, 4096);
@@ -290,36 +302,51 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       credit_id: String(form.get('credit_id') ?? ''),
       reason: String(form.get('reason') ?? ''),
     });
-    return redirect(await transfersPage(env, debit));
+    const { to, name } = await transferRow(env, debit);
+    return redirect(withDone('transferMade', to, { tx: debit, name }));
   }
   const transfer = path.match(/^\/transfers\/([a-f0-9]{64})\/undo$/);
   if (request.method === 'POST' && transfer?.[1]) {
+    // Undo of an undo needs the pair and the note, so read them first.
+    const pair = await env.DB.prepare('SELECT credit_id,reason FROM internal_transfers WHERE debit_id=?')
+      .bind(transfer[1])
+      .first<{ credit_id: string; reason: string }>();
     await undoTransfer(env.DB, transfer[1]);
     await reconcile(env);
-    return redirect(await transfersPage(env, transfer[1]));
+    const { to } = await transferRow(env, transfer[1]);
+    return redirect(withDone('transferUndone', to, { tx: transfer[1], credit: pair?.credit_id, reason: pair?.reason }));
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {
     await processReceipt(env, retry[1], { retry: true });
-    return new Response(null, {
-      status: 303,
-      headers: { Location: `/receipts/${retry[1]}` },
-    });
+    return redirect(withDone('readAgain', `/receipts/${retry[1]}`));
   }
   const kind = path.match(/^\/receipts\/([a-f0-9]{64})\/kind$/);
   if (request.method === 'POST' && kind?.[1]) {
     const form = await formData(request, 64 * 1024);
-    await changeKind(env, kind[1], String(form.get('kind') ?? ''), Number(form.get('revision')));
-    return redirect(`/receipts/${kind[1]}`);
+    const to = String(form.get('kind') ?? '');
+    await changeKind(env, kind[1], to, Number(form.get('revision')));
+    return redirect(withDone('kindMoved', `/receipts/${kind[1]}`, { to }));
   }
   const paid = path.match(/^\/receipts\/([a-f0-9]{64})\/paid$/);
   if (request.method === 'POST' && paid?.[1]) {
-    await markPaidOutside(env, paid[1], await formData(request, 4096));
-    return redirect(`/receipts/${paid[1]}`);
+    const before = await getReceipt(env, paid[1]);
+    const form = await formData(request, 4096);
+    await markPaidOutside(env, paid[1], form);
+    const on = String(form.get('paid_outside_on') ?? '').trim();
+    // Clearing the date is "Not paid"; its Undo needs what was there.
+    return redirect(
+      on
+        ? withDone('paid', `/receipts/${paid[1]}`, { on, id: paid[1] })
+        : withDone('notPaid', `/receipts/${paid[1]}`, {
+            on: before.paid_outside_on,
+            note: before.paid_outside_note,
+            id: paid[1],
+          }),
+    );
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
-  if (request.method === 'GET' && receipt?.[1])
-    return receiptPage(env, await getReceipt(env, receipt[1]), url.searchParams);
+  if (request.method === 'GET' && receipt?.[1]) return receiptPage(env, await getReceipt(env, receipt[1]));
   if (request.method === 'POST' && receipt?.[1]) {
     const id = receipt[1];
     const form = await formData(request, 64 * 1024);
@@ -329,11 +356,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     await correctReceipt(env, id, form);
     const after = await getReceipt(env, id);
     // Approve and Skip move on through the queue; the last one lands on Review.
-    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip'))
-      return redirect(next ? `/receipts/${next}${action === 'approve' ? '?approved=1' : ''}` : '/review');
+    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip')) {
+      const event = action === 'approve' ? (next ? 'approved' : 'approvedLast') : 'skipped';
+      return redirect(withDone(event, next ? `/receipts/${next}` : '/review'));
+    }
     // Saving a ready receipt checks it again; new flags send it back to Review.
-    if (before.status === 'ready' && after.status === 'needs_review') return redirect(`/receipts/${id}?moved=1`);
-    return redirect(`/receipts/${id}`);
+    if (before.status === 'ready' && after.status === 'needs_review')
+      return redirect(withDone('movedBack', `/receipts/${id}`));
+    return redirect(withDone('saved', `/receipts/${id}`));
   }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);
   if (request.method === 'GET' && original?.[1]) {
@@ -384,7 +414,16 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       409,
     );
     await reconcile(env);
-    return redirect(`/payments?month=${transaction.booking_date.slice(0, 7)}`);
+    return redirect(
+      withDone(
+        required === '0' ? 'notPurchase' : 'needsReceipt',
+        `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+        {
+          tx: transaction.id,
+          name: transaction.merchant,
+        },
+      ),
+    );
   }
   if (request.method === 'POST' && path === '/matches') {
     const form = await formData(request, 4096),
@@ -395,7 +434,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       .bind(id)
       .first<Transaction>();
     requireInput(transaction, 'Payment not found', 404);
-    if (form.get('action') === 'unlink')
+    const unlink = form.get('action') === 'unlink';
+    // Remembered for the banner's Undo and its message.
+    let matchedTo = transaction.receipt_id;
+    if (unlink)
       await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
         .bind(id)
         .run();
@@ -431,6 +473,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           .bind(row.id, new Date().toISOString(), id, row.id, row.kind, row.revision)
           .run();
         requireInput(result.meta.changes === 1, 'Match changed. Reload.', 409);
+        matchedTo = row.id;
       } catch (error) {
         if (error instanceof Error && error.message.includes('UNIQUE constraint'))
           throw new InputError('Receipt is already matched', 409);
@@ -440,8 +483,19 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     await clearBankReview(env);
     // The invoice page sends its own address back; nothing else is followed.
     const back = String(form.get('return_to') ?? '');
+    const onReceipt = /^\/receipts\/[a-f0-9]{64}$/.test(back);
     return redirect(
-      /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+      withDone(
+        unlink ? 'unmatched' : 'matched',
+        onReceipt ? back : `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+        {
+          tx: transaction.id,
+          rid: matchedTo,
+          name: transaction.merchant,
+          kind: transaction.amount_minor > 0 ? 'invoice' : 'receipt',
+          back: onReceipt ? back : null,
+        },
+      ),
     );
   }
   if (request.method === 'POST' && path === '/rules') {
@@ -454,7 +508,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     // A rule made from a receipt goes back to that receipt; otherwise to Settings.
     const back = String(form.get('return_to') ?? '');
-    return redirect(/^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings?rules=saved#rules');
+    return redirect(withDone('ruleSaved', /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings#rules'));
   }
   const rule = path.match(/^\/rules\/(\d{1,15})(\/delete)?$/);
   if (request.method === 'POST' && rule?.[1]) {
@@ -466,14 +520,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     if (rule[2]) {
       await env.DB.prepare('DELETE FROM vendor_rules WHERE id=?').bind(id).run();
-      return redirect('/settings?rules=deleted#rules');
+      return redirect(withDone('ruleDeleted', '/settings#rules'));
     }
     await saveRule(
       env.DB.prepare(
         'UPDATE vendor_rules SET vendor_contains=?,context_contains=?,bank_alias=?,product=?,expense_type=?,priority=? WHERE id=?',
       ).bind(...ruleFrom(env, await formData(request, 4096)), id),
     );
-    return redirect('/settings?rules=saved#rules');
+    return redirect(withDone('ruleSaved', '/settings#rules'));
   }
   throw new InputError('Not found', 404);
 }
@@ -500,8 +554,10 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
       }
     if (json) return Response.json({ files: results });
     const added = results.filter((r) => r.id);
-    if (results.length === 1 && added[0]) return redirect(`/receipts/${added[0].id}`);
-    return redirect(`/add?kind=${kind}&added=${added.length}&failed=${results.length - added.length}`);
+    if (results.length === 1 && added[0]) return redirect(withDone('uploaded', `/receipts/${added[0].id}`));
+    return redirect(
+      withDone('filesAdded', `/add?kind=${kind}`, { added: added.length, failed: results.length - added.length }),
+    );
   } catch (error) {
     if (json && error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
     throw error;
@@ -601,7 +657,10 @@ export default {
     try {
       const base = config(env).basePath;
       const inner = base ? stripBase(request, base) : request;
-      response = inner ? await route(inner, env, base, waiter) : new Response('Not found', { status: 404 });
+      // The query reaches the page shell (the feedback banner) through the request's own store.
+      response = inner
+        ? await requestState.run({ params: new URL(inner.url).searchParams }, () => route(inner, env, base, waiter))
+        : new Response('Not found', { status: 404 });
       await Promise.allSettled(pending);
       if (base) response = rebase(new Response(response.body, response), base);
     } catch (error) {

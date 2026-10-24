@@ -13,7 +13,7 @@ import {
 } from '../src/banking';
 import { hash, type Receipt } from '../src/domain';
 import { getReceipt } from '../src/receipts';
-import { request, uploadPdf, confirmationForm } from './helpers';
+import { request, uploadPdf, confirmationForm, idFrom } from './helpers';
 
 const csv =
   'Transaction ID;Booking date;Amount;Currency;Payee;Reference\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy;SAMPLE-1001\nb;2026-09-08;-9,99;EUR;Sample Missing;missing\n';
@@ -24,7 +24,7 @@ async function importCsv(text = csv, collision = '') {
 }
 async function receipt(): Promise<Receipt> {
   const response = await uploadPdf();
-  return getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+  return getReceipt(env, idFrom(response));
 }
 async function seedForeign(): Promise<Receipt> {
   const row = await receipt();

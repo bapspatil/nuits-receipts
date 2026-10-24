@@ -3,11 +3,11 @@ import { expect, test, vi } from 'vitest';
 import { hash } from '../src/domain';
 import { getReceipt } from '../src/receipts';
 import { cacheFx, eurValue, importBankCsv, parsePreset, reconcile } from '../src/banking';
-import { request, uploadPdf } from './helpers';
+import { request, uploadPdf, idFrom } from './helpers';
 
 async function seed(two = false) {
   const response = await uploadPdf(),
-    id = response.headers.get('Location')!.split('/').at(-1)!;
+    id = idFrom(response);
   const csv =
     'Transaction ID;Date;Amount;Currency;Payee\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy\n' +
     (two ? 'b;2026-09-08;-125,50;EUR;Sample Cloud Lantern Oy\n' : '');

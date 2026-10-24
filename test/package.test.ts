@@ -295,16 +295,16 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
   const sent = await post({ month: '2026-10', receipts_hash: shownHash });
   expect(sent.status).toBe(303);
-  expect(sent.headers.get('Location')).toBe('/?month=2026-10&sent=1#send');
+  expect(sent.headers.get('Location')).toBe('/?month=2026-10&done=sent#send');
   expect(
     await env.DB.prepare('SELECT month,method,file_count,total_minor,receipts_hash FROM month_sends').first(),
   ).toEqual({ month: '2026-10', method: 'download', file_count: 2, total_minor: 2500, receipts_hash: shownHash });
 
-  html = await (await request('/?month=2026-10&sent=1')).text();
+  html = await (await request('/?month=2026-10&done=sent')).text();
   const today = new Date();
   const short = `${today.getUTCDate()} ${today.toUTCString().slice(8, 11)}`;
   expect(html).toContain(`<b>Send</b><span>Sent ${short}</span>`);
-  expect(html).toContain('Marked October as sent.');
+  expect(html).toContain('Marked October 2026 as sent.');
   expect(html).toContain('<a href="/?month=2026-11">On to November ›</a>');
   expect(html).toContain('<li class="step done" id="send">');
   expect(html).not.toContain('action="/month/sent"');
@@ -364,7 +364,7 @@ test('package links and the sent form carry the base path; Access mode guards th
   form.set('month', '2026-10');
   form.set('receipts_hash', hash);
   const sent = await at('/app/month/sent', { method: 'POST', body: form });
-  expect(sent.headers.get('Location')).toBe('/app/?month=2026-10&sent=1#send');
+  expect(sent.headers.get('Location')).toBe('/app/?month=2026-10&done=sent#send');
 
   const accessEnv = {
     ...env,

@@ -14,6 +14,7 @@ import {
   type ParsedImport,
 } from './banking';
 import { day, escape, input, page, pageHead, select } from './ui';
+import { withDone } from './events';
 
 function hidden(name: string, value: unknown): string {
   return `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`;
@@ -558,7 +559,11 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
   return new Response(null, {
     status: 303,
     headers: {
-      Location: `/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}&inserted=${inserted}&skipped=${skipped}&replayed=${prior?.status === 'complete' ? parsed.rows.length : 0}`,
+      Location: withDone('imported', `/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}`, {
+        inserted,
+        skipped,
+        replayed: prior?.status === 'complete' ? parsed.rows.length : 0,
+      }),
     },
   });
 }

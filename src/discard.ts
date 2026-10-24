@@ -109,15 +109,6 @@ export function discardControl(
   }</div></details>`;
 }
 
-// "Discarded. Undo" on the page a discard lands on.
-export function discardBanner(params: URLSearchParams, back: string): string {
-  const at = params.get('discarded_at');
-  if (params.get('restored') !== null) return '<p class="banner" role="status">Restored.</p>';
-  if (!at) return '';
-  const n = Number(params.get('discarded')) || 1;
-  return `<div class="banner undo" role="status">${n > 1 ? `${n} discarded.` : 'Discarded.'}<form method="post" action="/restore"><input type="hidden" name="at" value="${escape(at)}"><input type="hidden" name="back" value="${escape(back)}"><button class="linkbtn">Undo</button></form></div>`;
-}
-
 export function restoreForm(id: string, back: string, primary = false): string {
   return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}"><button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
 }
