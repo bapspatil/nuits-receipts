@@ -13,6 +13,7 @@ One Cloudflare Worker with server-rendered HTML. No SPA, ORM, cron triggers or q
 | Bank import module | CSV parsing and mapping, bank rows, matching, FX lookups. |
 | `src/ui.ts` | Pages, forms and the CSV export, including the in-app notices. |
 | `schema/` | Bootstrap schema for a new installation, applied by `bun run deploy`. |
+| `migrations/` | Upgrade chain for databases created before `schema/` (ledger `d1_migrations`). Applied files are never changed. See `migrations/README.md`. |
 
 ## Data rules
 

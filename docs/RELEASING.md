@@ -4,6 +4,8 @@ The version follows [Semantic Versioning](https://semver.org) and nobody edits i
 
 Releasing a version and deploying it are separate. A release tags the code; each deployment owner decides when to run `bun run deploy`.
 
+This repository is the only source. Releases are cut here, and there is no separate snapshot step.
+
 ## How a commit moves the version
 
 | Commit | Bump | Changelog section |
