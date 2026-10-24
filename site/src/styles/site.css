@@ -543,6 +543,10 @@ a {
 }
 
 .demo-player {
+  /* 44px bar plus 8px of ink above it: Chrome sets a caption line a few pixels
+     past the video edge, and it must not sit under the bar. */
+  --player-plate: 52px;
+  container-type: inline-size;
   display: grid;
   gap: 0.75rem;
   max-width: 64rem;
@@ -555,6 +559,76 @@ a {
   aspect-ratio: 16 / 9;
   border: 2px solid var(--color-ink);
   background: var(--color-ink);
+}
+
+/* Media Chrome wraps the same <video>. Before it registers (or without
+   JavaScript) the controller is a plain 16/9 box around the native player, so
+   nothing moves when the components arrive. */
+.demo-player media-controller {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: calc((100cqw - 4px) * 9 / 16 + var(--player-plate) + 4px);
+  border: 2px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 600;
+  --media-font-family: var(--font-ui);
+  --media-font-size: var(--text-small);
+  --media-font-weight: 600;
+  --media-primary-color: var(--color-paper);
+  --media-secondary-color: var(--color-ink);
+  --media-text-color: var(--color-paper);
+  --media-icon-color: var(--color-paper);
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  --media-control-height: 24px;
+  --media-control-padding: 10px;
+  --media-focus-box-shadow: inset 0 0 0 2px var(--color-paper);
+  --media-range-bar-color: var(--color-mint);
+  --media-range-track-background: var(--color-ink-soft);
+  --media-range-thumb-background: var(--color-mint);
+  --media-range-thumb-border: 2px solid var(--color-ink);
+  --media-range-thumb-border-radius: 0;
+  --media-range-track-border-radius: 0;
+  --media-range-track-height: 6px;
+  --media-range-thumb-opacity: 1;
+  --media-tooltip-display: none;
+  --media-button-icon-transition: none;
+  --media-control-transition-in: none;
+  --media-control-transition-out: none;
+  --media-range-thumb-transition: none;
+  --media-range-track-transition: none;
+  --media-range-segment-transition: none;
+}
+
+.demo-player media-controller:not(:defined) > :not(video) {
+  display: none;
+}
+
+.demo-player media-controller video {
+  width: 100%;
+  height: calc(100% - var(--player-plate));
+  border: 0;
+  object-fit: contain;
+}
+
+.demo-player .player-bar {
+  width: 100%;
+  height: 44px;
+  align-items: center;
+  background: var(--color-ink);
+}
+
+.demo-player .player-big {
+  --media-control-height: 40px;
+  --media-control-padding: 16px;
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  border: 2px solid var(--color-paper);
 }
 
 .demo-player figcaption {

@@ -164,19 +164,31 @@
       <section class="scene demo" id="demo" aria-labelledby="demo-title">
         <h2 class="title" id="demo-title">See it in under a minute.</h2>
         <figure class="demo-player">
-          <video
-            controls
-            preload="metadata"
-            playsinline
-            width="1280"
-            height="720"
-            poster="/media/receipts-demo-v3-poster.webp"
-            aria-describedby="demo-note"
-          >
-            <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
-            <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
-            <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
-          </video>
+          <media-controller class="player" defaultsubtitles autohide="-1">
+            <video
+              slot="media"
+              controls
+              preload="metadata"
+              playsinline
+              width="1280"
+              height="720"
+              poster="/media/receipts-demo-v3-poster.webp"
+              aria-describedby="demo-note"
+            >
+              <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
+              <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
+              <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
+            </video>
+            <media-play-button slot="centered-chrome" class="player-big"></media-play-button>
+            <media-control-bar class="player-bar">
+              <media-play-button></media-play-button>
+              <media-time-display></media-time-display>
+              <media-time-range></media-time-range>
+              <media-mute-button></media-mute-button>
+              <media-captions-button></media-captions-button>
+              <media-fullscreen-button></media-fullscreen-button>
+            </media-control-bar>
+          </media-controller>
           <figcaption id="demo-note">
             53 seconds, with narration and captions. Made-up example data. Figures are read automatically and can be wrong.
           </figcaption>
