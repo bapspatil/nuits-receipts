@@ -152,10 +152,19 @@ The per-screen tables are in each folder's `shots/REPORT*.md`.
 
 **Keyboard.** Every interactive element has a visible focus style; the reviewers checked this on the screenshots and I checked it in the CSS. Tabbing through review, approve and next can only be tested on the real form, so it moves to the Review flow PR's verification step.
 
-## 5. Next
+## 5. Decision and next
 
-1. You pick the visual direction: A, B, C, or my recommended A with the two parts from C and B.
-2. Then the implementation PRs follow, in the plan's order:
+**Decision (24 Oct 2026): the owner chose B, Swiss workbench.** The visual rollout PR also fixes B's own findings:
+
+- A sticky Approve on phones.
+- No placeholder that reads like a value ("0 if none").
+- Match states told apart by word, not only by a hollow or filled square.
+- No stat cards that repeat the section headers.
+- A clearer hierarchy, so the next action outweighs the rest.
+
+The brand's fonts carry the identity that B's neutral palette leaves out.
+
+The the implementation PRs follow, in the plan's order:
    - Foundations
    - Review flow
    - Matching and undo
