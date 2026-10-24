@@ -823,35 +823,55 @@ a {
   color: var(--color-paper);
 }
 
+/* Cost. A specimen with annotation: the slip is the plate, the arithmetic
+   copy hangs beside it as margin notes on hairline leaders. */
+
 .cost {
-  display: grid;
-  gap: 3rem;
   background: var(--color-guilloche);
 }
 
 .cost-copy {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
   align-content: start;
+}
+
+.cost .title {
+  font-size: var(--title-xl);
+  max-width: 14ch;
 }
 
 .cost .lede {
   color: var(--color-ink);
 }
 
-.caveat {
+.cost-copy > p {
+  position: relative;
   max-width: var(--measure);
-  padding-left: 1rem;
-  border-left: 3px solid var(--color-stamp);
 }
 
-.credit {
-  font-weight: 600;
+/* The caveat is a note pinned to the specimen: a slip of its own, ruled in
+   stamp red, which DESIGN.md allows as a fill and a rule but never as text. */
+.caveat {
+  padding: 1rem 1.25rem;
+  background: var(--color-slip);
+  border-left: 3px solid var(--color-stamp);
+  box-shadow: var(--shadow-system);
 }
 
 .slip-cost {
-  width: min(30rem, 100%);
+  width: min(34rem, 100%);
   rotate: -1.5deg;
+  padding: 2rem 2rem 3rem;
+}
+
+.slip-cost .slip-vendor {
+  font-size: 1.625rem;
+}
+
+.slip-cost .slip-seal {
+  width: 5.5rem;
+  height: 5.5rem;
 }
 
 .tally {
@@ -891,43 +911,61 @@ a {
   padding-top: 0.6rem !important;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.375rem;
+  font-size: 1.625rem;
 }
 
-.proof {
-  display: grid;
-  gap: 2.5rem;
-}
+/* So far. A spec sheet, not a card row: one full-width ruled line per fact,
+   its index in the gutter and the figure set at display size. */
 
 .facts {
-  display: grid;
-  gap: 2rem 2.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  counter-reset: fact;
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .fact {
+  counter-increment: fact;
   display: grid;
-  gap: 0.4rem;
-  align-content: start;
-  padding-top: 1rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  padding: 1.5rem 0;
   border-top: 2px solid var(--color-ink);
+}
+
+.fact::before {
+  content: counter(fact, decimal-leading-zero);
+  grid-row: 1 / span 2;
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .fact-figure {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 2rem;
-  line-height: 1.05;
+  font-size: clamp(2.5rem, 1.2rem + 4.5vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
 }
 
-.nope {
-  border-top: var(--rule);
+.fact > p:last-child {
+  max-width: var(--measure);
+  font-size: 1.125rem;
 }
+
+/* Limits. A letter on a slip: the title stays on the ground, everything Baps
+   says to the reader is printed on the paper object. */
 
 .nope-letter {
   display: grid;
   gap: 1.5rem;
-  max-width: 42rem;
+}
+
+.nope-slip {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 44rem;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem) clamp(2.5rem, 5vw, 3.5rem);
 }
 
 .nope-list {
@@ -937,9 +975,8 @@ a {
 
 .nope-list li {
   position: relative;
-  padding-left: 2rem;
+  padding-left: 2.25rem;
   font-size: 1.125rem;
-  max-width: 36rem;
 }
 
 /* A struck-through box per line: the list is things it won't do. */
@@ -954,12 +991,11 @@ a {
   background: linear-gradient(45deg, transparent 45%, var(--color-stamp) 45% 55%, transparent 55%);
 }
 
-/* The required disclaimer sits on a plate so it reads as a statement, not as
-   one more line of the letter around it. */
+/* The required disclaimer sits on its own ruled plate inside the letter, so
+   it reads as a statement, not as one more line of the letter. */
 .disclaimer {
-  max-width: 36rem;
   padding: 1rem 1.25rem;
-  background: var(--color-slip);
+  background: var(--color-paper);
   border-left: 3px solid var(--color-ink);
   font-weight: 500;
 }
@@ -967,37 +1003,39 @@ a {
 .signoff {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 2rem;
+  font-size: clamp(1.75rem, 1rem + 2vw, 2.5rem);
   rotate: -4deg;
-  justify-self: start;
+  justify-self: end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-ink);
 }
 
-.faq {
-  display: grid;
-  gap: 2rem;
-  border-top: var(--rule);
-}
+/* FAQ. An index: each question carries its number at display size, the
+   answer hangs under the question's column, and the plus sits in a ruled
+   square that turns to a cross. */
 
 .faq-list {
-  max-width: 48rem;
-  border-top: var(--rule);
+  counter-reset: q;
+  border-top: 2px solid var(--color-ink);
 }
 
 .faq details {
+  counter-increment: q;
   border-bottom: var(--rule);
 }
 
 .faq summary {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
   gap: 1rem;
   align-items: center;
-  padding: 1.15rem 0;
+  padding: 1.25rem 0;
   min-height: 44px;
   cursor: pointer;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
+  line-height: 1.15;
   list-style: none;
 }
 
@@ -1005,11 +1043,32 @@ a {
   display: none;
 }
 
+.faq summary::before {
+  content: counter(q, decimal-leading-zero);
+  font-size: clamp(1.75rem, 1.2rem + 1.5vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
 .faq summary::after {
   content: "+";
-  font-size: 1.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 400;
   line-height: 1;
   transition: rotate 180ms var(--ease);
+}
+
+/* Colours swap instantly, as on the buttons. */
+.faq summary:hover::after {
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
 .faq details[open] summary::after {
@@ -1017,25 +1076,33 @@ a {
 }
 
 .faq details p {
-  padding-bottom: 1.25rem;
-  max-width: var(--measure);
+  padding: 0 3.75rem 1.5rem;
+  max-width: calc(var(--measure) + 7.5rem);
+  font-size: 1.125rem;
 }
 
+/* Close. A full-bleed statement: the largest type on the page, then the two
+   actions, then the footer tears off underneath. */
+
 .close {
-  display: grid;
-  gap: 2rem;
+  gap: 2.5rem;
   justify-items: start;
   background: var(--color-ink);
   color: var(--color-paper);
+  padding-bottom: clamp(5rem, 14vh, 9rem);
+}
+
+.close .slate {
+  justify-self: stretch;
 }
 
 .close-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(3rem, 1rem + 8vw, 7.5rem);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  max-width: 12ch;
+  font-size: clamp(3.5rem, 1rem + 10.5vw, 11rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  max-width: 11ch;
 }
 
 .close .button-secondary {
@@ -1214,9 +1281,31 @@ a {
     align-items: center;
   }
 
+  /* The specimen on the left, its notes on the right, each note with a
+     hairline leader reaching back to the slip. */
   .cost {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: center;
+  }
+
+  .cost-copy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .slip-cost {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .cost-copy > p::before {
+    content: "";
+    position: absolute;
+    top: 0.8em;
+    right: calc(100% + 0.75rem);
+    width: clamp(1.5rem, 3vw, 3.5rem);
+    border-top: 1px solid var(--color-ink);
   }
 
   .ledger {
@@ -1236,30 +1325,48 @@ a {
   }
 
   .slip-cost {
-    justify-self: center;
+    justify-self: end;
   }
 
   .nope-letter {
-    max-width: none;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    column-gap: 4rem;
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: start;
   }
 
-  .nope-letter > * {
-    grid-column: 1;
+  .nope-letter .title {
+    font-size: var(--title-xl);
   }
 
-  .nope-letter > .nope-list {
+  .nope-slip {
     grid-column: 2;
-    grid-row: 1 / span 4;
-    align-self: center;
+    grid-row: 1 / span 2;
+    rotate: -1deg;
   }
 
   .faq {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    column-gap: 4rem;
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: start;
+  }
+
+  /* The question index scrolls past a title that holds its place. CSS
+     sticky, not a pin, so it costs nothing without JavaScript. */
+  .faq .title {
+    position: sticky;
+    top: 2rem;
+    font-size: var(--title-xl);
+  }
+
+  .fact {
+    grid-template-columns: 4rem minmax(0, 1.1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+    padding: 2rem 0;
+  }
+
+  .fact::before {
+    grid-row: auto;
   }
 
 }

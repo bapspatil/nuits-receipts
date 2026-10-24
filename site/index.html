@@ -221,7 +221,7 @@
             Cloudflare bill.
           </p>
           <p class="caveat">
-            One honest caveat. A PDF upload measured about 186 ms of CPU in production, far over the 10 ms the Workers
+            <strong>One honest caveat.</strong> A PDF upload measured about 186 ms of CPU in production, far over the 10 ms the Workers
             Free plan allows. If you upload PDFs, plan on Workers Paid, a $5 a month minimum for the whole account.
             Forwarded email bodies may fit in Free.
           </p>
@@ -295,17 +295,19 @@
         <div class="nope-letter">
           <h2 class="title" id="nope-title">What it doesn't do.</h2>
           <p class="lede">I built this for my own receipts. Here's what it won't do for yours, at least not yet.</p>
-          <p class="disclaimer">
-            Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting
-            advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
-          </p>
-          <ul class="nope-list">
-            <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
-            <li>Bank CSV column mapping is new. It has been tested with Holvi exports so far, and other banks' files are less tested.</li>
-            <li>It's for one person with one inbox.</li>
-            <li>There's no mobile app.</li>
-          </ul>
-          <p class="signoff">Baps, who built it</p>
+          <div class="slip nope-slip">
+            <p class="disclaimer">
+              Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting
+              advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
+            </p>
+            <ul class="nope-list">
+              <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
+              <li>Bank CSV column mapping is new. It has been tested with Holvi exports so far, and other banks' files are less tested.</li>
+              <li>It's for one person with one inbox.</li>
+              <li>There's no mobile app.</li>
+            </ul>
+            <p class="signoff">Baps, who built it</p>
+          </div>
         </div>
       </section>
 

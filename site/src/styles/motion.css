@@ -69,8 +69,8 @@
 }
 
 .close .ill-export {
-  width: 4.5rem;
-  height: 4.5rem;
+  width: clamp(4.5rem, 3rem + 4vw, 7rem);
+  height: clamp(4.5rem, 3rem + 4vw, 7rem);
 }
 
 .slip-seal {
