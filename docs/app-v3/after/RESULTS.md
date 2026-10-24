@@ -24,7 +24,7 @@ Screens: `/` → `/receipts/:id?done=uploaded`
 
 Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast&month=2026-09&step=import`
 
-- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Check receipts Download anyw
+- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you, plus 1 undated receipt. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Chec
 - Review lists 3 receipts.
 - Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review.
 
@@ -46,7 +46,7 @@ Screens: `/receipts` → `/invoices` → `/add?kind=sales` → `/payments`
 
 ### c. September closed and marked sent
 
-Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A35%3A34.531Z`
+Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A40%3A17.617Z`
 
 - Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October Done: Check Done Done: Match Done Next: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be
 - Downloaded receipts-2026-09.zip

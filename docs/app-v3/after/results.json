@@ -32,7 +32,7 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Check receipts Download anyw",
+        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you, plus 1 undated receipt. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Chec",
         "Review lists 3 receipts.",
         "Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review."
       ]
@@ -83,7 +83,7 @@
       "edits": 0,
       "screens": [
         "/",
-        "/?month=2026-09&done=sent&at=2026-10-24T15%3A35%3A34.531Z"
+        "/?month=2026-09&done=sent&at=2026-10-24T15%3A40%3A17.617Z"
       ],
       "silentPosts": [],
       "deadEnds": [],
@@ -209,7 +209,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/624c99d268e8781e86368c4a4f0b9c752a5801816200617e75565a1b4c448a6b",
+      "path": "/receipts/e6a9218a95b95b4f0cb27a77a401b7e8e8e41439685d401eb2901160d51f8d18",
       "viewport": "1440",
       "viewports": 1.06,
       "file": "screens/invoice-paid-1440.png",
@@ -217,7 +217,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/624c99d268e8781e86368c4a4f0b9c752a5801816200617e75565a1b4c448a6b",
+      "path": "/receipts/e6a9218a95b95b4f0cb27a77a401b7e8e8e41439685d401eb2901160d51f8d18",
       "viewport": "390",
       "viewports": 1.59,
       "file": "screens/invoice-paid-390.png",
