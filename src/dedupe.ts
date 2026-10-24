@@ -74,9 +74,9 @@ async function matchedIds(env: Env): Promise<Set<string>> {
 export async function markDuplicate(env: Env, merge: Merge): Promise<boolean> {
   const [marked] = await env.DB.batch([
     env.DB.prepare(
-      `UPDATE receipts SET duplicate_of=?1,revision=revision+1 WHERE id=?2 AND id<>?1 AND duplicate_of IS NULL AND reviewed_at IS NULL AND manual_fields_json='{}' AND ${SETTLED}
+      `UPDATE receipts SET duplicate_of=?1,revision=revision+1 WHERE id=?2 AND id<>?1 AND duplicate_of IS NULL AND discarded_at IS NULL AND reviewed_at IS NULL AND manual_fields_json='{}' AND ${SETTLED}
       AND NOT EXISTS(SELECT 1 FROM bank_transactions WHERE receipt_id=?2)
-      AND EXISTS(SELECT 1 FROM receipts p WHERE p.id=?1 AND p.duplicate_of IS NULL)`,
+      AND EXISTS(SELECT 1 FROM receipts p WHERE p.id=?1 AND p.duplicate_of IS NULL AND p.discarded_at IS NULL)`,
     ).bind(merge.primary, merge.duplicate),
     env.DB.prepare(
       'UPDATE receipts SET duplicate_of=?1,revision=revision+1 WHERE duplicate_of=?2 AND id<>?1 AND EXISTS(SELECT 1 FROM receipts d WHERE d.id=?2 AND d.duplicate_of=?1)',
@@ -87,7 +87,7 @@ export async function markDuplicate(env: Env, merge: Merge): Promise<boolean> {
 
 // A "probable duplicate" flag whose twin is now merged into this row is stale.
 export async function clearDuplicateFlag(env: Env, id: string): Promise<void> {
-  const r = await env.DB.prepare('SELECT * FROM receipts WHERE id=? AND duplicate_of IS NULL')
+  const r = await env.DB.prepare('SELECT * FROM receipts WHERE id=? AND duplicate_of IS NULL AND discarded_at IS NULL')
     .bind(id)
     .first<Receipt>();
   if (!r) return;
@@ -95,7 +95,7 @@ export async function clearDuplicateFlag(env: Env, id: string): Promise<void> {
   if (!reasons.includes('probable_duplicate')) return;
   const peers = (
     await env.DB.prepare(
-      'SELECT vendor FROM receipts WHERE id<>? AND kind=? AND invoice_number=? AND issue_date=? AND currency=? AND total_minor=? AND duplicate_of IS NULL',
+      'SELECT vendor FROM receipts WHERE id<>? AND kind=? AND invoice_number=? AND issue_date=? AND currency=? AND total_minor=? AND duplicate_of IS NULL AND discarded_at IS NULL',
     )
       .bind(r.id, r.kind, r.invoice_number, r.issue_date, r.currency, r.total_minor)
       .all<{ vendor: string | null }>()
@@ -115,7 +115,7 @@ export async function settleEmailRows(env: Env, emailKey: string, ids: readonly 
   if (!ids.length) return;
   const rows = (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE id IN (${ids.map(() => '?').join(',')}) AND email_key=? AND duplicate_of IS NULL AND ${SETTLED}`,
+      `SELECT * FROM receipts WHERE id IN (${ids.map(() => '?').join(',')}) AND email_key=? AND duplicate_of IS NULL AND discarded_at IS NULL AND ${SETTLED}`,
     )
       .bind(...ids, emailKey)
       .all<Receipt>()
@@ -134,7 +134,7 @@ export async function settleEmailRows(env: Env, emailKey: string, ids: readonly 
     if (!key) continue;
     const earlier = (
       await env.DB.prepare(
-        `SELECT * FROM receipts WHERE id<>? AND (email_key IS NULL OR email_key<>?) AND duplicate_of IS NULL AND kind=? AND currency=? AND total_minor=? AND issue_date=? AND ${SETTLED}`,
+        `SELECT * FROM receipts WHERE id<>? AND (email_key IS NULL OR email_key<>?) AND duplicate_of IS NULL AND discarded_at IS NULL AND kind=? AND currency=? AND total_minor=? AND issue_date=? AND ${SETTLED}`,
       )
         .bind(row.id, emailKey, row.kind, row.currency, row.total_minor, row.issue_date)
         .all<Receipt>()
@@ -155,7 +155,7 @@ export async function settleEmailRows(env: Env, emailKey: string, ids: readonly 
 export async function mergePlan(env: Env): Promise<Merge[]> {
   const rows = (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE duplicate_of IS NULL AND ${SETTLED} ORDER BY received_at,id`,
+      `SELECT * FROM receipts WHERE duplicate_of IS NULL AND discarded_at IS NULL AND ${SETTLED} ORDER BY received_at,id`,
     ).all<Receipt>()
   ).results;
   const matched = await matchedIds(env);

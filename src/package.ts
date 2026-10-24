@@ -146,7 +146,7 @@ export function folderName(env: Env, month: string): string {
 // (needs review, still being read, an email held for review) only goes in
 // with "Download anyway", in check-these/, and undated ones only when asked.
 export function placement(r: Receipt, options: Pick<PackageOptions, 'anyway' | 'undated'>): Folder | null {
-  if (r.duplicate_of) return null;
+  if (r.duplicate_of || r.discarded_at) return null;
   if (r.media_type === 'message/rfc822')
     return options.anyway && (r.issue_date || options.undated) ? CHECK_FOLDER : null;
   if (!r.issue_date) return options.undated ? CHECK_FOLDER : null;
@@ -203,7 +203,7 @@ export async function planPackage(
   rows ??= await documentRows(env, month);
   const undatedRows = (
     await env.DB.prepare(
-      'SELECT * FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL ORDER BY received_at,id',
+      'SELECT * FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY received_at,id',
     ).all<Receipt>()
   ).results;
   const send = await sendStatus(env, month, rows);

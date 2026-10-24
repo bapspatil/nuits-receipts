@@ -281,7 +281,7 @@ export async function processReceipt(
     if (state.length > MAX_STATE_CHARS) reasons.push('input_truncated');
     const peers = (
       await env.DB.prepare(
-        'SELECT * FROM receipts WHERE id<>? AND kind=? AND invoice_number=? AND issue_date=? AND currency=? AND total_minor=? AND duplicate_of IS NULL',
+        'SELECT * FROM receipts WHERE id<>? AND kind=? AND invoice_number=? AND issue_date=? AND currency=? AND total_minor=? AND duplicate_of IS NULL AND discarded_at IS NULL',
       )
         .bind(id, claim.kind, facts.invoice_number, facts.issue_date, facts.currency, facts.total_minor)
         .all<Receipt>()
@@ -602,6 +602,7 @@ async function emailReview(env: Env, bytes: Uint8Array, emailKey: string, kind: 
 export async function correctReceipt(env: Env, id: string, form: FormData): Promise<void> {
   const current = await getReceipt(env, id),
     revision = Number(form.get('revision'));
+  requireInput(!current.discarded_at, 'Restore it first.', 409);
   requireInput(
     Number.isSafeInteger(revision) && revision === current.revision,
     'Stale receipt. Reload before saving.',

@@ -115,7 +115,19 @@ export type Receipt = Facts &
     eur_override_minor: number | null;
     eur_override_reason: string | null;
     duplicate_of: string | null;
+    discarded_at?: string | null;
+    discard_reason?: DiscardReason | null;
   };
+// Why a receipt was set aside. Optional; shown as one word.
+export const DISCARD_REASONS = {
+  personal: 'Personal',
+  duplicate: 'Duplicate',
+  not_receipt: 'Not a receipt',
+  other: 'Other',
+} as const;
+export type DiscardReason = keyof typeof DISCARD_REASONS;
+// A row that counts: not merged into another and not discarded.
+export const LIVE = 'duplicate_of IS NULL AND discarded_at IS NULL';
 export type Rule = {
   id: number;
   priority: number;
