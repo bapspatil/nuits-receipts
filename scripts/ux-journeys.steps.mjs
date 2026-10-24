@@ -56,13 +56,14 @@ export const journeys = [
       rec.note(
         `Landed on ${new URL(page.url()).pathname.replace(/[a-f0-9]{64}/, ':id')} with title "${await page.locator('h1').first().innerText()}"`,
       );
-      const accountant = page.locator('main a', { hasText: /accountant/i });
-      if (await accountant.count()) {
-        await rec.goto('/');
-        await rec.click(accountant);
-        await rec.fill(page.locator('[name=ACCOUNTANT_LABEL]'), 'Example Accounting Oy');
-        await rec.click(page.locator('form:has([name=ACCOUNTANT_LABEL]) button.btn'));
-      } else rec.note('No accountant step on Home after the first receipt.');
+      await rec.goto('/');
+      rec.note(
+        `Home after the first receipt: ${(await page.locator('main .setup').innerText()).replace(/\s+/g, ' ').slice(0, 220)}`,
+      );
+      await rec.click(page.locator('main .setup a', { hasText: /accountant/i }));
+      await rec.fill(page.locator('[name=ACCOUNTANT_LABEL]'), 'Example Accounting Oy');
+      await rec.click(page.locator('form:has([name=ACCOUNTANT_LABEL]) button.btn'));
+      rec.note(`Saved: ${(await page.locator('main [role=status]').first().innerText()).trim()}`);
     },
   },
   {
@@ -215,6 +216,33 @@ async function unsettleBank(page, base) {
     await open(merchant, 'Remove match');
 }
 
+// Settings runs one same-origin script under its own policy. The audit contexts bypass CSP, so
+// this check runs in the main context, where the policy applies: saving one group while another
+// has unsaved edits asks first.
+async function unsavedCheck(page, base) {
+  await page.goto(base + '/settings#f-ACCOUNTANT_LABEL');
+  await page.locator('[name=ACCOUNTANT_LABEL]').fill('Unsaved Accounting Oy');
+  await page.locator('details.sect:has(> .body#setup-business) > summary').click();
+  let said = '';
+  page.once('dialog', (dialog) => {
+    said = dialog.message();
+    void dialog.dismiss();
+  });
+  await page.locator('#setup-business button.btn').click();
+  if (!said.includes('not saved')) throw new Error('Settings did not warn about unsaved changes in another group');
+  console.log('settings: saving one group warns about unsaved changes in another');
+}
+
+// Put the accountant back to unset, so Home shows the setup checklist with one step left.
+async function unsetAccountant(page, base) {
+  await page.goto(base + '/settings#f-ACCOUNTANT_LABEL');
+  const reset = page.locator('button[name=reset][value=ACCOUNTANT_LABEL]');
+  if (await reset.count()) {
+    await reset.click();
+    await page.waitForLoadState('load');
+  }
+}
+
 export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   await sendEmail(
     'tour-flagged',
@@ -234,6 +262,7 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
       [flagged, invoice],
     );
   await keyboardCheck(page, base);
+  await unsavedCheck(page, base);
   return [
     { name: 'receipt-flagged', path: flagged },
     { name: 'home-sep', path: '/?month=2026-09' },
@@ -250,5 +279,8 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'settings', path: '/settings' },
     // Last: it undoes the matches, so the screens above keep the settled month.
     { name: 'bank-likely', path: '/payments?month=2026-09&show=missing', prepare: () => unsettleBank(page, base) },
+    { name: 'help', path: '/help' },
+    { name: 'help-flags', path: '/help#flag-missing_vendor' },
+    { name: 'home-setup', path: '/?month=2026-09', prepare: () => unsetAccountant(page, base) },
   ];
 }
