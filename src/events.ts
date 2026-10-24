@@ -46,6 +46,28 @@ const monthLabel = (value: string | null) =>
         timeZone: 'UTC',
       })
     : 'This month';
+const monthWord = (value: string | null) =>
+  value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
+    ? new Date(`${value}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' })
+    : '';
+// What comes after Check, by what the month still lacks: its bank statement, matches, or sending.
+const NEXT_STEP: Record<
+  string,
+  { text: (month: string) => string; link: (month: string) => { href: string; label: string } }
+> = {
+  import: {
+    text: (m) => `add ${m}'s bank statement`,
+    link: () => ({ href: '/import', label: 'Import statement' }),
+  },
+  match: {
+    text: (m) => `match ${m}'s payments`,
+    link: (m) => ({ href: `/payments?month=${m}&show=missing`, label: 'Open Bank' }),
+  },
+  send: {
+    text: (m) => `send ${m} to your accountant`,
+    link: (m) => ({ href: `/?month=${m}#send`, label: `Open ${monthWord(m)}` }),
+  },
+};
 // Where a discard or restore form may send you back to (see backPath in discard.ts).
 const BACK = /^\/(review|receipts(\/[a-f0-9]{64})?)$/;
 // A receipt page that Match and Remove match send you back to.
@@ -65,9 +87,18 @@ const GROUP_SECTION: Record<string, string> = {
 export const EVENTS = {
   // ---------- Receipts ----------
   approved: { text: () => 'Approved.' },
+  // The queue is empty: say so, and point at the step after Check for that month.
   approvedLast: {
-    text: () => 'That was the last one. Everything is checked.',
-    link: () => ({ href: '/payments', label: 'Match your bank payments' }),
+    text: (p) => {
+      const month = monthWord(p.get('month'));
+      const next = month && NEXT_STEP[p.get('step') ?? ''];
+      return next ? `Every receipt is checked. Next, ${next.text(month)}.` : 'Every receipt is checked.';
+    },
+    link: (p) => {
+      const month = p.get('month') ?? '',
+        next = NEXT_STEP[p.get('step') ?? ''];
+      return monthWord(month) && next ? next.link(month) : { href: '/payments', label: 'Open Bank' };
+    },
   },
   skipped: { text: () => 'Skipped. It stays in Review for later.' },
   saved: { text: () => 'Saved.' },
