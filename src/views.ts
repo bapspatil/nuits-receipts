@@ -1298,7 +1298,7 @@ async function mailLogPart(env: Env, open: boolean): Promise<string> {
     return `<li class="srow"><div class="sl"><span class="flabel">${escape(m.sender)}</span><span class="meta">${escape(when)}${m.subject ? ` · ${escape(m.subject)}` : ''}</span><span class="meta">${escape(reasonWords(m.reason))}</span></div>${action}</li>`;
   };
   const body = rows.length
-    ? `<p class="meta">The latest ${rows.length === 1 ? 'one' : rows.length} that reached the app and were not read. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
+    ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
     : '<p>Every email that reached the app was kept.</p>';
   return sect('mail', "Mail we didn't keep", rows.length ? String(rows.length) : 'None', body, open);
 }
