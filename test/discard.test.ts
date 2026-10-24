@@ -7,7 +7,7 @@ import { mergePlan } from '../src/dedupe';
 import { placement } from '../src/package';
 import { documentRows, monthRows } from '../src/ui';
 import { MAX_BULK } from '../src/discard';
-import { request, uploadPdf } from './helpers';
+import { locationOf, request, uploadPdf } from './helpers';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 async function receipt(n: number, o: { status?: string; vendor?: string; total?: number; invoice?: string } = {}) {
@@ -78,7 +78,7 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
 
   const at = new URL(location, 'http://localhost').searchParams.get('at')!;
   const undo = await post('/restore', { at, back: '/review' });
-  expect(undo.headers.get('Location')).toBe('/review?done=restored&n=2');
+  expect(locationOf(undo)).toBe('/review?done=restored&n=2');
   expect((await row(1))!.discarded_at).toBeNull();
   expect((await monthRows(env, '2026-10')).map((r) => r.id)).toEqual([id(1), id(2)]);
   expect(await (await request('/receipts?show=discarded')).text()).toContain('Nothing discarded.');
@@ -128,9 +128,9 @@ test('from the queue, discard moves on to the next receipt like Skip', async () 
   }
   const r = (await row(1))!;
   const res = await post('/discard', { id: id(1), revision: String(r.revision), back: 'queue' });
-  expect(res.headers.get('Location')).toMatch(new RegExp(`^/receipts/${id(2)}\\?done=discarded&n=1&`));
+  expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${id(2)}\\?done=discarded&n=1&`));
   const last = await post('/discard', { id: id(2), back: 'queue' });
-  expect(last.headers.get('Location')).toMatch(/^\/review\?done=discarded&n=1&/);
+  expect(locationOf(last)).toMatch(/^\/review\?done=discarded&n=1&/);
 });
 
 test('the same file sent again stays discarded', async () => {

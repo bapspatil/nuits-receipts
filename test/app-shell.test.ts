@@ -6,7 +6,7 @@ import { getReceipt, preserve } from '../src/receipts';
 import { FONT_FILES } from '../src/fonts';
 import { EXPORT_LINE, FOOTER_NOTICE } from '../src/ui';
 import type { Env } from '../src/env';
-import { authorization, htmlForm, request, uploadPdf, idFrom } from './helpers';
+import { authorization, htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
 // The same five destinations in the header and the phone tab bar, on every page.
@@ -330,12 +330,12 @@ test('old Month and More addresses redirect, keeping the query exactly', async (
     expect(more.status, method).toBe(302);
     expect(more.headers.get('Location'), method).toBe('/settings');
   }
-  expect((await request('/month')).headers.get('Location')).toBe('/');
+  expect(locationOf(await request('/month'))).toBe('/');
   const based = { ...env, APP_BASE_PATH: '/app' } as Env;
   const at = (path: string) =>
     worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), based);
-  expect((await at('/app/month' + query)).headers.get('Location')).toBe('/app/' + query);
-  expect((await at('/app/more')).headers.get('Location')).toBe('/app/settings');
+  expect(locationOf(await at('/app/month' + query))).toBe('/app/' + query);
+  expect(locationOf(await at('/app/more'))).toBe('/app/settings');
   // Sign-in comes first: no redirect without it.
   for (const path of ['/month?month=2026-09', '/more']) {
     const anonymous = await worker.fetch(new Request('http://localhost' + path), env);
@@ -714,7 +714,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   skip.set('vendor', 'Typed Then Skipped');
   skip.set('action', 'skip');
   const skipped = await request(`/receipts/${flagged.id}`, { method: 'POST', body: skip });
-  expect(skipped.headers.get('Location')).toBe(`/receipts/${second.id}?done=skipped`);
+  expect(locationOf(skipped)).toBe(`/receipts/${second.id}?done=skipped`);
   expect((await getReceipt(env, flagged.id)).vendor).toBe('Typed Then Skipped');
   expect((await getReceipt(env, flagged.id)).status).toBe('needs_review');
   // Approve opens the next one with a one-word confirmation.
@@ -723,18 +723,18 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
     approve.set(k, v);
   approve.set('action', 'approve');
   const approved = await request(`/receipts/${second.id}`, { method: 'POST', body: approve });
-  expect(approved.headers.get('Location')).toBe(`/receipts/${flagged.id}?done=approved`);
-  expect(await (await request(`/receipts/${flagged.id}?done=approved`)).text()).toContain(
+  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?done=approved`);
+  expect(await (await request(await signed(`/receipts/${flagged.id}?done=approved`))).text()).toContain(
     '<p class="banner" role="status">Approved.</p>',
   );
   const last = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
   last.set('action', 'approve');
-  expect((await request(`/receipts/${flagged.id}`, { method: 'POST', body: last })).headers.get('Location')).toBe(
+  expect(locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }))).toBe(
     '/review?done=approvedLast',
   );
   // The empty Review says what happened and points at the next step.
-  const empty = await (await request('/review?done=approvedLast')).text();
+  const empty = await (await request(await signed('/review?done=approvedLast'))).text();
   expect(empty).toContain(
     '<p class="banner" role="status">That was the last one. Everything is checked. <a href="/payments">Match your bank payments</a></p>',
   );
@@ -748,15 +748,17 @@ test('a ready receipt has one Save; a new problem sends it back to Review', asyn
   expect(html).toContain('<details class="all" open><summary>All fields</summary>');
   const form = htmlForm(html, `/receipts/${ready.id}`);
   form.set('action', 'save');
-  expect((await request(`/receipts/${ready.id}`, { method: 'POST', body: form })).headers.get('Location')).toBe(
+  expect(locationOf(await request(`/receipts/${ready.id}`, { method: 'POST', body: form }))).toBe(
     `/receipts/${ready.id}?done=saved`,
   );
   form.set('revision', String((await getReceipt(env, ready.id)).revision));
   form.set('vat', '');
   const moved = await request(`/receipts/${ready.id}`, { method: 'POST', body: form });
-  expect(moved.headers.get('Location')).toBe(`/receipts/${ready.id}?done=movedBack`);
+  expect(locationOf(moved)).toBe(`/receipts/${ready.id}?done=movedBack`);
   expect((await getReceipt(env, ready.id)).status).toBe('needs_review');
-  expect(await (await request(`/receipts/${ready.id}?done=movedBack`)).text()).toContain('it moved back to Review.');
+  expect(await (await request(await signed(`/receipts/${ready.id}?done=movedBack`))).text()).toContain(
+    'it moved back to Review.',
+  );
 });
 
 test('the receipt page: flags first, All fields closed, rare actions under one More', async () => {

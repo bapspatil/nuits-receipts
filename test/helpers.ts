@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { signer } from '../src/signing';
 import worker from '../src/index';
 export const authorization = 'Basic ' + btoa('owner:local-dummy-password');
 export function request(path: string, init: RequestInit = {}) {
@@ -59,3 +60,13 @@ export function htmlForm(html: string, action: string): FormData {
 export function idFrom(response: Response): string {
   return new URL(response.headers.get('Location')!, 'http://localhost').pathname.split('/').at(-1)!;
 }
+// A feedback link the way the app would have issued it, so a test can open ?done= pages.
+// base is an APP_BASE_PATH prefix already on path; it is not part of what is signed.
+export async function signed(path: string, base = '', now = Date.now()): Promise<string> {
+  return base + (await signer(env).sign(path.slice(base.length), now));
+}
+// A redirect's Location without the iat and sig that sign its ?done= link.
+export function unsigned(location: string | null): string {
+  return (location ?? '').replace(/&(iat|sig)=[^&#]*/g, '');
+}
+export const locationOf = (response: Response) => unsigned(response.headers.get('Location'));

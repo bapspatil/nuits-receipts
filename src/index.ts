@@ -17,9 +17,10 @@ import { home, importPage, payments, previewable, queueAround, receiptPage, revi
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
 import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
+import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
-import type { Rule } from './domain';
+import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
 import { withSettings } from './settings';
@@ -120,6 +121,15 @@ async function saveRule(statement: D1PreparedStatement): Promise<void> {
     if (error instanceof Error && error.message.includes('UNIQUE constraint'))
       throw new InputError('A rule with the same seller text already exists', 409);
     throw error;
+  }
+}
+// A failure to sign leaves the redirect without ?done= rather than with a link nobody can verify.
+async function signedLocation(signs: Signer, location: string): Promise<string> {
+  try {
+    return await signs.sign(location);
+  } catch (error) {
+    console.warn(JSON.stringify({ reason: 'feedback_unsigned', error: String(error) }));
+    return location.replace(/([?&])done=[^&#]*&?/, '$1').replace(/[?&]$/, '');
   }
 }
 function redirect(location: string): Response {
@@ -307,14 +317,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   const transfer = path.match(/^\/transfers\/([a-f0-9]{64})\/undo$/);
   if (request.method === 'POST' && transfer?.[1]) {
-    // Undo of an undo needs the pair and the note, so read them first.
-    const pair = await env.DB.prepare('SELECT credit_id,reason FROM internal_transfers WHERE debit_id=?')
-      .bind(transfer[1])
-      .first<{ credit_id: string; reason: string }>();
     await undoTransfer(env.DB, transfer[1]);
     await reconcile(env);
     const { to } = await transferRow(env, transfer[1]);
-    return redirect(withDone('transferUndone', to, { tx: transfer[1], credit: pair?.credit_id, reason: pair?.reason }));
+    return redirect(withDone('transferUndone', to));
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {
@@ -334,15 +340,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const form = await formData(request, 4096);
     await markPaidOutside(env, paid[1], form);
     const on = String(form.get('paid_outside_on') ?? '').trim();
-    // Clearing the date is "Not paid"; its Undo needs what was there.
+    // Clearing the date is "Not paid". Undo of "paid" clears it again, so it is offered only
+    // when nothing was recorded before.
     return redirect(
       on
-        ? withDone('paid', `/receipts/${paid[1]}`, { on, id: paid[1] })
-        : withDone('notPaid', `/receipts/${paid[1]}`, {
-            on: before.paid_outside_on,
-            note: before.paid_outside_note,
-            id: paid[1],
-          }),
+        ? withDone('paid', `/receipts/${paid[1]}`, { on, id: before.paid_outside_on ? null : paid[1] })
+        : withDone('notPaid', `/receipts/${paid[1]}`),
     );
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
@@ -436,12 +439,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     requireInput(transaction, 'Payment not found', 404);
     const unlink = form.get('action') === 'unlink';
     // Remembered for the banner's Undo and its message.
-    let matchedTo = transaction.receipt_id;
-    if (unlink)
+    let matchedTo = transaction.receipt_id,
+      exception = false;
+    if (unlink) {
+      // Matching it again needs the exception box only if the pair wasn't a normal fit.
+      const was = matchedTo
+        ? await env.DB.prepare('SELECT * FROM receipts WHERE id=?').bind(matchedTo).first<Receipt>()
+        : null;
+      if (was) {
+        const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
+        exception = !(transaction.amount_minor > 0
+          ? creditFit(was, transaction, config(env).tuning) !== null
+          : eligible(was, transaction, rules, false, config(env).tuning));
+      }
       await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
         .bind(id)
         .run();
-    else {
+    } else {
       // Money out pairs with a receipt, money in with a sales invoice.
       const credit = transaction.amount_minor > 0;
       requireInput(
@@ -494,6 +508,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           name: transaction.merchant,
           kind: transaction.amount_minor > 0 ? 'invoice' : 'receipt',
           back: onReceipt ? back : null,
+          exc: unlink && exception ? 1 : null,
         },
       ),
     );
@@ -653,14 +668,24 @@ export default {
     let response: Response;
     const env = await withSettings(deploy);
     const pending: Promise<unknown>[] = [];
+    const signs = signer(env);
     const waiter: Waiter = ctx ?? { waitUntil: (promise) => void pending.push(promise) };
     try {
       const base = config(env).basePath;
-      const inner = base ? stripBase(request, base) : request;
+      const stripped = base ? stripBase(request, base) : request;
+      // A ?done= link that isn't genuine and fresh is dropped before any page sees it.
+      const checked = stripped ? await signs.verify(new URL(stripped.url)) : null;
+      const inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
       // The query reaches the page shell (the feedback banner) through the request's own store.
       response = inner
         ? await requestState.run({ params: new URL(inner.url).searchParams }, () => route(inner, env, base, waiter))
         : new Response('Not found', { status: 404 });
+      const location = response.headers.get('Location');
+      if (location?.includes('done=')) {
+        const headers = new Headers(response.headers);
+        headers.set('Location', await signedLocation(signs, location));
+        response = new Response(null, { status: response.status, headers });
+      }
       await Promise.allSettled(pending);
       if (base) response = rebase(new Response(response.body, response), base);
     } catch (error) {

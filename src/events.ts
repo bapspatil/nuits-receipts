@@ -1,8 +1,9 @@
 // Feedback after an action. Every POST that changes something redirects with
 // ?done=<event> plus the few params its message needs; the page shell shows one
 // status banner from it, with an Undo form when an inverse route exists.
-// Params come from the address bar, so each one is checked before it is used,
-// and an Undo is offered only when all of its params are well formed.
+// The link is signed (src/signing.ts) and unsigned or stale ones never reach
+// here; each param is still checked before use, and an Undo is offered only
+// when all of its params are well formed.
 // test/events.test.ts fails when a redirect names an event that isn't here.
 
 export type Undo = { action: string; fields: Record<string, string>; label?: string };
@@ -91,19 +92,8 @@ export const EVENTS = {
       return receipt ? { action: `/receipts/${receipt}/paid`, fields: {} } : null;
     },
   },
-  notPaid: {
-    text: () => 'Marked as not paid.',
-    undo: (p) => {
-      const receipt = id(p, 'id'),
-        on = p.get('on') ?? '';
-      return receipt && date(on)
-        ? {
-            action: `/receipts/${receipt}/paid`,
-            fields: { paid_outside_on: on, paid_outside_note: (p.get('note') ?? '').slice(0, 300) },
-          }
-        : null;
-    },
-  },
+  // No Undo: re-marking it paid needs the note, which was cleared with the date.
+  notPaid: { text: () => 'Marked as not paid.' },
   ruleSaved: { text: () => 'Rule saved.', section: () => 'rules' },
   ruleDeleted: { text: () => 'Rule deleted.', section: () => 'rules' },
   // ---------- Discard ----------
@@ -149,7 +139,7 @@ export const EVENTS = {
       const tx = id(p, 'tx'),
         receipt = id(p, 'rid');
       const back = returnTo(p);
-      // It was matched before, so matching it again is not an exception to confirm.
+      // exc=1 is set by the server only when the pair was matched as an exception in the first place.
       return tx && receipt
         ? {
             action: '/matches',
@@ -157,7 +147,7 @@ export const EVENTS = {
               transaction_id: tx,
               receipt_id: receipt,
               action: 'link',
-              confirm_exception: 'yes',
+              ...(p.get('exc') === '1' ? { confirm_exception: 'yes' } : {}),
               ...(back ? { return_to: back } : {}),
             },
           }
@@ -185,17 +175,8 @@ export const EVENTS = {
       return tx ? { action: `/transfers/${tx}/undo`, fields: {} } : null;
     },
   },
-  transferUndone: {
-    text: () => 'Transfer undone. Both payments need a receipt again.',
-    undo: (p) => {
-      const debit = id(p, 'tx'),
-        credit = id(p, 'credit'),
-        reason = (p.get('reason') ?? '').slice(0, 500);
-      return debit && credit && reason
-        ? { action: '/transfers', fields: { debit_id: debit, credit_id: credit, reason } }
-        : null;
-    },
-  },
+  // No Undo: making the transfer again needs the note typed the first time, which is deleted with it.
+  transferUndone: { text: () => 'Transfer undone. Both payments need a receipt again.' },
   imported: {
     text: (p) => {
       const added = count(p, 'inserted'),

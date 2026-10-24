@@ -9,7 +9,7 @@ import { parseConfig, parseSellerNames } from '../src/config';
 import { fileName, placement } from '../src/package';
 import { hash, type Receipt } from '../src/domain';
 import type { Env } from '../src/env';
-import { htmlForm, idFrom, pdfBytes, request } from './helpers';
+import { htmlForm, idFrom, locationOf, pdfBytes, request } from './helpers';
 import { seed, zipOf } from './package-helpers';
 // Headers Cloudflare Email Routing prepends after authenticating the envelope.
 const cloudflarePass = 'Authentication-Results: mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass;\r\n';
@@ -248,7 +248,7 @@ test('uploads take several files and a kind; the Add page loads its script under
   form.append('file', new File([new Uint8Array([1, 2, 3])], 'b.pdf', { type: 'application/pdf' }));
   const many = await request('/upload', { method: 'POST', body: form });
   expect(many.status).toBe(303);
-  expect(many.headers.get('Location')).toBe('/add?kind=sales&done=filesAdded&added=1&failed=1');
+  expect(locationOf(many)).toBe('/add?kind=sales&done=filesAdded&added=1&failed=1');
   expect((await getReceipt(env, await hash(pdfBytes()))).kind).toBe('sales');
   const one = new FormData();
   one.set('file', new File([new Uint8Array([1, 2, 3])], 'c.pdf', { type: 'application/pdf' }));

@@ -165,6 +165,15 @@ export class InputError extends Error {
 export function requireInput(condition: unknown, message: string, status = 422, field?: string): asserts condition {
   if (!condition) throw new InputError(message, status, field);
 }
+// Run a check on one form control: a refusal inside it names that control.
+export function inField<T>(field: string, check: () => T): T {
+  try {
+    return check();
+  } catch (error) {
+    if (error instanceof InputError && !error.field) error.field = field;
+    throw error;
+  }
+}
 export function object(value: unknown): Record<string, unknown> {
   requireInput(value !== null && typeof value === 'object' && !Array.isArray(value), 'Expected object');
   return value as Record<string, unknown>;

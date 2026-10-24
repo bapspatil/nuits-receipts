@@ -17,7 +17,7 @@ function emittedCodes(): Set<string> {
     new RegExp(`,\\s*reason: ${CODE}`, 'g'),
     new RegExp(`\\?\\s*\\[${CODE}\\]`, 'g'),
     // Thrown InputError codes that processReceipt turns into reasons.
-    new RegExp(`requireInput\\([^;]*?,\\s*${CODE}\\)`, 'g'),
+    new RegExp(`requireInput\\([^;]*?,\\s*(?<!422,\\s*)${CODE}\\)`, 'g'),
     // processReceipt's catch: ? 'invalid_model_output' : ... : 'extraction_failed';
     new RegExp(`[?:]\\s*${CODE}\\s*[;:]`, 'g'),
   ];

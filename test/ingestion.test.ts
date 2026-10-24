@@ -3,12 +3,12 @@ import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { expect, test, vi } from 'vitest';
 import { documentText, getReceipt, preserve, processReceipt, receiveEmail, visibleText } from '../src/receipts';
 import { hash } from '../src/domain';
-import { pdfBytes, uploadPdf, request } from './helpers';
+import { idFrom, pdfBytes, uploadPdf, request } from './helpers';
 
 test('concurrent duplicate deliveries create one receipt and one successful extraction', async () => {
   const responses = await Promise.all([uploadPdf(), uploadPdf()]);
   expect(responses.map((r) => r.status)).toEqual([303, 303]);
-  expect(responses[0]!.headers.get('Location')).toBe(responses[1]!.headers.get('Location'));
+  expect(idFrom(responses[0]!)).toBe(idFrom(responses[1]!));
   expect(await env.DB.prepare('SELECT count(*) AS n FROM receipts').first('n')).toBe(1);
   const row = await getReceipt(env, await hash(pdfBytes()));
   expect(row.status).toBe('ready');

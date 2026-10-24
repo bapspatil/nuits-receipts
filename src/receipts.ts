@@ -24,6 +24,7 @@ import {
   MAX_PDF_PAGES,
   MAX_STATE_CHARS,
   normalize,
+  inField,
   object,
   PROCESSING_LEASE_SECONDS,
   requireInput,
@@ -611,21 +612,23 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
   const facts: Facts = { ...emptyFacts };
   for (const key of ['vendor', 'invoice_number', 'issue_date', 'due_date', 'currency'] as const) {
     const value = String(form.get(key) ?? '').trim();
-    requireInput(value.length <= 1000, 'Field too long');
+    requireInput(value.length <= 1000, 'Field too long', 422, key);
     facts[key] = value || null;
   }
-  if (facts.issue_date) date(facts.issue_date);
-  if (facts.due_date) date(facts.due_date);
-  if (facts.currency) requireInput(/^[A-Z]{3}$/.test(facts.currency), 'Invalid currency');
+  if (facts.issue_date) inField('issue_date', () => date(facts.issue_date!));
+  if (facts.due_date) inField('due_date', () => date(facts.due_date!));
+  if (facts.currency) requireInput(/^[A-Z]{3}$/.test(facts.currency), 'Invalid currency', 422, 'currency');
   for (const key of ['total', 'net', 'vat'] as const) {
     const value = String(form.get(key) ?? '').trim();
-    facts[`${key}_minor`] = value ? minor(value, facts.currency ?? '') : null;
+    facts[`${key}_minor`] = value ? inField(key, () => minor(value, facts.currency ?? '')) : null;
   }
   const rate = String(form.get('vat_rate') ?? '').trim();
-  facts.vat_rate_bps = rate ? minor(rate, 'EUR') : null;
+  facts.vat_rate_bps = rate ? inField('vat_rate', () => minor(rate, 'EUR')) : null;
   requireInput(
     facts.vat_rate_bps === null || (facts.vat_rate_bps >= 0 && facts.vat_rate_bps <= 10000),
     'Invalid VAT rate',
+    422,
+    'vat_rate',
   );
   facts.line_items_json = current.line_items_json;
   const isSales = current.kind === 'sales';
@@ -635,19 +638,23 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
   requireInput(
     (isProduct(env, product) || product === current.product) && EXPENSE_TYPES.some((t) => t === expense),
     'Invalid category',
+    422,
+    'product',
   );
   const eur = String(form.get('eur_override') ?? '').trim(),
     eurReason = String(form.get('eur_override_reason') ?? '').trim();
-  requireInput(!eur || eurReason.length > 0, 'EUR override needs reason');
-  const override = eur ? minor(eur, 'EUR') : null;
+  requireInput(!eur || eurReason.length > 0, 'EUR override needs reason', 422, 'eur_override_reason');
+  const override = eur ? inField('eur_override', () => minor(eur, 'EUR')) : null;
   const duplicate = String(form.get('duplicate_of') ?? '').trim() || null;
   if (duplicate) {
-    requireInput(duplicate !== id, 'Cannot duplicate itself');
+    requireInput(duplicate !== id, 'Cannot duplicate itself', 422, 'duplicate_of');
     const parent = await getReceipt(env, duplicate);
-    requireInput(!parent.duplicate_of, 'Duplicate chains are not allowed');
+    requireInput(!parent.duplicate_of, 'Duplicate chains are not allowed', 422, 'duplicate_of');
     requireInput(
       !(await env.DB.prepare('SELECT id FROM receipts WHERE duplicate_of=?').bind(id).first()),
       'A duplicate parent cannot become a duplicate',
+      422,
+      'duplicate_of',
     );
   }
   const approval = String(form.get('approval_reason') ?? '').trim(),
@@ -671,7 +678,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     ]),
   ];
   if (approved) {
-    requireInput(approval.length > 0, 'Approval needs a reason');
+    requireInput(approval.length > 0, 'Approval needs a reason', 422, 'approval_reason');
     requireInput(
       facts.vendor &&
         facts.issue_date &&
@@ -684,6 +691,18 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
       isSales
         ? 'Complete the client, date, currency and amounts before approval'
         : 'Complete required facts before approval',
+      422,
+      // The first missing fact, in the order the form lists them.
+      (
+        [
+          ['vendor', !facts.vendor],
+          ['issue_date', !facts.issue_date],
+          ['currency', !facts.currency || EXPONENTS[facts.currency] === undefined],
+          ['total', facts.total_minor === null],
+          ['net', facts.net_minor === null],
+          ['vat', facts.vat_minor === null],
+        ] as const
+      ).find(([, missing]) => missing)?.[0] ?? 'client',
     );
   }
   const manual = {
@@ -736,18 +755,33 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
 function salesForm(form: FormData): SalesFacts {
   const value = (key: string, max = 200) => {
     const text = String(form.get(key) ?? '').trim();
-    requireInput(text.length <= max, 'Field too long');
+    requireInput(text.length <= max, 'Field too long', 422, key);
     return text || null;
   };
   const country = value('client_country', 2)?.toUpperCase() ?? null;
-  requireInput(country === null || /^[A-Z]{2}$/.test(country), 'Country must be a two-letter code, like DE');
+  requireInput(
+    country === null || /^[A-Z]{2}$/.test(country),
+    'Country must be a two-letter code, like DE',
+    422,
+    'client_country',
+  );
   const vatId =
     value('client_vat_id', 30)
       ?.toUpperCase()
       .replace(/[\s.-]/g, '') ?? null;
-  requireInput(vatId === null || /^[A-Z]{2,3}[0-9A-Z+*]{2,14}$/.test(vatId), 'Invalid VAT number');
+  requireInput(
+    vatId === null || /^[A-Z]{2,3}[0-9A-Z+*]{2,14}$/.test(vatId),
+    'Invalid VAT number',
+    422,
+    'client_vat_id',
+  );
   const treatment = value('vat_treatment', 30);
-  requireInput(treatment === null || VAT_TREATMENTS.some((t) => t === treatment), 'Invalid VAT treatment');
+  requireInput(
+    treatment === null || VAT_TREATMENTS.some((t) => t === treatment),
+    'Invalid VAT treatment',
+    422,
+    'vat_treatment',
+  );
   return {
     client: value('client'),
     client_country: country,
