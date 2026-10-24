@@ -575,6 +575,14 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
             .first('n'),
         );
   const skipped = prior?.status === 'complete' ? 0 : parsed.rows.length - inserted;
+  // How many of this file's payments the app matched on its own, for the banner.
+  const auto = inserted
+    ? Number(
+        await env.DB.prepare("SELECT count(*) n FROM bank_transactions WHERE import_id=? AND match_method='automatic'")
+          .bind(importedId)
+          .first('n'),
+      )
+    : 0;
   return new Response(null, {
     status: 303,
     headers: {
@@ -582,6 +590,7 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
         inserted,
         skipped,
         replayed: prior?.status === 'complete' ? parsed.rows.length : 0,
+        auto,
       }),
     },
   });

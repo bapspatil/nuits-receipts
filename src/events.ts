@@ -46,6 +46,7 @@ const monthLabel = (value: string | null) =>
         timeZone: 'UTC',
       })
     : 'This month';
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const monthWord = (value: string | null) =>
   value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
     ? new Date(`${value}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' })
@@ -185,6 +186,26 @@ export const EVENTS = {
         : null;
     },
   },
+  // Match all likely: one Undo for the whole batch, found by the time they were all stamped with.
+  matchedMany: {
+    text: (p) => {
+      const n = count(p, 'n'),
+        left = count(p, 'skipped');
+      const changed = left
+        ? ` ${plural(left, 'payment')} changed since you opened the page and ${left === 1 ? 'was' : 'were'} left alone.`
+        : '';
+      return n ? `Matched ${plural(n, 'payment')}.${changed}` : `Nothing was matched.${changed}`;
+    },
+    undo: (p) => {
+      const at = p.get('at') ?? '',
+        month = p.get('month') ?? '';
+      return count(p, 'n') && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && MONTH.test(month)
+        ? { action: '/matches/undo', fields: { at, month } }
+        : null;
+    },
+  },
+  // No Undo: matching them again is the bulk button, which asks again what to accept.
+  unmatchedMany: { text: (p) => `Removed ${plural(count(p, 'n'), 'match', 'matches')}.` },
   notPurchase: {
     text: (p) => `${words(p, 'name', 'That payment')} is not a purchase, so it no longer needs a receipt.`,
     undo: (p) => {
@@ -214,8 +235,13 @@ export const EVENTS = {
         skipped = count(p, 'skipped'),
         again = count(p, 'replayed');
       if (again) return `You imported this file before, so nothing changed. It has ${plural(again, 'payment')}.`;
-      return `Added ${plural(added, 'payment')}.${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
+      const auto = count(p, 'auto');
+      return `Added ${plural(added, 'payment')}.${auto ? ` We matched ${auto} for you.` : ''}${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
     },
+    link: (p) =>
+      count(p, 'auto') && MONTH.test(p.get('month') ?? '')
+        ? { href: `/payments?month=${p.get('month')}&show=auto`, label: 'See them' }
+        : null,
   },
   // ---------- Month ----------
   sent: { text: (p) => `Marked ${monthLabel(p.get('month'))} as sent.` },

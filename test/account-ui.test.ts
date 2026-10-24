@@ -69,7 +69,9 @@ test('matches and payments show accounts and export appends two formula-safe acc
   expect((await eurValue(env, r)).source).toBe('bank');
   const payments = await (await request('/payments?month=2026-09')).text();
   expect(payments).toContain('=Fake Main');
-  expect(payments).toContain(`<a class="tag ok" href="/receipts/${r.id}">Receipt</a>`);
+  expect(payments).toContain(
+    `<span class="tag ok">Matched automatically</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`,
+  );
   expect(await (await request('/receipts/' + r.id)).text()).toContain('=Fake Main');
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,

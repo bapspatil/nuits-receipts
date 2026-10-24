@@ -19,31 +19,67 @@ async function seedMismatch() {
 }
 const alertOf = (html: string) => html.match(/<div class="alert" role="alert">[\s\S]*?<\/div>/)?.[0] ?? '';
 
-test('"Not exact, still this" re-renders Bank with the explanation on that row, and the retry works', async () => {
+test('a pair that is not exact is explained on its row, and Match anyway goes through', async () => {
   const { id, tx } = await seedMismatch();
   const refused = await post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link' }));
   expect(refused.status).toBe(422);
   const html = await refused.text();
   expect(html).toContain('<title>Bank · September 2026');
   expect(alertOf(html)).toContain(`<a href="#f-confirm-${tx}">Go to it</a>`);
-  // The row holds the box (marked, described by the line under the form) and the line itself.
+  // The row now holds the pair, the reason, and one button that says what it does.
   const row = html.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
-  expect(row).toContain(`id="f-confirm-${tx}" aria-invalid="true" aria-describedby="e-match-${tx}"`);
+  expect(row).toContain(`id="f-confirm-${tx}" aria-describedby="e-why-${tx} e-match-${tx}"`);
+  expect(row).toContain('>Match anyway</button>');
+  expect(row).toContain('This pair isn&#39;t exact: the amounts differ');
   expect(row).toMatch(new RegExp(`<p class="ferr" id="e-match-${tx}">[^<]*line up[^<]*</p>`));
-  // Nothing else on the page is marked.
-  expect(html.match(/aria-invalid="true"/g)).toHaveLength(1);
-  // Ticking it and sending the same form goes through.
-  // Leave out the Receipt ID form in More; the row's own form is the one to send again.
-  const form = htmlForm(
-    html.replace(/<form action="\/matches" method="post" class="inline-edit">[\s\S]*?<\/form>/, ''),
-    '/matches',
-  );
-  // The action is a button, so a test sends it by hand; the choice and the box come from the page.
+  expect(row).not.toContain('Not exact, still this');
+  // The exception rides along as a hidden field of that one form, not a box to tick.
+  const form = htmlForm(html, '/matches');
+  expect(form.get('confirm_exception')).toBe('yes');
   form.set('action', 'link');
-  const again = await post('/matches', form);
-  expect(again.status).toBe(422);
-  form.set('confirm_exception', 'yes');
   expect((await post('/matches', form)).status).toBe(303);
+});
+
+test('a row with an exact pair has no exception field, and typing a label in the search box finds the receipt', async () => {
+  const { id, tx } = await seedMismatch();
+  const page = await (await request('/payments?month=2026-09&show=all')).text();
+  // Nothing looks like this payment: the line says so and the search box stands alone.
+  const row = page.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
+  expect(row).toContain('No ready receipt looks like this one.');
+  expect(row).toContain('<input name="receipt_id" list="pick-receipts"');
+  expect(row).not.toContain('name="confirm_exception"');
+  expect(row).not.toContain('Receipt ID');
+  const label = page.match(/<datalist id="pick-receipts"><option value="([^"]+)">/)![1]!;
+  expect(label).toMatch(/^Sample Cloud Lantern Oy, 4 Sep, EUR 125\.50$/);
+  // The label stands for the receipt: it gets as far as the exception check.
+  const typed = await post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: label, action: 'link' }));
+  expect(typed.status).toBe(422);
+  expect(await typed.text()).toContain('Match anyway');
+  const withBox = new URLSearchParams({
+    transaction_id: tx,
+    receipt_id: label,
+    action: 'link',
+    confirm_exception: 'yes',
+  });
+  expect((await post('/matches', withBox)).status).toBe(303);
+  expect(await env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(tx).first('receipt_id')).toBe(
+    id,
+  );
+});
+
+test('text that names no receipt, or more than one, is refused at the search box', async () => {
+  const { tx } = await seedMismatch();
+  const none = await post(
+    '/matches',
+    new URLSearchParams({ transaction_id: tx, receipt_id: 'nothing like it', action: 'link' }),
+  );
+  expect(none.status).toBe(422);
+  const html = await none.text();
+  expect(html).toContain('Pick one of the receipts in the list');
+  expect(html).toContain('value="nothing like it"');
+  expect(html).toMatch(/<input name="receipt_id"[^>]*aria-invalid="true"/);
+  const blank = await post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: '', action: 'link' }));
+  expect(blank.status).toBe(422);
 });
 
 test('a match refused from the receipt page comes back to that receipt', async () => {

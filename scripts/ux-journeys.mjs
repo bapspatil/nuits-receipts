@@ -315,6 +315,8 @@ async function audit(browser, urls) {
   const screens = [];
   mkdirSync(join(OUT, 'screens'), { recursive: true });
   for (const url of urls) {
+    // A screen that needs the data in another state gets it set up once, before its first load.
+    if (url.prepare) await url.prepare();
     for (const v of VIEWPORTS) {
       const context = await browser.newContext({
         viewport: { width: v.width, height: v.height },

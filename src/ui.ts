@@ -6,6 +6,7 @@ import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
+import { STATUS, matchStatus } from './status';
 import { failureFor, kept, requestState } from './request';
 
 export function escape(value: unknown): string {
@@ -258,7 +259,11 @@ html:has(.sbar){scroll-padding-bottom:7rem}
 .pay .line>details.more[open]{grid-column:1/-1;grid-row:3;justify-self:stretch}.pay .line>details.more>.body{padding:var(--space-1) 0 var(--space-2)}
 .pay form{margin:0}
 .fixrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4);margin:var(--space-2) 0 0}.fixrow .none{margin:0;flex-basis:100%}
-.pmatch{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4)}.pmatch select{flex:1 1 14rem;min-width:0}.pmatch .check{margin:0}
+.pmatch{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4)}.pmatch select,.pmatch input[list]{flex:1 1 14rem;min-width:0}
+.likely{display:grid;gap:var(--space-2);margin:var(--space-2) 0 0;padding:var(--space-3) var(--space-4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-raised)}.likely__head{margin:0}.likely__why{margin:0;font-size:var(--text-sm);color:var(--text-muted)}.likely .btn{justify-self:start}.fixrow>.likely,.fixrow>details,.fixrow>.pmatch{flex:1 1 100%;margin:0}
+.cmp{width:100%;border-collapse:collapse;font-size:var(--text-sm)}.cmp th,.cmp td{text-align:left;padding:var(--space-2) var(--space-3) var(--space-2) 0;border-bottom:1px solid var(--border);vertical-align:baseline;font-weight:400}.cmp thead th{font-size:var(--text-xs);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}.cmp tbody th{font-weight:500;color:var(--text-muted);width:5rem}.cmp tbody tr:last-child th,.cmp tbody tr:last-child td{border-bottom:0}.cmp .diff{font-weight:700}.cmp .same{color:var(--success);font-weight:600}
+.matchall{margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-raised)}.matchall summary{font-weight:600}.matchall ul{list-style:none;margin:var(--space-2) 0;padding:0}.matchall li{padding:var(--space-2) 0;border-bottom:1px solid var(--border);font-size:var(--text-sm)}.matchall li:last-child{border-bottom:0}.matchall li span{display:block;color:var(--text-muted)}
+@media (max-width:720px){.cmp thead{display:none}.cmp,.cmp tbody{display:block}.cmp tbody tr{display:flex;flex-wrap:wrap;gap:0 var(--space-2);padding:var(--space-1) 0;border-bottom:1px solid var(--border)}.cmp tbody tr:last-child{border-bottom:0}.cmp tbody th,.cmp tbody td{padding:0;border:0;width:auto}.cmp tbody th{flex:0 0 4rem}.cmp td:nth-child(2),.cmp td:nth-child(3){flex:1 1 40%;min-width:0}.cmp td:nth-child(4){margin-left:auto;text-align:right}.cmp td[data-l]::before{content:attr(data-l) " ";color:var(--text-muted)}.likely .btn{justify-self:stretch}.likely__head{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.likely{padding:var(--space-2) var(--space-3)}}
 .transfer{display:flex;flex-wrap:wrap;gap:var(--space-2);margin:var(--space-2) 0 0}.transfer select,.transfer input{flex:1 1 10rem;min-width:0}
 .stmts{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4)}.stmts details{flex-basis:100%}
 .inline{display:flex;gap:var(--space-2) var(--space-4);align-items:center;flex-wrap:wrap;margin-top:var(--space-2)}
@@ -483,12 +488,6 @@ export function errorLine(scope: string, name?: string): string {
   if (!failure || (name !== undefined && name !== (failure.field ?? ''))) return '';
   return `<p class="ferr" id="${errorId(scope)}">${escape(failure.message)}</p>`;
 }
-// "Not exact, still this" in one payment's match form; ticked again after a refusal.
-export function exceptionBox(tx: string): string {
-  const scope = `match:${tx}`,
-    on = kept(scope, 'confirm_exception', '') === 'yes';
-  return `<label class="check"><input type="checkbox" name="confirm_exception" value="yes" id="f-confirm-${tx}"${on ? ' checked' : ''}${ariaFor(scope, 'confirm_exception')}>Not exact, still this</label>`;
-}
 // Why one payment's match was refused, under its form.
 export const matchError = (tx: string) => errorLine(`match:${tx}`);
 // The receipt the person chose before a refusal, else the fallback.
@@ -699,10 +698,10 @@ export function monthSwitcher(path: string, selected: string): string {
   return `<div class="months" role="group" aria-label="Month">${link(prev, `‹ ${monthName(prev, false).slice(0, 3)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${monthName(next, false).slice(0, 3)} ›`)}</div>`;
 }
 // A stamp only when the receipt needs you; quiet text otherwise, nothing when ready.
-export function stamp(receipt: Pick<Receipt, 'status'>, matched = false): string {
-  if (receipt.status === 'needs_review') return '<span class="stamp needs">Needs you</span>';
-  if (receipt.status === 'pending' || receipt.status === 'processing') return tag('Reading');
-  return matched ? tag('Matched', true) : '';
+export function stamp(receipt: Pick<Receipt, 'status'>, match: 'automatic' | 'manual' | null = null): string {
+  if (receipt.status === 'needs_review') return `<span class="stamp needs">${STATUS.needs}</span>`;
+  if (receipt.status === 'pending' || receipt.status === 'processing') return tag(STATUS.reading);
+  return match ? tag(matchStatus(match), true) : '';
 }
 
 // Expense receipts dated in the month. Sales invoices have salesMonthRows().

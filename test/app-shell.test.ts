@@ -634,11 +634,15 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
       expect(['needs', 'missing'], path).toContain(kind);
   }
   const bank = await (await request('/payments?month=2026-09&show=all')).text();
-  expect(bank).toMatch(/<a class="tag ok" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/);
+  expect(bank).toMatch(
+    /<span class="tag ok">Matched (?:automatically|by you)<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
+  );
   expect(bank).toContain('<span class="stamp missing">Missing</span>');
   expect(bank).toContain('<span class="tag">Money in</span>');
   // A ready receipt has no stamp at all; one that needs you keeps it, tilted on its own page only.
-  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain('<span class="tag ok">Matched</span>');
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
+    /<span class="tag ok">Matched (?:automatically|by you)<\/span>/,
+  );
   expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
     '<span class="stamp needs">Needs you</span>',
   );
@@ -666,9 +670,16 @@ test('filter chips show only when they filter something', async () => {
   // Six or more: chips that filter something.
   for (let i = 2; i < 6; i++) await flaggedImage(i);
   expect(chips(await (await request('/review')).text())).toEqual(['All (6)', 'Check the amount (5)']);
-  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual(['All (3)', 'Missing (1)']);
+  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
+    'All (3)',
+    'Missing (1)',
+    'Matched automatically (1)',
+  ]);
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
-  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([]);
+  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
+    'All (3)',
+    'Matched automatically (1)',
+  ]);
 });
 
 test('rarely used things sit behind one More per object, named for screen readers', async () => {
