@@ -63,7 +63,8 @@ test('every review reason code the app emits has plain-language copy', () => {
 
 test('flag copy is plain, punctuated and free of long dashes', () => {
   for (const [code, flag] of Object.entries(FLAGS)) {
-    expect(flag.title, code).toMatch(/[.?]$/);
+    // One form: a question, or a short instruction. Never a statement of what is wrong.
+    expect(flag.title, code).toMatch(/\?$|^(Check|Type|Upload|Open|Read|Try)\b.*\.$/);
     const body = typeof flag.body === 'string' ? flag.body : flag.body({ currency: 'XYZ' } as never);
     expect(body, code).toMatch(/[.!]$/);
     expect(flag.title + body, code).not.toMatch(new RegExp('[\\u2013\\u2014]'));
@@ -78,5 +79,5 @@ test('codes for the same problem share one card and unknown codes fall back', ()
     ['missing_issue_date'],
     ['brand_new_code'],
   ]);
-  expect(flagFor('brand_new_code').title).toBe('Something needs a look.');
+  expect(flagFor('brand_new_code').title).toBe('Check the details against the original.');
 });

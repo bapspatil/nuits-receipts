@@ -802,7 +802,7 @@ export async function payments(
     const facts = pairFacts(r, t, rules, tuning);
     const scope = `match:${t.id}`;
     const line = (label: string, bank: string, other: string, cell: Cell) =>
-      `<tr><th scope="row">${label}</th><td data-l="Bank">${bank}</td><td data-l="${noun}">${other}</td><td class="${cell.same ? 'same' : 'diff'}">${escape(cell.text)}</td></tr>`;
+      `<tr><th scope="row">${label}</th><td${cell.same ? '' : ' data-l="Bank"'}>${bank}</td><td${cell.same ? ' class="dup"' : ` data-l="${noun}"`}>${other}</td><td class="${cell.same ? 'same' : 'diff'}">${escape(cell.text)}</td></tr>`;
     const why = facts.exact
       ? ''
       : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)} <a href="/help#match-anyway">What is this?</a></p>`;
@@ -817,7 +817,7 @@ export async function payments(
   // The search box: type a seller, a date or an amount, or pick from the list.
   const picker = (t: Payment, listId: string, noun: string) => {
     const typed = chosenReceipt(t.id);
-    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Type a seller, a date or an amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
   };
   // A likely pair first, the search box behind it; no pair, the search box alone.
   const matchControls = (
@@ -850,7 +850,7 @@ export async function payments(
           `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
         );
       } else if (t.receipt_id) {
-        status = `${tag(matchStatus(t.match_method), true)} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>`;
+        status = `${tag(matchStatus(t.match_method), true, t.match_method === 'automatic')} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>`;
         extra.push(
           `<form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
         );
@@ -887,7 +887,7 @@ export async function payments(
             `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span>${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''} ${status}</span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
+      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -925,7 +925,7 @@ export async function payments(
   const body = rows.length
     ? `<p class="summary"><span>${out.length} out, ${matched.length} matched, <span${missing.length ? ' class="red"' : ''}>${missing.length} missing</span></span></p>${filter}${
         missing.length ? '' : await settled(env, selected)
-      }${matchAll}${shown.length ? `<ol class="pays">${items}</ol>${lists}` : ''}${
+      }${matchAll}${shown.length ? `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
           : ''
@@ -1024,12 +1024,12 @@ export async function home(env: Env, requested: string | null, params = new URLS
       ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
       : undated
         ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'Done', `/receipts?month=${selected}`, false, true);
+        : row(1, 'Check', 'All checked', `/receipts?month=${selected}`, false, true);
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
       ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
-      : row(2, 'Match', 'Done', `/payments?month=${selected}`, false, true);
+      : row(2, 'Match', 'All matched', `/payments?month=${selected}`, false, true);
   const send = await sendStep(env, s, selected, current, params);
   const step = nextStep(s, selected);
   const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';
@@ -1046,7 +1046,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
       : '';
   return page(
     'home',
-    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
+    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}${next ? `<div class="next">${next}</div>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
     200,
     env,
     { detail: monthName(selected), head: monthHead('/', selected) },
@@ -1274,7 +1274,7 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
     ? `<h3>Ignored</h3><ul class="plain rowlist">${ignored.map((i) => row(i.address, '/senders/unignore', 'Stop ignoring')).join('')}</ul>`
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
-  const add = `<form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address" placeholder="billing@example.com"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
+  const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
   return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
 }
 
@@ -1304,7 +1304,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             )
             .join('')}</ul>`
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
-    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { attrs: ' placeholder="Main account"', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
+    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
     opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
   );
   const rulesPart = sect(

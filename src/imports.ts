@@ -84,7 +84,17 @@ export async function importForm(env: Env): Promise<string> {
           'existing',
         )}`
       : '<input type="hidden" name="account_action" value="new">'
-  }</div><fieldset><legend>${accounts.length ? 'Only for a new account' : 'Your bank account'}</legend>${accounts.length ? '' : '<p class="small">You have no bank account yet. It is created when you import this file.</p>'}<div class="fields">${input('account_label', '', 'text', 'Account name', { scope: IMPORT, attrs: accounts.length ? '' : ' required placeholder="Main account"' })}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? config(env).defaultCurrency, 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
+  }</div><fieldset><legend>${accounts.length ? 'Only for a new account' : 'Your bank account'}</legend>${accounts.length ? '' : '<p class="small">You have no bank account yet. It is created when you import this file.</p>'}<div class="fields">${input(
+    'account_label',
+    '',
+    'text',
+    'Account name',
+    {
+      scope: IMPORT,
+      attrs: accounts.length ? '' : ' required',
+      hint: accounts.length ? '' : 'For example Main account',
+    },
+  )}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? config(env).defaultCurrency, 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
     'encoding',
     [
       { value: 'auto', label: 'Detect BOM or UTF-8' },

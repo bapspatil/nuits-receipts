@@ -35,7 +35,9 @@ export function render(tokens) {
   ];
   const roles = Object.entries(semantic).map(([k, v]) => [k, ref(v)]);
   const components = Object.entries(tokens.component).map(([k, v]) => [k, ref(v)]);
-  const css = `:root{${group('primitives', primitives)}${group('semantic', roles)}${group('component', components)}}`;
+  const phone = Object.entries(tokens.phone ?? {});
+  const small = phone.length ? `@media(max-width:720px){:root{${phone.map(([k, v]) => `--${k}:${v};`).join('')}}}` : '';
+  const css = `:root{${group('primitives', primitives)}${group('semantic', roles)}${group('component', components)}}${small}`;
   const palette = Object.fromEntries(Object.entries(colors).map(([k, v]) => [k, v.hex]));
   return `// Generated from src/tokens.json by scripts/app-tokens.mjs. Do not edit by hand.
 // Change the source and run \`bun run tokens\`.

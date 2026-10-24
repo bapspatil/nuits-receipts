@@ -215,7 +215,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
         `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form></div>`,
       );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post"><div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { attrs: ' placeholder="Stripe payout"' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post"><button class="linkbtn">Not paid</button></form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post"><div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post"><button class="linkbtn">Not paid</button></form>` : ''}`;
   if (r.paid_outside_on)
     return box(
       'Paid',

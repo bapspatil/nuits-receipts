@@ -16,16 +16,16 @@ Instance: fresh local database, mock AI, 2026-10-24.
 
 Screens: `/` → `/receipts/:id?done=uploaded` → `/` → `/settings` → `/settings?done=settingsSaved&group=accountant`
 
-- Welcome screen says: Welcome Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare The
+- Welcome screen says: Welcome Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare The
 - Landed on /receipts/:id with title "Sample Cloud Lantern Oy"
-- Home after the first receipt: Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c
+- Home after the first receipt: Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c
 - Saved: Saved your accountant.
 
 ### a. Mail arrives, every receipt approved
 
 Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast&month=2026-09&step=import`
 
-- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done Done: Business name added So invoices you send are told apart from receipts. Done: Email Routing confirmed A receipt arrived by email, so it wo
+- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done DONE: Business name added So invoices you send are told apart from receipts. DONE: Email Routing confirmed A receipt arrived by email, so it wo
 - Review lists 3 receipts.
 - Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review.
 
@@ -47,46 +47,46 @@ Screens: `/receipts` → `/invoices` → `/add?kind=sales` → `/payments`
 
 ### c. September closed and marked sent
 
-Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T15%3A57%3A58.207Z`
+Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A23%3A18.071Z`
 
-- Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October Done: Check Done Done: Match Done Next: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be
+- Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check All checked DONE: Match All matched NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Chec
 - Downloaded receipts-2026-09.zip
 
 ## Screens
 
 | Screen | Width | Height (viewports) | axe violations |
 | --- | --- | --- | --- |
-| [receipt-flagged](screens/receipt-flagged-1440.png) | 1440 | 1.52 | 0 |
-| [receipt-flagged](screens/receipt-flagged-390.png) | 390 | 2.09 | 0 |
-| [home-sep](screens/home-sep-1440.png) | 1440 | 1.26 | 0 |
-| [home-sep](screens/home-sep-390.png) | 390 | 1.41 | 0 |
-| [home-arrival](screens/home-arrival-1440.png) | 1440 | 1.31 | 0 |
-| [home-arrival](screens/home-arrival-390.png) | 390 | 1.49 | 0 |
+| [receipt-flagged](screens/receipt-flagged-1440.png) | 1440 | 1.45 | 0 |
+| [receipt-flagged](screens/receipt-flagged-390.png) | 390 | 2.15 | 0 |
+| [home-sep](screens/home-sep-1440.png) | 1440 | 1.16 | 0 |
+| [home-sep](screens/home-sep-390.png) | 390 | 1.49 | 0 |
+| [home-arrival](screens/home-arrival-1440.png) | 1440 | 1.2 | 0 |
+| [home-arrival](screens/home-arrival-390.png) | 390 | 1.57 | 0 |
 | [home-oct](screens/home-oct-1440.png) | 1440 | 1 | 0 |
 | [home-oct](screens/home-oct-390.png) | 390 | 1 | 0 |
 | [review](screens/review-1440.png) | 1440 | 1 | 0 |
 | [review](screens/review-390.png) | 390 | 1 | 0 |
-| [receipts](screens/receipts-1440.png) | 1440 | 1.38 | 0 |
-| [receipts](screens/receipts-390.png) | 390 | 1.52 | 0 |
+| [receipts](screens/receipts-1440.png) | 1440 | 1.33 | 0 |
+| [receipts](screens/receipts-390.png) | 390 | 1.51 | 0 |
 | [receipt-ready](screens/receipt-ready-1440.png) | 1440 | 1 | 0 |
-| [receipt-ready](screens/receipt-ready-390.png) | 390 | 1.16 | 0 |
-| [invoice-paid](screens/invoice-paid-1440.png) | 1440 | 1.06 | 0 |
-| [invoice-paid](screens/invoice-paid-390.png) | 390 | 1.59 | 0 |
-| [bank](screens/bank-1440.png) | 1440 | 1.39 | 0 |
-| [bank](screens/bank-390.png) | 390 | 1.47 | 0 |
-| [import](screens/import-1440.png) | 1440 | 1.06 | 0 |
-| [import](screens/import-390.png) | 390 | 1.42 | 0 |
+| [receipt-ready](screens/receipt-ready-390.png) | 390 | 1.27 | 0 |
+| [invoice-paid](screens/invoice-paid-1440.png) | 1440 | 1.02 | 0 |
+| [invoice-paid](screens/invoice-paid-390.png) | 390 | 1.68 | 0 |
+| [bank](screens/bank-1440.png) | 1440 | 1.27 | 0 |
+| [bank](screens/bank-390.png) | 390 | 1.52 | 0 |
+| [import](screens/import-1440.png) | 1440 | 1.03 | 0 |
+| [import](screens/import-390.png) | 390 | 1.43 | 0 |
 | [add](screens/add-1440.png) | 1440 | 1 | 0 |
-| [add](screens/add-390.png) | 390 | 1.06 | 0 |
+| [add](screens/add-390.png) | 390 | 1.07 | 0 |
 | [invoices](screens/invoices-1440.png) | 1440 | 1 | 0 |
 | [invoices](screens/invoices-390.png) | 390 | 1 | 0 |
 | [settings](screens/settings-1440.png) | 1440 | 1 | 0 |
 | [settings](screens/settings-390.png) | 390 | 1 | 0 |
-| [bank-likely](screens/bank-likely-1440.png) | 1440 | 2.77 | 0 |
-| [bank-likely](screens/bank-likely-390.png) | 390 | 2.98 | 0 |
-| [help](screens/help-1440.png) | 1440 | 1.66 | 0 |
-| [help](screens/help-390.png) | 390 | 2.2 | 0 |
-| [help-flags](screens/help-flags-1440.png) | 1440 | 1.86 | 0 |
-| [help-flags](screens/help-flags-390.png) | 390 | 2.5 | 0 |
-| [home-setup](screens/home-setup-1440.png) | 1440 | 1.72 | 0 |
-| [home-setup](screens/home-setup-390.png) | 390 | 1.93 | 0 |
+| [bank-likely](screens/bank-likely-1440.png) | 1440 | 2.5 | 0 |
+| [bank-likely](screens/bank-likely-390.png) | 390 | 2.67 | 0 |
+| [help](screens/help-1440.png) | 1440 | 1.58 | 0 |
+| [help](screens/help-390.png) | 390 | 2.24 | 0 |
+| [help-flags](screens/help-flags-1440.png) | 1440 | 1.78 | 0 |
+| [help-flags](screens/help-flags-390.png) | 390 | 2.55 | 0 |
+| [home-setup](screens/home-setup-1440.png) | 1440 | 1.6 | 0 |
+| [home-setup](screens/home-setup-390.png) | 390 | 2.01 | 0 |
