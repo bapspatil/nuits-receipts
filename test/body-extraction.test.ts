@@ -185,3 +185,37 @@ test('a confident model vendor is still preferred over the sender name', () => {
   );
   expect(result.facts.vendor).toBe('Google Commerce Limited');
 });
+
+test('account and seller labels printed before the name are stripped', () => {
+  expect(cleanVendor('Account holder HeyGen Technology Inc.')).toBe('HeyGen Technology Inc.');
+  expect(cleanVendor('Account holder: HeyGen Technology Inc.')).toBe('HeyGen Technology Inc.');
+  expect(cleanVendor('Account name Sample Studio Ltd')).toBe('Sample Studio Ltd');
+  expect(cleanVendor('Sold by Amazon EU S.à r.l.')).toBe('Amazon EU S.à r.l.');
+  expect(cleanVendor('Billed by Example Cloud Inc')).toBe('Example Cloud Inc');
+  expect(cleanVendor('Company name: Example Oy')).toBe('Example Oy');
+  // A buyer label means the line names the customer, never the seller.
+  expect(cleanVendor('Billed to Example Studio Oy')).toBeNull();
+  expect(cleanVendor('Bill to: Example Studio Oy')).toBeNull();
+  expect(cleanVendor('Sold to Example Studio Oy')).toBeNull();
+  expect(cleanVendor('Ship to Example Studio Oy')).toBeNull();
+});
+
+test('a labelled seller line in the document does not override the clean model name ("Read again")', () => {
+  const invoice = [
+    'Invoice',
+    'Invoice number SDAW3TLS-0001',
+    'Date of issue October 24, 2026',
+    'Account holder HeyGen Technology Inc.',
+    '1 Example Street',
+    'Bill to',
+    'Example Studio Oy',
+    'Total $15.00 USD',
+  ].join('\n');
+  expect(parseDocument(invoice).sellerCandidates).toEqual(['HeyGen Technology Inc.']);
+  const result = parseExtraction(
+    modelResponse({ vendor: { type: 'text', value: 'HeyGen Technology Inc.', confidence: 0.88, p_null: 0.01 } }),
+    invoice,
+  );
+  expect(result.facts.vendor).toBe('HeyGen Technology Inc.');
+  expect(result.reasons).not.toContain('uncertain_vendor');
+});

@@ -6,11 +6,16 @@ import { normalize } from './domain';
 
 const LABEL =
   /^(?:maksun saaja|saaja|myyjä|laskuttaja|lähettäjä|seller|sold by|merchant|payee|vendor|supplier|from|billed by|issued by|verkäufer|empfänger)\s*:\s*/i;
-const LEAD = /^(?:receipt from|invoice from|your receipt from|kuitti|lasku)\s+/i;
+// Labels printed in front of the seller's name, with or without a colon.
+const LEAD =
+  /^(?:receipt from|invoice from|your receipt from|kuitti|lasku|account holder|account name|company name|business name|merchant name|seller name|sold by|billed by|issued by)(?:\s*:\s*|\s+)/i;
+// Labels in front of the customer: the line names the buyer, never the seller.
+const BUYER_LABEL = /^(?:bill(?:ed)? to|invoice to|sold to|ship(?:ped)? to|customer|asiakas|laskutetaan)\b/i;
 
 export function cleanVendor(value: string | null | undefined): string | null {
   if (!value) return null;
   let name = value.replace(/\s+/g, ' ').trim();
+  if (BUYER_LABEL.test(name)) return null;
   for (let i = 0; i < 3; i++) {
     const before = name;
     name = name

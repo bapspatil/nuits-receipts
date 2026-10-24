@@ -63,6 +63,8 @@ jobs:
             bun scripts/version.mjs apply --force "$FORCED_BUMP" > plan.json
           fi
           cat plan.json
+          # The docs Changelog page is built from CHANGELOG.md; keep it in the release commit.
+          bun docs-site/scripts/sync-changelog.mjs
           {
             echo "action=$(node -p 'require("./plan.json").action')"
             echo "tag=$(node -p 'require("./plan.json").tag')"
@@ -94,7 +96,7 @@ jobs:
         env:
           TAG: ${{ steps.plan.outputs.tag }}
         run: |
-          git add package.json CHANGELOG.md
+          git add package.json CHANGELOG.md docs-site/src/content/docs/reference/changelog.mdx
           git commit -m "chore(release): $TAG"
           git tag -a "$TAG" -m "Release $TAG"
           git push origin HEAD:main
