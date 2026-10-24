@@ -82,7 +82,8 @@ test('a link that is not genuine and fresh says nothing and offers no Undo', asy
   expect(await shows(good.replace('name=Acme', 'name=Mallory'))).toBe(false);
   expect(await shows(good.replace('exc=1', 'exc=0'))).toBe(false);
   expect(await shows(good.replace('/review', '/receipts'))).toBe(false);
-  expect(await shows(good.replace(/sig=./, 'sig=A'))).toBe(false);
+  // Change the signature's first character for certain: a fixed 'A' is a no-op when it already starts with one.
+  expect(await shows(good.replace(/sig=(.)/, (_, c: string) => `sig=${c === 'A' ? 'B' : 'A'}`))).toBe(false);
   expect(await shows(good.replace('done=unmatched', 'done=matched'))).toBe(false);
   const html = await (await request(forged)).text();
   expect(html).not.toContain('name="confirm_exception"');
