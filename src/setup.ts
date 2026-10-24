@@ -26,6 +26,7 @@ import {
   type Field,
   type Group,
   type SettingKey,
+  type Source,
 } from './settings';
 import { reconcile } from './banking';
 import { ariaFor, day, errorLine, escape } from './ui';
@@ -237,6 +238,12 @@ function control(env: Env, field: Field): string {
 function resetButton(field: Field, text: string): string {
   return `<button class="linkbtn" form="reset-${field.key}" name="reset" value="${field.key}">${text}<span class="vh"> ${escape(field.label)}</span></button>`;
 }
+// Where a value in force came from, in plain words.
+const SOURCE_WORDS: Record<Source, string> = {
+  app: 'Set in the app',
+  deploy: 'Set when deployed',
+  default: 'Built-in default',
+};
 function fieldRow(env: Env, field: Field): string {
   const state = applied(env),
     source = sourceOf(env, field.key),
@@ -249,12 +256,12 @@ function fieldRow(env: Env, field: Field): string {
       ? `<span class="flabel" id="${key}-label">${label}</span>`
       : `<label for="f-${key}">${label}</label>`;
   const bad = invalid
-    ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'deploy value' : 'default'} is used. ${resetButton(field, 'Clear it')}</p>`
+    ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'value set when deployed' : 'built-in default'} is used. ${resetButton(field, 'Clear it')}</p>`
     : '';
   const confirm = field.confirm
     ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes" id="f-confirm_${key}"${kept(scopeOf(field.group), `confirm_${key}`, '') === 'yes' ? ' checked' : ''}${ariaFor(scopeOf(field.group), `confirm_${key}`)}> ${escape(field.confirm)}</label></div>`
     : '';
-  const meta = source === 'app' ? `<p class="meta">${resetButton(field, 'Reset')}</p>` : '';
+  const meta = `<p class="meta">${SOURCE_WORDS[source]}${source === 'app' ? ` · ${resetButton(field, 'Reset')}` : ''}${field.key === 'PRODUCTS_JSON' ? ' · <a href="/help#part">What is a part?</a>' : ''}</p>`;
   return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(scopeOf(field.group), key)}${bad}${confirm}${errorLine(scopeOf(field.group), `confirm_${key}`)}${meta}</div></div>`;
 }
 function resetForms(env: Env, fields: readonly Field[]): string {
@@ -329,13 +336,14 @@ export async function setupParts(
     return raw ? `<code>${escape(raw)}</code>` : 'Not set';
   };
   const hasOneDrive = !!settings.oneDrive || settings.oneDriveIncomplete;
-  const deployOnly = `<details class="group" id="setup-deploy"><summary>Set at deploy</summary><div class="body"><div class="scroll"><table><caption class="vh">Set at deploy</caption><thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead><tbody>${DEPLOY_ONLY.filter(
+  const deployOnly = `<details class="group" id="setup-deploy"><summary>Set when deployed</summary><div class="body"><p class="small">These are fixed when the app is deployed. Change them in Cloudflare, not here.</p><div class="scroll"><table><caption class="vh">Set when deployed</caption><thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead><tbody>${DEPLOY_ONLY.filter(
     (d) =>
       (!(d.key === 'AUTH_USERNAME' || d.key === 'NUITS_PASSWORD') || !settings.access) &&
       (hasOneDrive || !/^(MS_|ONEDRIVE_)/.test(d.key)),
   )
     .map(
-      (d) => `<tr><th scope="row">${escape(d.label)} <code>${d.key}</code></th><td>${shown(d.key, d.secret)}</td></tr>`,
+      (d) =>
+        `<tr><th scope="row">${escape(d.label)} <code>${d.key}</code><br><span class="hint">${escape(d.why)}</span></th><td>${shown(d.key, d.secret)}</td></tr>`,
     )
     .join('')}</tbody></table></div></div></details>`;
   const audit = `<details class="group" id="setup-history"><summary>Change history${rows.length ? ` (${rows.length}${rows.length === 20 ? '+' : ''})` : ''}</summary><div class="body">${
@@ -355,3 +363,33 @@ export async function setupParts(
     advanced: `<div class="folds">${fold('review')}${fold('integrations')}${deployOnly}${audit}</div>`,
   };
 }
+
+// ---------- Unsaved changes ----------
+// Settings is the one page besides /add that runs a script, from its own file so
+// the policy stays script-src 'self' with no inline script. Each group has its
+// own Save, so the script warns before a change in one group is lost by saving
+// another, and before leaving the page with changes.
+export const SETTINGS_CSP =
+  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+export const SETTINGS_JS = `(() => {
+  const forms = [...document.querySelectorAll('form.setup-form')];
+  if (!forms.length || !window.FormData) return;
+  const snapshot = (form) => JSON.stringify([...new FormData(form)].filter(([key]) => key !== 'revision'));
+  const start = new Map(forms.map((form) => [form, snapshot(form)]));
+  const changed = (except) => forms.filter((form) => form !== except && snapshot(form) !== start.get(form));
+  let leaving = false;
+  document.addEventListener('submit', (event) => {
+    const others = changed(event.target);
+    if (others.length && !confirm('You have changes in another group that are not saved. Continue and lose them?')) {
+      event.preventDefault();
+      return;
+    }
+    leaving = true;
+  });
+  addEventListener('beforeunload', (event) => {
+    if (leaving || !changed(null).length) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+})();
+`;

@@ -294,19 +294,31 @@ export const GROUPS: readonly { id: Group; title: string }[] = [
 ];
 // Stay deploy-time whatever the settings table holds, and why.
 export const DEPLOY_ONLY: readonly { key: string; label: string; why: string; secret?: boolean }[] = [
-  { key: 'ACCESS_TEAM_DOMAIN', label: 'Access team', why: 'Sign-in boundary; must match your Access application.' },
-  { key: 'ACCESS_AUD', label: 'Access audience', why: 'Sign-in boundary; must match your Access application.' },
-  { key: 'ACCESS_ALLOWED_EMAILS', label: 'Who can sign in', why: 'Sign-in boundary; must match Access policy.' },
-  { key: 'AUTH_USERNAME', label: 'Password user name', why: 'Changing it here could lock you out.' },
-  { key: 'NUITS_PASSWORD', label: 'Password', why: 'Secret.', secret: true },
-  { key: 'APP_BASE_PATH', label: 'Address', why: 'Must match the Worker routes, or every page 404s.' },
-  { key: 'AI_MODE', label: 'Reader', why: 'mock would quietly stop real reading.' },
-  { key: 'MS_CLIENT_ID', label: 'OneDrive app', why: 'Must match the Microsoft Entra app and its secrets.' },
-  { key: 'MS_CLIENT_SECRET', label: 'OneDrive secret', why: 'Secret.', secret: true },
+  {
+    key: 'ACCESS_TEAM_DOMAIN',
+    label: 'Access team',
+    why: 'Part of your sign-in. It must match your Cloudflare Access application.',
+  },
+  {
+    key: 'ACCESS_AUD',
+    label: 'Access audience',
+    why: 'Part of your sign-in. It must match your Cloudflare Access application.',
+  },
+  {
+    key: 'ACCESS_ALLOWED_EMAILS',
+    label: 'Who can sign in',
+    why: 'Part of your sign-in. It must match your Cloudflare Access policy.',
+  },
+  { key: 'AUTH_USERNAME', label: 'Password user name', why: 'Changing it in the app could lock you out.' },
+  { key: 'NUITS_PASSWORD', label: 'Password', why: 'A secret, so it is never shown.', secret: true },
+  { key: 'APP_BASE_PATH', label: 'Address', why: 'It must match the Worker routes, or every page is missing.' },
+  { key: 'AI_MODE', label: 'Reader', why: 'The setting mock would quietly stop real reading.' },
+  { key: 'MS_CLIENT_ID', label: 'OneDrive app', why: 'It must match your Microsoft Entra app and its secrets.' },
+  { key: 'MS_CLIENT_SECRET', label: 'OneDrive secret', why: 'A secret, so it is never shown.', secret: true },
   {
     key: 'ONEDRIVE_TOKEN_KEY',
     label: 'OneDrive token key',
-    why: 'Secret; rotating it disconnects OneDrive.',
+    why: 'A secret. Changing it disconnects OneDrive.',
     secret: true,
   },
 ];

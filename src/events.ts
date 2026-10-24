@@ -85,6 +85,16 @@ const GROUP_SECTION: Record<string, string> = {
   integrations: 'setup-integrations',
 };
 
+// What a settings group is called in its banner: "Saved your accountant."
+const GROUP_WORDS: Record<string, string> = {
+  business: 'your business',
+  email: 'your email settings',
+  accountant: 'your accountant',
+  review: 'review and matching',
+  integrations: 'integrations',
+};
+const groupWords = (p: URLSearchParams) => GROUP_WORDS[p.get('group') ?? ''];
+
 export const EVENTS = {
   // ---------- Receipts ----------
   approved: { text: () => 'Approved.' },
@@ -263,13 +273,16 @@ export const EVENTS = {
   },
   // ---------- Settings ----------
   settingsSaved: {
-    text: () => 'Saved.',
+    text: (p) => (groupWords(p) ? `Saved ${groupWords(p)}.` : 'Saved.'),
     section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null,
   },
-  settingsSame: { text: () => 'Nothing changed.', section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null },
+  settingsSame: {
+    text: (p) => (groupWords(p) ? `Nothing changed in ${groupWords(p)}.` : 'Nothing changed.'),
+    section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null,
+  },
   settingReset: {
     text: (p) =>
-      `${words(p, 'label', 'That setting')} is back to the ${p.get('to') === 'deploy' ? 'deploy value' : 'default'}.`,
+      `${words(p, 'label', 'That setting')} is back to ${p.get('to') === 'deploy' ? 'the value set when deployed' : 'the built-in default'}.`,
     section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null,
   },
   accountCreated: { text: () => 'Account created.', section: () => 'accounts' },

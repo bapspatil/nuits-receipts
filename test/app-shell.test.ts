@@ -442,12 +442,20 @@ test('home closes the month and lists what needs you, counting undated receipts'
   ]);
   const first = await (await request('/')).text();
   expect(first).toContain('<h1>Welcome</h1>');
-  // A three-item setup checklist, then the upload.
+  // A five-item setup checklist that counts what is done, then the upload.
+  const checklist = first.match(/<section class="setup"[\s\S]*?<\/section>/)![0];
+  expect(checklist).toMatch(/Finish setting up <span>\d of 5 done<\/span>/);
   expect(
-    [...first.matchAll(/<a href="\/settings(#[a-z-]+)"><span class="vh">[^<]*<\/span><b>(\w+)<\/b>/g)].map(
-      (m) => `${m[2]} ${m[1]}`,
-    ),
-  ).toEqual(['Business #setup-business', 'Email #setup-email', 'Accountant #setup-accountant']);
+    [...checklist.matchAll(/<a href="([^"]+)"><span class="vh">[^<]*<\/span><b>([^<]+)<\/b>/g)].map((m) => m[1]),
+  ).toEqual([
+    '/settings#f-SELLER_NAMES',
+    '/settings?routing=1#setup-email',
+    '/settings#f-ACCOUNTANT_LABEL',
+    '/settings#accounts',
+    '/import',
+  ]);
+  expect(checklist).toContain('<b>Confirm Email Routing in Cloudflare</b>');
+  expect(checklist).toContain('href="/help"');
   expect(first).toContain('receipts@example.com');
   expect(primaries(first)).toBe(1);
 });

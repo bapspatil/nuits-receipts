@@ -1,5 +1,6 @@
 import { EXPONENTS, hash, InputError, MAX_CSV_BYTES, money, requireInput } from './domain';
 import type { Env } from './env';
+import { config } from './config';
 import { listAccounts, validateAccountChoice, type AccountChoice } from './accounts';
 import { parseCsv, validateMapping, inspectCsv, type CsvMapping } from './csv';
 import { suggestMappings } from './presets';
@@ -68,18 +69,22 @@ export const IMPORT = 'import';
 export async function importForm(env: Env): Promise<string> {
   const refused = failureFor(IMPORT);
   const accounts = await listAccounts(env.DB);
-  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (CSV file)<input type="file" name="file" accept=".csv,.txt" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${options(
-    'account',
-    accounts.map((a) => ({ value: a.id, label: `${a.label}${a.bank_name ? ' · ' + a.bank_name : ''}` })),
-    accounts[0]?.id,
-  )}${options(
-    'account_action',
-    [
-      { value: 'existing', label: 'The account chosen here' },
-      { value: 'new', label: 'A new account (fill in below)' },
-    ],
-    'existing',
-  )}</div><fieldset><legend>Only for a new account</legend><div class="fields">${input('account_label', '', 'text', 'Account name', { scope: IMPORT })}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? 'EUR', 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
+  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (CSV file)<input type="file" name="file" accept=".csv,.txt" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
+    accounts.length
+      ? `${options(
+          'account',
+          accounts.map((a) => ({ value: a.id, label: `${a.label}${a.bank_name ? ' · ' + a.bank_name : ''}` })),
+          accounts[0]?.id,
+        )}${options(
+          'account_action',
+          [
+            { value: 'existing', label: 'The account chosen here' },
+            { value: 'new', label: 'A new account (fill in below)' },
+          ],
+          'existing',
+        )}`
+      : '<input type="hidden" name="account_action" value="new">'
+  }</div><fieldset><legend>${accounts.length ? 'Only for a new account' : 'Your bank account'}</legend>${accounts.length ? '' : '<p class="small">You have no bank account yet. It is created when you import this file.</p>'}<div class="fields">${input('account_label', '', 'text', 'Account name', { scope: IMPORT, attrs: accounts.length ? '' : ' required placeholder="Main account"' })}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? config(env).defaultCurrency, 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
     'encoding',
     [
       { value: 'auto', label: 'Detect BOM or UTF-8' },
