@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset, reconcile, eurValue } from '../src/banking';
 import { getReceipt } from '../src/receipts';
-import { request, uploadPdf } from './helpers';
+import { idFrom, locationOf, request, uploadPdf } from './helpers';
 async function account(id: string, label: string) {
   await env.DB.prepare('INSERT INTO accounts(id,label,bank_name,default_currency,created_at) VALUES (?,?,?, ?,?)')
     .bind(id, label, 'Fake Bank', 'EUR', '2026-10-20')
@@ -20,7 +20,7 @@ async function bank(key: string, text = csv) {
 }
 async function receipt() {
   const response = await uploadPdf();
-  return getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+  return getReceipt(env, idFrom(response));
 }
 test('account picker and create/rename forms use immutable IDs and generic labels', async () => {
   // The import form lives on /import only (no longer duplicated on home and payments).
@@ -35,7 +35,7 @@ test('account picker and create/rename forms use immutable IDs and generic label
   });
   expect(created.status).toBe(303);
   // Accounts are configuration: the forms live in Settings, and so does the way back.
-  expect(created.headers.get('Location')).toBe('/settings#accounts');
+  expect(locationOf(created)).toBe('/settings?done=accountCreated#accounts');
   const id = await env.DB.prepare("SELECT id FROM accounts WHERE label='Fake Savings'").first<string>('id');
   expect(id).toBeTruthy();
   const renamed = await request('/accounts/' + id, {
@@ -43,7 +43,7 @@ test('account picker and create/rename forms use immutable IDs and generic label
     body: new URLSearchParams({ label: 'Renamed Savings' }),
   });
   expect(renamed.status).toBe(303);
-  expect(renamed.headers.get('Location')).toBe('/settings#accounts');
+  expect(locationOf(renamed)).toBe('/settings?done=accountRenamed&name=Renamed+Savings#accounts');
   expect(await env.DB.prepare('SELECT id FROM accounts WHERE label=?').bind('Renamed Savings').first('id')).toBe(id);
 });
 test('automatic matching searches all accounts and ambiguity across accounts stays unlinked', async () => {
@@ -98,7 +98,9 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   });
   expect(paired.status).toBe(303);
   // Transfers live on Bank now, in the month the money left.
-  expect(paired.headers.get('Location')).toBe('/payments?month=2026-09&show=all#transfers');
+  expect(locationOf(paired)).toMatch(
+    /^\/payments\?month=2026-09&show=all&done=transferMade&tx=[a-f0-9]{64}&name=[^&#]+#transfers$/,
+  );
   const page = await (await request('/payments?month=2026-09&show=all')).text();
   // Both legs say where the money went; Undo is in each row's More.
   expect(page).toContain(`<li class="pay" id="transfers">`);
@@ -113,7 +115,7 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   ).toBe(409);
   const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
   expect(undone.status).toBe(303);
-  expect(undone.headers.get('Location')).toBe('/payments?month=2026-09&show=all#transfers');
+  expect(locationOf(undone)).toMatch(/^\/payments\?month=2026-09&show=all&done=transferUndone#transfers$/);
   // Unpaired again: the debit is missing, and its More offers the pair once more.
   const again = await (await request('/payments?month=2026-09')).text();
   expect(again).toContain(

@@ -4,6 +4,7 @@
 // set (src/config.ts). Tokens are never logged; the refresh token is stored
 // only AES-GCM encrypted, and the access token lives for one request.
 import { InputError, requireInput } from './domain';
+import { withDone } from './events';
 import type { Env } from './env';
 import { config, type OneDriveConfig } from './config';
 import {
@@ -227,7 +228,7 @@ export async function connectCallback(env: Env, request: Request, url: URL, base
   return new Response(null, {
     status: 303,
     headers: {
-      Location: '/settings?onedrive=connected#onedrive',
+      Location: withDone('oneDriveConnected', '/settings#onedrive'),
       'Set-Cookie': stateCookie('', url.origin, base, 0),
     },
   });

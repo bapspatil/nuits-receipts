@@ -3,7 +3,7 @@
 import type { Env } from './env';
 import { config } from './config';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
-import { discardBanner, restoreForm } from './discard';
+import { restoreForm } from './discard';
 import { invoiceName } from './invoices';
 import type { MailRow } from './inbound';
 import {
@@ -18,7 +18,6 @@ import {
   page,
   pageHead,
   shortDay,
-  plural,
   receiptsSegment,
   tag,
 } from './ui';
@@ -119,26 +118,6 @@ export function chipOf(row: AllRow): { label: string; css: string } {
 function rowName(row: AllRow): string {
   if (row.type === 'mail') return row.sender ?? 'Unknown sender';
   return row.kind === 'sales' ? invoiceName(row) : (row.vendor ?? row.filename ?? 'Receipt');
-}
-
-// What an approve, ignore or delete did. Shown on the page it returns to.
-export function senderBanner(params: URLSearchParams): string {
-  const n = (key: string) => {
-    const value = Number(params.get(key));
-    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
-  };
-  let text = '';
-  if (params.has('approved')) {
-    const count = n('approved');
-    text = count ? `Allowed. Reading ${plural(count, 'email')}.` : 'Allowed.';
-  } else if (params.has('ignored')) {
-    const count = n('ignored');
-    text = count ? `Ignored. ${plural(count, 'email')} deleted.` : 'Ignored.';
-  } else if (params.get('deleted') === '1') text = 'Email deleted.';
-  else if (params.get('senders') === 'removed') text = 'Sender removed.';
-  else if (params.get('senders') === 'unignored') text = 'No longer ignored.';
-  else if (params.has('merged')) text = `${n('merged')} merged.`;
-  return text ? `<p class="banner" role="status">${escape(text)}</p>` : '';
 }
 
 // The Unknown senders block. back: where the forms return to. primary: the
@@ -250,14 +229,8 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     ? `<p class="small waiting"><a href="/review">${counts.review} in Review ›</a></p>`
     : '';
   const add = shown.length ? '<a class="btn secondary" href="/add">Add receipts</a>' : '';
-  return page(
-    query.month ? `Receipts ${query.month}` : 'Receipts',
-    `${receiptsSegment(counts, 'all', query.month)}${senderBanner(params)}${discardBanner(params, '/receipts')}${waiting}${chips}${find}${list}`,
-    200,
-    env,
-    {
-      nav: 'receipts',
-      head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),
-    },
-  );
+  return page('receipts', `${receiptsSegment(counts, 'all', query.month)}${waiting}${chips}${find}${list}`, 200, env, {
+    detail: query.month ? monthName(query.month) : undefined,
+    head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),
+  });
 }

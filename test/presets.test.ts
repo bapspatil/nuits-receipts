@@ -14,7 +14,7 @@ test('saved mappings are suggested by ordered header fingerprint with selected b
   expect((await savedPresets(env, ['Amount', 'Date', 'Payee'])).length).toBe(0);
   expect((await savedPresets(env, headers))[0]?.mapping).toEqual(mapping);
   await expect(savePreset(env, { bank_name: 'Synthetic A', name: 'monthly', headers, mapping })).rejects.toThrow(
-    /exists/i,
+    /already saved a layout/i,
   );
   expect(a.revision).toBe(0);
 });

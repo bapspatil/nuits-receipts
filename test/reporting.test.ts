@@ -3,11 +3,11 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { hash, type Receipt } from '../src/domain';
 import { getReceipt } from '../src/receipts';
-import { request, uploadPdf } from './helpers';
+import { request, uploadPdf, idFrom } from './helpers';
 
 test('matrix and CSV agree to the cent across provisional, missing, undated, duplicate, and estimated costs', async () => {
   const response = await uploadPdf(),
-    original = await getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+    original = await getReceipt(env, idFrom(response));
   async function copy(name: string, changes: Partial<Receipt>) {
     const id = await hash(name),
       fields = { ...original, id, original_key: 'receipts/' + id, ...changes };

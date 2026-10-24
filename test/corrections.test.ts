@@ -2,11 +2,11 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { correctReceipt, getReceipt, preserve, processReceipt } from '../src/receipts';
 import { eurValue } from '../src/banking';
-import { pdfBytes, request, uploadPdf } from './helpers';
+import { pdfBytes, request, uploadPdf, idFrom } from './helpers';
 
 async function receipt() {
   const response = await uploadPdf();
-  return getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+  return getReceipt(env, idFrom(response));
 }
 function form(revision: number, extra: Record<string, string> = {}) {
   const values = {
@@ -97,7 +97,7 @@ test('manual approval needs complete tax facts and records an exception reason',
         approval_reason: 'No printed number',
       }),
     ),
-  ).rejects.toThrow('Complete required');
+  ).rejects.toThrow('Fill in the seller');
   await correctReceipt(
     env,
     row.id,

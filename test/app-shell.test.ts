@@ -6,7 +6,7 @@ import { getReceipt, preserve } from '../src/receipts';
 import { FONT_FILES } from '../src/fonts';
 import { EXPORT_LINE, FOOTER_NOTICE } from '../src/ui';
 import type { Env } from '../src/env';
-import { authorization, htmlForm, request, uploadPdf } from './helpers';
+import { authorization, htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
 // The same five destinations in the header and the phone tab bar, on every page.
@@ -29,7 +29,7 @@ async function flaggedImage(variant = 0) {
 }
 async function readyPdf() {
   const response = await uploadPdf();
-  return getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+  return getReceipt(env, idFrom(response));
 }
 async function bankRows() {
   const text =
@@ -122,7 +122,9 @@ test('every page, including error pages, has the same five-item nav', async () =
   expect(missing.headers.get('Content-Type')).toContain('text/html');
   const missingHtml = await missing.text();
   expectShell(missingHtml, null);
-  expect(missingHtml).toContain('<div class="alert" role="alert"><p><strong>Not found</strong></p></div>');
+  expect(missingHtml).toContain(
+    '<div class="alert" role="alert"><p><strong>We couldn&#39;t find that page.</strong></p></div>',
+  );
   expect(missingHtml).toContain('<a class="btn primary" href="/review">Go back</a>');
   const body = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   body.set('action', 'approve');
@@ -133,9 +135,13 @@ test('every page, including error pages, has the same five-item nav', async () =
   });
   expect(refused.status).toBe(422);
   const refusedHtml = await refused.text();
-  expectShell(refusedHtml, null);
-  expect(refusedHtml).toContain('role="alert"><p><strong>Complete required facts before approval</strong>');
-  expect(refusedHtml).toContain('href="/">Go back</a>');
+  // The refused form comes back in place: the receipt page, what was typed, and the message at the field.
+  expectShell(refusedHtml, '/review');
+  expect(refusedHtml).toContain(
+    'role="alert"><p><strong>Nothing was saved.</strong> Fill in the seller, date, currency, total, amount before VAT and VAT, then approve. <a href="#f-',
+  );
+  expect(refusedHtml).toMatch(/aria-invalid="true" aria-describedby="e-receipt"/);
+  expect(refusedHtml).toMatch(/<p class="ferr" id="e-receipt">Fill in the seller/);
   // A server failure renders the same way with the same message.
   const prepare = env.DB.prepare.bind(env.DB);
   const spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
@@ -244,7 +250,7 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(phone).toMatch(/nav\.tabs\{display:block;position:fixed;[^}]*bottom:0/);
   expect(phone).toMatch(/nav\.tabs a\{[^}]*min-height:3\.5rem/);
   expect(phone).toContain('env(safe-area-inset-bottom)');
-  expect(phone).toContain('body{padding-bottom:var(--tabs)}');
+  expect(phone).toContain('body{padding-bottom:var(--tabbar-height)}');
   expect(phone).toContain('html{scroll-padding-bottom:');
   expect(phone).toContain('textarea:focus) :is(nav.tabs,.fix .actions){display:none}');
   expect(phone).not.toContain(':hover');
@@ -326,12 +332,12 @@ test('old Month and More addresses redirect, keeping the query exactly', async (
     expect(more.status, method).toBe(302);
     expect(more.headers.get('Location'), method).toBe('/settings');
   }
-  expect((await request('/month')).headers.get('Location')).toBe('/');
+  expect(locationOf(await request('/month'))).toBe('/');
   const based = { ...env, APP_BASE_PATH: '/app' } as Env;
   const at = (path: string) =>
     worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), based);
-  expect((await at('/app/month' + query)).headers.get('Location')).toBe('/app/' + query);
-  expect((await at('/app/more')).headers.get('Location')).toBe('/app/settings');
+  expect(locationOf(await at('/app/month' + query))).toBe('/app/' + query);
+  expect(locationOf(await at('/app/more'))).toBe('/app/settings');
   // Sign-in comes first: no redirect without it.
   for (const path of ['/month?month=2026-09', '/more']) {
     const anonymous = await worker.fetch(new Request('http://localhost' + path), env);
@@ -382,8 +388,8 @@ test('flagged fields are one compact row: the question labels the input, its sen
   // Phones keep Approve above the tab bar, never over the focused field: it hides while typing,
   // and scrolling into view leaves room for it.
   const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
-  expect(phone).toContain('.fix .actions{position:sticky;bottom:var(--tabs);');
-  expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabs) + 88px)}');
+  expect(phone).toContain('.fix .actions{position:sticky;bottom:var(--tabbar-height);');
+  expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
   expect(html).not.toMatch(/\n\.actions\{[^}]*position:sticky/);
 });
 
@@ -661,8 +667,10 @@ test('rarely used things sit behind one More per object, named for screen reader
   const bank = await (await request('/payments?month=2026-09&show=all')).text();
   expect(bank).not.toContain('Technical details');
   const more = [...bank.matchAll(/<details class="more"><summary aria-label="More for ([^"]+)">More<\/summary>/g)];
-  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop', 'Fake Customer']);
-  // Remove match and the payment ID wait in More; the row shows only the receipt link.
+  // A row has a More only when it has an action to hide; the payment ID is not shown at all.
+  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy']);
+  expect(bank).not.toMatch(/ID <code>/);
+  // Remove match waits in More; the row shows only the receipt link.
   const matchedRow = bank.match(/<li class="pay">[\s\S]*?<\/li>/)![0];
   expect(matchedRow).toMatch(/<details class="more">[\s\S]*value="unlink">Remove match<\/button>/);
   // Bank opens on Missing; the footer trio and the Transfers section are gone.
@@ -678,21 +686,24 @@ test('rarely used things sit behind one More per object, named for screen reader
 test('one type and spacing scale, 44px targets, and a footer clear of the tab bar', async () => {
   const html = await (await request('/')).text();
   const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
-  expect(css).toContain('h1{font-size:1.75rem;');
-  expect(css).toMatch(/@media \(max-width:640px\)\{[\s\S]*h1\{font-size:1\.5rem\}/);
-  expect(css).toContain('h2{font-size:1.125rem;');
-  expect(css).toContain('font:400 1rem/1.5 var(--ui)');
-  // No text under 12px.
+  expect(css).toContain('h1{font-size:var(--text-2xl);');
+  expect(css).toMatch(/@media \(max-width:640px\)\{[\s\S]*h1\{font-size:var\(--text-xl\)\}/);
+  expect(css).toContain('h2{font-size:var(--text-lg);');
+  expect(css).toContain('font:400 var(--text-base)/1.5 var(--font-ui)');
+  // No text under 12px, in the type tokens or in a raw length.
+  for (const [, size] of css.matchAll(/--text-\w+:([\d.]+)rem/g)) expect(Number(size)).toBeGreaterThanOrEqual(0.75);
   for (const [, size] of css.matchAll(/font(?:-size)?:(?:\d+ )?\.(\d+)rem/g))
     expect(Number(`0.${size}`)).toBeGreaterThanOrEqual(0.75);
+  // Spacing comes from --space-1..8; the only raw lengths left are a hairline and one negative nudge.
+  expect([...css.matchAll(/--space-\d:(\d+)px/g)].map((m) => Number(m[1]))).toEqual([4, 8, 12, 16, 24, 32, 48, 64]);
   const spacing = new Set<number>();
   for (const [, value] of css.matchAll(/(?<![\w-])(?:padding|margin|gap)(?:-(?:top|right|bottom|left))?:([^;}]+)/g))
     for (const [, px] of value!.matchAll(/(?:^|[\s(,-])(\d+)px/g)) spacing.add(Number(px));
-  expect([...spacing].sort((a, b) => a - b)).toEqual([1, 4, 8, 12, 16, 24, 32, 48]);
+  expect([...spacing].sort((a, b) => a - b)).toEqual([1, 12]);
   for (const rule of ['label.check{', '.list a{', '.why>summary{', '.chips a{'])
     expect(css.slice(css.indexOf(rule)).split('}')[0], rule).toContain('min-height:44px');
   // Chip borders reach 3:1 against the page.
-  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--ink-soft)');
+  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--text-muted)');
   expect(css).not.toContain('.kicker');
 });
 
@@ -707,7 +718,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   skip.set('vendor', 'Typed Then Skipped');
   skip.set('action', 'skip');
   const skipped = await request(`/receipts/${flagged.id}`, { method: 'POST', body: skip });
-  expect(skipped.headers.get('Location')).toBe(`/receipts/${second.id}`);
+  expect(locationOf(skipped)).toBe(`/receipts/${second.id}?done=skipped`);
   expect((await getReceipt(env, flagged.id)).vendor).toBe('Typed Then Skipped');
   expect((await getReceipt(env, flagged.id)).status).toBe('needs_review');
   // Approve opens the next one with a one-word confirmation.
@@ -716,15 +727,20 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
     approve.set(k, v);
   approve.set('action', 'approve');
   const approved = await request(`/receipts/${second.id}`, { method: 'POST', body: approve });
-  expect(approved.headers.get('Location')).toBe(`/receipts/${flagged.id}?approved=1`);
-  expect(await (await request(`/receipts/${flagged.id}?approved=1`)).text()).toContain(
+  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?done=approved`);
+  expect(await (await request(await signed(`/receipts/${flagged.id}?done=approved`))).text()).toContain(
     '<p class="banner" role="status">Approved.</p>',
   );
   const last = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
   last.set('action', 'approve');
-  expect((await request(`/receipts/${flagged.id}`, { method: 'POST', body: last })).headers.get('Location')).toBe(
-    '/review',
+  expect(locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }))).toBe(
+    '/review?done=approvedLast',
+  );
+  // The empty Review says what happened and points at the next step.
+  const empty = await (await request(await signed('/review?done=approvedLast'))).text();
+  expect(empty).toContain(
+    '<p class="banner" role="status">That was the last one. Everything is checked. <a href="/payments">Match your bank payments</a></p>',
   );
 });
 
@@ -736,15 +752,17 @@ test('a ready receipt has one Save; a new problem sends it back to Review', asyn
   expect(html).toContain('<details class="all" open><summary>All fields</summary>');
   const form = htmlForm(html, `/receipts/${ready.id}`);
   form.set('action', 'save');
-  expect((await request(`/receipts/${ready.id}`, { method: 'POST', body: form })).headers.get('Location')).toBe(
-    `/receipts/${ready.id}`,
+  expect(locationOf(await request(`/receipts/${ready.id}`, { method: 'POST', body: form }))).toBe(
+    `/receipts/${ready.id}?done=saved`,
   );
   form.set('revision', String((await getReceipt(env, ready.id)).revision));
   form.set('vat', '');
   const moved = await request(`/receipts/${ready.id}`, { method: 'POST', body: form });
-  expect(moved.headers.get('Location')).toBe(`/receipts/${ready.id}?moved=1`);
+  expect(locationOf(moved)).toBe(`/receipts/${ready.id}?done=movedBack`);
   expect((await getReceipt(env, ready.id)).status).toBe('needs_review');
-  expect(await (await request(`/receipts/${ready.id}?moved=1`)).text()).toContain('Moved back to Review.');
+  expect(await (await request(await signed(`/receipts/${ready.id}?done=movedBack`))).text()).toContain(
+    'it moved back to Review.',
+  );
 });
 
 test('the receipt page: flags first, All fields closed, rare actions under one More', async () => {

@@ -375,7 +375,7 @@ export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
       record: mapping.headerRecord + 1,
       field: 'mapping',
       code: 'mapping_column',
-      message: 'Mapped column is missing from header',
+      message: "One of the columns you chose isn't in the file. Choose the columns again.",
     });
     return preview;
   }
@@ -393,7 +393,7 @@ export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
         record: i + 1,
         field: 'row',
         code: 'column_count',
-        message: 'Column count differs from header',
+        message: 'This row has a different number of columns from the header row.',
       });
       continue;
     }

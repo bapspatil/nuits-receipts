@@ -102,12 +102,9 @@ export const journeys = [
           label: 'Sample Domain Desk · 12 Sep 2026 · EUR 12.00',
         });
         await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
-        if (rec.deadEnds.length) {
-          rec.note(`Matching without the exception box: "${(await page.locator('[role=alert]').innerText()).trim()}"`);
-          await rec.click(link(page, 'Go back'));
-          await rec.select(row('DOMAINDESK').locator('select'), {
-            label: 'Sample Domain Desk · 12 Sep 2026 · EUR 12.00',
-          });
+        // The refusal comes back on the Bank page, on that row, with the choice kept.
+        if (rec.inlineErrors.length) {
+          rec.note(`Matching without the exception box: "${(await page.locator('main [role=alert]').innerText()).trim()}"`);
           await rec.click(row('DOMAINDESK').locator('input[type=checkbox][name=confirm_exception]'));
           await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
         }

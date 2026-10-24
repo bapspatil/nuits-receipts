@@ -13,7 +13,9 @@ import {
   savePreset,
   type ParsedImport,
 } from './banking';
-import { day, escape, input, page, pageHead, select } from './ui';
+import { ariaFor, day, errorLine, escape, input, page, pageHead, select } from './ui';
+import { failureFor, kept } from './request';
+import { withDone } from './events';
 
 function hidden(name: string, value: unknown): string {
   return `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`;
@@ -53,16 +55,20 @@ const LABELS: Record<string, string> = {
 };
 const label = (name: string) => LABELS[name] ?? name.replaceAll('_', ' ');
 function options(name: string, values: readonly { value: string; label: string }[], current: unknown): string {
-  return `<label>${escape(label(name))}<select name="${name}">${values.map((v) => `<option value="${escape(v.value)}"${v.value === String(current) ? ' selected' : ''}>${escape(v.label)}</option>`).join('')}</select></label>`;
+  const shown = String(kept(IMPORT, name, current));
+  return `<label>${escape(label(name))}<select name="${name}" id="f-${name}"${ariaFor(IMPORT, name)}>${values.map((v) => `<option value="${escape(v.value)}"${v.value === shown ? ' selected' : ''}>${escape(v.label)}</option>`).join('')}</select>${errorLine(IMPORT, name)}</label>`;
 }
 // Presets are named after the CSV layout they read, never as a bank product.
 export function presetLabel(p: { id: string; bank_name: string; name: string }): string {
   if (p.id.startsWith('builtin-')) return `${p.bank_name} (CSV layout)`;
   return p.bank_name ? `${p.name} · ${p.bank_name} (CSV layout)` : `${p.name} (CSV layout)`;
 }
+// The first step's form, as the failure scope names it.
+export const IMPORT = 'import';
 export async function importForm(env: Env): Promise<string> {
+  const refused = failureFor(IMPORT);
   const accounts = await listAccounts(env.DB);
-  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2><div class="fields"><label class="wide">Bank statement (CSV file)<input type="file" name="file" accept=".csv,.txt" required></label>${options(
+  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (CSV file)<input type="file" name="file" accept=".csv,.txt" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${options(
     'account',
     accounts.map((a) => ({ value: a.id, label: `${a.label}${a.bank_name ? ' · ' + a.bank_name : ''}` })),
     accounts[0]?.id,
@@ -73,7 +79,7 @@ export async function importForm(env: Env): Promise<string> {
       { value: 'new', label: 'A new account (fill in below)' },
     ],
     'existing',
-  )}</div><fieldset><legend>Only for a new account</legend><div class="fields">${input('account_label', '', 'text', 'Account name')}${input('bank_name', '', 'text', 'Bank')}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? 'EUR', 'Currency')}</div></fieldset><details><summary>File options</summary><div class="body">${options(
+  )}</div><fieldset><legend>Only for a new account</legend><div class="fields">${input('account_label', '', 'text', 'Account name', { scope: IMPORT })}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? 'EUR', 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
     'encoding',
     [
       { value: 'auto', label: 'Detect BOM or UTF-8' },
@@ -96,7 +102,7 @@ export function wizard(step: 1 | 2 | 3): string {
 function bytesFromForm(form: FormData): Uint8Array {
   const file = form.get('file'),
     encoded = form.get('csv');
-  requireInput(file instanceof File || typeof encoded === 'string', 'Choose CSV');
+  requireInput(file instanceof File || typeof encoded === 'string', 'Choose CSV', 422, 'file');
   requireInput(
     !(typeof encoded === 'string') || encoded.length <= 4 * Math.ceil(MAX_CSV_BYTES / 3),
     'CSV too large',
@@ -127,6 +133,20 @@ function json(value: string | File | null): unknown {
     throw new InputError('Invalid preview settings');
   }
 }
+// The control behind a refusal of the new-account details, from what the message names.
+function accountField(error: unknown): never {
+  if (error instanceof InputError && !error.field) {
+    const named = /label/i.test(error.message)
+      ? 'account_label'
+      : /bank/i.test(error.message)
+        ? 'bank_name'
+        : /currency/i.test(error.message)
+          ? 'account_currency'
+          : undefined;
+    if (named) error.field = named;
+  }
+  throw error;
+}
 async function accountFromForm(env: Env, form: FormData): Promise<AccountChoice> {
   if (form.has('account_choice')) return validateAccountChoice(env.DB, json(form.get('account_choice')));
   return validateAccountChoice(
@@ -139,12 +159,12 @@ async function accountFromForm(env: Env, form: FormData): Promise<AccountChoice>
           default_currency: String(form.get('account_currency') ?? 'EUR'),
         }
       : { kind: 'existing', id: String(form.get('account') ?? '') },
-  );
+  ).catch(accountField);
 }
 function column(form: FormData, key: string, optional = false): number | null {
   const value = String(form.get(key) ?? '');
   if (optional && value === '') return null;
-  requireInput(/^\d+$/.test(value), `Map ${key}`);
+  requireInput(/^\d+$/.test(value), 'Choose a column for every field the file needs', 422, key);
   return Number(value);
 }
 function mappingFromEditor(form: FormData, base: CsvMapping): CsvMapping {
@@ -244,6 +264,18 @@ function mappingEditor(mapping: CsvMapping, headers: string[], currency: string,
       c.kind,
     )}${pick('default_currency', Object.keys(EXPONENTS), c.kind === 'default' ? c.currency : currency)}${col('map_currency', c.kind === 'column' ? c.column : null)}${pick('currency_blank_default', ['', ...Object.keys(EXPONENTS)], c.kind === 'column' ? c.blankDefault : '')}${col('map_merchant', mapping.merchant)}${col('map_reference', mapping.reference)}${col('map_external_id', mapping.externalId)}${col('map_original_amount', mapping.original?.amount ?? null)}${col('map_original_currency', mapping.original?.currency ?? null)}</div></fieldset>`;
 }
+// What a row problem calls the column it is about.
+const ISSUE_FIELDS: Record<string, string> = {
+  date: 'date',
+  merchant: 'paid to',
+  currency: 'currency',
+  amount: 'amount',
+  original_currency: 'original currency',
+  original_amount: 'original amount',
+  csv: 'file',
+  mapping: 'column settings',
+  row: 'columns',
+};
 type ImportState = { overlaps: string[]; otherAccounts: string[] };
 async function currentState(env: Env, parsed: ParsedImport, bytes: Uint8Array): Promise<ImportState> {
   const identity = await importIdentity(parsed.rows[0]!.account_key, bytes);
@@ -393,7 +425,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
           .slice(0, 100)
           .map(
             (e) =>
-              `<p class="warning">Row ${e.record}, ${escape(e.field)}: ${escape(e.message)} <span class="small">(${escape(e.code)})</span></p>`,
+              `<p class="warning">Row ${e.record}, ${escape(ISSUE_FIELDS[e.field] ?? e.field)}: ${escape(e.message)}</p>`,
           )
           .join('')}<p class="small">Adjust how we read the file below, then check it again.</p></div>`
       : '';
@@ -440,8 +472,8 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
     confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><details><summary>Save this layout for next time</summary><div class="body"><div class="fields">${input('preset_bank', savedAccount.bank_name, 'text', 'Bank')}${input('preset_name', '', 'text', 'Layout name', { hint: 'Optional. Used for files with the same columns.' })}</div></div></details><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
   }
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${table}${exclusions}${confirm}${editor}</form>`;
-  return page('Check the file', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
-    nav: 'bank',
+  return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
+    detail: 'Check the file',
     head: pageHead('Check the file'),
   });
 }
@@ -526,11 +558,11 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
       });
     } catch (error) {
       return page(
-        'Import complete',
+        'import',
         `${wizard(3)}<div class="banner" role="status">Transactions were imported. Preset was not saved.</div><p class="lede">${escape(error instanceof InputError ? error.message : 'Storage unavailable. Try saving the mapping again.')}</p><a class="btn primary" href="/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}">Match receipts</a>`,
         200,
         env,
-        { nav: 'bank' },
+        { detail: 'Import complete' },
       );
     }
   }
@@ -546,7 +578,11 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
   return new Response(null, {
     status: 303,
     headers: {
-      Location: `/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}&inserted=${inserted}&skipped=${skipped}&replayed=${prior?.status === 'complete' ? parsed.rows.length : 0}`,
+      Location: withDone('imported', `/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}`, {
+        inserted,
+        skipped,
+        replayed: prior?.status === 'complete' ? parsed.rows.length : 0,
+      }),
     },
   });
 }

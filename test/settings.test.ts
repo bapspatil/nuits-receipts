@@ -8,7 +8,7 @@ import { kindFor } from '../src/receipts';
 import { applied, layer, SETTING_VALUE_LIMIT, sourceOf, withSettings, type Row } from '../src/settings';
 import { DATA_LINE } from '../src/ui';
 import type { Env } from '../src/env';
-import { request } from './helpers';
+import { locationOf, request, signed } from './helpers';
 
 const page = async () => (await request('/settings')).text();
 const decode = (s: string) =>
@@ -50,7 +50,8 @@ async function save(fields: Record<string, string | string[]>, group: string, or
   return request('/settings/setup', { method: 'POST', body: form, headers: { Origin: origin } });
 }
 const rows = async () =>
-  (await env.DB.prepare('SELECT key,value_json,updated_by FROM settings ORDER BY key').all()).results;
+  (await env.DB.prepare("SELECT key,value_json,updated_by FROM settings WHERE key<>'_FEEDBACK_KEY' ORDER BY key").all())
+    .results;
 const audit = async () =>
   (
     await env.DB.prepare(
@@ -90,7 +91,7 @@ test('with nothing saved, every value comes from the deploy or the default', asy
 test('a saved value wins over the deploy value, is audited, and Reset goes back', async () => {
   const response = await save({ APP_NAME: 'Example Books', ACCOUNTANT_LABEL: 'ignored: other group' }, 'business');
   expect(response.status).toBe(303);
-  expect(response.headers.get('Location')).toBe('/settings?saved=business#setup-business');
+  expect(locationOf(response)).toBe('/settings?done=settingsSaved&group=business#setup-business');
   expect(await rows()).toEqual([{ key: 'APP_NAME', value_json: '"Example Books"', updated_by: 'password' }]);
   const html = await page();
   expect(html).toContain('Example Books</a>'); // the header brand
@@ -135,9 +136,13 @@ test('Reset posts its own small form, so Enter in a field still means Save', asy
   body.set('revision', reset[1]!.match(/name="revision" value="(\d+)"/)![1]!);
   body.set('reset', 'APP_NAME');
   const response = await request('/settings/setup/reset', { method: 'POST', body });
-  expect(response.headers.get('Location')).toBe('/settings?reset=APP_NAME#setup-business');
+  expect(locationOf(response)).toBe(
+    '/settings?done=settingReset&label=App+name&group=business&to=deploy#setup-business',
+  );
   expect(await rows()).toEqual([]);
-  expect(await (await request('/settings?reset=APP_NAME')).text()).toContain('App name is back to the deploy value.');
+  expect(
+    await (await request(await signed('/settings?done=settingReset&label=App+name&group=business&to=deploy'))).text(),
+  ).toContain('App name is back to the deploy value.');
 });
 
 test('the page is one fold per section, one Save per group and history tucked away', async () => {
@@ -317,8 +322,8 @@ test('the email handler reads in-app senders and forward-copy target', async () 
 
 test('a changed invoice address shows the routing checklist and keeps the old one for 30 days', async () => {
   const response = await save({ INVOICES_ADDRESS: 'sales@example.com', confirm_INVOICES_ADDRESS: 'yes' }, 'email');
-  expect(response.headers.get('Location')).toBe('/settings?saved=email&routing=1#setup-email');
-  const html = await (await request('/settings?saved=email&routing=1')).text();
+  expect(locationOf(response)).toBe('/settings?routing=1&done=settingsSaved&group=email#setup-email');
+  const html = await (await request(await signed('/settings?routing=1&done=settingsSaved&group=email'))).text();
   expect(html).toContain('Now update Cloudflare Email Routing');
   expect(html).toContain('<code>sales@example.com</code>');
   expect(html).toContain('Mail to <code>invoices@example.com</code> still counts as an invoice for 30 days.');

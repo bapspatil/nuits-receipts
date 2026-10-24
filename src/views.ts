@@ -8,11 +8,11 @@ import type { Env } from './env';
 import { config, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts } from './setup';
 import { heldMail, ignoredSenders } from './inbound';
-import { heldSection, senderBanner } from './all';
+import { heldSection } from './all';
 import { mergePlan } from './dedupe';
-import { discardBanner, discardControl, restoreForm } from './discard';
+import { discardControl, restoreForm } from './discard';
+import { feedback } from './events';
 import { DISCARD_REASONS } from './domain';
-import { FIELD, type SettingKey } from './settings';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
 import { invoiceName, overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
@@ -54,7 +54,13 @@ import {
   stamp,
   tag,
   uploadForm,
+  ariaFor,
+  chosenReceipt,
+  errorLine,
+  exceptionBox,
+  matchError,
 } from './ui';
+import { failureFor, kept } from './request';
 
 type Payment = Transaction & { account_name: string; bank_name: string };
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
@@ -249,12 +255,11 @@ export async function reviewPage(
         ? ''
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
-    'Review',
-    `${senderBanner(params)}${discardBanner(params, '/review')}${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    'review',
+    `${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
-      nav: 'review',
       head: pageHead(
         all.length
           ? `${all.length} to check`
@@ -317,7 +322,9 @@ export async function queueAround(
   return { position, total: queue.length, next };
 }
 
-export async function receiptPage(env: Env, r: Receipt, params = new URLSearchParams()): Promise<Response> {
+// The failure scope of the receipt form.
+const RECEIPT = 'receipt';
+export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const sales = r.kind === 'sales';
   const eur = await eurValue(env, r);
   const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100').all<Rule>())
@@ -384,11 +391,13 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
     const id = `f-${name}`;
     const label = sales && name === 'total' ? 'Total invoiced' : FIELD_LABELS[name];
     const hint = FIELD_HINTS[name];
-    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${flagged && (values[name] === null || values[name] === '') ? ' aria-invalid="true"' : ''}`;
+    // A refused field says so; otherwise a flagged empty one is marked.
+    const refused = ariaFor(RECEIPT, name);
+    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${refused || (flagged && (values[name] === null || values[name] === '') ? ' aria-invalid="true"' : '')}`;
     const text = (type: string, extra = '', value = values[name]) =>
-      `<input name="${name}" value="${escape(value)}" type="${type}"${extra}${attrs}>`;
+      `<input name="${name}" value="${escape(kept(RECEIPT, name, value))}" type="${type}"${extra}${attrs}>`;
     const choose = (list: { v: string; l: string }[], current: string) =>
-      `<select name="${name}" id="${id}"${flagged ? ' aria-invalid="true"' : ''}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === current ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
+      `<select name="${name}" id="${id}"${refused || (flagged ? ' aria-invalid="true"' : '')}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === kept(RECEIPT, name, current) ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
     const one = (html: string): Control[] => [{ id, label, html }];
     switch (name) {
       case 'vat_treatment':
@@ -436,12 +445,12 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
           {
             id: 'f-eur_override_reason',
             label: 'Why',
-            html: `<input name="eur_override_reason" value="${escape(r.eur_override_reason)}" type="text" id="f-eur_override_reason" placeholder="Needed with a euro amount">`,
+            html: `<input name="eur_override_reason" value="${escape(kept(RECEIPT, 'eur_override_reason', r.eur_override_reason))}" type="text" id="f-eur_override_reason" placeholder="Needed with a euro amount"${ariaFor(RECEIPT, 'eur_override_reason')}>`,
           },
         ];
       case 'duplicate_of':
         return one(
-          `<select name="duplicate_of" id="${id}"><option value="">Not a duplicate</option>${duplicates.map((d) => receiptOption(d, d.id === r.duplicate_of)).join('')}</select>`,
+          `<select name="duplicate_of" id="${id}"${refused}><option value="">Not a duplicate</option>${duplicates.map((d) => receiptOption(d, d.id === kept(RECEIPT, 'duplicate_of', r.duplicate_of))).join('')}</select>`,
         );
       case 'issue_date':
       case 'due_date':
@@ -457,7 +466,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
   };
   // One row: the label on the left, the control on the right.
   const row = (c: Control, label = escape(c.label), title = '') =>
-    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label></div><div class="sc">${c.html}</div></div>`;
+    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label></div><div class="sc">${c.html}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
   const rows = (name: FlagField | 'due_date') =>
     controls(name)
       .map((c) => row(c))
@@ -521,19 +530,21 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
   const heading = reading ? 'Reading' : needs ? `${cards.length} to check` : '';
-  const note = `<details class="note"><summary>Note</summary><div class="body rowlist">${row({
-    id: 'f-approval_reason',
-    label: 'For your accountant',
-    html: '<input name="approval_reason" value="Checked against the original" type="text" id="f-approval_reason">',
-  })}</div></details>`;
+  const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
+    {
+      id: 'f-approval_reason',
+      label: 'For your accountant',
+      html: `<input name="approval_reason" value="${escape(kept(RECEIPT, 'approval_reason', 'Checked against the original'))}" type="text" id="f-approval_reason"${ariaFor(RECEIPT, 'approval_reason')}>`,
+    },
+  )}</div></details>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const actions = `<div class="actions">${unverified ? retryButton('Read it', 'primary') : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}${
     needs || reading
       ? `<button class="btn ${primary}" name="action" value="approve">Approve</button>`
       : '<button class="btn primary" name="action" value="save">Save</button>'
   }</div>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${hidden('revision', r.revision)}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}
-    <details class="all"${cards.length ? '' : ' open'}><summary>All fields</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}
+    <details class="all"${cards.length && !failureFor(RECEIPT) ? '' : ' open'}><summary>All fields</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}${actions}</form>`;
   const matches = sales
     ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
@@ -541,7 +552,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       ? `<section aria-labelledby="match-h" class="matchs"><h2 id="match-h">Payment?</h2>${suggestions
           .map(
             (t) =>
-              `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label><button class="btn secondary" name="action" value="link">Match</button></form>`,
+              `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
           )
           .join('')}</section>`
       : '';
@@ -574,12 +585,6 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       : !needs && next
         ? `<a href="/receipts/${next}">Next to check ›</a>`
         : '';
-  const banner =
-    params.get('moved') === '1'
-      ? '<p class="banner" role="status">Moved back to Review.</p>'
-      : params.get('approved') === '1'
-        ? '<p class="banner" role="status">Approved.</p>'
-        : '';
   const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
     .bind(r.id)
     .first());
@@ -593,12 +598,12 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
       : stamp(r, !!eur.transaction);
   return page(
-    receiptName(r),
-    `${banner}${discardBanner(params, `/receipts/${r.id}`)}<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
+    needs && !gone ? 'reviewItem' : 'receipt',
+    `<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
     200,
     env,
     {
-      nav: needs && !gone ? 'review' : 'receipts',
+      detail: receiptName(r),
       head: `<div class="crumbs">${back}${where}${skip}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
   );
@@ -611,13 +616,6 @@ export async function payments(
   offset: number,
   params = new URLSearchParams(),
 ): Promise<Response> {
-  const result = ['inserted', 'skipped', 'replayed']
-    .map((key) => {
-      const value = params.get(key);
-      return value !== null && /^\d{1,4}$/.test(value) ? `${Number(value)} ${key}` : null;
-    })
-    .filter(Boolean)
-    .join(', ');
   const rows = (
     await env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
@@ -663,14 +661,12 @@ export async function payments(
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
   const shown = show === 'missing' ? missing : rows;
-  const exact =
-    '<label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label>';
+  // Which account a payment came from matters only when there is more than one.
+  const accounts = new Set(rows.map((t) => t.account_key));
   const items = shown
     .map((t) => {
       const pair = paired.get(t.id);
-      const extra: string[] = [
-        `<p class="hint">${escape(t.account_name)}${t.bank_name ? ` · ${escape(t.bank_name)}` : ''} · ID <code>${t.id}</code></p>`,
-      ];
+      const extra: string[] = [];
       let status: string,
         controls = '';
       if (pair) {
@@ -692,7 +688,7 @@ export async function payments(
         const likely = invoices.filter((r) => creditFit(r, t, config(env).tuning) !== null);
         const others = invoices.filter((r) => !likely.includes(r));
         if (invoices.length && t.amount_minor > 0 && t.receipt_required)
-          controls = `<details${likely.length ? ' open' : ''}><summary>Find invoice</summary><div class="body"><form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Invoice"><option value="">Choose an invoice</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other open invoices">${others.map((r) => receiptOption(r)).join('')}</optgroup>` : ''}</select>${exact}<button class="btn secondary" name="action" value="link">Match</button></form></div></details>`;
+          controls = `<details${likely.length || failureFor(`match:${t.id}`) ? ' open' : ''}><summary>Find invoice</summary><div class="body"><form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Invoice"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose an invoice</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other open invoices">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}</div></details>`;
       } else if (!t.receipt_required) {
         status = tag('No receipt');
         extra.push(
@@ -704,9 +700,9 @@ export async function payments(
         const likely = suggestionsFor(t, receipts, rules, config(env).tuning);
         const others = receipts.filter((r) => !likely.includes(r));
         const find = receipts.length
-          ? `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Receipt"><option value="">Choose a receipt</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other ready receipts">${others.map((r) => receiptOption(r)).join('')}</optgroup>` : ''}</select>${exact}<button class="btn ${first ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`
+          ? `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Receipt"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose a receipt</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other ready receipts">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn ${first ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`
           : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
-        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">Not a purchase</button></form></div>`;
+        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">Not a purchase</button></form></div>${matchError(t.id)}`;
         if (receipts.length)
           extra.push(
             `<form action="/matches" method="post" class="inline-edit"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="confirm_exception" value="yes"><input name="receipt_id_manual" autocomplete="off" aria-label="Receipt ID" placeholder="Receipt ID"><button class="btn secondary" name="action" value="link">Match</button></form>`,
@@ -719,7 +715,7 @@ export async function payments(
             `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span> ${status}</span>${more(extra.join(''), escape(t.merchant))}</div>${controls}</li>`;
+      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span>${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''} ${status}</span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
     })
     .join('');
   const others = elsewhere.length
@@ -751,16 +747,10 @@ export async function payments(
         `No statement for ${escape(monthName(selected))} yet.`,
         '<a class="btn primary" href="/import">Import statement</a>',
       );
-  return page(
-    `Payments for ${selected}`,
-    `<p role="status" class="banner">${result ? `Import done: ${escape(result)}.` : ''}</p>${others}${body}${await statements(env)}`,
-    200,
-    env,
-    {
-      nav: 'bank',
-      head: monthHead('/payments', selected),
-    },
-  );
+  return page('bank', `${others}${body}${await statements(env)}`, 200, env, {
+    detail: monthName(selected),
+    head: monthHead('/payments', selected),
+  });
 }
 
 // ---------- Home: close the month ----------
@@ -777,11 +767,11 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
       ['#setup-accountant', 'Accountant', settings.accountantLabel !== 'your accountant'],
     ];
     return page(
-      'Home',
+      'home',
       `<ol class="steps" aria-label="Set up">${setup.map(([href, label, done]) => `<li class="step${done ? ' done' : ''}"><a href="/settings${href}"><b>${label}</b><span>${done ? 'Done' : 'Set up'}</span></a></li>`).join('')}</ol><div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
       200,
       env,
-      { nav: 'home', head: pageHead('Welcome') },
+      { head: pageHead('Welcome') },
     );
   }
   const s: MonthState = await monthState(env, selected);
@@ -834,11 +824,11 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
     .filter(Boolean)
     .join(', ');
   return page(
-    'Home',
+    'home',
     `${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status)}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
     200,
     env,
-    { nav: 'home', head: monthHead('/', selected) },
+    { detail: monthName(selected), head: monthHead('/', selected) },
   );
 }
 
@@ -864,8 +854,7 @@ async function sendStep(
   current: number,
   params: URLSearchParams,
 ): Promise<{ status: string; body: string }> {
-  const settings = config(env),
-    short = escape(monthName(selected, false));
+  const settings = config(env);
   const empty = s.docs === 0,
     ready = s.done.review && s.done.match && !empty,
     changed = !!s.send.last && s.send.changed && !empty;
@@ -873,7 +862,8 @@ async function sendStep(
   const kind = current === 3 ? 'primary' : 'secondary';
   const defaults: PackageOptions = { anyway: !ready, undated: false, changes: changed };
   // While an upload runs, the URL carries its options so "Continue" repeats them.
-  const chosen = params.has('upload') ? options(params) : defaults;
+  const uploading = ['driveDone', 'driveMore'].includes(params.get('done') ?? '');
+  const chosen = uploading ? options(params) : defaults;
   const plan = await planPackage(
     env,
     selected,
@@ -919,17 +909,9 @@ async function sendStep(
         )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
     : '';
   const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
-  const status =
-    params.get('upload') === 'done'
-      ? `<p class="banner" role="status">Uploaded to ${folder}. Marked as sent.</p>`
-      : params.get('upload') === 'more' && upload
-        ? `<p class="banner" role="status">${upload.plan.files.length - upload.pending.length} of ${upload.plan.files.length} uploaded.${/^\d+$/.test(params.get('wait') ?? '') ? ` Continue in ${Number(params.get('wait'))} s.` : ''}</p>`
-        : params.get('sent') === '1' && s.sent
-          ? `<p class="banner" role="status">Marked ${short} as sent.</p>`
-          : '';
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
-    `<div class="card active send">${status}${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${manifest}${parts}</div>`;
+    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${manifest}${parts}</div>`;
 
   if (changed) {
     const what = [
@@ -955,7 +937,7 @@ async function sendStep(
     const next = shiftMonth(selected, 1);
     return {
       status: `Sent ${escape(sentOn)}`,
-      body: `<div class="card">${status}${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
+      body: `<div class="card">${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
     };
   }
   if (ready) {
@@ -975,7 +957,7 @@ async function sendStep(
   }`;
   return {
     status: 'Not ready',
-    body: `<details class="send"${status ? ' open' : ''}><summary>Download anyway</summary><div class="body">${status}${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${markSent}${line}${manifest}${parts}</div></details>`,
+    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${markSent}${line}${manifest}${parts}</div></details>`,
   };
 }
 
@@ -1015,17 +997,11 @@ function sect(id: string, title: string, summary: string, body: string, open = f
 }
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
-async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): Promise<string> {
+async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<string> {
   const settings = config(env);
   const docs = settings.sourceRepository
     ? `<a href="${escape(settings.sourceRepository)}/blob/main/docs/ENVIRONMENT.md#onedrive-upload-optional">docs/ENVIRONMENT.md</a>`
     : '<code>docs/ENVIRONMENT.md</code>';
-  const done: Record<string, string> = {
-    connected: 'Microsoft account connected.',
-    folder: 'Folder saved.',
-    disconnected: 'Disconnected. Its sign-in was deleted from this app.',
-  };
-  const open = params.has('onedrive');
   if (!settings.oneDrive)
     return settings.oneDriveIncomplete
       ? sect(
@@ -1037,14 +1013,13 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
         )
       : '';
   const conn = await connection(env);
-  const banner = `<p class="banner" role="status">${escape(done[params.get('onedrive') ?? ''] ?? '')}</p>`;
   const tech = `<details class="tech"><summary>Redirect URI</summary><div class="body"><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
     return sect(
       'onedrive',
       'OneDrive',
       'Not connected',
-      `${banner}<p class="cta"><a class="btn secondary" href="/settings/onedrive/connect">Connect</a></p>${tech}`,
+      `<p class="cta"><a class="btn secondary" href="/settings/onedrive/connect">Connect</a></p>${tech}`,
       open,
     );
   const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"' })}</div><button class="btn secondary">Use folder</button></form>`;
@@ -1055,7 +1030,7 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
     'onedrive',
     'OneDrive',
     escape(conn.account_email ?? conn.account_name),
-    `${banner}<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
+    `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
       conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
     }<form action="/settings/onedrive/disconnect" method="post" class="cta"><button class="linkbtn">Disconnect</button></form>${tech}`,
     open,
@@ -1063,7 +1038,7 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
 }
 
 // Settings > Senders: who is read automatically and who is ignored.
-async function sendersPart(env: Env, params: URLSearchParams): Promise<string> {
+async function sendersPart(env: Env, open: boolean): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const ignored = await ignoredSenders(env);
   const row = (address: string, action: string, button: string) =>
@@ -1076,28 +1051,20 @@ async function sendersPart(env: Env, params: URLSearchParams): Promise<string> {
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
   const add = `<form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address" placeholder="billing@example.com"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  const open = ['approved', 'ignored', 'deleted', 'senders'].some((k) => params.has(k));
-  return sect(
-    'senders',
-    'Senders',
-    `${allowed.length} allowed`,
-    `${senderBanner(params)}${approved}${add}${ignoredList}`,
-    open,
-  );
+  return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
 }
 
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
-  const oneDrive = await oneDrivePart(env, params, origin);
-  const setup = await setupParts(env, params);
+  // The section the last action touched opens; the rest stay folded.
+  const opened = feedback(params)?.section ?? '';
+  const oneDrive = await oneDrivePart(env, opened === 'onedrive', origin);
+  const setup = await setupParts(env, params, opened);
   const [accounts, rules] = await Promise.all([
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
   ]);
-  // The section a save, reset or banner returns to opens; the rest stay folded.
-  const resetGroup = params.get('reset') ? FIELD.get(params.get('reset') as SettingKey)?.group : undefined;
-  const saved = params.get('saved') ?? resetGroup ?? '';
-  const opens = (group: string) => saved === group || (group === 'email' && params.has('routing'));
+  const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
   const accountsPart = sect(
     'accounts',
     'Bank accounts',
@@ -1113,12 +1080,11 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
     }<details class="add"${accounts.length ? '' : ' open'}><summary>Add account</summary><div class="body"><form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { attrs: ' placeholder="Main account"' })}${input('bank_name', '', 'text', 'Bank')}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency')}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
   );
-  const rulesBanner = { saved: 'Rule saved.', deleted: 'Rule deleted.' }[params.get('rules') ?? ''];
   const rulesPart = sect(
     'rules',
     'Vendor rules',
     String(rules.results.length),
-    `${rulesBanner ? `<p class="banner" role="status">${rulesBanner}</p>` : ''}${
+    `${
       rules.results.length
         ? `<ul class="plain rowlist rules">${rules.results
             .map(
@@ -1128,7 +1094,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
     }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}<button class="btn secondary">Add</button></form></div></details>`,
-    !!rulesBanner,
+    opened === 'rules',
   );
   const parts = settings.products.length;
   const body = [
@@ -1140,24 +1106,23 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
       opens('business'),
     ),
     sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    await sendersPart(env, params),
+    await sendersPart(env, opened === 'senders'),
     accountsPart,
     rulesPart,
     sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
     oneDrive,
-    sect('advanced', 'Advanced', '', setup.advanced, opens('review') || opens('integrations')),
+    sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
-  return page('Settings', `<div class="settings">${body}</div>`, 200, env, {
-    nav: 'settings',
+  return page('settings', `<div class="settings">${body}</div>`, 200, env, {
     head: pageHead('Settings', signOutLink(env)),
   });
 }
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
-  return page('Import a bank statement', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
-    nav: 'bank',
+  return page('import', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
+    detail: 'Import a bank statement',
     head: pageHead('Import a bank statement'),
   });
 }

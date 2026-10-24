@@ -22,6 +22,8 @@ import {
   receiptsSegment,
   shortDay,
   tag,
+  exceptionBox,
+  matchError,
 } from './ui';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
@@ -184,8 +186,8 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
       : ''
   }${month.length ? `<div class="csv"><a class="btn secondary" href="/export-sales.csv?month=${selected}">CSV</a><p class="small">${EXPORT_LINE}</p></div>` : ''}`;
   const add = shown.length ? '<a class="btn primary" href="/add?kind=sales">Add invoice</a>' : '';
-  return page(`Invoices ${selected}`, body, 200, env, {
-    nav: 'receipts',
+  return page('invoices', body, 200, env, {
+    detail: `Invoices · ${monthName(selected)}`,
     head: across ? pageHead(SHOWS[show], add) : monthHead('/invoices', selected, add),
   });
 }
@@ -235,7 +237,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
             .slice(0, 5)
             .map(
               (t) =>
-                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label><button class="btn secondary" name="action" value="link">Match</button></form>`,
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
             )
             .join('')
         : due
@@ -252,23 +254,17 @@ export const MAX_UPLOAD_FILES = 10;
 export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
   const settings = config(env);
   const kind = params.get('kind') === 'sales' ? 'sales' : 'expense';
-  const added = Number(params.get('added') ?? 0),
-    failed = Number(params.get('failed') ?? 0);
-  const result =
-    Number.isSafeInteger(added) && Number.isSafeInteger(failed) && (added > 0 || failed > 0)
-      ? `${added ? `${plural(added, 'file')} added. ` : ''}${failed ? `${plural(failed, 'file')} couldn't be added: each must be a PDF up to 10 MB or a photo up to 4 MB.` : ''}`
-      : '';
   const option = (value: 'expense' | 'sales', title: string, sub: string) =>
     `<label><input type="radio" name="kind" value="${value}"${kind === value ? ' checked' : ''}><span>${title}<span class="s">${sub}</span></span></label>`;
   const mail = [
     settings.receiptAddress ? `receipts to <code>${escape(settings.receiptAddress)}</code>` : '',
     settings.invoicesAddress ? `invoices you sent to <code>${escape(settings.invoicesAddress)}</code>` : '',
   ].filter(Boolean);
-  const body = `<p class="banner" role="status" id="add-status">${escape(result)}</p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p><button type="submit" class="btn primary">Add files</button></p></form>${
+  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p><button type="submit" class="btn primary">Add files</button></p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
   }<script src="/assets/add.js" defer></script>`;
-  return page('Add documents', body, 200, env, {
-    nav: 'receipts',
+  return page('add', body, 200, env, {
+    detail: 'Add',
     head: pageHead('Add receipts or invoices'),
   });
 }

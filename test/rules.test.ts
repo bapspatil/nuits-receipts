@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, expect, test } from 'vitest';
 import { getReceipt } from '../src/receipts';
-import { htmlForm, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
 
 const rule = (fields: Record<string, string> = {}) =>
   new URLSearchParams({
@@ -30,8 +30,8 @@ test('Settings lists vendor rules with an open Add form when there are none', as
   expect(created.status).toBe(422);
   const saved = await post('/rules', rule());
   expect(saved.status).toBe(303);
-  expect(saved.headers.get('Location')).toBe('/settings?rules=saved#rules');
-  const after = await (await request('/settings?rules=saved')).text();
+  expect(locationOf(saved)).toBe('/settings?done=ruleSaved#rules');
+  const after = await (await request(await signed('/settings?done=ruleSaved'))).text();
   expect(after).toContain('<p class="banner" role="status">Rule saved.</p>');
   // One plain row per rule; it opens its own edit form. The saved section is open.
   expect(after).toContain('<details class="sect" open><summary><h2>Vendor rules</h2><span class="sum">1</span>');
@@ -41,17 +41,17 @@ test('Settings lists vendor rules with an open Add form when there are none', as
 
 test('a rule made from a receipt goes back to that receipt', async () => {
   const response = await uploadPdf();
-  const receipt = await getReceipt(env, response.headers.get('Location')!.split('/').at(-1)!);
+  const receipt = await getReceipt(env, idFrom(response));
   const html = await (await request(`/receipts/${receipt.id}`)).text();
   const form = htmlForm(html, '/rules');
   expect(form.get('return_to')).toBe(`/receipts/${receipt.id}`);
   form.set('vendor_contains', 'Sample Cloud');
   const saved = await request('/rules', { method: 'POST', body: form });
   expect(saved.status).toBe(303);
-  expect(saved.headers.get('Location')).toBe(`/receipts/${receipt.id}`);
+  expect(locationOf(saved)).toBe(`/receipts/${receipt.id}?done=ruleSaved`);
   // Anything else in return_to is ignored.
   const elsewhere = await post('/rules', rule({ vendor_contains: 'Other', return_to: 'https://evil.example/' }));
-  expect(elsewhere.headers.get('Location')).toBe('/settings?rules=saved#rules');
+  expect(locationOf(elsewhere)).toBe('/settings?done=ruleSaved#rules');
 });
 
 test('vendor rules can be edited and deleted from Settings, with the same checks as a new rule', async () => {
@@ -71,7 +71,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   edit.set('priority', '9');
   const saved = await request(`/rules/${id}`, { method: 'POST', body: edit });
   expect(saved.status).toBe(303);
-  expect(saved.headers.get('Location')).toBe('/settings?rules=saved#rules');
+  expect(locationOf(saved)).toBe('/settings?done=ruleSaved#rules');
   expect((await rules())[0]).toMatchObject({ vendor_contains: 'Sample Cloud Lantern', priority: 9 });
 
   // Same validation as a new rule.
@@ -83,7 +83,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   // Two rules can't share the same seller and context text.
   const clash = await post(`/rules/${id}`, rule({ vendor_contains: 'Fake Shop', context_contains: 'card' }));
   expect(clash.status).toBe(409);
-  expect(await clash.text()).toContain('A rule with the same seller text already exists');
+  expect(await clash.text()).toContain('You already have a rule for that seller text');
   expect((await post('/rules', rule({ vendor_contains: 'Fake Shop', context_contains: 'card' }))).status).toBe(409);
   // Unknown or malformed IDs are not found; other sites can't post.
   expect((await post('/rules/999999', rule())).status).toBe(404);
@@ -97,7 +97,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
 
   const deleted = await post(`/rules/${id}/delete`, new URLSearchParams());
   expect(deleted.status).toBe(303);
-  expect(deleted.headers.get('Location')).toBe('/settings?rules=deleted#rules');
+  expect(locationOf(deleted)).toBe('/settings?done=ruleDeleted#rules');
   expect((await rules()).map((r) => r.id)).toEqual([second!.id]);
-  expect(await (await request('/settings?rules=deleted')).text()).toContain('Rule deleted.');
+  expect(await (await request(await signed('/settings?done=ruleDeleted'))).text()).toContain('Rule deleted.');
 });

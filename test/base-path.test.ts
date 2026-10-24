@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import worker, { withBase } from '../src/index';
 import { parseConfig } from '../src/config';
 import type { Env } from '../src/env';
-import { authorization, pdfBytes } from './helpers';
+import { authorization, locationOf, pdfBytes, signed } from './helpers';
 
 const based = { ...env, APP_BASE_PATH: '/app' } as Env;
 function at(path: string, init: RequestInit = {}, headers: Record<string, string> = {}) {
@@ -54,9 +54,10 @@ test('links, form actions and redirects carry the base path', async () => {
   for (const target of targets) expect(target.startsWith('/app/')).toBe(true);
   const uploaded = await upload();
   expect(uploaded.status).toBe(303);
-  const location = uploaded.headers.get('Location')!;
-  expect(location).toMatch(/^\/app\/receipts\/[a-f0-9]{64}$/);
-  const receipt = await (await at(location)).text();
+  const signedLocation = uploaded.headers.get('Location')!,
+    location = locationOf(uploaded);
+  expect(location).toMatch(/^\/app\/receipts\/[a-f0-9]{64}\?done=uploaded$/);
+  const receipt = await (await at(signedLocation)).text();
   expect(receipt).toMatch(/href="\/app\/originals\/[a-f0-9]{64}"/);
   expect(receipt).toMatch(/action="\/app\/receipts\/[a-f0-9]{64}\/retry"/);
   expect((await at(location.replace('/receipts/', '/originals/'))).status).toBe(200);
@@ -76,4 +77,11 @@ test('export links point at the base path', async () => {
   const csv = await (await at(`/app/export.csv?month=${(issue ?? month).slice(0, 7)}`)).text();
   expect(csv).toContain('http://localhost/app/originals/');
   expect(csv).not.toMatch(/http:\/\/localhost\/originals\//);
+});
+
+test('the feedback banner and its Undo form carry the base path', async () => {
+  const tx = 'a'.repeat(64);
+  const html = await (await at(await signed(`/app/review?done=notPurchase&tx=${tx}&name=Acme`, '/app'))).text();
+  expect(html).toContain(`<form method="post" action="/app/payments/${tx}">`);
+  expect(html).toContain('Acme is not a purchase');
 });

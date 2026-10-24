@@ -19,7 +19,7 @@ test('same bytes in another account are blocked before loser rows are written', 
   await account('test-account');
   await account('other-account');
   await importBankCsv(env, input());
-  await expect(importBankCsv(env, input(csv, 'other-account'))).rejects.toThrow(/another account/i);
+  await expect(importBankCsv(env, input(csv, 'other-account'))).rejects.toThrow(/different account/i);
   expect(await count('imports')).toBe(1);
   expect(await count('bank_transactions')).toBe(1);
 });
@@ -37,7 +37,7 @@ test('pending imports freeze collision decisions and reject changed replay', asy
   await expect(importBankCsv(env, input(overlapping, 'test-account', 'additional'))).rejects.toThrow('interrupted');
   spy.mockRestore();
   await expect(importBankCsv(env, input(overlapping, 'test-account', 'keep_existing'))).rejects.toThrow(
-    /frozen|changed/i,
+    /didn't finish/i,
   );
   await importBankCsv(env, input(overlapping, 'test-account', 'additional'));
   expect(await count('bank_transactions')).toBe(2);
@@ -61,7 +61,7 @@ test('a conflicting external-ID insert race cannot complete an import', async ()
     return batch(statements);
   });
   try {
-    await expect(importBankCsv(env, input())).rejects.toThrow(/conflicting|facts/i);
+    await expect(importBankCsv(env, input())).rejects.toThrow(/doesn't match what you imported/i);
   } finally {
     prepareSpy.mockRestore();
     batchSpy.mockRestore();

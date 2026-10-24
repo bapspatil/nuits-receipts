@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import worker from '../src/index';
 import { documentText, getReceipt } from '../src/receipts';
 
-import { authorization, request, pdfBytes, uploadPdf } from './helpers';
+import { authorization, idFrom, request, pdfBytes, uploadPdf } from './helpers';
 
 test('all routes require authentication and mutations require the exact Origin', async () => {
   for (const path of [
@@ -43,7 +43,7 @@ test('text PDF travels through workerd extraction, original download, view, and 
   const response = await uploadPdf();
   expect(response.status).toBe(303);
   const location = response.headers.get('Location')!;
-  const row = await getReceipt(env, location.split('/').at(-1)!);
+  const row = await getReceipt(env, idFrom(response));
   expect(row.vendor).toBe('Sample Cloud Lantern Oy');
   expect(row.total_minor).toBe(12550);
   expect(row.vat_minor).toBe(2550);

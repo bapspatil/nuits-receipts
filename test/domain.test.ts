@@ -135,7 +135,7 @@ test('Holvi parses BOM, delimiters, quoted fields, decimal commas, dates, and ex
   expect(parsePreset('Date;Amount;Payee\n01/02/2026;-12;Sample\n', 'sample', 'EUR').errors).toHaveLength(1);
   expect(parsePreset('Date;Amount;Payee\n2026-09-01;1.234,56;Sample\n', 'sample', 'EUR').errors).toHaveLength(1);
   expect(parsePreset('Date;Balance;Payee\n2026-09-01;12;Sample\n', 'sample', 'EUR').errors).toContain(
-    'Map amount or debit and credit',
+    'Choose the amount column, or both the money in and money out columns.',
   );
 });
 test('fallback identities preserve repeated rows and remain stable across formatting', async () => {

@@ -11,15 +11,16 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month } from './ui';
+import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import { home, importPage, payments, previewable, queueAround, receiptPage, reviewPage, settingsPage } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
 import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
+import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
-import type { Rule } from './domain';
+import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
 import { withSettings } from './settings';
@@ -28,6 +29,8 @@ import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup } from './setup';
 import { markSent, options, packageZip, query } from './package';
+import { withDone, type EventKey } from './events';
+import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
 // Who is signed in: the Access email, "password" for HTTP Basic, or null.
@@ -60,9 +63,13 @@ async function passwordOk(request: Request, env: Env): Promise<boolean> {
 async function formData(request: Request, limit: number): Promise<FormData> {
   const bytes = await readBounded(request.body, limit);
   try {
-    return await new Response(bytes, {
+    const form = await new Response(bytes, {
       headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' },
     }).formData();
+    // Kept so a refusal can show the same form again with what was typed.
+    const state = requestState.getStore();
+    if (state) state.form = form;
+    return form;
   } catch {
     throw new InputError('Invalid form data', 400);
   }
@@ -73,22 +80,25 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
   const form = await formData(request, 4096);
   const back = ({ settings: '/settings', receipts: '/receipts' } as Record<string, string>)[String(form.get('back'))];
   const address = form.get('address');
-  let done: string;
-  if (path === '/senders/approve') done = `approved=${await approveSender(env, address, who, ctx)}`;
-  else if (path === '/senders/ignore') done = `ignored=${await ignoreSender(env, address, who)}`;
+  let event: EventKey, n: number | undefined;
+  if (path === '/senders/approve') [event, n] = ['mailAllowed', await approveSender(env, address, who, ctx)];
+  else if (path === '/senders/ignore') [event, n] = ['mailIgnored', await ignoreSender(env, address, who)];
   else if (path === '/senders/delete') {
     const id = String(form.get('id') ?? '');
     requireInput(/^[0-9a-f-]{36}$/.test(id), 'Invalid email', 400);
     await deleteHeld(env, id);
-    done = 'deleted=1';
+    event = 'mailDeleted';
   } else if (path === '/senders/remove') {
     await removeApproved(env, address, who);
-    done = 'senders=removed';
+    event = 'senderRemoved';
   } else if (path === '/senders/unignore') {
     await unignoreSender(env, address);
-    done = 'senders=unignored';
+    event = 'senderUnignored';
   } else return new Response('Not found', { status: 404 });
-  return redirect(back === '/settings' ? `/settings?${done}#senders` : `${back ?? '/review'}?${done}`);
+  const settings = back === '/settings';
+  return redirect(
+    withDone(event, settings ? '/settings#senders' : (back ?? '/review'), { n, from: settings ? 'settings' : null }),
+  );
 }
 // The fields of a vendor rule, checked the same way for a new rule and an edit.
 function ruleFrom(env: Env, form: FormData): [string, string | null, string | null, string, string, number] {
@@ -117,6 +127,15 @@ async function saveRule(statement: D1PreparedStatement): Promise<void> {
     throw error;
   }
 }
+// A failure to sign leaves the redirect without ?done= rather than with a link nobody can verify.
+async function signedLocation(signs: Signer, location: string): Promise<string> {
+  try {
+    return await signs.sign(location);
+  } catch (error) {
+    console.warn(JSON.stringify({ reason: 'feedback_unsigned', error: String(error) }));
+    return location.replace(/([?&])done=[^&#]*&?/, '$1').replace(/[?&]$/, '');
+  }
+}
 function redirect(location: string): Response {
   return new Response(null, { status: 303, headers: { Location: location } });
 }
@@ -125,12 +144,15 @@ function redirect(location: string): Response {
 export function moved(location: string, search = ''): Response {
   return new Response(null, { status: 302, headers: { Location: location + search } });
 }
-// The first transfer row on Bank, in the month the money left.
-async function transfersPage(env: Env, debitId: string): Promise<string> {
-  const date = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
+// The first transfer row on Bank, in the month the money left, and who was paid.
+async function transferRow(env: Env, debitId: string): Promise<{ to: string; name: string }> {
+  const row = await env.DB.prepare('SELECT booking_date,merchant FROM bank_transactions WHERE id=?')
     .bind(debitId)
-    .first<string>('booking_date');
-  return `/payments?${date ? `month=${date.slice(0, 7)}&` : ''}show=all#transfers`;
+    .first<{ booking_date: string; merchant: string }>();
+  return {
+    to: `/payments?${row ? `month=${row.booking_date.slice(0, 7)}&` : ''}show=all#transfers`,
+    name: row?.merchant ?? '',
+  };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
@@ -181,23 +203,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         : form.get('back') === 'queue'
           ? '/review'
           : backPath(form.get('back'));
-    return redirect(`${to}?discarded=${ids.length}&discarded_at=${encodeURIComponent(at)}`);
+    return redirect(withDone('discarded', to, { n: ids.length, at, back: to }));
   }
   if (request.method === 'POST' && path === '/restore') {
     const form = await formData(request, 16 * 1024);
     const at = form.get('at');
     const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, receiptIds(form.getAll('id')));
-    return redirect(`${backPath(form.get('back'))}?restored=${n}`);
+    return redirect(withDone('restored', backPath(form.get('back')), { n }));
   }
   if (request.method === 'POST' && path === '/review/merge')
-    return redirect(`/review?merged=${await mergeDuplicates(env)}`);
+    return redirect(withDone('merged', '/review', { n: await mergeDuplicates(env) }));
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {
     const form = await formData(request, 4096),
       selected = month(String(form.get('month') ?? ''));
     await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
-    return redirect(`/?month=${selected}&sent=1#send`);
+    return redirect(withDone('sent', `/?month=${selected}#send`));
   }
   if (request.method === 'POST' && path === '/month/onedrive-upload') {
     const form = await formData(request, 4096),
@@ -205,7 +227,11 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       chosen = options(form);
     const result = await uploadBatch(env, selected, chosen, url.origin + base);
     return redirect(
-      `/?${query(selected, chosen)}&upload=${result.finished ? 'done' : 'more'}${result.wait ? `&wait=${result.wait}` : ''}#send`,
+      withDone(result.finished ? 'driveDone' : 'driveMore', `/?${query(selected, chosen)}#send`, {
+        n: result.total - result.remaining,
+        of: result.total,
+        wait: result.wait || null,
+      }),
     );
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
@@ -221,12 +247,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/settings/onedrive/disconnect') {
     oneDrive(env);
     await disconnect(env);
-    return redirect('/settings?onedrive=disconnected#onedrive');
+    return redirect(withDone('oneDriveDisconnected', '/settings#onedrive'));
   }
   if (request.method === 'POST' && path === '/settings/onedrive/folder') {
     const form = await formData(request, 8192);
     await chooseFolder(env, String(form.get('folder_link') ?? ''), String(form.get('folder_name') ?? ''));
-    return redirect('/settings?onedrive=folder#onedrive');
+    return redirect(withDone('oneDriveFolder', '/settings#onedrive'));
   }
   if (request.method === 'GET' && path === '/import') return importPage(env);
   if (request.method === 'GET' && path === '/add') {
@@ -268,7 +294,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       bank_name: String(form.get('bank_name') ?? ''),
       default_currency: String(form.get('default_currency') ?? ''),
     });
-    return redirect('/settings#accounts');
+    return redirect(withDone('accountCreated', '/settings#accounts'));
   }
   const account = path.match(/^\/accounts\/([^/]+)$/);
   if (request.method === 'POST' && account?.[1]) {
@@ -280,7 +306,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       throw new InputError('Invalid account ID');
     }
     await renameAccount(env.DB, accountId, String(form.get('label') ?? ''));
-    return redirect('/settings#accounts');
+    return redirect(withDone('accountRenamed', '/settings#accounts', { name: String(form.get('label') ?? '').trim() }));
   }
   if (request.method === 'POST' && path === '/transfers') {
     const form = await formData(request, 4096);
@@ -290,36 +316,44 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       credit_id: String(form.get('credit_id') ?? ''),
       reason: String(form.get('reason') ?? ''),
     });
-    return redirect(await transfersPage(env, debit));
+    const { to, name } = await transferRow(env, debit);
+    return redirect(withDone('transferMade', to, { tx: debit, name }));
   }
   const transfer = path.match(/^\/transfers\/([a-f0-9]{64})\/undo$/);
   if (request.method === 'POST' && transfer?.[1]) {
     await undoTransfer(env.DB, transfer[1]);
     await reconcile(env);
-    return redirect(await transfersPage(env, transfer[1]));
+    const { to } = await transferRow(env, transfer[1]);
+    return redirect(withDone('transferUndone', to));
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {
     await processReceipt(env, retry[1], { retry: true });
-    return new Response(null, {
-      status: 303,
-      headers: { Location: `/receipts/${retry[1]}` },
-    });
+    return redirect(withDone('readAgain', `/receipts/${retry[1]}`));
   }
   const kind = path.match(/^\/receipts\/([a-f0-9]{64})\/kind$/);
   if (request.method === 'POST' && kind?.[1]) {
     const form = await formData(request, 64 * 1024);
-    await changeKind(env, kind[1], String(form.get('kind') ?? ''), Number(form.get('revision')));
-    return redirect(`/receipts/${kind[1]}`);
+    const to = String(form.get('kind') ?? '');
+    await changeKind(env, kind[1], to, Number(form.get('revision')));
+    return redirect(withDone('kindMoved', `/receipts/${kind[1]}`, { to }));
   }
   const paid = path.match(/^\/receipts\/([a-f0-9]{64})\/paid$/);
   if (request.method === 'POST' && paid?.[1]) {
-    await markPaidOutside(env, paid[1], await formData(request, 4096));
-    return redirect(`/receipts/${paid[1]}`);
+    const before = await getReceipt(env, paid[1]);
+    const form = await formData(request, 4096);
+    await markPaidOutside(env, paid[1], form);
+    const on = String(form.get('paid_outside_on') ?? '').trim();
+    // Clearing the date is "Not paid". Undo of "paid" clears it again, so it is offered only
+    // when nothing was recorded before.
+    return redirect(
+      on
+        ? withDone('paid', `/receipts/${paid[1]}`, { on, id: before.paid_outside_on ? null : paid[1] })
+        : withDone('notPaid', `/receipts/${paid[1]}`),
+    );
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
-  if (request.method === 'GET' && receipt?.[1])
-    return receiptPage(env, await getReceipt(env, receipt[1]), url.searchParams);
+  if (request.method === 'GET' && receipt?.[1]) return receiptPage(env, await getReceipt(env, receipt[1]));
   if (request.method === 'POST' && receipt?.[1]) {
     const id = receipt[1];
     const form = await formData(request, 64 * 1024);
@@ -329,11 +363,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     await correctReceipt(env, id, form);
     const after = await getReceipt(env, id);
     // Approve and Skip move on through the queue; the last one lands on Review.
-    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip'))
-      return redirect(next ? `/receipts/${next}${action === 'approve' ? '?approved=1' : ''}` : '/review');
+    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip')) {
+      const event = action === 'approve' ? (next ? 'approved' : 'approvedLast') : 'skipped';
+      return redirect(withDone(event, next ? `/receipts/${next}` : '/review'));
+    }
     // Saving a ready receipt checks it again; new flags send it back to Review.
-    if (before.status === 'ready' && after.status === 'needs_review') return redirect(`/receipts/${id}?moved=1`);
-    return redirect(`/receipts/${id}`);
+    if (before.status === 'ready' && after.status === 'needs_review')
+      return redirect(withDone('movedBack', `/receipts/${id}`));
+    return redirect(withDone('saved', `/receipts/${id}`));
   }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);
   if (request.method === 'GET' && original?.[1]) {
@@ -384,7 +421,16 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       409,
     );
     await reconcile(env);
-    return redirect(`/payments?month=${transaction.booking_date.slice(0, 7)}`);
+    return redirect(
+      withDone(
+        required === '0' ? 'notPurchase' : 'needsReceipt',
+        `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+        {
+          tx: transaction.id,
+          name: transaction.merchant,
+        },
+      ),
+    );
   }
   if (request.method === 'POST' && path === '/matches') {
     const form = await formData(request, 4096),
@@ -395,11 +441,25 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       .bind(id)
       .first<Transaction>();
     requireInput(transaction, 'Payment not found', 404);
-    if (form.get('action') === 'unlink')
+    const unlink = form.get('action') === 'unlink';
+    // Remembered for the banner's Undo and its message.
+    let matchedTo = transaction.receipt_id,
+      exception = false;
+    if (unlink) {
+      // Matching it again needs the exception box only if the pair wasn't a normal fit.
+      const was = matchedTo
+        ? await env.DB.prepare('SELECT * FROM receipts WHERE id=?').bind(matchedTo).first<Receipt>()
+        : null;
+      if (was) {
+        const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
+        exception = !(transaction.amount_minor > 0
+          ? creditFit(was, transaction, config(env).tuning) !== null
+          : eligible(was, transaction, rules, false, config(env).tuning));
+      }
       await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
         .bind(id)
         .run();
-    else {
+    } else {
       // Money out pairs with a receipt, money in with a sales invoice.
       const credit = transaction.amount_minor > 0;
       requireInput(
@@ -410,12 +470,19 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         'Payment cannot be linked',
       );
       const row = await getReceipt(env, String(form.get('receipt_id_manual') || form.get('receipt_id')));
-      requireInput(!row.duplicate_of && !row.discarded_at && matchable(row), 'Approve receipt before matching');
+      requireInput(
+        !row.duplicate_of && !row.discarded_at && matchable(row),
+        'Approve receipt before matching',
+        422,
+        'receipt_id',
+      );
       requireInput(
         row.kind === (credit ? 'sales' : 'expense'),
         credit
           ? 'Money in can only be matched to an invoice you sent'
           : 'A payment out needs a receipt, not a sales invoice',
+        422,
+        'receipt_id',
       );
       const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
       requireInput(
@@ -423,6 +490,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           ? creditFit(row, transaction, config(env).tuning) !== null
           : eligible(row, transaction, rules, false, config(env).tuning)) || form.get('confirm_exception') === 'yes',
         'Confirm match exceptions',
+        422,
+        'confirm_exception',
       );
       try {
         const result = await env.DB.prepare(
@@ -431,6 +500,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           .bind(row.id, new Date().toISOString(), id, row.id, row.kind, row.revision)
           .run();
         requireInput(result.meta.changes === 1, 'Match changed. Reload.', 409);
+        matchedTo = row.id;
       } catch (error) {
         if (error instanceof Error && error.message.includes('UNIQUE constraint'))
           throw new InputError('Receipt is already matched', 409);
@@ -440,8 +510,20 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     await clearBankReview(env);
     // The invoice page sends its own address back; nothing else is followed.
     const back = String(form.get('return_to') ?? '');
+    const onReceipt = /^\/receipts\/[a-f0-9]{64}$/.test(back);
     return redirect(
-      /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+      withDone(
+        unlink ? 'unmatched' : 'matched',
+        onReceipt ? back : `/payments?month=${transaction.booking_date.slice(0, 7)}`,
+        {
+          tx: transaction.id,
+          rid: matchedTo,
+          name: transaction.merchant,
+          kind: transaction.amount_minor > 0 ? 'invoice' : 'receipt',
+          back: onReceipt ? back : null,
+          exc: unlink && exception ? 1 : null,
+        },
+      ),
     );
   }
   if (request.method === 'POST' && path === '/rules') {
@@ -454,7 +536,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     // A rule made from a receipt goes back to that receipt; otherwise to Settings.
     const back = String(form.get('return_to') ?? '');
-    return redirect(/^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings?rules=saved#rules');
+    return redirect(withDone('ruleSaved', /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings#rules'));
   }
   const rule = path.match(/^\/rules\/(\d{1,15})(\/delete)?$/);
   if (request.method === 'POST' && rule?.[1]) {
@@ -466,14 +548,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     if (rule[2]) {
       await env.DB.prepare('DELETE FROM vendor_rules WHERE id=?').bind(id).run();
-      return redirect('/settings?rules=deleted#rules');
+      return redirect(withDone('ruleDeleted', '/settings#rules'));
     }
     await saveRule(
       env.DB.prepare(
         'UPDATE vendor_rules SET vendor_contains=?,context_contains=?,bank_alias=?,product=?,expense_type=?,priority=? WHERE id=?',
       ).bind(...ruleFrom(env, await formData(request, 4096)), id),
     );
-    return redirect('/settings?rules=saved#rules');
+    return redirect(withDone('ruleSaved', '/settings#rules'));
   }
   throw new InputError('Not found', 404);
 }
@@ -500,8 +582,10 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
       }
     if (json) return Response.json({ files: results });
     const added = results.filter((r) => r.id);
-    if (results.length === 1 && added[0]) return redirect(`/receipts/${added[0].id}`);
-    return redirect(`/add?kind=${kind}&added=${added.length}&failed=${results.length - added.length}`);
+    if (results.length === 1 && added[0]) return redirect(withDone('uploaded', `/receipts/${added[0].id}`));
+    return redirect(
+      withDone('filesAdded', `/add?kind=${kind}`, { added: added.length, failed: results.length - added.length }),
+    );
   } catch (error) {
     if (json && error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
     throw error;
@@ -537,6 +621,68 @@ function backLink(request: Request, base: string): string {
     return path.startsWith('/') && !path.startsWith('//') ? path + referer.search : '/';
   } catch {
     return '/';
+  }
+}
+// A refused form on a page that can show it again: that page, status 422, what was
+// typed kept, and the message at the control that caused it. Null for anything else,
+// which gets the plain error page.
+async function redisplay(inner: Request, env: Env, state: RequestState, error: unknown): Promise<Response | null> {
+  const form = state.form;
+  if (!(error instanceof InputError) || inner.method !== 'POST' || !form || ![409, 422].includes(error.status))
+    return null;
+  const url = new URL(inner.url),
+    base = config(env).basePath;
+  const values: Record<string, string> = {};
+  for (const [key, value] of form) if (typeof value === 'string' && value.length <= 2000) values[key] = value;
+  const refused = (scope: string, target?: string): RequestState => ({
+    ...state,
+    failure: {
+      message: error.message,
+      status: error.status,
+      field: error.field,
+      scope,
+      target,
+      values,
+    } satisfies FormFailure,
+  });
+  try {
+    let shown: Promise<Response> | null = null;
+    const receipt = url.pathname.match(/^\/receipts\/([a-f0-9]{64})$/);
+    if (receipt?.[1] && error.status === 422)
+      shown = requestState.run(refused('receipt'), async () => receiptPage(env, await getReceipt(env, receipt[1]!)));
+    else if (url.pathname === '/matches') {
+      const tx = String(form.get('transaction_id') ?? '');
+      const row = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
+        .bind(tx)
+        .first<{ booking_date: string }>();
+      const scope = `match:${tx}`;
+      const back = String(form.get('on_error') || form.get('return_to') || '');
+      const onReceipt = /^\/receipts\/([a-f0-9]{64})$/.exec(back);
+      if (row)
+        shown = requestState.run(
+          refused(scope, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope)),
+          async () =>
+            onReceipt
+              ? receiptPage(env, await getReceipt(env, onReceipt[1]!))
+              : payments(
+                  env,
+                  month(row.booking_date.slice(0, 7)),
+                  0,
+                  new URLSearchParams({ month: row.booking_date.slice(0, 7), show: 'all' }),
+                ),
+        );
+    } else if (url.pathname === '/imports/csv' && form.get('file') instanceof File)
+      shown = requestState.run(refused('import'), () => importPage(env));
+    else if (url.pathname === '/settings/setup' && error.status === 422)
+      shown = requestState.run(
+        refused(`setup:${String(form.get('group') ?? '')}`, error.field === 'product_new' ? 'part-new' : undefined),
+        () => settingsPage(env, new URLSearchParams(), url.origin + base),
+      );
+    if (!shown) return null;
+    const response = await shown;
+    return base ? rebase(response, base) : response;
+  } catch {
+    return null;
   }
 }
 async function failure(request: Request, env: Env, error: unknown): Promise<Response> {
@@ -594,18 +740,37 @@ export default {
   // ctx is optional so tests can call fetch(request, env); work handed to
   // waitUntil then finishes before the response is returned.
   async fetch(request: Request, deploy: Env, ctx?: Waiter): Promise<Response> {
-    let response: Response;
+    let response: Response,
+      inner: Request | null = null,
+      state: RequestState | undefined;
     const env = await withSettings(deploy);
     const pending: Promise<unknown>[] = [];
+    const signs = signer(env);
     const waiter: Waiter = ctx ?? { waitUntil: (promise) => void pending.push(promise) };
     try {
       const base = config(env).basePath;
-      const inner = base ? stripBase(request, base) : request;
-      response = inner ? await route(inner, env, base, waiter) : new Response('Not found', { status: 404 });
+      const stripped = base ? stripBase(request, base) : request;
+      // A ?done= link that isn't genuine and fresh is dropped before any page sees it.
+      const checked = stripped ? await signs.verify(new URL(stripped.url)) : null;
+      inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
+      // The query reaches the page shell (the feedback banner) through the request's own store.
+      const own = inner;
+      if (own) state = { params: new URL(own.url).searchParams };
+      response =
+        own && state
+          ? await requestState.run(state, () => route(own, env, base, waiter))
+          : new Response('Not found', { status: 404 });
+      const location = response.headers.get('Location');
+      if (location?.includes('done=')) {
+        const headers = new Headers(response.headers);
+        headers.set('Location', await signedLocation(signs, location));
+        response = new Response(null, { status: response.status, headers });
+      }
       await Promise.allSettled(pending);
       if (base) response = rebase(new Response(response.body, response), base);
     } catch (error) {
-      response = await failure(request, env, error);
+      response =
+        (inner && state && (await redisplay(inner, env, state, error))) || (await failure(request, env, error));
     }
     if (!response.headers.has('Cache-Control')) response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('X-Content-Type-Options', 'nosniff');

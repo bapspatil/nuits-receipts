@@ -5,7 +5,7 @@ import { parseConfig, parseOneDrive } from '../src/config';
 import { CHUNK, seal, shareId, unseal } from '../src/onedrive';
 import type { Env } from '../src/env';
 import { hash } from '../src/domain';
-import { authorization } from './helpers';
+import { authorization, locationOf, signed } from './helpers';
 import { seed, unzip } from './package-helpers';
 
 // Synthetic app registration and key; nothing here talks to Microsoft.
@@ -254,7 +254,7 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
     { Cookie: jar },
   );
   expect(done.status).toBe(303);
-  expect(done.headers.get('Location')).toBe('/app/settings?onedrive=connected#onedrive');
+  expect(locationOf(done)).toBe('/app/settings?done=oneDriveConnected#onedrive');
   expect(done.headers.get('Set-Cookie')).toContain('Max-Age=0');
   const exchange = new URLSearchParams(new TextDecoder().decode(ms.calls[0]!.body));
   expect(exchange.get('grant_type')).toBe('authorization_code');
@@ -281,7 +281,7 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
   expect(await unseal(odEnv, 'refresh-token', row!.refresh_token_enc!)).toBe('refresh-original');
   // Bound to its purpose: the token can't be opened as a state cookie.
   expect(await unseal(odEnv, 'oauth-state', row!.refresh_token_enc!)).toBeNull();
-  const after = await (await at('/app/settings?onedrive=connected')).text();
+  const after = await (await at(await signed('/app/settings?done=oneDriveConnected', '/app'))).text();
   expect(after).toContain('Microsoft account connected.');
   expect(after).toContain('<dd>Synthetic Owner (owner@example.com)</dd>');
   // The section the callback returns to is open, its summary names the account.
@@ -296,7 +296,7 @@ test('a folder link resolves through /shares, and other folders and failures are
   const link = 'https://example-my.sharepoint.com/:f:/g/personal/books/EaSynthetic?e=abc';
   const saved = await post('/app/settings/onedrive/folder', { folder_link: link });
   expect(saved.status).toBe(303);
-  expect(saved.headers.get('Location')).toBe('/app/settings?onedrive=folder#onedrive');
+  expect(locationOf(saved)).toBe('/app/settings?done=oneDriveFolder#onedrive');
   const share = graphCalls()[0]!;
   expect(share.url).toBe(`${GRAPH}/shares/${shareId(link)}/driveItem`);
   expect(shareId(link)).toMatch(/^u![A-Za-z0-9_-]+$/);
@@ -380,7 +380,7 @@ test('upload puts small files, chunked large files and the index in the month fo
 
   const first = await post('/app/month/onedrive-upload', { month: '2026-10' });
   expect(first.status).toBe(303);
-  expect(first.headers.get('Location')).toBe('/app/?month=2026-10&upload=done#send');
+  expect(locationOf(first)).toBe('/app/?month=2026-10&done=driveDone&n=2&of=2#send');
   expect(ms.folders.get('root-folder/receipts-2026-10')).toBe('receipts-2026-10-id');
   const smallName = `2026-10-02_Vendor-0_EUR-12.50_${small!.id.slice(0, 6)}.pdf`;
   const largeName = `2026-10-03_Large-Scan_EUR-12.50_${large!.id.slice(0, 6)}.pdf`;
@@ -401,8 +401,8 @@ test('upload puts small files, chunked large files and the index in the month fo
   });
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(2);
   expect(ms.refreshes).toEqual(['refresh-original']);
-  const done = await (await at('/app/?month=2026-10&upload=done')).text();
-  expect(done).toContain('Uploaded to Accountant Inbox. Marked as sent.');
+  const done = await (await at(await signed('/app/?month=2026-10&done=driveDone&n=2&of=2', '/app'))).text();
+  expect(done).toContain('Uploaded to OneDrive. Marked as sent.');
   expect(done).toContain('Via OneDrive');
 
   // Again: nothing new to upload, only the index is refreshed.
@@ -419,7 +419,7 @@ test('upload puts small files, chunked large files and the index in the month fo
     .run();
   ms.calls = [];
   const again = await post('/app/month/onedrive-upload', { month: '2026-10', changes: '1' });
-  expect(again.headers.get('Location')).toBe('/app/?month=2026-10&changes=1&upload=done#send');
+  expect(locationOf(again)).toMatch(/^\/app\/\?month=2026-10&changes=1&done=driveDone&n=\d+&of=\d+#send$/);
   const renamed = `2026-10-02_Vendor-Renamed_EUR-12.50_${small!.id.slice(0, 6)}.pdf`;
   const put = ms.calls.find((c) => c.method === 'PUT' && decodeURIComponent(c.url).includes(renamed))!;
   expect(put.url).toContain('conflictBehavior=replace');
@@ -438,16 +438,16 @@ test('uploads run in batches of ten and continue without JavaScript', async () =
   await connect();
   await readyMonth(12);
   const first = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
-  expect(first.headers.get('Location')).toBe('/app/?month=2026-10&anyway=1&upload=more#send');
+  expect(locationOf(first)).toBe('/app/?month=2026-10&anyway=1&done=driveMore&n=10&of=12#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(10);
   expect(ms.files.has('receipts-2026-10-id/00-index-2026-10.csv')).toBe(false);
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
-  const page = await (await at('/app/?month=2026-10&anyway=1&upload=more')).text();
+  const page = await (await at(await signed('/app/?month=2026-10&anyway=1&done=driveMore&n=10&of=12', '/app'))).text();
   expect(page).toContain('10 of 12 uploaded.');
   expect(page).toContain('<input type="hidden" name="anyway" value="1">');
   expect(page).not.toMatch(/http-equiv|<script/);
   const second = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
-  expect(second.headers.get('Location')).toBe('/app/?month=2026-10&anyway=1&upload=done#send');
+  expect(locationOf(second)).toBe('/app/?month=2026-10&anyway=1&done=driveDone&n=12&of=12#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(12);
   expect(await env.DB.prepare('SELECT method FROM month_sends').first('method')).toBe('onedrive');
 });
@@ -464,7 +464,7 @@ test('a 401 refreshes the token once and keeps a rotated refresh token', async (
     }
   };
   const result = await post('/app/month/onedrive-upload', { month: '2026-10' });
-  expect(result.headers.get('Location')).toContain('upload=done');
+  expect(locationOf(result)).toContain('done=driveDone');
   expect(ms.refreshes).toEqual(['refresh-original', 'refresh-rotated-1']);
   const stored = await env.DB.prepare('SELECT refresh_token_enc FROM onedrive_connection').first<string>(
     'refresh_token_enc',
@@ -484,16 +484,14 @@ test('429 and 503 stop the batch with the wait Microsoft asks for', async () => 
       return new Response(null, { status: 429, headers: { 'Retry-After': '7' } });
   };
   const result = await post('/app/month/onedrive-upload', { month: '2026-10' });
-  expect(result.headers.get('Location')).toBe('/app/?month=2026-10&upload=more&wait=7#send');
+  expect(locationOf(result)).toBe('/app/?month=2026-10&done=driveMore&n=1&of=3&wait=7#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(1);
-  const page = await (await at('/app/?month=2026-10&upload=more&wait=7')).text();
+  const page = await (await at(await signed('/app/?month=2026-10&done=driveMore&n=1&of=3&wait=7', '/app'))).text();
   expect(page).toContain('1 of 3 uploaded. Continue in 7 s.');
   ms.hook = (call) => (call.method === 'PUT' ? new Response(null, { status: 503 }) : undefined);
-  expect((await post('/app/month/onedrive-upload', { month: '2026-10' })).headers.get('Location')).toContain('wait=30');
+  expect(locationOf(await post('/app/month/onedrive-upload', { month: '2026-10' }))).toContain('wait=30');
   ms.hook = () => undefined;
-  expect((await post('/app/month/onedrive-upload', { month: '2026-10' })).headers.get('Location')).toContain(
-    'upload=done',
-  );
+  expect(locationOf(await post('/app/month/onedrive-upload', { month: '2026-10' }))).toContain('done=driveDone');
   ms.hook = (call) => (call.method === 'PUT' ? new Response(null, { status: 403 }) : undefined);
   await env.DB.prepare('UPDATE receipts SET revision=revision+1').run();
   const denied = await post('/app/month/onedrive-upload', { month: '2026-10' });
@@ -510,7 +508,7 @@ test('upload and disconnect need the same origin, a folder, and the config', asy
   ).toBe(403);
   expect((await post('/app/settings/onedrive/disconnect', {}, { Origin: 'https://evil.example' })).status).toBe(403);
   const gone = await post('/app/settings/onedrive/disconnect', {});
-  expect(gone.headers.get('Location')).toBe('/app/settings?onedrive=disconnected#onedrive');
+  expect(locationOf(gone)).toBe('/app/settings?done=oneDriveDisconnected#onedrive');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_connection').first('n')).toBe(0);
   const plain = { ...env, APP_BASE_PATH: '/app' } as Env;
   const form = new FormData();

@@ -28,7 +28,9 @@ import {
   type SettingKey,
 } from './settings';
 import { reconcile } from './banking';
-import { day, escape } from './ui';
+import { ariaFor, day, errorLine, escape } from './ui';
+import { failureFor, kept } from './request';
+import { withDone } from './events';
 
 const tuningField = (key: SettingKey) =>
   (Object.entries(TUNING_VARS).find(([, v]) => v.name === key)?.[0] ?? null) as keyof Tuning | null;
@@ -58,7 +60,12 @@ function submittedProducts(env: Env, form: FormData): string {
     .map((p) => ({ id: p.id, label: p.label || p.id }));
   const added = String(form.get('product_new') ?? '').trim();
   if (added) {
-    requireInput(!products.some((p) => p.id.toLowerCase() === added.toLowerCase()), `“${added}” is already a part`);
+    requireInput(
+      !products.some((p) => p.id.toLowerCase() === added.toLowerCase()),
+      `“${added}” is already a part`,
+      422,
+      'product_new',
+    );
     products.push({ id: added, label: added });
   }
   requireInput(products.length > 0, 'Keep at least one part of the business');
@@ -85,15 +92,15 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
     } else {
       if (!form.has(field.key)) continue;
       const raw = String(form.get(field.key));
-      requireInput(raw.length <= (field.maxLength ?? 400) * 2, `${field.label} is too long`);
+      requireInput(raw.length <= (field.maxLength ?? 400) * 2, `${field.label} is too long`, 422, field.key);
       submitted = normalizeValue(field, raw);
     }
     // settings.value_json holds at most SETTING_VALUE_LIMIT characters (a CHECK
     // in the table), so a longer value is refused here, not by a failed write.
-    requireInput(JSON.stringify(submitted).length <= SETTING_VALUE_LIMIT, `${field.label} is too long`);
+    requireInput(JSON.stringify(submitted).length <= SETTING_VALUE_LIMIT, `${field.label} is too long`, 422, field.key);
     if (submitted === effective(env, field)) continue;
     if (field.confirm && form.get(`confirm_${field.key}`) !== 'yes')
-      throw new InputError(`To change ${field.label}, tick “${field.confirm}”.`);
+      throw new InputError(`To change ${field.label}, tick “${field.confirm}”.`, 422, `confirm_${field.key}`);
     const deploy = deployValue(env, field.key);
     const deployNormal = deploy.trim() ? normalizeValue(field, deploy) : '';
     // Back to the deploy value (or, for numbers left empty, the default):
@@ -104,13 +111,17 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
     if (value === null && !row) continue;
     changes.push({ key: field.key, value, old: row?.value ?? null });
   }
-  if (!changes.length) return `/settings?saved=${group}#setup-${group}`;
+  if (!changes.length) return withDone('settingsSame', `/settings#setup-${group}`, { group });
   let next;
   try {
     next = parseConfig(candidate as Partial<Env>);
   } catch (error) {
     if (error instanceof ConfigError)
-      throw new InputError(error.message.replace(/^Configuration error: |\. See docs.*$/g, ''));
+      throw new InputError(
+        error.message.replace(/^Configuration error: |\. See docs.*$/g, ''),
+        422,
+        changes.find((c) => error.message.includes(c.key))?.key,
+      );
     throw error;
   }
   if (changes.some((c) => c.key === 'PRODUCTS_JSON')) {
@@ -138,7 +149,7 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
   await saveChanges(env, changes, who, revision);
   await afterSave(base, changes);
   const routing = changes.some((c) => c.key === 'RECEIPT_ADDRESS' || c.key === 'INVOICES_ADDRESS');
-  return `/settings?saved=${group}${routing ? '&routing=1' : ''}#setup-${group}`;
+  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${group}`, { group });
 }
 export async function resetSetting(env: Env, form: FormData, who: string): Promise<string> {
   const key = String(form.get('reset') ?? '') as SettingKey,
@@ -148,7 +159,7 @@ export async function resetSetting(env: Env, form: FormData, who: string): Promi
   requireInput(Number.isSafeInteger(revision) && revision >= 0, 'Reload the page and try again');
   const state = applied(env);
   const stored = state.app.get(key)?.value ?? state.invalid.get(key)?.value;
-  if (stored === undefined) return `/settings#setup-${field!.group}`;
+  if (stored === undefined) return withDone('settingsSame', `/settings#setup-${field!.group}`, { group: field!.group });
   const changes: Change[] = [{ key, value: null, old: stored }];
   if (key === 'INVOICES_ADDRESS') {
     const before = config(env).invoicesAddress,
@@ -164,7 +175,11 @@ export async function resetSetting(env: Env, form: FormData, who: string): Promi
   // whenever the app is running at all.
   await saveChanges(env, changes, who, revision);
   await afterSave(deployEnv(env), changes);
-  return `/settings?reset=${encodeURIComponent(key)}#setup-${field!.group}`;
+  return withDone('settingReset', `/settings#setup-${field!.group}`, {
+    label: field!.label,
+    group: field!.group,
+    to: deployValue(env, key).trim() ? 'deploy' : 'default',
+  });
 }
 // Wider or narrower matching windows can pair payments that were waiting.
 async function afterSave(base: Env, changes: readonly Change[]): Promise<void> {
@@ -183,18 +198,21 @@ async function afterSave(base: Env, changes: readonly Change[]): Promise<void> {
 function unchanged(value: string): string {
   return value.replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&');
 }
+const scopeOf = (group: Group) => `setup:${group}`;
 function control(env: Env, field: Field): string {
-  const value = effective(env, field),
+  const scope = scopeOf(field.group);
+  // After a refusal the form shows what was typed, not what is saved.
+  const value = String(kept(scope, field.key, effective(env, field))),
     name = escape(field.key),
-    attrs = `id="f-${name}" title="${escape(field.help)}"${field.confirm ? ` pattern="${escape(unchanged(value))}"${value ? ' required' : ''}` : ''}`;
+    attrs = `id="f-${name}"${ariaFor(scope, field.key)} title="${escape(field.help)}"${field.confirm ? ` pattern="${escape(unchanged(value))}"${value ? ' required' : ''}` : ''}`;
   const settings = config(env);
   switch (field.kind) {
     case 'textarea':
       return `<textarea name="${name}" rows="2" maxlength="${field.maxLength ?? 300}" ${attrs}>${escape(value)}</textarea>`;
     case 'list':
-      return `<textarea name="${name}" rows="${Math.min(8, Math.max(2, value.split(', ').length))}" ${attrs} spellcheck="false" autocomplete="off">${escape(value.split(', ').filter(Boolean).join('\n'))}</textarea>`;
+      return `<textarea name="${name}" rows="${Math.min(8, Math.max(2, value.split(', ').length))}" ${attrs} spellcheck="false" autocomplete="off">${escape(kept(scope, field.key, null) ?? value.split(', ').filter(Boolean).join('\n'))}</textarea>`;
     case 'product':
-      return `<select name="${name}" ${attrs}>${settings.products.map((p) => `<option value="${escape(p.id)}"${p.id === settings.defaultProduct ? ' selected' : ''}>${escape(p.label)}</option>`).join('')}</select>`;
+      return `<select name="${name}" ${attrs}>${settings.products.map((p) => `<option value="${escape(p.id)}"${p.id === kept(scope, field.key, settings.defaultProduct) ? ' selected' : ''}>${escape(p.label)}</option>`).join('')}</select>`;
     case 'currency':
       return `<select name="${name}" ${attrs}>${Object.keys(EXPONENTS)
         .map((c) => `<option${c === value ? ' selected' : ''}>${c}</option>`)
@@ -209,7 +227,7 @@ function control(env: Env, field: Field): string {
         )
         .join(
           '',
-        )}<li><label class="vh" for="part-new">Add a part</label><input id="part-new" name="product_new" placeholder="Add a part, for example Consulting" maxlength="100"></li></ul>`;
+        )}<li><label class="vh" for="part-new">Add a part</label><input id="part-new" name="product_new" placeholder="Add a part, for example Consulting" maxlength="100" value="${escape(kept(scope, 'product_new', ''))}"${ariaFor(scope, 'product_new')}></li></ul>`;
     default:
       return `<input name="${name}" value="${escape(value)}" type="${field.kind === 'email' ? 'email' : 'text'}"${field.maxLength ? ` maxlength="${field.maxLength}"` : ''} ${attrs}${field.kind === 'email' ? ' autocomplete="off" spellcheck="false"' : ''}>`;
   }
@@ -234,10 +252,10 @@ function fieldRow(env: Env, field: Field): string {
     ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'deploy value' : 'default'} is used. ${resetButton(field, 'Clear it')}</p>`
     : '';
   const confirm = field.confirm
-    ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes"> ${escape(field.confirm)}</label></div>`
+    ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes" id="f-confirm_${key}"${kept(scopeOf(field.group), `confirm_${key}`, '') === 'yes' ? ' checked' : ''}${ariaFor(scopeOf(field.group), `confirm_${key}`)}> ${escape(field.confirm)}</label></div>`
     : '';
   const meta = source === 'app' ? `<p class="meta">${resetButton(field, 'Reset')}</p>` : '';
-  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${bad}${confirm}${meta}</div></div>`;
+  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(scopeOf(field.group), key)}${bad}${confirm}${errorLine(scopeOf(field.group), `confirm_${key}`)}${meta}</div></div>`;
 }
 function resetForms(env: Env, fields: readonly Field[]): string {
   const state = applied(env);
@@ -252,7 +270,7 @@ function resetForms(env: Env, fields: readonly Field[]): string {
 // Allowed senders are edited row by row in Senders, so Email leaves the list out.
 function groupForm(env: Env, group: (typeof GROUPS)[number], card: boolean): string {
   const fields = FIELDS.filter((f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS');
-  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}"><input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
+  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}">${errorLine(scopeOf(group.id), '')}<input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
 }
 const AUDIT_LABEL = new Map(FIELDS.map((f) => [f.key as string, f.label]));
 function auditValue(json: string | null, key: string): string {
@@ -277,12 +295,11 @@ function auditValue(json: string | null, key: string): string {
 export async function setupParts(
   env: Env,
   params: URLSearchParams,
+  opened = '',
 ): Promise<{ business: string; email: string; accountant: string; advanced: string }> {
   const settings = config(env),
     state = applied(env),
     rows = await history(env);
-  const reset = params.get('reset'),
-    saved = params.get('saved') ?? (reset ? (FIELD.get(reset as SettingKey)?.group ?? null) : null);
   const notice = (group: Group) =>
     group === 'email' && params.get('routing') === '1'
       ? `<div class="alert" role="status"><p><strong>Saved. Now update Cloudflare Email Routing.</strong> The app can’t do this for you.</p><ol><li>In Cloudflare, Email &gt; Email Routing &gt; Routing rules, add a custom address with the action <strong>Send to a Worker</strong> for ${[
@@ -294,14 +311,12 @@ export async function setupParts(
           .join(
             ' and ',
           )}.</li><li>Send a test from an allowed address and check it arrives.</li><li>Remove the rule for the old address. ${previousInvoicesAddress(env) ? `Mail to <code>${escape(previousInvoicesAddress(env))}</code> still counts as an invoice for ${GRACE_DAYS} days.` : ''}</li></ol></div>`
-      : saved === group
-        ? `<p class="banner" role="status">${reset ? `${escape(FIELD.get(reset as SettingKey)?.label ?? 'Setting')} is back to the ${sourceOf(env, reset as SettingKey) === 'deploy' ? 'deploy value' : 'default'}.` : 'Saved.'}</p>`
-        : '';
+      : '';
   const group = (id: Group) => GROUPS.find((g) => g.id === id)!;
   const top = (id: Group) => `${notice(id)}${groupForm(env, group(id), false)}`;
   const fold = (id: Group) => {
     const changed = FIELDS.some((f) => f.group === id && (state.app.has(f.key) || state.invalid.has(f.key)));
-    return `<details class="group" id="setup-${id}"${changed || saved === id ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
+    return `<details class="group" id="setup-${id}"${changed || opened === `setup-${id}` || failureFor(scopeOf(id)) ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
   };
   const base = deployEnv(env) as unknown as Record<string, unknown>;
   const shown = (key: string, secret?: boolean): string => {

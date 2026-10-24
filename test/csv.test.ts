@@ -359,8 +359,8 @@ test('empty files, missing columns, malformed quotes, and duplicated empty heade
 });
 
 test('Holvi rejects unpaired original headers instead of silently dropping foreign facts', () => {
-  expect(() => holviMapping(['Date', 'Amount', 'Payee', 'Original amount'], 'EUR')).toThrow(/Original/);
-  expect(() => holviMapping(['Date', 'Amount', 'Payee', 'Original currency'], 'EUR')).toThrow(/Original/);
+  expect(() => holviMapping(['Date', 'Amount', 'Payee', 'Original amount'], 'EUR')).toThrow(/original amount/);
+  expect(() => holviMapping(['Date', 'Amount', 'Payee', 'Original currency'], 'EUR')).toThrow(/original amount/);
 });
 
 test('direction labels reject explicit conflicting plus signs while unsigned magnitudes remain valid', () => {
@@ -384,7 +384,7 @@ test('BOM-less UTF-16 requires selection and byte limits count encoded Unicode',
   expect(() => decodeCsv(content)).toThrow();
   expect(decodeCsv(content, 'utf-16le').text).toContain('Päivätyö');
   expect(preview('2026-09-01;' + 'ä'.repeat(32768) + ';-1;;;').rows).toHaveLength(1);
-  expect(() => preview('2026-09-01;' + 'ä'.repeat(32769) + ';-1;;;')).toThrow(/64 KiB/);
+  expect(() => preview('2026-09-01;' + 'ä'.repeat(32769) + ';-1;;;')).toThrow(/cell in this file is too long/);
 });
 
 test('duplicate headers remain selectable by index and raw JSON preserves both cells', () => {
