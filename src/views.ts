@@ -817,7 +817,7 @@ export async function payments(
   // The search box: type a seller, a date or an amount, or pick from the list.
   const picker = (t: Payment, listId: string, noun: string) => {
     const typed = chosenReceipt(t.id);
-    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Type a seller, a date or an amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
   };
   // A likely pair first, the search box behind it; no pair, the search box alone.
   const matchControls = (
@@ -1024,12 +1024,12 @@ export async function home(env: Env, requested: string | null, params = new URLS
       ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
       : undated
         ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'Done', `/receipts?month=${selected}`, false, true);
+        : row(1, 'Check', 'All checked', `/receipts?month=${selected}`, false, true);
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
       ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
-      : row(2, 'Match', 'Done', `/payments?month=${selected}`, false, true);
+      : row(2, 'Match', 'All matched', `/payments?month=${selected}`, false, true);
   const send = await sendStep(env, s, selected, current, params);
   const step = nextStep(s, selected);
   const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';
