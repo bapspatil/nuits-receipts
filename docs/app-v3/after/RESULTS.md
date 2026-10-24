@@ -47,9 +47,9 @@ Screens: `/receipts` → `/invoices` → `/add?kind=sales` → `/payments`
 
 ### c. September closed and marked sent
 
-Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A20%3A41.029Z`
+Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A23%3A18.071Z`
 
-- Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check Done DONE: Match Done NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be
+- Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check All checked DONE: Match All matched NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Chec
 - Downloaded receipts-2026-09.zip
 
 ## Screens

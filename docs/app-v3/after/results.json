@@ -87,13 +87,13 @@
       "edits": 0,
       "screens": [
         "/",
-        "/?month=2026-09&done=sent&at=2026-10-24T16%3A20%3A41.029Z"
+        "/?month=2026-09&done=sent&at=2026-10-24T16%3A23%3A18.071Z"
       ],
       "silentPosts": [],
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check Done DONE: Match Done NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be",
+        "Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check All checked DONE: Match All matched NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Chec",
         "Downloaded receipts-2026-09.zip"
       ]
     }
@@ -213,7 +213,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/24fe26cf07d6f50eac4dc9b3cb2691ed1327f57980fabbfd9d60ffac57badd0b",
+      "path": "/receipts/93d70128e59faa013fe4684ac533bee2324a1b2ce88ddbc49a9a907c6a99bbfc",
       "viewport": "1440",
       "viewports": 1.02,
       "file": "screens/invoice-paid-1440.png",
@@ -221,7 +221,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/24fe26cf07d6f50eac4dc9b3cb2691ed1327f57980fabbfd9d60ffac57badd0b",
+      "path": "/receipts/93d70128e59faa013fe4684ac533bee2324a1b2ce88ddbc49a9a907c6a99bbfc",
       "viewport": "390",
       "viewports": 1.68,
       "file": "screens/invoice-paid-390.png",
