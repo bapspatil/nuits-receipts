@@ -1,18 +1,19 @@
 name: Release
 
 # Semantic versioning from Conventional Commits. See docs/RELEASING.md.
-# Triggers are push to main and manual dispatch only, never a schedule. The same steps can run locally (docs/RELEASING.md).
+# Manual dispatch on main only: merging does not release, never a schedule. Run it from
+# Actions, Release, Run workflow, when you want to cut a release. The same steps can run
+# locally (docs/RELEASING.md).
 #
 #   fix / hotfix / perf / style / revert  -> patch   (hotfixes, UI polish)
 #   feat                                  -> minor   (features, UI enhancements)
 #   type! or a BREAKING CHANGE footer      -> major
 #
-# On every push to main the release job bumps package.json, prepends CHANGELOG.md,
-# commits, tags vX.Y.Z and publishes a GitHub Release with the grouped notes.
+# Each run releases everything merged since the last tag as one version: it bumps
+# package.json, prepends CHANGELOG.md, commits, tags vX.Y.Z and publishes a GitHub
+# Release with the grouped notes.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -31,9 +32,8 @@ concurrency:
 jobs:
   release:
     name: Tag and publish
-    if: >-
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && !startsWith(github.event.head_commit.message, 'chore(release):')
+    # A dispatch from any other branch does nothing.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

@@ -45,7 +45,7 @@ See [Run the tests](/how-to/run-the-tests/) for what `check` covers.
   </Step>
   <Step title="Merge to main">
 
-`.github/workflows/release.yml` runs on every push to `main`. It skips commits whose subject starts with `chore(release):`, so its own release commit does not trigger another run. It never runs on a schedule.
+Merging does not release. `.github/workflows/release.yml` runs only when you start it by hand on `main`: Actions, Release, Run workflow. It never runs on a push or a schedule, and a run started from another branch does nothing. One run releases every commit merged since the last tag.
 
 The workflow runs `bun scripts/version.mjs apply`, which rewrites `package.json` and prepends an entry to `CHANGELOG.md`, then acts on the plan:
 
