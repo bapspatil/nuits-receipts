@@ -39,7 +39,7 @@ export default defineConfig({
                 ),
               ),
           // Tests run against the public bootstrap. scripts/schema.test.ts proves it
-          // matches the private migrations/ chain.
+          // matches the migrations/ upgrade chain.
           TEST_MIGRATIONS: await readD1Migrations('./schema'),
           TEST_UPGRADE_MIGRATIONS: existsSync('./migrations') ? await readD1Migrations('./migrations') : [],
         },
