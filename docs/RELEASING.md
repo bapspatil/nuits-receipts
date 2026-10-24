@@ -21,7 +21,7 @@ UI scopes are `a11y`, `design`, `footer`, `style` and `ui` (`UI_SCOPES` in `scri
 
 ## Cutting a release
 
-`.github/workflows/release.yml` runs on pushes to `main` and on manual dispatch, never on a schedule. It does the steps below. To run them locally on an up-to-date `main`:
+`.github/workflows/release.yml` runs only on manual dispatch from `main` (Actions, Release, Run workflow), never on a push or a schedule; a run started from another branch does nothing. One run releases every commit merged since the last tag. It does the steps below. To run them locally on an up-to-date `main`:
 
 ```sh
 bun run version:next                 # read-only: prints the plan as JSON
