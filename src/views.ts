@@ -10,6 +10,8 @@ import { setupParts } from './setup';
 import { heldMail, ignoredSenders } from './inbound';
 import { heldSection, senderBanner } from './all';
 import { mergePlan } from './dedupe';
+import { discardBanner, discardControl, restoreForm } from './discard';
+import { DISCARD_REASONS } from './domain';
 import { FIELD, type SettingKey } from './settings';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
@@ -64,7 +66,7 @@ const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, i
 async function reviewQueue(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL ${QUEUE_ORDER} LIMIT 500`,
+      `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
     ).all<Receipt>()
   ).results;
 }
@@ -96,7 +98,7 @@ function receiptName(r: Receipt): string {
 async function matchableReceipts(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE kind='expense' AND duplicate_of IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete') ORDER BY issue_date DESC,id`,
+      `SELECT * FROM receipts WHERE kind='expense' AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete') ORDER BY issue_date DESC,id`,
     ).all<Receipt>()
   ).results;
 }
@@ -197,7 +199,7 @@ export async function reviewPage(
   const held = await heldMail(env);
   const rows = filter ? all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter)) : all;
   const reading = await env.DB.prepare(
-    "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL",
+    "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
   ).first<number>('n');
   const mergeable = (await mergePlan(env)).length;
   const merge = mergeable
@@ -212,14 +214,35 @@ export async function reviewPage(
       current: k === filter,
     })),
   ]);
+  // Rows a bank line points at: Discard asks to remove the match too.
+  const matched = new Set(
+    (
+      await env.DB.prepare('SELECT DISTINCT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL').all<{
+        receipt_id: string;
+      }>()
+    ).results.map((t) => t.receipt_id),
+  );
+  const selecting = params.get('select') === '1' && rows.length > 0;
+  const here = filter ? `/review?reason=${filter}` : '/review';
+  const select =
+    rows.length > 1 && !selecting
+      ? `<a class="linkbtn select" href="${here}${filter ? '&' : '?'}select=1">Select</a>`
+      : '';
   // Row 1 is the next to check: its name is the screen's one primary.
+  const items = rows
+    .map((r, i) => {
+      const name = escape(receiptName(r));
+      const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
+      const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
+      return selecting
+        ? `<li><label class="pick"><input type="checkbox" name="id" value="${r.id}">${name}</label>${amt}${why}</li>`
+        : `<li><a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
+    })
+    .join('');
   const list = rows.length
-    ? `<ul class="list checks">${rows
-        .map(
-          (r, i) =>
-            `<li><a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${escape(receiptName(r))}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span></li>`,
-        )
-        .join('')}</ul>`
+    ? selecting
+      ? `<form class="bulk" method="post" action="/discard"><input type="hidden" name="back" value="/review"><ul class="list checks">${items}</ul><div class="bar">${discardControl(null, { back: '/review', matched: rows.some((r) => matched.has(r.id)), bare: true })}<a class="linkbtn" href="${here}">Cancel</a></div></form>`
+      : `<ul class="list checks">${items}</ul>`
     : all.length
       ? emptyState('Nothing in this filter.', `<a class="btn primary" href="/review">Show all ${all.length}</a>`)
       : held.length
@@ -227,7 +250,7 @@ export async function reviewPage(
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'Review',
-    `${senderBanner(params)}${merge}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${senderBanner(params)}${discardBanner(params, '/review')}${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -320,7 +343,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
   const { position, total, next } = await queueAround(env, r.id);
   const duplicates = (
     await env.DB.prepare(
-      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
+      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
     )
       .bind(r.id, r.vendor ?? '', r.total_minor ?? -1, r.duplicate_of ?? '')
       .all<Receipt>()
@@ -333,6 +356,7 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       .all<{ id: string; filename: string }>()
   ).results;
   const codes = reasonCodes(r.review_reasons_json);
+  const gone = !!r.discarded_at;
   const needs = r.status === 'needs_review',
     reading = r.status === 'pending' || r.status === 'processing';
   const cards = needs ? flagCards(codes) : [];
@@ -535,14 +559,17 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
   const doc = previewable(r)
     ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`
     : `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
-  const back = needs
-    ? '<a href="/review">‹ Review</a>'
-    : sales
-      ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
-      : '<a href="/receipts">‹ Receipts</a>';
+  const back = gone
+    ? '<a href="/receipts?show=discarded">‹ Discarded</a>'
+    : needs
+      ? '<a href="/review">‹ Review</a>'
+      : sales
+        ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
+        : '<a href="/receipts">‹ Receipts</a>';
   const where = needs && position >= 0 ? `<span class="small">${position + 1} of ${total}</span>` : '';
-  const skip =
-    needs && next && next !== r.id
+  const skip = gone
+    ? ''
+    : needs && next && next !== r.id
       ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
       : !needs && next
         ? `<a href="/receipts/${next}">Next to check ›</a>`
@@ -553,16 +580,25 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       : params.get('approved') === '1'
         ? '<p class="banner" role="status">Approved.</p>'
         : '';
-  const status = sales
-    ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
-    : stamp(r, !!eur.transaction);
+  const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
+    .bind(r.id)
+    .first());
+  const discard = gone
+    ? ''
+    : discardControl(r.id, { back: needs ? 'queue' : '/receipts', matched: linked, revision: r.revision });
+  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true)}</section>`;
+  const status = gone
+    ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
+    : sales
+      ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
+      : stamp(r, !!eur.transaction);
   return page(
     receiptName(r),
-    `${banner}<div class="work"><section class="fixes" aria-label="Fields">${form}${matches}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
+    `${banner}${discardBanner(params, `/receipts/${r.id}`)}<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
     200,
     env,
     {
-      nav: needs ? 'review' : 'receipts',
+      nav: needs && !gone ? 'review' : 'receipts',
       head: `<div class="crumbs">${back}${where}${skip}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
   );
@@ -757,7 +793,7 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
       ? `<a href="/review?reason=sender">${plural(unverified, 'email')} not verified ›</a>`
       : '';
   const undated = await env.DB.prepare(
-    "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND status='needs_review'",
+    "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
   ).first<number>('n');
   const short = monthName(selected, false);
   const empty = s.docs === 0;

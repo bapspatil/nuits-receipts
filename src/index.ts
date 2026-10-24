@@ -25,6 +25,7 @@ import { verifyAccessJwt } from './access';
 import { withSettings } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
+import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup } from './setup';
 import { markSent, options, packageZip, query } from './package';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
@@ -162,6 +163,31 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'GET' && path === '/review') {
     const reason = url.searchParams.get('reason') ?? '';
     return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
+  }
+  if (request.method === 'POST' && path === '/discard') {
+    const form = await formData(request, 16 * 1024);
+    const ids = receiptIds(form.getAll('id'));
+    const revision = form.get('revision');
+    // From the receipt page in the queue: land on the next one, like Skip.
+    const queue = form.get('back') === 'queue' && ids.length === 1 ? (await queueAround(env, ids[0]!)).next : null;
+    const at = await discardReceipts(env, ids, {
+      reason: discardReason(form.get('reason')),
+      unmatch: form.get('unmatch') === '1',
+      revision: revision === null ? null : Number(revision),
+    });
+    const to =
+      queue && queue !== ids[0]
+        ? `/receipts/${queue}`
+        : form.get('back') === 'queue'
+          ? '/review'
+          : backPath(form.get('back'));
+    return redirect(`${to}?discarded=${ids.length}&discarded_at=${encodeURIComponent(at)}`);
+  }
+  if (request.method === 'POST' && path === '/restore') {
+    const form = await formData(request, 16 * 1024);
+    const at = form.get('at');
+    const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, receiptIds(form.getAll('id')));
+    return redirect(`${backPath(form.get('back'))}?restored=${n}`);
   }
   if (request.method === 'POST' && path === '/review/merge')
     return redirect(`/review?merged=${await mergeDuplicates(env)}`);
@@ -384,7 +410,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         'Payment cannot be linked',
       );
       const row = await getReceipt(env, String(form.get('receipt_id_manual') || form.get('receipt_id')));
-      requireInput(!row.duplicate_of && matchable(row), 'Approve receipt before matching');
+      requireInput(!row.duplicate_of && !row.discarded_at && matchable(row), 'Approve receipt before matching');
       requireInput(
         row.kind === (credit ? 'sales' : 'expense'),
         credit
@@ -400,7 +426,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       );
       try {
         const result = await env.DB.prepare(
-          `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')))`,
+          `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')))`,
         )
           .bind(row.id, new Date().toISOString(), id, row.id, row.kind, row.revision)
           .run();

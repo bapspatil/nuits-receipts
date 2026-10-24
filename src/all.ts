@@ -2,7 +2,8 @@
 // newest first, and the Unknown senders block that Review shows.
 import type { Env } from './env';
 import { config } from './config';
-import { requireInput } from './domain';
+import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
+import { discardBanner, restoreForm } from './discard';
 import { invoiceName } from './invoices';
 import type { MailRow } from './inbound';
 import {
@@ -28,6 +29,7 @@ export const SHOW = {
   needs: 'Needs you',
   reading: 'Being read',
   duplicate: 'Duplicate',
+  discarded: 'Discarded',
   sales: 'Sales invoices',
   unknown: 'Unknown sender',
 } as const;
@@ -35,7 +37,7 @@ export type Show = keyof typeof SHOW;
 // Only the exceptions are chips. Ready is the default, Sales has its own
 // segment, and Needs you and Unknown sender are Review's: all still filter
 // from the URL.
-const CHIPS = ['reading', 'duplicate'] as const;
+const CHIPS = ['reading', 'duplicate', 'discarded'] as const;
 export type AllRow = {
   type: 'receipt' | 'mail';
   id: string;
@@ -43,6 +45,8 @@ export type AllRow = {
   kind: string | null;
   status: string;
   duplicate_of: string | null;
+  discarded_at: string | null;
+  discard_reason: DiscardReason | null;
   vendor: string | null;
   filename: string | null;
   client: string | null;
@@ -54,15 +58,16 @@ export type AllRow = {
   subject: string | null;
 };
 const WHERE: Record<Show, string> = {
-  ready: "type='receipt' AND status='ready' AND duplicate_of IS NULL",
-  needs: "type='receipt' AND status='needs_review' AND duplicate_of IS NULL",
-  reading: "type='receipt' AND status IN ('pending','processing') AND duplicate_of IS NULL",
-  duplicate: "type='receipt' AND duplicate_of IS NOT NULL",
-  sales: "type='receipt' AND kind='sales'",
+  ready: "type='receipt' AND status='ready' AND duplicate_of IS NULL AND discarded_at IS NULL",
+  needs: "type='receipt' AND status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+  reading: "type='receipt' AND status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
+  duplicate: "type='receipt' AND duplicate_of IS NOT NULL AND discarded_at IS NULL",
+  discarded: "type='receipt' AND discarded_at IS NOT NULL",
+  sales: "type='receipt' AND kind='sales' AND discarded_at IS NULL",
   unknown: "type='mail'",
 };
-const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject FROM receipts`;
-const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject FROM inbound_mail WHERE state='held'`;
+const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject FROM receipts`;
+const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject FROM inbound_mail WHERE state='held'`;
 
 export type AllQuery = { show: Show | null; month: string | null; q: string; offset: number };
 
@@ -70,7 +75,8 @@ export type AllQuery = { show: Show | null; month: string | null; q: string; off
 export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
   const where: string[] = [],
     binds: unknown[] = [];
-  if (query.show) where.push(WHERE[query.show]);
+  // Discarded rows show only under their own chip.
+  where.push(query.show ? WHERE[query.show] : "(type='mail' OR discarded_at IS NULL)");
   if (query.month) {
     // The document's month, like Home; undated ones by when they arrived.
     where.push('substr(coalesce(issue_date,received_at),1,7)=?');
@@ -103,6 +109,8 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
 
 export function chipOf(row: AllRow): { label: string; css: string } {
   if (row.type === 'mail') return { label: 'Unknown sender', css: 'needs' };
+  if (row.discarded_at)
+    return { label: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : 'Discarded', css: 'muted' };
   if (row.duplicate_of) return { label: 'Duplicate', css: 'muted' };
   if (row.status === 'pending' || row.status === 'processing') return { label: 'Being read', css: 'muted' };
   if (row.status === 'needs_review') return { label: 'Needs you', css: 'needs' };
@@ -186,8 +194,8 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const shown = rows.slice(0, PAGE_SIZE);
   const filtered = !!(query.show || query.q);
   const tally = await env.DB.prepare(
-    "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL),0) AS duplicate FROM receipts",
-  ).first<Record<'reading' | 'duplicate', number>>();
+    "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
+  ).first<Record<'reading' | 'duplicate' | 'discarded', number>>();
   const chips = chipRow('Show', [
     { href: link(query, { show: null }), label: 'All', current: !query.show },
     ...CHIPS.map((k) => ({
@@ -210,7 +218,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
                 ? `${tag(chip.label)} `
                 : '';
           const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
-          return `<li><a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span></li>`;
+          return `<li><a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, '/receipts') : ''}</li>`;
         })
         .join('')}</ul>${
         query.offset || more
@@ -222,19 +230,21 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
           `Nothing matches &#8220;${escape(query.q)}&#8221;.`,
           `<a class="btn primary" href="${link(query, { q: '' })}">Clear search</a>`,
         )
-      : filtered || query.offset
-        ? emptyState('Nothing here.', '<a class="btn primary" href="/receipts">Show all</a>')
-        : query.month
-          ? emptyState(
-              `Nothing dated ${escape(monthName(query.month, false))}.`,
-              '<a class="btn primary" href="/add">Add receipts</a>',
-            )
-          : emptyState(
-              config(env).receiptAddress
-                ? `No receipts yet. Forward to <code>${escape(config(env).receiptAddress)}</code>.`
-                : 'No receipts yet.',
-              '<a class="btn primary" href="/add">Add receipts</a>',
-            );
+      : query.show === 'discarded'
+        ? emptyState('Nothing discarded.', '<a class="btn primary" href="/receipts">Show all</a>')
+        : filtered || query.offset
+          ? emptyState('Nothing here.', '<a class="btn primary" href="/receipts">Show all</a>')
+          : query.month
+            ? emptyState(
+                `Nothing dated ${escape(monthName(query.month, false))}.`,
+                '<a class="btn primary" href="/add">Add receipts</a>',
+              )
+            : emptyState(
+                config(env).receiptAddress
+                  ? `No receipts yet. Forward to <code>${escape(config(env).receiptAddress)}</code>.`
+                  : 'No receipts yet.',
+                '<a class="btn primary" href="/add">Add receipts</a>',
+              );
   const counts = await navCounts(env);
   const waiting = counts.review
     ? `<p class="small waiting"><a href="/review">${counts.review} in Review ›</a></p>`
@@ -242,7 +252,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const add = shown.length ? '<a class="btn secondary" href="/add">Add receipts</a>' : '';
   return page(
     query.month ? `Receipts ${query.month}` : 'Receipts',
-    `${receiptsSegment(counts, 'all', query.month)}${senderBanner(params)}${waiting}${chips}${find}${list}`,
+    `${receiptsSegment(counts, 'all', query.month)}${senderBanner(params)}${discardBanner(params, '/receipts')}${waiting}${chips}${find}${list}`,
     200,
     env,
     {

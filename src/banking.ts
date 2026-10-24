@@ -465,6 +465,7 @@ export function eligible(
     receipt.kind === 'sales' ||
     !matchable(receipt) ||
     receipt.duplicate_of ||
+    receipt.discarded_at ||
     transaction.receipt_id ||
     !transaction.receipt_required ||
     transaction.amount_minor >= 0 ||
@@ -489,7 +490,7 @@ export function eligible(
   );
   return alias || similar(receipt.vendor ?? '', transaction.merchant, tuning.minVendorSimilarity);
 }
-const matchableReceipts = `SELECT * FROM receipts WHERE kind='expense' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
+const matchableReceipts = `SELECT * FROM receipts WHERE kind='expense' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
 const unmatchedTransactions =
   "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.receipt_id IS NULL AND t.amount_minor<0 AND t.receipt_required=1";
 const receiptSnapshotSql = (t: Tuning) =>
@@ -596,6 +597,7 @@ export function creditFit(r: Receipt, t: Transaction, tuning: Tuning = DEFAULT_T
     r.kind !== 'sales' ||
     !matchable(r) ||
     r.duplicate_of ||
+    r.discarded_at ||
     t.receipt_id ||
     !t.receipt_required ||
     t.amount_minor <= 0 ||
@@ -627,7 +629,7 @@ export function creditFit(r: Receipt, t: Transaction, tuning: Tuning = DEFAULT_T
   if (amount || converted || reference) return 'suggested';
   return null;
 }
-const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
+const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
 export const unmatchedCredits =
   "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.receipt_id IS NULL AND t.amount_minor>0 AND t.receipt_required=1 AND NOT EXISTS (SELECT 1 FROM internal_transfers p WHERE p.credit_id=t.id OR p.debit_id=t.id)";
 export async function openSales(env: Env): Promise<Receipt[]> {
@@ -653,7 +655,7 @@ export async function reconcileSales(env: Env): Promise<void> {
     if (byInvoice.get(r.id) !== 1 || byCredit.get(t.id) !== 1) continue;
     try {
       await env.DB.prepare(
-        `UPDATE bank_transactions SET receipt_id=?,match_method='automatic',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND amount_minor>0 AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind='sales' AND revision=? AND duplicate_of IS NULL)`,
+        `UPDATE bank_transactions SET receipt_id=?,match_method='automatic',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND amount_minor>0 AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind='sales' AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL)`,
       )
         .bind(r.id, new Date().toISOString(), t.id, r.id, r.revision)
         .run();

@@ -125,7 +125,7 @@ test('schema/ accepts configured products and rejects invalid product lengths', 
 });
 
 test.skipIf(!existsSync('migrations'))(
-  'populated migrations/0001..0008 preserve every legacy value, link and constraint',
+  'populated migrations/0001..0009 preserve every legacy value, link and constraint',
   () => {
     using db = apply('migrations', '0003_duplicate_integrity.sql');
     seedLegacy(db);
@@ -185,6 +185,12 @@ test.skipIf(!existsSync('migrations'))(
     expect(() => mail.run('m4', null, 'waiting', 'x')).toThrow();
     expect(() => mail.run('m5', null, 'held', '')).toThrow();
     db.exec('DELETE FROM inbound_mail');
+    // 0009: discard is additive; nothing starts discarded, reasons are checked.
+    db.transaction(() => db.exec(readFileSync('migrations/0009_discard.sql', 'utf8')))();
+    expect(db.query('SELECT count(*) n FROM receipts WHERE discarded_at IS NULL').get()).toEqual({ n: 3 });
+    db.exec("UPDATE receipts SET discarded_at='now',discard_reason='personal' WHERE id='receipt-manual'");
+    expect(() => db.exec("UPDATE receipts SET discard_reason='food' WHERE id='receipt-manual'")).toThrow();
+    db.exec("UPDATE receipts SET discarded_at=NULL,discard_reason=NULL WHERE id='receipt-manual'");
     healthy(db);
     using fresh = apply('schema');
     expect(shape(fresh)).toEqual(shape(db));
@@ -193,7 +199,7 @@ test.skipIf(!existsSync('migrations'))(
 );
 
 test.skipIf(!existsSync('migrations'))(
-  'schema/ and empty migrations/0001..0008 have identical tables, columns, indexes, triggers and foreign keys',
+  'schema/ and empty migrations/0001..0009 have identical tables, columns, indexes, triggers and foreign keys',
   () => {
     using fresh = apply('schema');
     using upgraded = apply('migrations');

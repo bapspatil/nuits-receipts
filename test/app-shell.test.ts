@@ -782,7 +782,7 @@ test('the receipt page: flags first, All fields closed, rare actions under one M
   // Review rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/review')).text();
   expect(review).toContain(
-    `<li><a class="btn primary" href="/receipts/${flagged.id}">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span></li>`,
+    `<li><a class="btn primary" href="/receipts/${flagged.id}">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span><details class="discard">`,
   );
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('Start reviewing');

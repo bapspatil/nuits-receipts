@@ -74,7 +74,7 @@ export function invoiceName(r: Pick<Receipt, 'client' | 'invoice_number'>): stri
 export async function salesRows(env: Env, where: string, ...binds: unknown[]): Promise<SalesRow[]> {
   return (
     await env.DB.prepare(
-      `SELECT r.*,${PAID_BANK} FROM receipts r WHERE r.kind='sales' AND r.duplicate_of IS NULL AND ${where} ORDER BY r.issue_date,r.invoice_number,r.id LIMIT 500`,
+      `SELECT r.*,${PAID_BANK} FROM receipts r WHERE r.kind='sales' AND r.duplicate_of IS NULL AND r.discarded_at IS NULL AND ${where} ORDER BY r.issue_date,r.invoice_number,r.id LIMIT 500`,
     )
       .bind(...binds)
       .all<SalesRow>()

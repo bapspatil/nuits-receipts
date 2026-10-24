@@ -42,7 +42,9 @@ async function heldTotal(env: Env): Promise<number> {
 export async function navCounts(env: Env): Promise<Counts> {
   try {
     const [review, missing, sales] = await env.DB.batch<{ n: number }>([
-      env.DB.prepare("SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL"),
+      env.DB.prepare(
+        "SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+      ),
       env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
       env.DB.prepare("SELECT count(*) n FROM (SELECT 1 FROM receipts WHERE kind='sales' LIMIT 1)"),
     ]);
@@ -346,6 +348,24 @@ nav.tabs .count{position:absolute;top:-5px;left:15px;padding:0 4px;line-height:1
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) :is(nav.tabs,.fix .actions){display:none}
 }
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--ink)}}
+.tools{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:0 0 12px}.tools form{margin:0}.tools .select{margin-left:auto}
+.list li:has(>details.discard)>.why{align-self:center}
+details.discard{grid-column:2;grid-row:2;justify-self:end;border:0;background:none;margin:0}
+details.discard>summary{padding:0 0 0 8px;font-size:.875rem;color:var(--ink-soft);display:flex;align-items:center;justify-content:flex-end;list-style:none}
+details.discard>summary::-webkit-details-marker{display:none}
+details.discard[open]{grid-column:1/-1;grid-row:3;justify-self:stretch}
+details.discard>.body{padding:4px 0 8px}
+.fixes>details.discard{margin:12px 0 0}.fixes>details.discard>summary{justify-content:flex-start;padding:0;font-size:1rem;font-weight:600;text-decoration:underline;text-underline-offset:.18em;color:var(--ink)}
+.reasons{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{min-height:44px;padding:0 16px;border:1px solid var(--ink-soft);border-radius:var(--pill);background:var(--slip);font:inherit;font-weight:600;font-size:.9375rem;color:var(--ink);cursor:pointer}
+.chip:hover,.chip:focus-visible{border-color:var(--ink)}
+.ask{margin:0 0 8px;font-weight:600;color:var(--stamp)}
+.banner.undo{display:flex;align-items:center;gap:8px;padding-top:0;padding-bottom:0;min-height:44px}.banner.undo form{margin-left:auto}
+.pick{display:flex;align-items:center;gap:12px;min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none}
+.bulk .bar{position:sticky;bottom:var(--tabs);z-index:4;background:var(--paper);padding:8px 0;display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--guilloche)}
+.bulk .bar details.discard>summary{display:none}.bulk .bar details.discard>.body{padding:0}
+.list.all li>form{grid-column:2;grid-row:2;justify-self:end}
+.gone{margin:0 0 16px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
 }
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
@@ -586,7 +606,7 @@ export function stamp(receipt: Pick<Receipt, 'status'>, matched = false): string
 export async function monthRows(env: Env, selected: string): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      "SELECT * FROM receipts WHERE kind='expense' AND substr(issue_date,1,7)=? AND duplicate_of IS NULL ORDER BY issue_date,id",
+      "SELECT * FROM receipts WHERE kind='expense' AND substr(issue_date,1,7)=? AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY issue_date,id",
     )
       .bind(selected)
       .all<Receipt>()
@@ -596,7 +616,7 @@ export async function monthRows(env: Env, selected: string): Promise<Receipt[]> 
 export async function salesMonthRows(env: Env, selected: string): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      "SELECT * FROM receipts WHERE kind='sales' AND substr(issue_date,1,7)=? AND duplicate_of IS NULL ORDER BY issue_date,invoice_number,id",
+      "SELECT * FROM receipts WHERE kind='sales' AND substr(issue_date,1,7)=? AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY issue_date,invoice_number,id",
     )
       .bind(selected)
       .all<Receipt>()
