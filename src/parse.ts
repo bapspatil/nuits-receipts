@@ -4,6 +4,7 @@
 // can cross-check the model and do the arithmetic itself. Nothing here guesses:
 // a value is returned only when the document states it without contradiction.
 import { date, EXPONENTS, minor, normalize } from './domain';
+import { cleanVendor } from './vendor';
 
 export type ParsedDocument = {
   // ISO code of the amounts, or null when none or conflicting markers were found.
@@ -252,7 +253,8 @@ export function parseDocument(text: string): ParsedDocument {
     }
   const usdHint = /\bUSD\b|US\$|United States|\bUSA\b|U\.S\.A/i.test(sellerRegion.join('\n') + '\n' + text);
   const company = (l: string) => {
-    const name = l.replace(/^(sold by|seller|from|merchant|myyjä|receipt from|invoice from)[:\s]+/i, '').trim();
+    const name =
+      cleanVendor(l.replace(/^(sold by|seller|from|merchant|myyjä|receipt from|invoice from)[:\s]+/i, '')) ?? '';
     return name.length >= 3 && name.length <= 80 && SUFFIX.test(name) && !/@|https?:|\d{4,}/.test(name) && !label(name)
       ? name
       : null;

@@ -26,10 +26,11 @@ UI scopes are `a11y`, `design`, `footer`, `style` and `ui` (`UI_SCOPES` in `scri
 ```sh
 bun run version:next                 # read-only: prints the plan as JSON
 bun run version:apply > plan.json    # rewrites package.json and prepends CHANGELOG.md
+node docs-site/scripts/sync-changelog.mjs   # rebuilds the docs Changelog page from CHANGELOG.md
 ```
 
 - `"action": "baseline"` (first run, no tag yet): `git tag -a vX.Y.Z -m "Release baseline vX.Y.Z"` for the current `package.json` version, push the tag, and create a GitHub Release for it.
-- `"action": "release"`: `git add package.json CHANGELOG.md && git commit -m "chore(release): vX.Y.Z"`, `git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push `main` and the tag, then `bun scripts/version.mjs notes X.Y.Z > notes.md && gh release create vX.Y.Z --title vX.Y.Z --notes-file notes.md`.
+- `"action": "release"`: `git add package.json CHANGELOG.md docs-site/src/content/docs/reference/changelog.mdx && git commit -m "chore(release): vX.Y.Z"`, `git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push `main` and the tag, then `bun scripts/version.mjs notes X.Y.Z > notes.md && gh release create vX.Y.Z --title vX.Y.Z --notes-file notes.md`.
 - `"action": "skip"`: nothing to release.
 
 Nothing is published to npm.
