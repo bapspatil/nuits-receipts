@@ -8,10 +8,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // A refused form, for the page that holds the form to show in place.
 export type FormFailure = {
   message: string;
+  // The refusal's own status: 422 for something to fix, 409 for something that changed.
+  status: number;
   // The form control at fault, by its name, when one is.
   field?: string;
   // Which form on the page was submitted ("receipt", "match:<payment id>", "import", "setup:<group>").
   scope: string;
+  // The id of the element the summary links to, when it isn't f-<field>.
+  target?: string;
   // What was typed, by control name.
   values: Record<string, string>;
 };

@@ -22,6 +22,8 @@ import {
   receiptsSegment,
   shortDay,
   tag,
+  exceptionBox,
+  matchError,
 } from './ui';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
@@ -235,7 +237,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
             .slice(0, 5)
             .map(
               (t) =>
-                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label><button class="btn secondary" name="action" value="link">Match</button></form>`,
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
             )
             .join('')
         : due

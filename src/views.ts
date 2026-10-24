@@ -54,7 +54,13 @@ import {
   stamp,
   tag,
   uploadForm,
+  ariaFor,
+  chosenReceipt,
+  errorLine,
+  exceptionBox,
+  matchError,
 } from './ui';
+import { failureFor, kept } from './request';
 
 type Payment = Transaction & { account_name: string; bank_name: string };
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
@@ -316,6 +322,8 @@ export async function queueAround(
   return { position, total: queue.length, next };
 }
 
+// The failure scope of the receipt form.
+const RECEIPT = 'receipt';
 export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const sales = r.kind === 'sales';
   const eur = await eurValue(env, r);
@@ -383,11 +391,13 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     const id = `f-${name}`;
     const label = sales && name === 'total' ? 'Total invoiced' : FIELD_LABELS[name];
     const hint = FIELD_HINTS[name];
-    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${flagged && (values[name] === null || values[name] === '') ? ' aria-invalid="true"' : ''}`;
+    // A refused field says so; otherwise a flagged empty one is marked.
+    const refused = ariaFor(RECEIPT, name);
+    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${refused || (flagged && (values[name] === null || values[name] === '') ? ' aria-invalid="true"' : '')}`;
     const text = (type: string, extra = '', value = values[name]) =>
-      `<input name="${name}" value="${escape(value)}" type="${type}"${extra}${attrs}>`;
+      `<input name="${name}" value="${escape(kept(RECEIPT, name, value))}" type="${type}"${extra}${attrs}>`;
     const choose = (list: { v: string; l: string }[], current: string) =>
-      `<select name="${name}" id="${id}"${flagged ? ' aria-invalid="true"' : ''}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === current ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
+      `<select name="${name}" id="${id}"${refused || (flagged ? ' aria-invalid="true"' : '')}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === kept(RECEIPT, name, current) ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
     const one = (html: string): Control[] => [{ id, label, html }];
     switch (name) {
       case 'vat_treatment':
@@ -435,12 +445,12 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
           {
             id: 'f-eur_override_reason',
             label: 'Why',
-            html: `<input name="eur_override_reason" value="${escape(r.eur_override_reason)}" type="text" id="f-eur_override_reason" placeholder="Needed with a euro amount">`,
+            html: `<input name="eur_override_reason" value="${escape(kept(RECEIPT, 'eur_override_reason', r.eur_override_reason))}" type="text" id="f-eur_override_reason" placeholder="Needed with a euro amount"${ariaFor(RECEIPT, 'eur_override_reason')}>`,
           },
         ];
       case 'duplicate_of':
         return one(
-          `<select name="duplicate_of" id="${id}"><option value="">Not a duplicate</option>${duplicates.map((d) => receiptOption(d, d.id === r.duplicate_of)).join('')}</select>`,
+          `<select name="duplicate_of" id="${id}"${refused}><option value="">Not a duplicate</option>${duplicates.map((d) => receiptOption(d, d.id === kept(RECEIPT, 'duplicate_of', r.duplicate_of))).join('')}</select>`,
         );
       case 'issue_date':
       case 'due_date':
@@ -456,7 +466,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   };
   // One row: the label on the left, the control on the right.
   const row = (c: Control, label = escape(c.label), title = '') =>
-    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label></div><div class="sc">${c.html}</div></div>`;
+    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label></div><div class="sc">${c.html}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
   const rows = (name: FlagField | 'due_date') =>
     controls(name)
       .map((c) => row(c))
@@ -520,19 +530,21 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
   const heading = reading ? 'Reading' : needs ? `${cards.length} to check` : '';
-  const note = `<details class="note"><summary>Note</summary><div class="body rowlist">${row({
-    id: 'f-approval_reason',
-    label: 'For your accountant',
-    html: '<input name="approval_reason" value="Checked against the original" type="text" id="f-approval_reason">',
-  })}</div></details>`;
+  const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
+    {
+      id: 'f-approval_reason',
+      label: 'For your accountant',
+      html: `<input name="approval_reason" value="${escape(kept(RECEIPT, 'approval_reason', 'Checked against the original'))}" type="text" id="f-approval_reason"${ariaFor(RECEIPT, 'approval_reason')}>`,
+    },
+  )}</div></details>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const actions = `<div class="actions">${unverified ? retryButton('Read it', 'primary') : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}${
     needs || reading
       ? `<button class="btn ${primary}" name="action" value="approve">Approve</button>`
       : '<button class="btn primary" name="action" value="save">Save</button>'
   }</div>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${hidden('revision', r.revision)}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}
-    <details class="all"${cards.length ? '' : ' open'}><summary>All fields</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}
+    <details class="all"${cards.length && !failureFor(RECEIPT) ? '' : ' open'}><summary>All fields</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}${actions}</form>`;
   const matches = sales
     ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
@@ -540,7 +552,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
       ? `<section aria-labelledby="match-h" class="matchs"><h2 id="match-h">Payment?</h2>${suggestions
           .map(
             (t) =>
-              `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label><button class="btn secondary" name="action" value="link">Match</button></form>`,
+              `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
           )
           .join('')}</section>`
       : '';
@@ -649,8 +661,6 @@ export async function payments(
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
   const shown = show === 'missing' ? missing : rows;
-  const exact =
-    '<label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label>';
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
   const items = shown
@@ -678,7 +688,7 @@ export async function payments(
         const likely = invoices.filter((r) => creditFit(r, t, config(env).tuning) !== null);
         const others = invoices.filter((r) => !likely.includes(r));
         if (invoices.length && t.amount_minor > 0 && t.receipt_required)
-          controls = `<details${likely.length ? ' open' : ''}><summary>Find invoice</summary><div class="body"><form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Invoice"><option value="">Choose an invoice</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other open invoices">${others.map((r) => receiptOption(r)).join('')}</optgroup>` : ''}</select>${exact}<button class="btn secondary" name="action" value="link">Match</button></form></div></details>`;
+          controls = `<details${likely.length || failureFor(`match:${t.id}`) ? ' open' : ''}><summary>Find invoice</summary><div class="body"><form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Invoice"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose an invoice</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other open invoices">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}</div></details>`;
       } else if (!t.receipt_required) {
         status = tag('No receipt');
         extra.push(
@@ -690,9 +700,9 @@ export async function payments(
         const likely = suggestionsFor(t, receipts, rules, config(env).tuning);
         const others = receipts.filter((r) => !likely.includes(r));
         const find = receipts.length
-          ? `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Receipt"><option value="">Choose a receipt</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other ready receipts">${others.map((r) => receiptOption(r)).join('')}</optgroup>` : ''}</select>${exact}<button class="btn ${first ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`
+          ? `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Receipt"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose a receipt</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other ready receipts">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn ${first ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`
           : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
-        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">Not a purchase</button></form></div>`;
+        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">Not a purchase</button></form></div>${matchError(t.id)}`;
         if (receipts.length)
           extra.push(
             `<form action="/matches" method="post" class="inline-edit"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="confirm_exception" value="yes"><input name="receipt_id_manual" autocomplete="off" aria-label="Receipt ID" placeholder="Receipt ID"><button class="btn secondary" name="action" value="link">Match</button></form>`,

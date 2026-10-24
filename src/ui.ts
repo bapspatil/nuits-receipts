@@ -6,7 +6,7 @@ import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
-import { requestState } from './request';
+import { failureFor, kept, requestState } from './request';
 
 export function escape(value: unknown): string {
   return String(value ?? '').replace(
@@ -159,6 +159,8 @@ label.check input{width:22px;height:22px;min-height:0;margin:1px 0 0;flex:none;a
 input,select,textarea{font:400 var(--text-base)/1.3 var(--font-ui);min-height:var(--field-height);padding:var(--space-2) var(--space-3);border:1.5px solid var(--text-muted);border-radius:var(--radius-sm);background:var(--surface-raised);color:var(--text);width:100%;max-width:100%}
 input[type=file]{padding:var(--space-2)}
 input[aria-invalid=true]{border-color:var(--danger);border-width:2px}
+.ferr{color:var(--danger);font-weight:600;font-size:var(--text-sm);margin:var(--space-1) 0 0}
+.alert a{font-weight:600}
 .fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)}
 .fields .wide{grid-column:1/-1}
 fieldset{border:1px dashed var(--border);border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-1);margin:0 0 var(--space-4);min-width:0}
@@ -451,6 +453,40 @@ export function signOutLink(env: Env): string {
   return config(env).access ? '<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>' : '';
 }
 
+// ---------- A refused form, shown in place ----------
+// The id of the message for the form (scope) that was refused.
+export const errorId = (scope: string) => `e-${scope.replace(/[^a-z0-9]+/gi, '-')}`;
+// aria on a control, when the refusal named it: invalid, and described by the message.
+export function ariaFor(scope: string, name: string): string {
+  return failureFor(scope)?.field === name ? ` aria-invalid="true" aria-describedby="${errorId(scope)}"` : '';
+}
+// The message under a control or form. name picks the control it names; '' means the
+// refusal named none; leave it out to show the message whichever control it named.
+export function errorLine(scope: string, name?: string): string {
+  const failure = failureFor(scope);
+  if (!failure || (name !== undefined && name !== (failure.field ?? ''))) return '';
+  return `<p class="ferr" id="${errorId(scope)}">${escape(failure.message)}</p>`;
+}
+// "Not exact, still this" in one payment's match form; ticked again after a refusal.
+export function exceptionBox(tx: string): string {
+  const scope = `match:${tx}`,
+    on = kept(scope, 'confirm_exception', '') === 'yes';
+  return `<label class="check"><input type="checkbox" name="confirm_exception" value="yes" id="f-confirm-${tx}"${on ? ' checked' : ''}${ariaFor(scope, 'confirm_exception')}>Not exact, still this</label>`;
+}
+// Why one payment's match was refused, under its form.
+export const matchError = (tx: string) => errorLine(`match:${tx}`);
+// The receipt the person chose before a refusal, else the fallback.
+export const chosenReceipt = (tx: string): string => String(kept(`match:${tx}`, 'receipt_id', ''));
+
+// Said once at the top of the page, with a link to the control at fault.
+function failureSummary(): string {
+  const failure = requestState.getStore()?.failure;
+  if (!failure) return '';
+  const target = failure.target ?? (failure.field ? `f-${failure.field}` : '');
+  const link = target ? ` <a href="#${escape(target)}">Go to it</a>` : '';
+  return `<div class="alert" role="alert"><p><strong>Nothing was saved.</strong> ${escape(failure.message)}${link}</p></div>`;
+}
+
 // The one status banner: what the last action did, with a next step or an Undo.
 function feedbackBanner(): string {
   const params = requestState.getStore()?.params;
@@ -482,8 +518,11 @@ export async function page(
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
-    { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
+    {
+      status: requestState.getStore()?.failure?.status ?? status,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    },
   );
 }
 
@@ -537,22 +576,34 @@ export function errorPage(env: Env, status: number, message: string, back: strin
 }
 
 // A labelled field. The label wraps the control, so no ids are needed.
+// scope ties the control to a form that can be refused: it shows what was typed,
+// is marked when it was at fault, and carries its message.
 export function input(
   name: string,
   value: unknown = '',
   type = 'text',
   label = name.replaceAll('_', ' '),
-  { hint = '', attrs = '', wide = false }: { hint?: string; attrs?: string; wide?: boolean } = {},
+  {
+    hint = '',
+    attrs = '',
+    wide = false,
+    scope = '',
+  }: { hint?: string; attrs?: string; wide?: boolean; scope?: string } = {},
 ): string {
-  return `<label${wide ? ' class="wide"' : ''}>${escape(label)}${hint ? ` <span class="hint">${escape(hint)}</span>` : ''}<input name="${escape(name)}" value="${escape(value)}" type="${escape(type)}"${attrs}></label>`;
+  const shown = scope ? kept(scope, name, value) : value;
+  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  return `<label${wide ? ' class="wide"' : ''}>${escape(label)}${hint ? ` <span class="hint">${escape(hint)}</span>` : ''}<input name="${escape(name)}" value="${escape(shown)}" type="${escape(type)}"${tied}${attrs}>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 export function select(
   name: string,
   values: readonly string[],
   current: unknown = '',
   label = name.replaceAll('_', ' '),
+  scope = '',
 ): string {
-  return `<label>${escape(label)}<select name="${escape(name)}">${values.map((v) => `<option${v === current ? ' selected' : ''}>${escape(v)}</option>`).join('')}</select></label>`;
+  const shown = scope ? kept(scope, name, current) : current;
+  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  return `<label>${escape(label)}<select name="${escape(name)}"${tied}>${values.map((v) => `<option${v === shown ? ' selected' : ''}>${escape(v)}</option>`).join('')}</select>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 // Configured products, plus the current value when it is no longer configured,
 // so historical rows stay visible and are never silently recategorised.

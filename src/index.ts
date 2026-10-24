@@ -11,7 +11,7 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month } from './ui';
+import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import { home, importPage, payments, previewable, queueAround, receiptPage, reviewPage, settingsPage } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
@@ -30,7 +30,7 @@ import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, res
 import { resetSetting, saveSetup } from './setup';
 import { markSent, options, packageZip, query } from './package';
 import { withDone, type EventKey } from './events';
-import { requestState } from './request';
+import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
 // Who is signed in: the Access email, "password" for HTTP Basic, or null.
@@ -63,9 +63,13 @@ async function passwordOk(request: Request, env: Env): Promise<boolean> {
 async function formData(request: Request, limit: number): Promise<FormData> {
   const bytes = await readBounded(request.body, limit);
   try {
-    return await new Response(bytes, {
+    const form = await new Response(bytes, {
       headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' },
     }).formData();
+    // Kept so a refusal can show the same form again with what was typed.
+    const state = requestState.getStore();
+    if (state) state.form = form;
+    return form;
   } catch {
     throw new InputError('Invalid form data', 400);
   }
@@ -466,12 +470,19 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         'Payment cannot be linked',
       );
       const row = await getReceipt(env, String(form.get('receipt_id_manual') || form.get('receipt_id')));
-      requireInput(!row.duplicate_of && !row.discarded_at && matchable(row), 'Approve receipt before matching');
+      requireInput(
+        !row.duplicate_of && !row.discarded_at && matchable(row),
+        'Approve receipt before matching',
+        422,
+        'receipt_id',
+      );
       requireInput(
         row.kind === (credit ? 'sales' : 'expense'),
         credit
           ? 'Money in can only be matched to an invoice you sent'
           : 'A payment out needs a receipt, not a sales invoice',
+        422,
+        'receipt_id',
       );
       const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
       requireInput(
@@ -479,6 +490,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           ? creditFit(row, transaction, config(env).tuning) !== null
           : eligible(row, transaction, rules, false, config(env).tuning)) || form.get('confirm_exception') === 'yes',
         'Confirm match exceptions',
+        422,
+        'confirm_exception',
       );
       try {
         const result = await env.DB.prepare(
@@ -610,6 +623,68 @@ function backLink(request: Request, base: string): string {
     return '/';
   }
 }
+// A refused form on a page that can show it again: that page, status 422, what was
+// typed kept, and the message at the control that caused it. Null for anything else,
+// which gets the plain error page.
+async function redisplay(inner: Request, env: Env, state: RequestState, error: unknown): Promise<Response | null> {
+  const form = state.form;
+  if (!(error instanceof InputError) || inner.method !== 'POST' || !form || ![409, 422].includes(error.status))
+    return null;
+  const url = new URL(inner.url),
+    base = config(env).basePath;
+  const values: Record<string, string> = {};
+  for (const [key, value] of form) if (typeof value === 'string' && value.length <= 2000) values[key] = value;
+  const refused = (scope: string, target?: string): RequestState => ({
+    ...state,
+    failure: {
+      message: error.message,
+      status: error.status,
+      field: error.field,
+      scope,
+      target,
+      values,
+    } satisfies FormFailure,
+  });
+  try {
+    let shown: Promise<Response> | null = null;
+    const receipt = url.pathname.match(/^\/receipts\/([a-f0-9]{64})$/);
+    if (receipt?.[1] && error.status === 422)
+      shown = requestState.run(refused('receipt'), async () => receiptPage(env, await getReceipt(env, receipt[1]!)));
+    else if (url.pathname === '/matches') {
+      const tx = String(form.get('transaction_id') ?? '');
+      const row = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
+        .bind(tx)
+        .first<{ booking_date: string }>();
+      const scope = `match:${tx}`;
+      const back = String(form.get('on_error') || form.get('return_to') || '');
+      const onReceipt = /^\/receipts\/([a-f0-9]{64})$/.exec(back);
+      if (row)
+        shown = requestState.run(
+          refused(scope, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope)),
+          async () =>
+            onReceipt
+              ? receiptPage(env, await getReceipt(env, onReceipt[1]!))
+              : payments(
+                  env,
+                  month(row.booking_date.slice(0, 7)),
+                  0,
+                  new URLSearchParams({ month: row.booking_date.slice(0, 7), show: 'all' }),
+                ),
+        );
+    } else if (url.pathname === '/imports/csv' && form.get('file') instanceof File)
+      shown = requestState.run(refused('import'), () => importPage(env));
+    else if (url.pathname === '/settings/setup' && error.status === 422)
+      shown = requestState.run(
+        refused(`setup:${String(form.get('group') ?? '')}`, error.field === 'product_new' ? 'part-new' : undefined),
+        () => settingsPage(env, new URLSearchParams(), url.origin + base),
+      );
+    if (!shown) return null;
+    const response = await shown;
+    return base ? rebase(response, base) : response;
+  } catch {
+    return null;
+  }
+}
 async function failure(request: Request, env: Env, error: unknown): Promise<Response> {
   const status = error instanceof InputError ? error.status : 500;
   const message = error instanceof InputError ? error.message : 'Request failed. Saved documents can be retried.';
@@ -665,7 +740,9 @@ export default {
   // ctx is optional so tests can call fetch(request, env); work handed to
   // waitUntil then finishes before the response is returned.
   async fetch(request: Request, deploy: Env, ctx?: Waiter): Promise<Response> {
-    let response: Response;
+    let response: Response,
+      inner: Request | null = null,
+      state: RequestState | undefined;
     const env = await withSettings(deploy);
     const pending: Promise<unknown>[] = [];
     const signs = signer(env);
@@ -675,11 +752,14 @@ export default {
       const stripped = base ? stripBase(request, base) : request;
       // A ?done= link that isn't genuine and fresh is dropped before any page sees it.
       const checked = stripped ? await signs.verify(new URL(stripped.url)) : null;
-      const inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
+      inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
       // The query reaches the page shell (the feedback banner) through the request's own store.
-      response = inner
-        ? await requestState.run({ params: new URL(inner.url).searchParams }, () => route(inner, env, base, waiter))
-        : new Response('Not found', { status: 404 });
+      const own = inner;
+      if (own) state = { params: new URL(own.url).searchParams };
+      response =
+        own && state
+          ? await requestState.run(state, () => route(own, env, base, waiter))
+          : new Response('Not found', { status: 404 });
       const location = response.headers.get('Location');
       if (location?.includes('done=')) {
         const headers = new Headers(response.headers);
@@ -689,7 +769,8 @@ export default {
       await Promise.allSettled(pending);
       if (base) response = rebase(new Response(response.body, response), base);
     } catch (error) {
-      response = await failure(request, env, error);
+      response =
+        (inner && state && (await redisplay(inner, env, state, error))) || (await failure(request, env, error));
     }
     if (!response.headers.has('Cache-Control')) response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('X-Content-Type-Options', 'nosniff');

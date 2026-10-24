@@ -135,11 +135,13 @@ test('every page, including error pages, has the same five-item nav', async () =
   });
   expect(refused.status).toBe(422);
   const refusedHtml = await refused.text();
-  expectShell(refusedHtml, null);
+  // The refused form comes back in place: the receipt page, what was typed, and the message at the field.
+  expectShell(refusedHtml, '/review');
   expect(refusedHtml).toContain(
-    'role="alert"><p><strong>Fill in the seller, date, currency, total, amount before VAT and VAT, then approve.</strong>',
+    'role="alert"><p><strong>Nothing was saved.</strong> Fill in the seller, date, currency, total, amount before VAT and VAT, then approve. <a href="#f-',
   );
-  expect(refusedHtml).toContain('href="/">Go back</a>');
+  expect(refusedHtml).toMatch(/aria-invalid="true" aria-describedby="e-receipt"/);
+  expect(refusedHtml).toMatch(/<p class="ferr" id="e-receipt">Fill in the seller/);
   // A server failure renders the same way with the same message.
   const prepare = env.DB.prepare.bind(env.DB);
   const spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
