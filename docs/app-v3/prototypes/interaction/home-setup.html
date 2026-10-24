@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Home setup checklist · Nuits Receipts (prototype)</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar"><a class="brand" href="#"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>Nuits Receipts</a><nav class="main" aria-label="Main"><ul><li><a href="#" aria-current="page">Home</a></li><li><a href="#">Review</a></li><li><a href="#">Receipts</a></li><li><a href="#">Bank</a></li><li><a href="#">Settings</a></li></ul></nav></div></header>
+<nav class="tabs" aria-label="Main"><ul><li><a href="#" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>Home</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/></svg></span>Review</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg></span>Receipts</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/></svg></span>Bank</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>Settings</a></li></ul></nav>
+<main id="main">
+<p class="protonote"><strong>Prototype.</strong> A new self-hoster, after the first receipt was read. The checklist stays on Home until all five are done. Each row links to the exact settings field (the real target is in the link's data-href).</p>
+<div class="head"><div class="months" role="group" aria-label="Month"><a href="#">&lsaquo; Aug</a><h1 class="mh">September 2026</h1><a href="#">Oct &rsaquo;</a></div></div>
+<section class="card active setupcard" aria-labelledby="setup-h">
+<div class="total"><h2 id="setup-h" class="ch">Set up</h2><span><span class="num">1 of 5</span> done</span></div>
+<p class="lede">Your first receipt was read. Finish setup to get a matched month.</p>
+<ol class="steps">
+<li class="done"><div><b>Business</b><span>Done</span></div></li>
+<li><a href="#" data-href="/settings#email-routing"><b>Receipt email routing confirmed</b><span>To do: Settings, Email, Routing confirmed</span></a></li>
+<li><a href="#" data-href="/settings#accountant-label"><b>Accountant</b><span>To do: Settings, Accountant, Accountant label</span></a></li>
+<li><a href="#" data-href="/settings#bank-accounts"><b>Bank account</b><span>To do: Settings, Bank accounts, Add account</span></a></li>
+<li><a href="#" data-href="/import"><b>First bank statement</b><span>To do: Bank, Import statement</span></a></li>
+</ol>
+</section>
+<ol class="steps">
+<li class="now"><a href="#"><b>Check</b><span>Done</span></a></li>
+<li><div><b>Match</b><span>No statement</span></div></li>
+<li><div><b>Send</b><span>Nothing to send yet</span></div></li>
+</ol>
+<div class="card"><div class="total"><span>Spent</span><span>EUR 125.50</span></div><p class="small">1 receipt.</p></div>
+</main>
+<footer class="foot"><p class="notice">Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p><p>Nuits Receipts v1.5.0</p></footer>
+</body>
+</html>

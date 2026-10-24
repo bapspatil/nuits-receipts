@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Receipts and invoices tabs · Nuits Receipts (prototype)</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar"><a class="brand" href="#"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>Nuits Receipts</a><nav class="main" aria-label="Main"><ul><li><a href="#">Home</a></li><li><a href="#">Review <span class="count">3<span class="vh"> waiting</span></span></a></li><li><a href="#" aria-current="page">Receipts</a></li><li><a href="#">Bank <span class="count">3<span class="vh"> missing receipts</span></span></a></li><li><a href="#">Settings</a></li></ul></nav></div></header>
+<nav class="tabs" aria-label="Main"><ul><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>Home</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/></svg> <span class="count">3<span class="vh"> waiting</span></span></span>Review</a></li><li><a href="#" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg></span>Receipts</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/></svg> <span class="count">3<span class="vh"> missing receipts</span></span></span>Bank</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>Settings</a></li></ul></nav>
+<main id="main">
+<h1 class="protoh">Receipts: two tabs, one Add</h1>
+<p class="protonote"><strong>Prototype.</strong> Receipts and Invoices are two tabs of one page. The Add button adds to the tab you are on, so adding an invoice is Receipts, Invoices (already there), Add.</p>
+<section class="state" aria-labelledby="t1"><h2 class="statelabel" id="t1">State 1: Receipts tab</h2>
+<div class="head"><div class="months" role="group" aria-label="Month"><a href="#">&lsaquo; Aug</a><h3 class="mh">September 2026</h3><a href="#">Oct &rsaquo;</a></div><a class="btn primary" href="#">Add<span class="vh"> a receipt</span></a></div>
+<nav class="seg tabsnav" aria-label="Receipts and invoices"><ul><li><a href="#" aria-current="page">Receipts <span class="num n">6</span></a></li><li><a href="#">Invoices <span class="num n">1</span></a></li></ul></nav>
+<form class="find" action="#" role="search"><input type="search" aria-label="Search" placeholder="Seller"><button class="btn secondary">Search</button></form>
+<ul class="list all">
+<li><a href="#">Sample Cloud Lantern Oy</a><span class="amt">EUR 125.50</span><span class="ok"><span class="tag ok">Ready</span> 4 Sep</span></li>
+<li><a href="#">Sample Mail Meadow Oy</a><span class="amt">EUR 50.20</span><span class="ok"><span class="tag ok">Ready</span> 6 Sep</span></li>
+<li><a href="#">Sample Domain Desk</a><span class="amt">EUR 12.00</span><span class="ok"><span class="tag ok">Ready</span> 12 Sep</span></li>
+<li><a href="#">Sample Train Line</a><span class="amt">EUR 23.40</span><span class="ok"><span class="stamp needs">Needs you</span> 15 Sep</span></li>
+<li><a href="#">Sample Print Shop</a><span class="amt"></span><span class="ok"><span class="stamp needs">Needs you</span> 18 Sep</span></li>
+<li><a href="#">Sample Coffee Corner</a><span class="amt">EUR 9.12</span><span class="ok"><span class="stamp needs">Needs you</span> Undated</span></li>
+</ul></section>
+<section class="state" aria-labelledby="t2"><h2 class="statelabel" id="t2">State 2: Invoices tab</h2>
+<div class="head"><div class="months" role="group" aria-label="Month"><a href="#">&lsaquo; Aug</a><h3 class="mh">September 2026</h3><a href="#">Oct &rsaquo;</a></div><a class="btn primary" href="#">Add<span class="vh"> an invoice</span></a></div>
+<nav class="seg tabsnav" aria-label="Receipts and invoices"><ul><li><a href="#">Receipts <span class="num n">6</span></a></li><li><a href="#" aria-current="page">Invoices <span class="num n">1</span></a></li></ul></nav>
+<form class="find" action="#" role="search"><input type="search" aria-label="Search" placeholder="Client"><button class="btn secondary">Search</button></form>
+<ul class="list all">
+<li><a href="#">Sample Client Oy &middot; INV-2026-001</a><span class="amt">EUR 125.50</span><span class="ok"><span class="tag ok">Paid, matched automatically</span> 10 Sep</span></li>
+</ul></section>
+</main>
+<footer class="foot"><p class="notice">Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p><p>Nuits Receipts v1.5.0</p></footer>
+</body>
+</html>

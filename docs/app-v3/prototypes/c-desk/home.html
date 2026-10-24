@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>September 2026, Home, Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="desk.css">
+<style>
+  .home { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-7); margin-top: var(--space-6); align-items: start; }
+  .eyebrow { font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .next-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+  .next h2 { font-size: 44px; margin: var(--space-2) 0 var(--space-3); }
+  .next > p { max-width: 46ch; margin-bottom: var(--space-5); }
+  .next { padding: var(--space-6); padding-bottom: calc(var(--space-6) + var(--tear)); }
+  .steps-title { margin: var(--space-2) 0 var(--space-3); font-size: var(--text-lg); }
+  .steps a { display: flex; align-items: center; gap: var(--space-3); min-height: var(--row-height); padding: var(--space-2) var(--space-2); text-decoration: none; }
+  .steps a:hover { background: var(--surface-page); }
+  .step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--border-strong); border-radius: var(--radius-pill); font-weight: 700; font-size: var(--text-sm); }
+  .step-name { font: 750 var(--text-lg)/1 var(--font-display); font-variation-settings: "opsz" 96, "wdth" 82; }
+  .step-state { color: var(--text-muted); font-size: var(--text-sm); text-align: right; }
+  .step-stamp { min-width: 104px; display: flex; justify-content: flex-end; }
+
+  .tally .row { display: flex; align-items: baseline; gap: var(--space-3); }
+  .tally .big { font: 800 var(--text-2xl)/1 var(--font-display); font-variation-settings: "opsz" 96, "wdth" 82; }
+  .tally p + p { margin-top: var(--space-2); }
+
+  .pile-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); margin: var(--space-6) 0 var(--space-3); }
+  .pile { list-style: none; margin: 0; padding: var(--space-4); background: var(--surface-sunken); border-radius: var(--radius-sm); }
+  .pile li { margin-top: calc(var(--tear) * -1 + 2px); }
+  .pile li:first-child { margin-top: 0; }
+  .pile li:nth-child(odd) .lift { transform: rotate(-0.5deg); }
+  .pile li:nth-child(even) .lift { transform: rotate(0.4deg); }
+  .pile a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: center; padding: var(--space-3) var(--space-4) calc(var(--space-3) + var(--tear)); text-decoration: none; min-height: 64px; }
+  .pile .seller { font-weight: 600; }
+  .pile .meta { grid-column: 1; font-size: var(--text-sm); color: var(--text-muted); }
+  .pile .stamp { grid-column: 2; grid-row: 1 / span 2; }
+  .pile a:hover .seller { text-decoration: underline; }
+  .all { display: inline-flex; align-items: center; min-height: 44px; margin-top: var(--space-3); }
+
+  @media (max-width: 960px) {
+    .home { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  }
+  @media (max-width: 720px) {
+    .next { padding: var(--space-5) var(--space-4); padding-bottom: calc(var(--space-5) + var(--tear)); }
+    .next h2 { font-size: 36px; }
+    .next .btn { width: 100%; }
+    .steps a { flex-wrap: wrap; row-gap: 0; }
+    .steps .dots { display: none; }
+    .step-state { order: 4; flex-basis: 100%; text-align: left; padding-left: 40px; }
+    .step-stamp { margin-left: auto; min-width: 0; }
+    .pile a { grid-template-columns: minmax(0, 1fr); }
+    .pile .stamp { grid-column: 1; grid-row: auto; justify-self: start; margin-top: var(--space-1); }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar"><div class="bar-in">
+  <a class="brand" href="home.html">Nuits Receipts</a>
+  <nav class="nav" aria-label="Main">
+    <a href="home.html" aria-current="page">Home</a>
+    <a href="review.html">Review <span class="badge">3<span class="vh"> to check</span></span></a>
+    <a href="#">Receipts</a>
+    <a href="bank.html">Bank</a>
+    <a href="#">Settings</a>
+  </nav>
+</div></header>
+<nav class="tabbar" aria-label="Main, phone"><div class="nav">
+  <a href="home.html" aria-current="page">Home</a>
+  <a href="review.html">Review <span class="badge">3<span class="vh"> to check</span></span></a>
+  <a href="#">Receipts</a>
+  <a href="bank.html">Bank</a>
+  <a href="#">Settings</a>
+</div></nav>
+
+<main id="main">
+  <div class="month">
+    <a href="#"><span aria-hidden="true">&lsaquo;</span> August <span class="stamp stamp--sent">Sent</span></a>
+    <h1>September 2026</h1>
+    <a href="#">October <span aria-hidden="true">&rsaquo;</span></a>
+  </div>
+  <p class="lede">September is the oldest month you haven't sent, so it opens first.</p>
+
+  <div class="home">
+    <section aria-labelledby="next">
+      <div class="lift"><div class="slip torn next">
+        <div class="next-head">
+          <p class="eyebrow">Next for September</p>
+          <span class="stamp stamp--needs">Needs you</span>
+        </div>
+        <h2 id="next">Check 3 receipts</h2>
+        <p>The reader couldn't get everything off three receipts. Fill in what's missing and two of the bank's missing payments can match.</p>
+        <a class="btn btn--primary" href="review.html">Check 3 receipts</a>
+        <hr class="perf">
+        <h3 class="steps-title">Closing September</h3>
+        <ol class="ruled steps">
+          <li><a href="review.html"><span class="step-n" aria-hidden="true">1</span><span class="step-name">Check</span><span class="dots" aria-hidden="true"></span><span class="step-state">3 to go, 1 undated</span><span class="step-stamp"><span class="stamp stamp--needs">Needs you</span></span></a></li>
+          <li><a href="bank.html"><span class="step-n" aria-hidden="true">2</span><span class="step-name">Match</span><span class="dots" aria-hidden="true"></span><span class="step-state">3 payments without a receipt</span><span class="step-stamp"><span class="stamp stamp--missing">3 missing</span></span></a></li>
+          <li><a href="send.html"><span class="step-n" aria-hidden="true">3</span><span class="step-name">Send</span><span class="dots" aria-hidden="true"></span><span class="step-state">After Check and Match</span><span class="step-stamp"><span class="stamp stamp--plain">Not ready</span></span></a></li>
+        </ol>
+      </div></div>
+    </section>
+
+    <div>
+      <section aria-labelledby="spent">
+        <div class="lift"><div class="slip torn tally">
+          <h2 id="spent" class="eyebrow">Spent in September so far</h2>
+          <p class="row"><span class="big num">EUR 211.10</span></p>
+          <p class="small muted">One receipt isn't counted yet. It has no euro amount.</p>
+        </div></div>
+      </section>
+
+      <section aria-labelledby="pile">
+        <div class="pile-head">
+          <h2 id="pile">September's pile</h2>
+          <p class="small muted">6 receipts</p>
+        </div>
+        <ul class="pile">
+          <li><div class="lift"><a class="slip torn" href="review.html"><span class="seller">Sample Print Shop</span><span class="meta">18 Sep, no amount yet</span><span class="stamp stamp--needs">Needs you</span></a></div></li>
+          <li><div class="lift"><a class="slip torn" href="#"><span class="seller">Sample Train Line</span><span class="meta">15 Sep, <span class="num">EUR 23.40</span>, VAT missing</span><span class="stamp stamp--needs">Needs you</span></a></div></li>
+          <li><div class="lift"><a class="slip torn" href="#"><span class="seller">Sample Coffee Corner</span><span class="meta">No date, <span class="num">EUR 9.12</span></span><span class="stamp stamp--needs">Needs you</span></a></div></li>
+          <li><div class="lift"><a class="slip torn" href="#"><span class="seller">Sample Domain Desk</span><span class="meta">12 Sep, <span class="num">EUR 12.00</span>, not matched yet</span><span class="stamp stamp--you">Ready</span></a></div></li>
+          <li><div class="lift"><a class="slip torn" href="#"><span class="seller">Sample Mail Meadow Oy</span><span class="meta">6 Sep, <span class="num">EUR 50.20</span></span><span class="stamp stamp--auto">Matched automatically</span></a></div></li>
+          <li><div class="lift"><a class="slip torn" href="#"><span class="seller">Sample Cloud Lantern Oy</span><span class="meta">4 Sep, <span class="num">EUR 125.50</span></span><span class="stamp stamp--auto">Matched automatically</span></a></div></li>
+        </ul>
+        <a class="all" href="#">All September receipts <span aria-hidden="true">&nbsp;&rsaquo;</span></a>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p>
+  <p>Nuits Receipts v1.5.0</p>
+</footer>
+</body>
+</html>

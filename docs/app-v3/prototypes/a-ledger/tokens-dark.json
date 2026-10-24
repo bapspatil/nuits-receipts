@@ -1,0 +1,19 @@
+{
+  "_comment": "Direction A, night ledger. App-only dark theme under prefers-color-scheme: dark.",
+  "color": {
+    "night": { "hex": "#0B1F1C", "role": "Page surface.", "surface": true },
+    "nightRaised": { "hex": "#133029", "role": "Raised slips: cards, rows.", "surface": true },
+    "nightSunken": { "hex": "#071513", "role": "Wells and inputs.", "surface": true },
+    "nightLine": { "hex": "#2A4943", "role": "Hairlines. Never text.", "surface": true },
+    "nightLineStrong": { "hex": "#7C9E95", "role": "Input borders and strong rules.", "indicatorOn": ["night", "nightRaised", "nightSunken"] },
+    "paperText": { "hex": "#E6EFE9", "role": "Primary text, the primary button fill.", "surface": true, "textOn": ["night", "nightRaised", "nightSunken", "okWash", "needsWash"] },
+    "paperHover": { "hex": "#FFFFFF", "role": "Primary button hover fill.", "surface": true },
+    "mutedText": { "hex": "#A6C0B6", "role": "Muted text.", "textOn": ["night", "nightRaised", "nightSunken", "okWash"] },
+    "inkOnPaper": { "hex": "#0D3A36", "role": "Text on the paper-filled primary button.", "textOn": ["paperText", "paperHover", "okText", "needsText"] },
+    "okText": { "hex": "#9FD3BC", "role": "OK stamp word and border.", "surface": true, "textOn": ["night", "nightRaised", "okWash"] },
+    "okWash": { "hex": "#16403A", "role": "Success surface.", "surface": true },
+    "needsText": { "hex": "#FF9AB0", "role": "Needs you and missing words; missing stamp fill.", "surface": true, "textOn": ["night", "nightRaised", "nightSunken", "needsWash"] },
+    "needsWash": { "hex": "#3A1621", "role": "Danger surface.", "surface": true },
+    "onNeeds": { "hex": "#0B1F1C", "role": "Text on the missing stamp fill.", "textOn": ["needsText"] }
+  }
+}

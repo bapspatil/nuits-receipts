@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sample Print Shop · Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap"><a class="brand" href="home.html"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>Nuits Receipts</a><nav class="main" aria-label="Main"><ul><li><a href="home.html">Home</a></li><li><a href="review.html" aria-current="page">Review <span class="count">3<span class="vh"> waiting</span></span></a></li><li><a href="#">Receipts</a></li><li><a href="bank.html">Bank</a></li><li><a href="#">Settings</a></li></ul></nav></div></header>
+<div class="guilloche" aria-hidden="true"></div>
+<nav class="tabs" aria-label="Main, tabs"><ul><li><a href="home.html"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>Home</a></li><li><a href="review.html" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/></svg> <span class="count">3<span class="vh"> waiting</span></span></span>Review</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg></span>Receipts</a></li><li><a href="bank.html"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/></svg></span>Bank</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>Settings</a></li></ul></nav>
+<main id="main"><div class="wrap">
+<div class="crumbs"><a href="home.html">&lsaquo; Review</a><span class="progress"><span class="meter" aria-hidden="true"><i class="done"></i><i class="done"></i><i class="now"></i></span>3 of 3 to check</span></div>
+<div class="head">
+  <h1>Sample Print Shop</h1>
+  <span class="stamp needs tilt">Needs you</span>
+  <p class="lede">18 Sep 2026, from email. The reader found the seller and the date. You fill in the amounts.</p>
+</div>
+
+<div class="grid">
+  <section class="slip s5 doc" aria-labelledby="doc-h">
+    <div class="slip-head"><h2 id="doc-h">The document</h2><a class="sm" href="#">Open original</a></div>
+    <div class="well">
+      <div class="paper-slip" role="document" aria-label="Text the reader got from the receipt">
+        <p><mark>SAMPLE PRINT SHOP</mark></p>
+        <p>Receipt</p>
+        <p><mark>18.09.2026</mark></p>
+        <p class="gap"><span>2 x A2 poster print</span><span>30,00 EUR</span></p>
+        <p><span>incl. VAT <mark class="todo">25.5%</mark></span><span><mark class="todo">6,10</mark></span></p>
+        <p class="gap"><span>Total</span><span><mark class="todo">30,00 EUR</mark></span></p>
+        <p>Paid by card</p>
+      </div>
+    </div>
+    <div class="legend"><span><i aria-hidden="true"></i>Read into the fields</span><span><i class="todo" aria-hidden="true"></i>On the receipt, not read yet</span></div>
+  </section>
+
+  <form class="slip s7" aria-labelledby="fields-h" action="#">
+    <h2 id="fields-h" class="vh">Receipt fields</h2>
+    <div class="section-label req"><span>Needs you</span><span>5 required</span></div>
+    <div class="field required">
+      <div class="lab"><label for="total">Total</label><span class="tag req">Required</span></div>
+      <div class="inline2">
+        <select id="cur" aria-label="Currency, required" required><option value="">Currency</option><option>EUR</option></select>
+        <input id="total" inputmode="decimal" required aria-describedby="total-h">
+      </div>
+      <p class="hint" id="total-h">On the document: <q>Total 30,00 EUR</q></p>
+    </div>
+    <div class="field required">
+      <div class="lab"><label for="vat">VAT</label><span class="tag req">Required</span></div>
+      <input id="vat" inputmode="decimal" required aria-describedby="vat-h">
+      <p class="hint" id="vat-h">On the document: <q>incl. VAT 25.5% 6,10</q></p>
+    </div>
+    <div class="field required">
+      <div class="lab"><label for="rate">VAT %</label><span class="tag req">Required</span></div>
+      <input id="rate" inputmode="decimal" required aria-describedby="rate-h">
+      <p class="hint" id="rate-h">On the document: <q>25.5%</q></p>
+    </div>
+    <div class="field required">
+      <div class="lab"><label for="net">Before VAT</label><span class="tag req">Required</span></div>
+      <input id="net" inputmode="decimal" required aria-describedby="net-h">
+      <p class="hint" id="net-h">Not printed. Total minus VAT is 23.90.</p>
+    </div>
+
+    <div class="section-label"><span>Optional</span><span>1</span></div>
+    <div class="field optional">
+      <div class="lab"><label for="no">Receipt number</label><span class="tag">Optional</span></div>
+      <input id="no" aria-describedby="no-h">
+      <p class="hint" id="no-h">Not on the document. Leave it empty if there isn't one.</p>
+    </div>
+
+    <div class="section-label"><span>Read from the email</span><span>2 read</span></div>
+    <div class="field read">
+      <div class="lab"><label for="seller">Seller</label><span class="tag read">Read</span></div>
+      <input id="seller" value="Sample Print Shop">
+    </div>
+    <div class="field read">
+      <div class="lab"><label for="date">Date</label><span class="tag read">Read</span></div>
+      <input id="date" value="18 Sep 2026">
+    </div>
+    <div class="field optional">
+      <div class="lab"><label for="part">Part of the business</label></div>
+      <select id="part"><option>General</option><option>App</option><option>Website</option><option>Hosting</option></select>
+    </div>
+    <div class="field optional">
+      <div class="lab"><label for="kind">Kind</label></div>
+      <select id="kind"><option>other</option><option>infra</option><option>AI APIs</option><option>subscriptions</option></select>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" type="submit">Approve receipt</button>
+      <span class="progress">3 of 3 to check</span>
+      <div class="right">
+        <button class="btn quiet" type="button">Discard</button>
+        <details class="more-menu"><summary>More</summary></details>
+      </div>
+    </div>
+  </form>
+</div>
+
+</div></main>
+<footer class="foot"><div class="wrap"><p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p><p>Nuits Receipts v1.5.0</p></div></footer>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample Print Shop, Review, Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  .progress { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
+  .progress ol { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .progress li { width: 24px; height: 4px; background: var(--border); }
+  .progress li.done { background: var(--success); }
+  .progress li.now { background: var(--text); }
+  .crumb { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--text-sm); }
+
+  .split { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-6); align-items: start; }
+  .doc { grid-column: 1 / span 6; position: sticky; top: var(--space-5); }
+  .work { grid-column: 7 / span 6; display: grid; gap: var(--space-6); }
+
+  .doc details { background: var(--surface-sunken); border: var(--hairline); }
+  .doc summary {
+    display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+    min-height: 44px; padding: var(--space-2) var(--space-4); cursor: pointer; list-style: none;
+    border-bottom: var(--hairline);
+  }
+  .doc summary::-webkit-details-marker { display: none; }
+  .doc summary .label { color: var(--text); }
+  .doc__src { font-size: var(--text-xs); color: var(--text-muted); }
+  .slip { margin: var(--space-5); background: var(--surface-raised); box-shadow: var(--shadow-raised); border: var(--hairline); padding: var(--space-5) 0; }
+  .slip ol { margin: 0; padding: 0; list-style: none; counter-reset: line; }
+  .slip li {
+    counter-increment: line;
+    display: grid; grid-template-columns: 40px 1fr auto; gap: var(--space-3); align-items: baseline;
+    padding: var(--space-1) var(--space-5) var(--space-1) 0; font-size: var(--text-md);
+  }
+  .slip li::before { content: counter(line); text-align: right; font-size: var(--text-xs); color: var(--text-muted); }
+  .slip li.hit { background: var(--danger-surface); box-shadow: inset 3px 0 0 var(--danger); }
+  .slip li.read { background: var(--surface-sunken); }
+  .slip .tag { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+  .slip li.hit .tag { color: var(--danger); }
+  .doc__foot a { display: inline-flex; align-items: center; min-height: 44px; white-space: nowrap; }
+  .doc__foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: 0 var(--space-5) var(--space-4); font-size: var(--text-sm); }
+
+  fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+  legend { padding: 0; width: 100%; }
+  .group__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); padding-bottom: var(--space-2); border-bottom: 1px solid var(--text); width: 100%; }
+  .group__head h2 { font-size: var(--text-md); font-weight: 600; }
+  .rows { border-bottom: var(--hairline); }
+  .row { display: grid; grid-template-columns: 180px 1fr; gap: var(--space-2) var(--space-4); padding: var(--space-3) 0 var(--space-3) var(--space-4); border-top: var(--hairline); align-items: center; }
+  .rows .row:first-child { border-top: 0; }
+  .row label { font-weight: 600; font-size: var(--text-sm); }
+  .row .req { display: block; font-size: var(--text-xs); font-weight: 600; color: var(--danger); }
+  .row .opt { display: block; font-size: var(--text-xs); font-weight: 500; color: var(--text-muted); }
+  .row .hint { grid-column: 2; font-size: var(--text-sm); color: var(--text-muted); }
+  .row--need { box-shadow: inset 3px 0 0 var(--danger); }
+  .row--need .input, .row--need .select { border-color: var(--danger); }
+  .row--opt label { font-weight: 500; color: var(--text-muted); }
+  .row--read .input, .row--read .select { background: var(--surface-page); }
+  .readmark { display: block; width: fit-content; margin-top: 2px; padding: 0 var(--space-2); background: var(--surface-sunken); font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
+  .pair { display: grid; grid-template-columns: 1fr 120px; gap: var(--space-2); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--text); }
+  .more summary { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; color: var(--accent); font-weight: 600; font-size: var(--text-sm); padding: 0 var(--space-3); }
+
+  @media (max-width: 960px) {
+    .doc { grid-column: 1 / -1; position: static; }
+    .work { grid-column: 1 / -1; }
+  }
+  @media (max-width: 720px) {
+    .split { gap: var(--space-5); }
+    .slip { margin: var(--space-3); padding: var(--space-3) 0; }
+    .slip li { grid-template-columns: 28px 1fr auto; gap: var(--space-2); padding-top: var(--space-2); padding-bottom: var(--space-2); padding-right: var(--space-3); }
+    .row { grid-template-columns: 1fr; }
+    .row .hint { grid-column: 1; }
+    .bar .btn--primary { width: 100%; }
+    .doc__foot { flex-direction: column; align-items: flex-start; gap: 0; }
+    .bar { flex-direction: column; align-items: stretch; }
+    .bar .actions { justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="topbar__in">
+    <a class="brand" href="home.html">Nuits Receipts</a>
+    <nav aria-label="Main"><ul class="nav">
+      <li><a href="home.html">Home</a></li>
+      <li><a href="review.html" aria-current="page">Review <span class="badge">3<span class="sr-only"> to check</span></span></a></li>
+      <li><a href="#">Receipts</a></li>
+      <li><a href="bank.html">Bank</a></li>
+      <li><a href="#">Settings</a></li>
+    </ul></nav>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div class="pagehead">
+    <div class="pagehead__row">
+      <a class="crumb" href="#">&lsaquo; Review, September</a>
+      <div class="progress">
+        <ol aria-hidden="true"><li class="done"></li><li class="done"></li><li class="now"></li></ol>
+        <span>3 of 3 to check</span>
+      </div>
+    </div>
+    <div class="pagehead__title">
+      <h1>Sample Print Shop</h1>
+      <span class="stamp">Needs you</span>
+    </div>
+    <p class="muted">From email, 18 Sep 2026. The reader got the seller and the date. It couldn't read the amounts.</p>
+  </div>
+
+  <div class="split">
+    <section class="doc" aria-labelledby="doc-h">
+      <details open>
+        <summary><span class="label" id="doc-h">Document, as read</span><span class="doc__src">From email. Hide</span></summary>
+        <div class="slip">
+          <ol>
+            <li class="read"><span>SAMPLE PRINT SHOP</span><span class="tag">Seller</span></li>
+            <li><span>Receipt</span><span class="tag">No number</span></li>
+            <li class="read"><span>18.09.2026</span><span class="tag">Date</span></li>
+            <li><span>2 x A2 poster print 30,00 EUR</span><span class="tag"></span></li>
+            <li class="hit"><span>incl. VAT 25.5% 6,10</span><span class="tag">VAT, VAT %</span></li>
+            <li class="hit"><span>Total 30,00 EUR</span><span class="tag">Total, currency</span></li>
+            <li><span>Paid by card</span><span class="tag"></span></li>
+          </ol>
+        </div>
+        <div class="doc__foot"><span class="muted">Grey lines were read. Red lines hold what you need to enter.</span><a href="#">Open original</a></div>
+      </details>
+    </section>
+
+    <form class="work" action="#" method="post">
+      <fieldset>
+        <legend><span class="group__head"><h2>Needs you</h2><span class="label">5 required</span></span></legend>
+        <div class="rows">
+          <div class="row row--need">
+            <label for="total">Total<span class="req">Required</span></label>
+            <div class="pair">
+              <input class="input" id="total" name="total" inputmode="decimal" aria-describedby="total-h" aria-required="true">
+              <select class="select" id="cur" name="currency" aria-label="Currency, required" aria-required="true">
+                <option value="">Currency</option><option>EUR</option><option>USD</option><option>SEK</option>
+              </select>
+            </div>
+            <span class="hint" id="total-h">Line 6 says Total 30,00 EUR.</span>
+          </div>
+          <div class="row row--need">
+            <label for="net">Before VAT<span class="req">Required</span></label>
+            <input class="input" id="net" name="net" inputmode="decimal" aria-describedby="net-h" aria-required="true">
+            <span class="hint" id="net-h">Not printed on the document.</span>
+          </div>
+          <div class="row row--need">
+            <label for="vat">VAT<span class="req">Required</span></label>
+            <input class="input" id="vat" name="vat" inputmode="decimal" placeholder="0 if none" aria-describedby="vat-h" aria-required="true">
+            <span class="hint" id="vat-h">Line 5 says incl. VAT 6,10.</span>
+          </div>
+          <div class="row row--need">
+            <label for="rate">VAT %<span class="req">Required</span></label>
+            <input class="input" id="rate" name="rate" inputmode="decimal" aria-describedby="rate-h" aria-required="true">
+            <span class="hint" id="rate-h">Line 5 says 25.5%.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="group__head"><h2>Optional</h2><span class="label">Leave empty if there is none</span></span></legend>
+        <div class="rows">
+          <div class="row row--opt">
+            <label for="no">Receipt number<span class="opt">Optional</span></label>
+            <input class="input" id="no" name="number" aria-describedby="no-h">
+            <span class="hint" id="no-h">Line 2 has no number.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="group__head"><h2>Read by the reader</h2><span class="label">Check, change if wrong</span></span></legend>
+        <div class="rows">
+          <div class="row row--read">
+            <label for="seller">Seller <span class="readmark">Read, line 1</span></label>
+            <input class="input" id="seller" name="seller" value="Sample Print Shop">
+          </div>
+          <div class="row row--read">
+            <label for="date">Date <span class="readmark">Read, line 3</span></label>
+            <input class="input" id="date" name="date" value="18 Sep 2026">
+          </div>
+          <div class="row">
+            <label for="part">Part of the business</label>
+            <select class="select" id="part" name="part"><option>General</option><option>App</option><option>Website</option><option>Hosting</option></select>
+          </div>
+          <div class="row">
+            <label for="kind">Kind</label>
+            <select class="select" id="kind" name="kind"><option>other</option><option>infra</option><option>AI APIs</option><option>subscriptions</option></select>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="bar">
+        <button class="btn btn--primary btn--lg" type="submit">Approve receipt</button>
+        <div class="actions">
+          <button class="btn btn--quiet" type="submit" formaction="#discard">Discard</button>
+          <details class="more"><summary>More</summary></details>
+        </div>
+      </div>
+    </form>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="footer__in">
+    <p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p>
+    <p>Nuits Receipts v1.5.0</p>
+  </div>
+</footer>
+
+<nav class="tabbar" aria-label="Main, phone"><ul class="nav">
+  <li><a href="home.html">Home</a></li>
+  <li><a href="review.html" aria-current="page">Review <span class="badge">3<span class="sr-only"> to check</span></span></a></li>
+  <li><a href="#">Receipts</a></li>
+  <li><a href="bank.html">Bank</a></li>
+  <li><a href="#">Settings</a></li>
+</ul></nav>
+</body>
+</html>

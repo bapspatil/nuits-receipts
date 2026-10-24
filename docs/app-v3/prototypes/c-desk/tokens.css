@@ -1,0 +1,85 @@
+/* Direction C, Paper desk. Primitives, then the fixed semantic contract, then components. */
+
+@font-face {
+  font-family: "Bricolage";
+  src: url("../../../../site/public/fonts/bricolage.woff2") format("woff2");
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../../../../site/public/fonts/instrument-sans.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  /* Primitives */
+  --c-ink: #0D3A36;
+  --c-ink-soft: #355650;
+  --c-paper: #E6EFE9;
+  --c-desk: #D9E6DE;
+  --c-slip: #FFFFFF;
+  --c-guilloche: #C2D8CB;
+  --c-mint: #9FD3BC;
+  --c-stamp: #A8123F;
+  --c-stamp-wash: #FBEBEF;
+  --c-on-stamp: #FFFFFF;
+
+  /* Semantic */
+  --surface-page: var(--c-paper);
+  --surface-raised: var(--c-slip);
+  --surface-sunken: var(--c-desk);
+  --text: var(--c-ink);
+  --text-muted: var(--c-ink-soft);
+  --text-on-accent: var(--c-slip);
+  --border: var(--c-guilloche);
+  --border-strong: var(--c-ink);
+  --accent: var(--c-ink);
+  --accent-hover: var(--c-ink-soft);
+  --danger: var(--c-stamp);
+  --danger-surface: var(--c-stamp-wash);
+  --success: var(--c-ink);
+  --success-surface: var(--c-mint);
+  --focus-ring: var(--c-ink);
+
+  --font-display: "Bricolage", "Arial Narrow", system-ui, sans-serif;
+  --font-ui: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "Instrument Sans", system-ui, sans-serif; /* the brand has no monospace; figures use tabular-nums */
+
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 36px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-pill: 999px;
+  --shadow-raised: 0 18px 40px -18px rgb(13 58 54 / 0.35);
+  --shadow-drop: drop-shadow(0 10px 14px rgb(13 58 54 / 0.16));
+
+  /* Components */
+  --btn-primary-bg: var(--accent);
+  --btn-primary-text: var(--text-on-accent);
+  --btn-height: 48px;
+  --nav-height: 64px;
+  --tabbar-height: 64px;
+  --stamp-needs: var(--danger);
+  --stamp-ok: var(--success-surface);
+  --stamp-missing: var(--danger);
+  --field-height: 48px;
+  --row-height: 56px;
+  --tear: 8px;
+}

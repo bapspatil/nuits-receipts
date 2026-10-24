@@ -1,0 +1,103 @@
+/* Direction B, Swiss workbench. The only file with hex values. */
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../../../../site/public/fonts/instrument-sans.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("../../../../site/public/fonts/bricolage.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+:root {
+  /* Primitives */
+  --grey-0: #FFFFFF;
+  --grey-50: #F5F6F7;
+  --grey-100: #ECEEF0;
+  --grey-200: #D6DADF;
+  --grey-500: #7D8691;
+  --grey-700: #4B5560;
+  --grey-950: #101418;
+  --petrol-900: #0D3A36;
+  --petrol-950: #072522;
+  --petrol-50: #E2ECEA;
+  --red-700: #B3261E;
+  --red-50: #FCEBEA;
+  --green-800: #1E6B3C;
+  --green-50: #E6F2EA;
+  --shadow-color: rgba(16, 20, 24, 0.08);
+
+  /* Semantic */
+  --surface-page: var(--grey-50);
+  --surface-raised: var(--grey-0);
+  --surface-sunken: var(--grey-100);
+  --surface-accent-quiet: var(--petrol-50);
+  --text: var(--grey-950);
+  --text-muted: var(--grey-700);
+  --text-on-accent: var(--grey-0);
+  --border: var(--grey-200);
+  --border-strong: var(--grey-500);
+  --accent: var(--petrol-900);
+  --accent-hover: var(--petrol-950);
+  --danger: var(--red-700);
+  --danger-surface: var(--red-50);
+  --success: var(--green-800);
+  --success-surface: var(--green-50);
+  --focus-ring: var(--petrol-900);
+
+  --font-display: "Instrument Sans", system-ui, sans-serif;
+  --font-brand: "Bricolage Grotesque", "Instrument Sans", system-ui, sans-serif;
+  --font-ui: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "Instrument Sans", system-ui, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-pill: 999px;
+  --shadow-raised: 0 1px 2px var(--shadow-color);
+  --hairline: 1px solid var(--border);
+  --motion: 120ms ease-out;
+
+  /* Component */
+  --btn-primary-bg: var(--accent);
+  --btn-primary-text: var(--text-on-accent);
+  --btn-height: 44px;
+  --nav-height: 56px;
+  --tabbar-height: 64px;
+  --stamp-needs: var(--danger);
+  --stamp-ok: var(--success);
+  --stamp-missing: var(--danger);
+  --field-height: 44px;
+  --row-height: 48px;
+  --page-max: 1200px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --text-md: 16px;
+    --text-2xl: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion: 0ms linear; }
+}
