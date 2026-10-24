@@ -165,6 +165,11 @@
               <tr><td>28 Oct</td><td>Lunch with a client</td><td class="num">−€46.20</td><td><span class="stamp stamp-missing">Missing</span></td></tr>
             </tbody>
           </table>
+          <ul class="stamp-tally">
+            <li><span class="stamp-count">3</span> <span class="stamp stamp-matched">Matched</span></li>
+            <li><span class="stamp-count">2</span> <span class="stamp stamp-missing">Missing</span></li>
+            <li><span class="stamp-count">1</span> <span class="stamp stamp-review">Check me</span></li>
+          </ul>
           <p class="statement-foot">Two missing. You know exactly which two.</p>
         </div>
       </section>
@@ -173,31 +178,33 @@
         <div class="slate" aria-hidden="true"><span class="slate-n">04</span><span>Demo</span><span class="slate-end">53 s</span></div>
         <h2 class="title" id="demo-title">See it in under a minute.</h2>
         <figure class="demo-player">
-          <media-controller class="player" defaultsubtitles autohide="-1">
-            <video
-              slot="media"
-              controls
-              preload="metadata"
-              playsinline
-              width="1280"
-              height="720"
-              poster="/media/receipts-demo-v3-poster.webp"
-              aria-describedby="demo-note"
-            >
-              <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
-              <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
-              <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
-            </video>
-            <media-play-button slot="centered-chrome" class="player-big"></media-play-button>
-            <media-control-bar class="player-bar">
-              <media-play-button></media-play-button>
-              <media-time-display></media-time-display>
-              <media-time-range></media-time-range>
-              <media-mute-button></media-mute-button>
-              <media-captions-button></media-captions-button>
-              <media-fullscreen-button></media-fullscreen-button>
-            </media-control-bar>
-          </media-controller>
+          <div class="film">
+            <media-controller class="player" defaultsubtitles autohide="-1">
+              <video
+                slot="media"
+                controls
+                preload="metadata"
+                playsinline
+                width="1280"
+                height="720"
+                poster="/media/receipts-demo-v3-poster.webp"
+                aria-describedby="demo-note"
+              >
+                <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
+                <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
+                <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
+              </video>
+              <media-play-button slot="centered-chrome" class="player-big"></media-play-button>
+              <media-control-bar class="player-bar">
+                <media-play-button></media-play-button>
+                <media-time-display></media-time-display>
+                <media-time-range></media-time-range>
+                <media-mute-button></media-mute-button>
+                <media-captions-button></media-captions-button>
+                <media-fullscreen-button></media-fullscreen-button>
+              </media-control-bar>
+            </media-controller>
+          </div>
           <figcaption id="demo-note">
             53 seconds, with narration and captions. Made-up example data. Figures are read automatically and can be wrong.
           </figcaption>
