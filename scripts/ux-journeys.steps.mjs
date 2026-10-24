@@ -9,6 +9,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 const scratch = mkdtempSync(join(tmpdir(), 'ux-journeys-'));
 const nav = (page, href) => page.locator(`nav a[href="${href}"]:visible`);
 const button = (page, name) => page.getByRole('button', { name, exact: true });
+const approve = /^Approve (receipt|invoice)$/;
 const link = (page, name) => page.getByRole('link', { name, exact: true });
 
 async function pdf(name, lines) {
@@ -34,11 +35,12 @@ async function fixAndApprove(page, rec) {
   const values = CORRECTIONS[vendor] ?? {};
   for (const [name, value] of Object.entries(values)) {
     const input = page.locator(`form.fix [name="${name}"]`).first();
-    if (!(await input.isVisible())) await rec.click(page.locator('form.fix summary', { hasText: 'All fields' }));
+    if (!(await input.isVisible()))
+      await rec.click(page.locator('form.fix summary', { hasText: /^(All fields|Other fields|Edit)$/ }));
     if ((await input.evaluate((e) => e.tagName)) === 'SELECT') await rec.select(input, value);
     else await rec.fill(input, value);
   }
-  await rec.click(button(page, 'Approve'));
+  await rec.click(button(page, approve));
   return vendor;
 }
 
@@ -104,7 +106,9 @@ export const journeys = [
         await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
         // The refusal comes back on the Bank page, on that row, with the choice kept.
         if (rec.inlineErrors.length) {
-          rec.note(`Matching without the exception box: "${(await page.locator('main [role=alert]').innerText()).trim()}"`);
+          rec.note(
+            `Matching without the exception box: "${(await page.locator('main [role=alert]').innerText()).trim()}"`,
+          );
           await rec.click(row('DOMAINDESK').locator('input[type=checkbox][name=confirm_exception]'));
           await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
         }
@@ -140,7 +144,7 @@ export const journeys = [
       rec.note(
         `After upload: ${new URL(page.url()).pathname} says "${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 160)}"`,
       );
-      if (await button(page, 'Approve').count()) await fixAndApprove(page, rec);
+      if (await button(page, approve).count()) await fixAndApprove(page, rec);
       await rec.click(nav(page, '/payments'));
       if (!page.url().includes('2026-09')) await rec.click(page.locator('main a[href$="month=2026-09"]'));
       if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
@@ -174,6 +178,34 @@ export const journeys = [
 ];
 
 // Screens to photograph and axe-check after the journeys, with real ids.
+// A keyboard-only run from Review to the first receipt: Tab to it, open it, Tab into a field, type,
+// and press Enter. Enter must approve (this receipt is incomplete, so the refusal comes back in
+// place); Skip, Discard or Read again would redirect or post elsewhere.
+async function keyboardCheck(page, base) {
+  await page.goto(base + '/review');
+  for (
+    let i = 0;
+    i < 40 && !(await page.evaluate(() => document.activeElement?.matches('main a.btn.primary[href^="/receipts/"]')));
+    i++
+  )
+    await page.keyboard.press('Tab');
+  await Promise.all([page.waitForURL(/\/receipts\/[a-f0-9]{64}/), page.keyboard.press('Enter')]);
+  for (
+    let i = 0;
+    i < 40 && !(await page.evaluate(() => document.activeElement?.matches('form.fix input[name=total]')));
+    i++
+  )
+    await page.keyboard.press('Tab');
+  await page.keyboard.type('30.00');
+  const [post] = await Promise.all([
+    page.waitForResponse((r) => r.request().method() === 'POST' && /\/receipts\/[a-f0-9]{64}$/.test(r.url())),
+    page.keyboard.press('Enter'),
+  ]);
+  if (post.status() !== 422 || !(await page.locator('main [role=alert]').innerText()).includes('Nothing was saved'))
+    throw new Error(`Enter in a field did not approve (status ${post.status()}, now at ${page.url()})`);
+  console.log('keyboard: Review to first receipt, fill a field, Enter approves');
+}
+
 export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   await sendEmail(
     'tour-flagged',
@@ -185,12 +217,21 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   const flagged = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
   await page.goto(base + '/invoices?month=2026-09');
   const invoice = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
+  await page.goto(base + '/receipts?month=2026-09');
+  const ready = await page
+    .locator('main a[href^="/receipts/"]')
+    .evaluateAll(
+      (links, skip) => links.map((a) => a.getAttribute('href')).find((h) => h && !skip.includes(h)),
+      [flagged, invoice],
+    );
+  await keyboardCheck(page, base);
   return [
     { name: 'receipt-flagged', path: flagged },
     { name: 'home-sep', path: '/?month=2026-09' },
     { name: 'home-oct', path: '/' },
     { name: 'review', path: '/review' },
     { name: 'receipts', path: '/receipts?month=2026-09' },
+    { name: 'receipt-ready', path: ready },
     { name: 'invoice-paid', path: invoice },
     { name: 'bank', path: '/payments?month=2026-09&show=all' },
     { name: 'import', path: '/import' },
