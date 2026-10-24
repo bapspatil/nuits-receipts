@@ -9,50 +9,36 @@ Paths are relative to the app's root. With `APP_BASE_PATH` set (for example `/ap
 
 ## Main navigation
 
-On a wide screen (880 pixels or more), the header shows these links, in this order. **Invoices** appears only when `INVOICES_ADDRESS` is set or at least one sales invoice exists.
+Every page has the same five links, in this order. On a wide screen (880 pixels or more) they are in the header. On a narrow screen they are in a tab bar fixed to the bottom of the screen, each with an icon. The link for the page you are on is marked. The tab bar hides while you type in a field, so it does not cover the keyboard.
 
-| Link | Path | Badge |
-| --- | --- | --- |
-| Home | `/` | |
-| Review | `/review` | Number of documents and Unknown sender emails waiting |
-| All receipts | `/receipts` | |
-| Payments | `/payments` | Number of payments missing a receipt |
-| Invoices | `/invoices` | |
-| Month | `/month` | |
-| Settings | `/settings` | |
+| Link | Path | Badge | Marked on |
+| --- | --- | --- | --- |
+| Home | `/` | | Home |
+| Review | `/review` | Number of documents and Unknown sender emails waiting | Review, and a document that needs review |
+| Receipts | `/receipts` | | All receipts, Invoices you sent, Add, and a document that does not need review |
+| Bank | `/payments` | Number of payments missing a receipt | Bank and the bank statement import |
+| Settings | `/settings` | | Settings |
 
-In Access mode the header also shows **Sign out**, which goes to `/cdn-cgi/access/logout`.
+In Access mode the header also shows **Sign out**, which goes to `/cdn-cgi/access/logout`. On a phone, **Sign out** is at the top of **Settings**.
 
-### On a phone
-
-On a narrow screen the header links give way to a tab bar fixed to the bottom of the screen. It has five tabs, in this order, and the tab for the page you are on is marked. The bar hides while you type in a field, so it does not cover the keyboard.
-
-| Tab | Path | Badge |
-| --- | --- | --- |
-| Home | `/` | |
-| Review | `/review` | Number of documents and Unknown sender emails waiting |
-| Payments | `/payments` | Number of payments missing a receipt |
-| Month | `/month` | |
-| More | `/more` | |
-
-**More** opens a list of the pages the bar has no room for: **All receipts**, **Invoices** (only when the header would show it), **Settings**, and **Sign out** in Access mode. The More tab is marked on those pages too.
+**Receipts** has two views at the top: **All receipts** (`/receipts`) and **Invoices you sent** (`/invoices`). **Invoices you sent** appears once `INVOICES_ADDRESS` is set or at least one sales invoice exists; `/invoices` works either way.
 
 ## Pages
 
 | Path | Page title | Query parameters | What it shows |
 | --- | --- | --- | --- |
-| `/` | Home | `month` | Heading "Welcome" on first run, "Here's what needs you" with open tasks, or "All caught up". Tasks that need you and a summary of the month with a link to close it. After the first receipt, also an **Add a receipt** upload form. |
-| `/more` | More | | The phone's list of **All receipts**, **Invoices**, **Settings** and **Sign out**. See [On a phone](#on-a-phone). |
+| `/` | Home | `month`, `offset`, `anyway`, `undated`, `changes`, `sent`, `upload`, `wait` | On first run, "Welcome" with an upload form. Otherwise the month, with the three steps to close it: **Check receipts**, **Match payments** (with likely matches to confirm), **Send to `<ACCOUNTANT_LABEL>`**. Overdue invoices and emails from addresses that could not be verified show above the steps. Then "Money in: invoices dated `<month>`" when there are sales invoices, and "Receipts dated `<month>`". |
+| `/month` | | any | Redirects (temporarily, 302) to `/` with the same query string. |
+| `/more` | | | Redirects (temporarily, 302) to `/settings`. |
 | `/review` | Review | `reason`: `info`, `amount` or `sender`; `approved`, `ignored`, `deleted` (result banners) | **Unknown senders** first: mail from senders not on your list, each with **Approve sender**, **Ignore sender** and **Delete**. Then documents with status `needs_review`, filtered by **Missing info**, **Check the amount** or **Email not verified**. Documents still being read are counted in a banner. |
-| `/receipts` | All receipts | `show`: `ready`, `needs`, `reading`, `duplicate`, `sales` or `unknown`; `month` (month received); `q` (search seller, client, file name, invoice number, sender or subject); `offset` | Every receipt, sales invoice and Unknown sender email, newest received first, 50 per page. Each row shows its status and links to the document (or to Review for Unknown sender). On the first page, **Recent mail** lists the last 20 emails that reached the app and what happened to each. With nothing yet, the receipt address to forward to. |
+| `/receipts` | All receipts | `show`: `ready`, `reading`, `duplicate` or `sales` (offered as filters), also `needs` and `unknown`; `month` (month received); `q` (search seller, client, file name, invoice number, sender or subject); `offset` | Every receipt, sales invoice and Unknown sender email, newest received first, 50 per page. A link counts what is waiting in Review, and **Add receipts** opens `/add`. Each row shows its status and links to the document (or to Review for Unknown sender). On the first page, **Recent mail** lists the last 20 emails that reached the app and what happened to each. With nothing yet, the receipt address to forward to. |
 | `/receipts/<id>` | The document's seller or file name | | The original (image preview, or a link to the PDF or email) beside the form: review flag cards, all fields, part of the business and kind of cost, due date, euro amount, duplicate choice, **Note for your accountant** and the approve, save and **Read it again** buttons. Also bank match suggestions and a form to add a vendor rule. Sales invoices also show **Move to receipts** and the paid-outside form. |
 | `/add` | Add documents | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or sales invoices, and the email addresses to forward to. |
-| `/payments` | Payments for `<month>` | `month`, `offset`, `show`: `missing`; `inserted`, `skipped`, `replayed` (import result) | Bank rows booked in the month from completed imports, 100 per page: matches, suggestions, payments with no receipt, exemption controls (**Not a purchase (no receipt needed)**, **Needs a receipt after all**) and own-account transfers. |
+| `/payments` | Bank: payments for `<month>` | `month`, `offset`, `show`: `missing`; `inserted`, `skipped`, `replayed` (import result) | Bank rows booked in the month from completed imports, 100 per page: matches, suggestions, payments with no receipt, exemption controls (**Not a purchase (no receipt needed)**, **Needs a receipt after all**) and own-account transfers. Once any statement is imported, also **Transfers** (`#transfers`: pairs, **Pair a transfer**, **Undo transfer**) and **Statements imported** (`#imports`: date, account and row count). |
 | `/import` | Import a bank statement | | Step 1 of the [bank CSV import](/reference/bank-csv-import/): file, account and encoding. |
 | `/imports/csv`, `/imports/csv/preview` (POST) | Check the file | | Step 2 of the import: rows read, problems, mapping editor and the import button. |
-| `/invoices` | Invoices `<month>` | `month`, `show`: `all`, `review`, `unpaid`, `overdue`, `paid` | Sales invoices dated in the month with totals invoiced and received. `unpaid` and `overdue` list invoices from every month. |
-| `/month` | Month `<month>` | `month`, `offset`, `anyway`, `undated`, `changes`, `sent`, `upload`, `wait` | The three steps to close the month: **Check receipts**, **Match payments**, **Send to `<ACCOUNTANT_LABEL>`**. Then "Money in: invoices dated `<month>`" when there are sales invoices, and "All receipts dated `<month>`". |
-| `/settings` | Settings | `onedrive`, `saved`, `reset`, `routing` (result banners) | Sections listed below. |
+| `/invoices` | Invoices you sent, `<month>` | `month`, `show`: `all`, `review`, `unpaid`, `overdue`, `paid` | Sales invoices dated in the month with totals invoiced and received. `unpaid` and `overdue` list invoices from every month. |
+| `/settings` | Settings | `onedrive`, `saved`, `reset`, `routing`, `rules` (result banners) | Sections listed below. |
 
 ### Settings sections
 
@@ -63,12 +49,10 @@ In page order. Each links from the side menu.
 | Business | `#setup-business` | App name, business names, parts of the business, default part, payment terms, new account currency. |
 | Email | `#setup-email` | Receipt address, invoice address, allowed senders, forward copy address. |
 | Senders | `#senders` | Approved senders (those from the deploy value marked **Default**) with **Remove**, **Add a sender**, and ignored senders with **Stop ignoring**. |
+| Bank accounts | `#accounts` | Accounts with bank, currency and ID; rename; **Add a bank account**. Notes at `#imports` and `#transfers` point to **Bank**, where those moved. |
+| Vendor rules | `#rules` | Rules with seller text, part of the business, kind of cost, extra conditions and priority; **Edit**, **Delete rule** and **Add a rule**. |
 | Export | `#setup-accountant` | Accountant, export file name, note under the month download. |
 | OneDrive | `#onedrive` | Shown only when `MS_CLIENT_ID` is set. Connect or disconnect a Microsoft account, the redirect URI for Microsoft Entra, and the destination folder. |
-| Bank accounts | `#accounts` | Accounts with bank, currency and ID; rename; **Add a bank account**. |
-| Imports | `#imports` | Recent imports with date, account and row count. |
-| Transfers | `#transfers` | Own-account transfer pairs; **Pair a transfer**; **Undo transfer**. |
-| Vendor rules | `#rules` | Rules with seller text, product and type, extra conditions and priority. |
 | Advanced | `#advanced` | Review & matching thresholds, the source code link, **Set at deploy** (read-only deploy values) and **Change history** (the last 20 setting changes). |
 
 Each setting shows where its value comes from: **App** (set here), **Deploy** (Worker variable) or **Default** (built in). See [Configuration](/reference/configuration/).
@@ -81,6 +65,17 @@ Each setting shows where its value comes from: **App** (set here), **Deploy** (W
 | `/export-sales.csv` | `month` | [Sales CSV](/reference/export-csv/#sales-csv-columns) for the month. |
 | `/month/package.zip` | `month`, `anyway`, `undated`, `changes` | [Month package](/reference/month-package/) ZIP. |
 | `/originals/<id>` | `variant=email`: the source email instead of the document. `view=inline`: show a PNG, JPEG or WebP image in the browser. | The original, as a download unless `view=inline`. |
+
+## Form actions
+
+Each form posts to one of these paths and then redirects (303).
+
+| Path | Does | Goes back to |
+| --- | --- | --- |
+| `/accounts`, `/accounts/<id>` | Add or rename a bank account. | `/settings#accounts` |
+| `/transfers`, `/transfers/<id>/undo` | Pair or undo an own-account transfer. | Bank for the month the money left, `#transfers` |
+| `/rules` | Add a vendor rule. | The receipt it was made from, else `/settings#rules` |
+| `/rules/<id>`, `/rules/<id>/delete` | Change or delete a vendor rule. Unknown IDs return 404; a rule with the same seller and context text returns 409. | `/settings#rules` |
 
 ## Sign-in and OneDrive routes
 

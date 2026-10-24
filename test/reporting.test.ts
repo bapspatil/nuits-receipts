@@ -52,7 +52,7 @@ test('matrix and CSV agree to the cent across provisional, missing, undated, dup
   });
   await copy('duplicate', { duplicate_of: original.id, total_minor: 8000 });
   // The cost summary moved from home to the month page, in plain words.
-  const monthly = await (await request('/month?month=2026-09')).text();
+  const monthly = await (await request('/?month=2026-09')).text();
   expect(monthly).toContain('<span>Spent</span><span>EUR 165.18</span>');
   expect(monthly).toContain('<td class="n">EUR 165.18</td>');
   expect(monthly).toContain('Not yet checked 19.99');

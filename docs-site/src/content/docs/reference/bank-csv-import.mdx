@@ -16,7 +16,7 @@ The import reads a CSV export of booked payments. There are presets for some lay
 | 2. Check | **Check the file** | `POST /imports/csv/preview` (button **Check again**) | Nothing |
 | 3. Import | | `POST /imports/csv/confirm` (button **Import N payments**) | R2 original, D1 import and bank rows |
 
-Preview reads the whole file and shows up to 50 rows and up to 100 row problems. Any row problem blocks the import. A preview is valid for 30 minutes and is signed; changing the mapping, the account or a decision after the preview needs a new preview. After import the browser goes to **Payments** for the month of the first row.
+Preview reads the whole file and shows up to 50 rows and up to 100 row problems. Any row problem blocks the import. A preview is valid for 30 minutes and is signed; changing the mapping, the account or a decision after the preview needs a new preview. After import the browser goes to **Bank** for the month of the first row.
 
 ## Step 1 fields
 

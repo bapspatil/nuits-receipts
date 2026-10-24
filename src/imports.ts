@@ -442,7 +442,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   }
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${table}${exclusions}${confirm}${editor}</form>`;
   return page('Check the file', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
-    nav: 'payments',
+    nav: 'bank',
     head: pageHead('Check the file', { kicker: 'Import a bank statement' }),
   });
 }
@@ -531,7 +531,7 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
         `${wizard(3)}<div class="banner" role="status">Transactions were imported. Preset was not saved.</div><p class="lede">${escape(error instanceof InputError ? error.message : 'Storage unavailable. Try saving the mapping again.')}</p><a class="btn primary" href="/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}">Match receipts</a>`,
         200,
         env,
-        { nav: 'payments' },
+        { nav: 'bank' },
       );
     }
   }

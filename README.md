@@ -31,7 +31,8 @@ One Worker, server-rendered HTML, no cron jobs or queues:
 - Extraction uses Cloudflare's Clairic model on Workers AI (`@cf/cloudflare/clairic`). Cloudflare labels it a **preview** model, so its availability, behaviour and price may change. VAT arithmetic is checked in code, and uncertain rows are marked for review.
 - Each cost gets a product and an expense type from your vendor rules, falling back to Cloudflare's Clef model (`@cf/cloudflare/clef`).
 - Bank rows from your CSV exports are matched to approved receipts. Foreign-currency receipts without a bank match get an ECB reference rate.
-- A monthly view shows costs in EUR by product and type, and exports a CSV or a ZIP with every original and an index spreadsheet. Optionally it uploads the same files to a OneDrive folder.
+- Home shows the month: what still needs a check, which payments lack a receipt, and costs in EUR by product and type. It exports a CSV or a ZIP with every original and an index spreadsheet. Optionally it uploads the same files to a OneDrive folder.
+- Five places, the same on a computer and a phone: **Home**, **Review** (what needs a check), **Receipts** (every document, plus invoices you sent), **Bank** (statements, matches and own-account transfers) and **Settings**.
 
 ## Deploy
 

@@ -9,9 +9,11 @@ import type { Env } from '../src/env';
 import { authorization, htmlForm, request, uploadPdf } from './helpers';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
-// INVOICES_ADDRESS is set in wrangler.local.jsonc, so the Invoices tab shows.
-const NAV = ['/', '/review', '/receipts', '/payments', '/invoices', '/month', '/settings'];
-const TABS = ['/', '/review', '/payments', '/month', '/more'];
+// The same five destinations in the header and the phone tab bar, on every page.
+const NAV = ['/', '/review', '/receipts', '/payments', '/settings'];
+const LABELS = ['Home', 'Review', 'Receipts', 'Bank', 'Settings'];
+// Wording Legal never allows on a page.
+const BANNED = /vat[- ]compliant|tax[- ]ready|100\s*% accurate|\bany[- ]bank\b|never leaves your account/i;
 
 async function flaggedImage(variant = 0) {
   const bytes = variant ? new Uint8Array([...PNG, variant]) : PNG;
@@ -67,13 +69,13 @@ function visible(html: string) {
     .replace(/<style>[\s\S]*?<\/style>/g, '')
     .replace(/<[^>]*>/g, ' ');
 }
-// The phone tab for each desktop nav item: Invoices and Settings live behind More.
-const TAB_FOR: Record<string, string> = { '/receipts': '/more', '/invoices': '/more', '/settings': '/more' };
-function expectShell(html: string, current: string | null, tab = current && (TAB_FOR[current] ?? current)) {
+function expectShell(html: string, current: string | null) {
   expect(navOf(html)).toEqual({ links: NAV, current });
   const { links, current: currentTabs } = tabsOf(html);
-  expect(links).toEqual(TABS);
-  expect(currentTabs).toEqual(tab ? [tab] : []);
+  expect(links).toEqual(NAV);
+  expect(currentTabs).toEqual(current ? [current] : []);
+  expect(html).not.toContain('href="/more"');
+  expect(html).not.toMatch(BANNED);
   expect(html).toContain('viewport-fit=cover');
   expect(html).toContain('<a class="skip" href="#main">Skip to content</a>');
   expect(html).toContain('<main id="main">');
@@ -83,25 +85,25 @@ function expectShell(html: string, current: string | null, tab = current && (TAB
   expect(html).not.toContain('/cdn-cgi/access/logout');
 }
 
-test('every page, including error pages, has the same seven-item nav', async () => {
+test('every page, including error pages, has the same five-item nav', async () => {
   const { ready, flagged } = await seed();
   const pages: [string, string | null][] = [
     ['/', '/'],
     ['/?month=2026-09', '/'],
+    ['/?month=2026-09&offset=100', '/'],
     ['/review', '/review'],
     ['/review?reason=sender', '/review'],
     ['/receipts', '/receipts'],
     ['/receipts?show=needs&month=2026-09&q=a', '/receipts'],
     ['/payments?month=2026-09', '/payments'],
     ['/payments?month=2026-09&show=missing', '/payments'],
-    ['/month?month=2026-09', '/month'],
     ['/settings', '/settings'],
     ['/import', '/payments'],
-    ['/invoices?month=2026-09', '/invoices'],
-    ['/invoices?month=2026-09&show=overdue', '/invoices'],
-    ['/add', '/'],
-    ['/add?kind=sales', '/invoices'],
-    [`/receipts/${ready.id}`, '/review'],
+    ['/invoices?month=2026-09', '/receipts'],
+    ['/invoices?month=2026-09&show=overdue', '/receipts'],
+    ['/add', '/receipts'],
+    ['/add?kind=sales', '/receipts'],
+    [`/receipts/${ready.id}`, '/receipts'],
     [`/receipts/${flagged.id}`, '/review'],
   ];
   for (const [path, current] of pages) {
@@ -109,9 +111,6 @@ test('every page, including error pages, has the same seven-item nav', async () 
     expect(response.status, path).toBe(200);
     expectShell(await response.text(), current);
   }
-  const more = await request('/more');
-  expect(more.status).toBe(200);
-  expectShell(await more.text(), null, '/more');
   // Errors keep their status and message, now inside the layout with a way back.
   const missing = await request('/nope', { headers: { Referer: 'http://localhost/review' } });
   expect(missing.status).toBe(404);
@@ -155,7 +154,7 @@ test('each work screen has exactly one primary button, empty or busy', async () 
     '/review',
     '/payments?month=2026-09',
     '/import',
-    '/month?month=2026-09',
+    '/?month=2026-09',
     '/invoices?month=2026-09',
     '/add',
     '/add?kind=sales',
@@ -190,12 +189,25 @@ test('each work screen has exactly one primary button, empty or busy', async () 
 });
 
 test('empty screens say what is missing and offer one next step', async () => {
-  for (const path of ['/review', '/payments?month=2026-09', '/invoices?month=2026-09']) {
+  for (const path of ['/review', '/receipts', '/payments?month=2026-09', '/invoices?month=2026-09']) {
     const html = await (await request(path)).text();
     const empty = html.match(/<div class="card empty">([\s\S]*?)<\/main>/)?.[1] ?? '';
     expect(empty, path).toMatch(/<h2>[^<]+/);
     expect(primaries(empty), path).toBe(1);
   }
+  expect(await (await request('/review')).text()).toContain('<a href="/receipts">See all receipts</a>');
+  // No statement yet: Bank has no transfer or import sections to show.
+  expect(await (await request('/payments?month=2026-09')).text()).not.toContain('id="transfers"');
+  const plain = { ...env, INVOICES_ADDRESS: '' } as Env;
+  const invoices = await (
+    await worker.fetch(new Request('http://localhost/invoices', { headers: { Authorization: authorization } }), plain)
+  ).text();
+  expect(invoices).toContain('set an invoice address in <a href="/settings#setup-email">Settings › Email</a>');
+  // Home with nothing dated this month still offers the next step.
+  await uploadPdf();
+  const quiet = await (await request('/?month=2030-01')).text();
+  expect(quiet).toContain('None dated January yet.');
+  expect(primaries(quiet)).toBe(1);
   await seed();
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
   const matched = await (await request('/payments?month=2026-09')).text();
@@ -206,13 +218,11 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   await seed();
   const html = await (await request('/')).text();
   const { nav } = tabsOf(html);
-  expect([...nav.matchAll(/<\/span>([A-Za-z]+)<\/a>/g)].map((m) => m[1])).toEqual([
-    'Home',
-    'Review',
-    'Payments',
-    'Month',
-    'More',
-  ]);
+  expect([...nav.matchAll(/<\/span>([A-Za-z]+)<\/a>/g)].map((m) => m[1])).toEqual(LABELS);
+  const header = html.match(/<nav class="main" aria-label="Main">([\s\S]*?)<\/nav>/)?.[1] ?? '';
+  expect([...header.matchAll(/<a href="[^"]*"[^>]*>([A-Za-z]+)/g)].map((m) => m[1])).toEqual(LABELS);
+  expect(header).toMatch(/Review <span class="count">\d+<span class="vh"> waiting<\/span><\/span>/);
+  expect(header).toMatch(/Bank <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);
   expect(nav.match(/<svg [^>]*aria-hidden="true"/g)).toHaveLength(5);
   expect(nav).toMatch(/href="\/review">.*?<span class="count">\d+<span class="vh"> waiting<\/span><\/span>/);
   expect(nav).toMatch(/href="\/payments">.*?<span class="count">1<span class="vh"> missing a receipt<\/span>/);
@@ -228,27 +238,94 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(html).toContain('nav.tabs{display:none}');
 });
 
-test('More lists Invoices only when the Invoices tab shows', async () => {
-  const shown = await (await request('/more')).text();
-  expect(shown).toContain('<a href="/invoices">');
-  expect(shown).toContain('<a href="/settings">');
-  expect(shown).not.toContain('/cdn-cgi/access/logout');
+test('empty Settings sections say what to add', async () => {
+  // Settings sections say what to do when empty.
+  await env.DB.batch([env.DB.prepare('DELETE FROM vendor_rules'), env.DB.prepare('DELETE FROM accounts')]);
+  const settings = await (await request('/settings')).text();
+  expect(settings).toContain('No bank accounts yet. Importing a statement creates one.');
+  expect(settings).toContain('No rules yet.');
+});
+
+// INVOICES_ADDRESS is set in wrangler.local.jsonc, so the Invoices you sent view shows.
+test('Receipts offers Invoices you sent only once invoices are in use', async () => {
+  const segment = (html: string) => html.match(/<nav class="seg" aria-label="Receipts">([\s\S]*?)<\/nav>/)?.[1];
+  const shown = await (await request('/receipts')).text();
+  expect(segment(shown)).toBe(
+    '<ul><li><a href="/receipts" aria-current="page">All receipts</a></li><li><a href="/invoices">Invoices you sent</a></li></ul>',
+  );
+  const invoices = await (await request('/invoices')).text();
+  expect(segment(invoices)).toContain('<a href="/invoices" aria-current="page">Invoices you sent</a>');
   const plain = { ...env, INVOICES_ADDRESS: '' } as Env;
-  const hidden = await (
-    await worker.fetch(new Request('http://localhost/more', { headers: { Authorization: authorization } }), plain)
-  ).text();
-  expect(navOf(hidden).links).not.toContain('/invoices');
+  const at = async (path: string) =>
+    (
+      await worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), plain)
+    ).text();
+  const hidden = await at('/receipts');
+  expect(segment(hidden)).toBeUndefined();
   expect(hidden).not.toContain('href="/invoices"');
-  expect(hidden).toContain('<a href="/settings">');
-  expect((await worker.fetch(new Request('http://localhost/more'), env)).status).toBe(401);
+  // The address keeps working, with the way back to All receipts.
+  expect(segment(await at('/invoices'))).toContain('<a href="/receipts">All receipts</a>');
+});
+
+test('Receipts leaves Needs you and Unknown sender to Review, and offers Add', async () => {
+  const empty = await (await request('/receipts')).text();
+  expect(empty).not.toContain('waiting in Review');
+  expect(empty).toContain('<a class="btn secondary" href="/add">Add receipts</a>');
+  await seed();
+  const html = await (await request('/receipts')).text();
+  const chips = html.match(/<ul class="chips" aria-label="Show">([\s\S]*?)<\/ul>/)?.[1] ?? '';
+  expect([...chips.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual([
+    'All',
+    'Ready',
+    'Being read',
+    'Duplicate',
+    'Sales invoices',
+  ]);
+  expect(html).toContain('<p class="small waiting"><a href="/review">1 waiting in Review ›</a></p>');
+  // Old filter links still filter.
+  const needs = await (await request('/receipts?show=needs')).text();
+  expect(needs).toContain('photo.png');
+  expect(needs).not.toContain('sample.pdf');
+});
+
+test('a receipt links back to where it lives', async () => {
+  const { ready, flagged } = await seed();
+  expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain('<a href="/review">‹ Review</a>');
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain('<a href="/receipts">‹ All receipts</a>');
+});
+
+test('old Month and More addresses redirect, keeping the query exactly', async () => {
+  const query = '?month=2026-09&offset=100&anyway=1&undated=1&changes=1&sent=1&upload=more&wait=7&x=a%2Fb+c';
+  for (const method of ['GET', 'HEAD']) {
+    const month = await request('/month' + query, { method });
+    expect(month.status, method).toBe(302);
+    expect(month.headers.get('Location'), method).toBe('/' + query);
+    const more = await request('/more', { method });
+    expect(more.status, method).toBe(302);
+    expect(more.headers.get('Location'), method).toBe('/settings');
+  }
+  expect((await request('/month')).headers.get('Location')).toBe('/');
+  const based = { ...env, APP_BASE_PATH: '/app' } as Env;
+  const at = (path: string) =>
+    worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), based);
+  expect((await at('/app/month' + query)).headers.get('Location')).toBe('/app/' + query);
+  expect((await at('/app/more')).headers.get('Location')).toBe('/app/settings');
+  // Sign-in comes first: no redirect without it.
+  for (const path of ['/month?month=2026-09', '/more']) {
+    const anonymous = await worker.fetch(new Request('http://localhost' + path), env);
+    expect(anonymous.status, path).toBe(401);
+    expect(anonymous.headers.get('Location'), path).toBeNull();
+  }
+  // Downloads and form actions under /month keep their addresses.
+  expect((await request('/month/package.zip?month=2026-09')).status).not.toBe(302);
 });
 
 test('stacked tables label every cell for phones and keep column headers', async () => {
   await seed();
-  for (const path of ['/month?month=2026-09', '/invoices?month=2026-09']) {
+  for (const path of ['/?month=2026-09', '/invoices?month=2026-09']) {
     const html = await (await request(path)).text();
     const tables = [...html.matchAll(/<table class="stack">([\s\S]*?)<\/table>/g)].map((m) => m[1]!);
-    if (path.startsWith('/month')) expect(tables.length, path).toBeGreaterThan(0);
+    if (path.startsWith('/?')) expect(tables.length, path).toBeGreaterThan(0);
     for (const table of tables) {
       expect(table, path).toMatch(/<caption[^>]*>[^<]+<\/caption>/);
       expect(table, path).toMatch(/<th scope="col"/);
@@ -273,31 +350,26 @@ test('flagged fields are one compact row: the question labels the input it descr
   expect(html).not.toMatch(/\.actions\{[^}]*position:sticky/);
 });
 
-test('home lists what needs you, counting undated receipts', async () => {
+test('home closes the month and lists what needs you, counting undated receipts', async () => {
   const { flagged } = await seed();
   await env.DB.prepare('UPDATE receipts SET issue_date=NULL WHERE id=?').bind(flagged.id).run();
   await flaggedImage(1);
   const html = await (await request('/?month=2026-09')).text();
-  expect(html).toContain('<b>2</b> receipts need a quick check');
-  expect(html).toContain('<b>1</b> payment has no receipt yet');
-  expect(html).toContain('href="/payments?month=2026-09&show=missing"');
+  expect(html).toContain('<p class="kicker">Close the month</p><h1>September 2026</h1>');
+  expect(html).toContain('Plus 2 receipts with no date. <a href="/review">Add the date</a> to file them.');
+  expect(html).toContain('<span class="stamp needs">1 missing</span>');
+  expect(html).toContain('href="/payments?month=2026-09&show=missing">Fake Unmatched Shop</a>');
   expect(html).toMatch(/Review <span class="count">2<span class="vh"> waiting<\/span><\/span>/);
-  expect(html).toMatch(/Payments <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);
-  expect(html).toContain('photo.png: Who is this from?');
-  // The month slip never reads 0 beside the card: undated flagged receipts
-  // (in no month) get their own row with the same total as the card.
-  const slip = html.match(/<div class="slip">[\s\S]*?<\/div>/)?.[0] ?? '';
-  const needYou = Number(slip.match(/<dt>Need you<\/dt><dd[^>]*>(\d+)<\/dd>/)?.[1]);
-  const undated = Number(slip.match(/No date yet, need you<\/a><\/dt><dd class="red">(\d+)<\/dd>/)?.[1] ?? 0);
-  expect(undated).toBe(2);
-  expect(needYou + undated).toBe(2);
-  const undatedRow = await (await request('/?month=2026-09')).text();
-  expect(undatedRow).toContain('<a href="/review">No date yet, need you</a>');
-  // Once dated in the month, it moves to the month's own count.
+  expect(html).toMatch(/Bank <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);
+  expect(html).toContain('Forward more to <code>receipts@example.com</code> or <a href="/add">add them here</a>.');
+  // The month switcher stays on Home.
+  expect(html).toContain('<form method="get" action="/">');
+  // Once dated in the month, they count in the month's own step.
   await env.DB.prepare("UPDATE receipts SET issue_date='2026-09-20' WHERE status='needs_review'").run();
   const dated = await (await request('/?month=2026-09')).text();
-  expect(dated).toMatch(/<dt>Need you<\/dt><dd class="red">2<\/dd>/);
-  expect(dated).not.toContain('No date yet, need you');
+  expect(dated).toContain('<span class="stamp needs">2 need you</span>');
+  expect(dated).toContain('>photo.png</a>');
+  expect(dated).not.toContain('with no date');
   // First run says what to do next instead of showing zeros.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM bank_transactions'),
@@ -305,8 +377,10 @@ test('home lists what needs you, counting undated receipts', async () => {
     env.DB.prepare('DELETE FROM receipts'),
   ]);
   const first = await (await request('/')).text();
+  expect(first).toContain('<h1>Welcome</h1>');
   expect(first).toContain("Let's get your first receipt in");
   expect(first).toContain('receipts@example.com');
+  expect(primaries(first)).toBe(1);
 });
 
 test('raw reason codes and payment IDs appear only in technical details', async () => {
@@ -317,7 +391,7 @@ test('raw reason codes and payment IDs appear only in technical details', async 
   expect(receipt).toContain('Who is this from?');
   expect(receipt).toContain('No date on it.');
   expect(receipt.match(/Who is this from\?/g)).toHaveLength(1);
-  for (const path of ['/', '/review', '/month?month=2026-09', `/receipts/${flagged.id}`, '/payments?month=2026-09']) {
+  for (const path of ['/', '/review', '/?month=2026-09', `/receipts/${flagged.id}`, '/payments?month=2026-09']) {
     const html = await (await request(path)).text();
     expect(visible(html), path).not.toMatch(/\b(uncertain|missing)_[a-z_]+\b/);
     expect(visible(html), path).not.toMatch(/\bneeds_review\b/);
@@ -432,9 +506,8 @@ test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
   for (const path of [
     '/app/',
     '/app/review',
-    '/app/month?month=2026-09',
+    '/app/?month=2026-09',
     '/app/settings',
-    '/app/more',
     '/app/import',
     '/app/nope',
     `/app/receipts/${flagged.id}`,
@@ -462,7 +535,7 @@ test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
 test('public template: no deployment names hardcoded in pages', async () => {
   await seed();
   const custom = { ...env, APP_NAME: 'Synthetic Books', ACCOUNTANT_LABEL: 'Example Accounting' } as Env;
-  for (const path of ['/', '/review', '/month?month=2026-09', '/settings', '/payments?month=2026-09']) {
+  for (const path of ['/', '/review', '/?month=2026-09', '/settings', '/payments?month=2026-09']) {
     const html = await (
       await worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), custom)
     ).text();

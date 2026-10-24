@@ -5,7 +5,20 @@ import { creditFit, eurValue, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { flagFor, reasonCodes } from './flags';
-import { amount, day, emptyState, escape, input, monthName, monthSwitcher, page, pageHead, plural } from './ui';
+import {
+  amount,
+  day,
+  emptyState,
+  escape,
+  input,
+  monthName,
+  monthSwitcher,
+  navCounts,
+  page,
+  pageHead,
+  plural,
+  receiptsSegment,
+} from './ui';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
 export type SalesStatus = 'reading' | 'review' | 'paid' | 'overdue' | 'unpaid';
@@ -123,11 +136,11 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         month.length || across ? 'Nothing in this filter.' : `No invoices dated ${escape(monthName(selected, false))}.`,
         settings.invoicesAddress
           ? `Copy <code>${escape(settings.invoicesAddress)}</code> when you send one, or add it here.`
-          : 'Add the invoices you sent.',
+          : 'Add the invoices you sent, or set an invoice address in <a href="/settings#setup-email">Settings › Email</a>.',
         '<a class="btn primary" href="/add?kind=sales">Add invoices</a>',
       );
   const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const body = `<p class="summary"><span>Invoiced in ${escape(monthName(selected, false))}: EUR ${money(invoiced)}</span><span>Received: EUR ${money(received)}</span>${noEur ? `<span class="red">${plural(noEur, 'invoice has', 'invoices have')} no euro amount yet</span>` : ''}</p>${
+  const body = `${receiptsSegment(await navCounts(env), 'invoices')}<p class="summary"><span>Invoiced in ${escape(monthName(selected, false))}: EUR ${money(invoiced)}</span><span>Received: EUR ${money(received)}</span>${noEur ? `<span class="red">${plural(noEur, 'invoice has', 'invoices have')} no euro amount yet</span>` : ''}</p>${
     overdue.length
       ? `<div class="alert" role="note"><p><strong>${plural(overdue.length, 'older invoice is', 'older invoices are')} overdue.</strong> <a href="/invoices?month=${selected}&show=overdue">See ${overdue.length === 1 ? 'it' : 'them'}</a></p></div>`
       : ''
@@ -140,7 +153,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
       : ''
   }<div class="btns">${shown.length ? '<a class="btn primary" href="/add?kind=sales">Add invoices</a>' : ''}<a class="btn secondary" href="/export-sales.csv?month=${selected}">Spreadsheet (CSV)</a></div><details class="why"><summary>What counts as paid?</summary><p>Money in matched on your bank statement, or marked paid by you. Unpaid invoices don't stop the month from being ready. Your accountant decides how these are booked.</p></details>`;
   return page(`Invoices ${selected}`, body, 200, env, {
-    nav: 'invoices',
+    nav: 'receipts',
     head: pageHead(across ? SHOWS[show] : escape(monthName(selected)), {
       kicker: 'Invoices you sent',
       sub: settings.invoicesAddress
@@ -216,7 +229,7 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
   }<script src="/assets/add.js" defer></script>`;
   return page('Add documents', body, 200, env, {
-    nav: kind === 'sales' ? 'invoices' : 'home',
+    nav: 'receipts',
     head: pageHead('Add receipts or invoices', {
       kicker: 'Add',
       sub: 'Each file is read on its own. Unsure ones wait in Review.',

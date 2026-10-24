@@ -10,9 +10,9 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month, morePage } from './ui';
+import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
-import { home, importPage, monthPage, payments, previewable, receiptPage, reviewPage, settingsPage } from './views';
+import { home, importPage, payments, previewable, receiptPage, reviewPage, settingsPage } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
 import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
@@ -88,8 +88,47 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
   } else return new Response('Not found', { status: 404 });
   return redirect(back === '/settings' ? `/settings?${done}#senders` : `${back ?? '/review'}?${done}`);
 }
+// The fields of a vendor rule, checked the same way for a new rule and an edit.
+function ruleFrom(env: Env, form: FormData): [string, string | null, string | null, string, string, number] {
+  const vendor = String(form.get('vendor_contains') ?? '').trim();
+  const context = String(form.get('context_contains') ?? '').trim() || null,
+    alias = String(form.get('bank_alias') ?? '').trim() || null;
+  const product = String(form.get('product')),
+    expense = String(form.get('expense_type')),
+    priority = Number(form.get('priority'));
+  requireInput(
+    normalize(vendor) && vendor.length <= 200 && (!context || context.length <= 200) && (!alias || alias.length <= 200),
+    'Invalid vendor rule',
+  );
+  requireInput(
+    isProduct(env, product) && EXPENSE_TYPES.some((t) => t === expense) && Number.isSafeInteger(priority),
+    'Invalid rule category or priority',
+  );
+  return [vendor, context, alias, product, expense, priority];
+}
+async function saveRule(statement: D1PreparedStatement): Promise<void> {
+  try {
+    await statement.run();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint'))
+      throw new InputError('A rule with the same seller text already exists', 409);
+    throw error;
+  }
+}
 function redirect(location: string): Response {
   return new Response(null, { status: 303, headers: { Location: location } });
+}
+// A page that moved. Temporary (302) while the new layout settles; the query
+// string is carried over exactly as sent.
+export function moved(location: string, search = ''): Response {
+  return new Response(null, { status: 302, headers: { Location: location + search } });
+}
+// Bank's Transfers section for the month the money left in.
+async function transfersPage(env: Env, debitId: string): Promise<string> {
+  const date = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
+    .bind(debitId)
+    .first<string>('booking_date');
+  return `/payments${date ? `?month=${date.slice(0, 7)}` : ''}#transfers`;
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
@@ -113,20 +152,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/upload') return uploadFiles(request, env);
   const offset = Number(url.searchParams.get('offset') ?? 0);
   requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page');
-  if (request.method === 'GET' && path === '/') return home(env, month(url.searchParams.get('month')));
+  if (request.method === 'GET' && path === '/')
+    return home(env, month(url.searchParams.get('month')), offset, url.searchParams);
+  // Old addresses: the month close is Home now, and the phone's More menu is gone.
+  const read = request.method === 'GET' || request.method === 'HEAD';
+  if (read && path === '/month') return moved('/', url.search);
+  if (read && path === '/more') return moved('/settings');
   if (request.method === 'GET' && path === '/review') {
     const reason = url.searchParams.get('reason') ?? '';
     return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
   }
-  if (request.method === 'GET' && path === '/month')
-    return monthPage(env, month(url.searchParams.get('month')), offset, url.searchParams);
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {
     const form = await formData(request, 4096),
       selected = month(String(form.get('month') ?? ''));
     await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
-    return redirect(`/month?month=${selected}&sent=1#send`);
+    return redirect(`/?month=${selected}&sent=1#send`);
   }
   if (request.method === 'POST' && path === '/month/onedrive-upload') {
     const form = await formData(request, 4096),
@@ -134,10 +176,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       chosen = options(form);
     const result = await uploadBatch(env, selected, chosen, url.origin + base);
     return redirect(
-      `/month?${query(selected, chosen)}&upload=${result.finished ? 'done' : 'more'}${result.wait ? `&wait=${result.wait}` : ''}#send`,
+      `/?${query(selected, chosen)}&upload=${result.finished ? 'done' : 'more'}${result.wait ? `&wait=${result.wait}` : ''}#send`,
     );
   }
-  if (request.method === 'GET' && path === '/more') return morePage(env);
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
@@ -198,7 +239,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       bank_name: String(form.get('bank_name') ?? ''),
       default_currency: String(form.get('default_currency') ?? ''),
     });
-    return redirect('/payments');
+    return redirect('/settings#accounts');
   }
   const account = path.match(/^\/accounts\/([^/]+)$/);
   if (request.method === 'POST' && account?.[1]) {
@@ -210,22 +251,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       throw new InputError('Invalid account ID');
     }
     await renameAccount(env.DB, accountId, String(form.get('label') ?? ''));
-    return redirect('/payments');
+    return redirect('/settings#accounts');
   }
   if (request.method === 'POST' && path === '/transfers') {
     const form = await formData(request, 4096);
+    const debit = String(form.get('debit_id') ?? '');
     await confirmTransfer(env.DB, {
-      debit_id: String(form.get('debit_id') ?? ''),
+      debit_id: debit,
       credit_id: String(form.get('credit_id') ?? ''),
       reason: String(form.get('reason') ?? ''),
     });
-    return redirect('/payments');
+    return redirect(await transfersPage(env, debit));
   }
   const transfer = path.match(/^\/transfers\/([a-f0-9]{64})\/undo$/);
   if (request.method === 'POST' && transfer?.[1]) {
     await undoTransfer(env.DB, transfer[1]);
     await reconcile(env);
-    return redirect('/payments');
+    return redirect(await transfersPage(env, transfer[1]));
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {
@@ -362,30 +404,35 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
   }
   if (request.method === 'POST' && path === '/rules') {
-    const form = await formData(request, 4096),
-      vendor = String(form.get('vendor_contains') ?? '').trim();
-    const context = String(form.get('context_contains') ?? '').trim() || null,
-      alias = String(form.get('bank_alias') ?? '').trim() || null;
-    const product = String(form.get('product')),
-      expense = String(form.get('expense_type')),
-      priority = Number(form.get('priority'));
-    requireInput(
-      normalize(vendor) &&
-        vendor.length <= 200 &&
-        (!context || context.length <= 200) &&
-        (!alias || alias.length <= 200),
-      'Invalid vendor rule',
+    const form = await formData(request, 4096);
+    const rule = ruleFrom(env, form);
+    await saveRule(
+      env.DB.prepare(
+        'INSERT INTO vendor_rules (vendor_contains,context_contains,bank_alias,product,expense_type,priority) VALUES (?,?,?,?,?,?)',
+      ).bind(...rule),
     );
+    // A rule made from a receipt goes back to that receipt; otherwise to Settings.
+    const back = String(form.get('return_to') ?? '');
+    return redirect(/^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings?rules=saved#rules');
+  }
+  const rule = path.match(/^\/rules\/(\d{1,15})(\/delete)?$/);
+  if (request.method === 'POST' && rule?.[1]) {
+    const id = Number(rule[1]);
     requireInput(
-      isProduct(env, product) && EXPENSE_TYPES.some((t) => t === expense) && Number.isSafeInteger(priority),
-      'Invalid rule category or priority',
+      await env.DB.prepare('SELECT 1 FROM vendor_rules WHERE id=?').bind(id).first(),
+      'Vendor rule not found',
+      404,
     );
-    await env.DB.prepare(
-      'INSERT INTO vendor_rules (vendor_contains,context_contains,bank_alias,product,expense_type,priority) VALUES (?,?,?,?,?,?)',
-    )
-      .bind(vendor, context, alias, product, expense, priority)
-      .run();
-    return redirect('/');
+    if (rule[2]) {
+      await env.DB.prepare('DELETE FROM vendor_rules WHERE id=?').bind(id).run();
+      return redirect('/settings?rules=deleted#rules');
+    }
+    await saveRule(
+      env.DB.prepare(
+        'UPDATE vendor_rules SET vendor_contains=?,context_contains=?,bank_alias=?,product=?,expense_type=?,priority=? WHERE id=?',
+      ).bind(...ruleFrom(env, await formData(request, 4096)), id),
+    );
+    return redirect('/settings?rules=saved#rules');
   }
   throw new InputError('Not found', 404);
 }

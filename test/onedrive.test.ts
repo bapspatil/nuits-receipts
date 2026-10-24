@@ -191,7 +191,7 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
   const settings = await (await at('/app/settings', {}, {}, plain)).text();
   expect(settings).not.toMatch(/OneDrive|onedrive/);
   await seed({ bytes: 'r', issue_date: '2026-10-02' });
-  expect(await (await at('/app/month?month=2026-10', {}, {}, plain)).text()).not.toContain('onedrive');
+  expect(await (await at('/app/?month=2026-10', {}, {}, plain)).text()).not.toContain('onedrive');
   expect((await at('/app/settings/onedrive/connect', {}, {}, plain)).status).toBe(404);
   const half = { ...plain, MS_CLIENT_ID: CLIENT_ID } as Env;
   const note = await (await at('/app/settings', {}, {}, half)).text();
@@ -368,14 +368,14 @@ async function readyMonth(count = 1, big = false) {
 test('upload puts small files, chunked large files and the index in the month folder, then skips and replaces', async () => {
   await connect();
   const [small, large] = await readyMonth(1, true);
-  const page = await (await at('/app/month?month=2026-10')).text();
+  const page = await (await at('/app/?month=2026-10')).text();
   expect(page).toContain('action="/app/month/onedrive-upload"');
   expect(page).toContain('Upload anyway to Accountant Inbox');
   expect(page).toContain('href="/app/settings#onedrive">Change</a>');
 
   const first = await post('/app/month/onedrive-upload', { month: '2026-10' });
   expect(first.status).toBe(303);
-  expect(first.headers.get('Location')).toBe('/app/month?month=2026-10&upload=done#send');
+  expect(first.headers.get('Location')).toBe('/app/?month=2026-10&upload=done#send');
   expect(ms.folders.get('root-folder/receipts-2026-10')).toBe('receipts-2026-10-id');
   const smallName = `2026-10-02_Vendor-0_EUR-12.50_${small!.id.slice(0, 6)}.pdf`;
   const largeName = `2026-10-03_Large-Scan_EUR-12.50_${large!.id.slice(0, 6)}.pdf`;
@@ -396,7 +396,7 @@ test('upload puts small files, chunked large files and the index in the month fo
   });
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(2);
   expect(ms.refreshes).toEqual(['refresh-original']);
-  const done = await (await at('/app/month?month=2026-10&upload=done')).text();
+  const done = await (await at('/app/?month=2026-10&upload=done')).text();
   expect(done).toContain('Everything is in Accountant Inbox. October is marked as sent.');
   expect(done).toContain('by uploading it to OneDrive');
 
@@ -414,7 +414,7 @@ test('upload puts small files, chunked large files and the index in the month fo
     .run();
   ms.calls = [];
   const again = await post('/app/month/onedrive-upload', { month: '2026-10', changes: '1' });
-  expect(again.headers.get('Location')).toBe('/app/month?month=2026-10&changes=1&upload=done#send');
+  expect(again.headers.get('Location')).toBe('/app/?month=2026-10&changes=1&upload=done#send');
   const renamed = `2026-10-02_Vendor-Renamed_EUR-12.50_${small!.id.slice(0, 6)}.pdf`;
   const put = ms.calls.find((c) => c.method === 'PUT' && decodeURIComponent(c.url).includes(renamed))!;
   expect(put.url).toContain('conflictBehavior=replace');
@@ -433,16 +433,16 @@ test('uploads run in batches of ten and continue without JavaScript', async () =
   await connect();
   await readyMonth(12);
   const first = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
-  expect(first.headers.get('Location')).toBe('/app/month?month=2026-10&anyway=1&upload=more#send');
+  expect(first.headers.get('Location')).toBe('/app/?month=2026-10&anyway=1&upload=more#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(10);
   expect(ms.files.has('receipts-2026-10-id/00-index-2026-10.csv')).toBe(false);
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
-  const page = await (await at('/app/month?month=2026-10&anyway=1&upload=more')).text();
+  const page = await (await at('/app/?month=2026-10&anyway=1&upload=more')).text();
   expect(page).toContain('10 of 12 files uploaded to Accountant Inbox. Continue to upload the rest.');
   expect(page).toContain('<input type="hidden" name="anyway" value="1">');
   expect(page).not.toMatch(/http-equiv|<script/);
   const second = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
-  expect(second.headers.get('Location')).toBe('/app/month?month=2026-10&anyway=1&upload=done#send');
+  expect(second.headers.get('Location')).toBe('/app/?month=2026-10&anyway=1&upload=done#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(12);
   expect(await env.DB.prepare('SELECT method FROM month_sends').first('method')).toBe('onedrive');
 });
@@ -479,9 +479,9 @@ test('429 and 503 stop the batch with the wait Microsoft asks for', async () => 
       return new Response(null, { status: 429, headers: { 'Retry-After': '7' } });
   };
   const result = await post('/app/month/onedrive-upload', { month: '2026-10' });
-  expect(result.headers.get('Location')).toBe('/app/month?month=2026-10&upload=more&wait=7#send');
+  expect(result.headers.get('Location')).toBe('/app/?month=2026-10&upload=more&wait=7#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(1);
-  const page = await (await at('/app/month?month=2026-10&upload=more&wait=7')).text();
+  const page = await (await at('/app/?month=2026-10&upload=more&wait=7')).text();
   expect(page).toContain(
     '1 of 3 files uploaded to Accountant Inbox. Microsoft asked us to wait; continue in 7 seconds.',
   );

@@ -68,19 +68,13 @@ test('configured owner imports into a new account and retains products, notices 
   expectBranding(html);
   expect(await env.DB.prepare('SELECT count(*) n FROM accounts').first('n')).toBe(before);
   expect((await request('/imports/csv/confirm', confirmationForm(html))).status).toBe(303);
-  for (const path of [
-    '/?month=2026-09',
-    '/month?month=2026-09',
-    '/payments?month=2026-09',
-    receipt.headers.get('Location')!,
-  ]) {
+  for (const path of ['/?month=2026-09', '/payments?month=2026-09', receipt.headers.get('Location')!]) {
     const page = await request(path);
     expect(page.status).toBe(200);
     const rendered = await page.text();
     expectBranding(rendered);
     if (path.startsWith('/?')) {
       expect(rendered).toContain('invoices@example.org');
-    } else if (path.startsWith('/month')) {
       expect(rendered).toContain('<th scope="row">Studio work</th>');
       expect(rendered).toContain('<h2>Send to Synthetic Accounts</h2>');
       expect(rendered).toMatch(/I've sent September to Synthetic Accounts<\/button>|Download anyway/);

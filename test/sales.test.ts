@@ -314,7 +314,9 @@ test('money in is matched to a sales invoice by amount and reference, never to a
 test('overdue and paid outside the bank', async () => {
   const r = await sales(DOMESTIC, 'lasku.txt');
   const home = await (await request('/?month=2026-09')).text();
-  expect(home).toMatch(/<b>1<\/b> invoice is overdue/);
+  expect(home).toContain(
+    '<strong>1 invoice is overdue.</strong> <a href="/invoices?month=2026-09&show=overdue">See it</a>',
+  );
   expect(await (await request('/invoices?month=2026-10&show=overdue')).text()).toContain('Esimerkki Asiakas Oy');
   const form = new FormData();
   form.set('paid_outside_on', '2026-09-30');
@@ -358,7 +360,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
     folder: 'sales',
   });
   // Unpaid doesn't hold the month back...
-  let month = await (await request('/month?month=2026-09')).text();
+  let month = await (await request('/?month=2026-09')).text();
   expect(month).toContain('Money in: invoices dated September');
   expect(month).not.toContain('need you</span>');
   // ...an invoice that needs a look does.
@@ -371,7 +373,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
     'flagged.txt',
   );
   expect(flagged.status).toBe('needs_review');
-  month = await (await request('/month?month=2026-09')).text();
+  month = await (await request('/?month=2026-09')).text();
   expect(month).toContain('1 need you</span>');
   expect(month).toContain(`/receipts/${flagged.id}`);
   const csv = await request('/export-sales.csv?month=2026-09');

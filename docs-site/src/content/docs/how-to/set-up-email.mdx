@@ -58,11 +58,11 @@ Recent Wrangler versions can also create **Send to a Worker** rules on deploy fr
 
 ## Check it worked
 
-Within a minute or so the receipt appears on **Home** and, if anything needs a look, under **Review**. The email itself is kept in your R2 bucket as the original.
+Within a minute or so the receipt appears on **Receipts** and, if anything needs a look, under **Review**. The email itself is kept in your R2 bucket as the original.
 
 If nothing appears:
 
-- **The sender is not approved yet.** Mail from anyone not on your approved senders waits in **Review** under **Unknown senders**. Press **Approve sender** to read it, and their later mail is read as it arrives. **All receipts** > **Recent mail** shows every email that arrived and what happened to it.
+- **The sender is not approved yet.** Mail from anyone not on your approved senders waits in **Review** under **Unknown senders**. Press **Approve sender** to read it, and their later mail is read as it arrives. **Receipts** > **Recent mail** shows every email that arrived and what happened to it.
 - **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
 - **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept in **Review** with "We couldn't verify who sent this email." It is not read by AI. Download the original, check it, and upload it if it is genuine.
 - **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).

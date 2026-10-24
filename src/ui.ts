@@ -21,10 +21,10 @@ export const EXPORT_NOTICE = 'Review flagged rows first. Your accountant decides
 export const MISSING_PAYMENTS =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL";
 
-export type NavKey = 'home' | 'review' | 'receipts' | 'payments' | 'invoices' | 'month' | 'settings' | 'more';
+export type NavKey = 'home' | 'review' | 'receipts' | 'bank' | 'settings';
 // style: extra page CSS, appended to the shared sheet.
 export type PageOptions = { nav?: NavKey; head?: string; style?: string };
-type Counts = { review: number; missing: number; invoices: boolean };
+export type Counts = { review: number; missing: number; invoices: boolean };
 
 // Its own query, so a database without the inbound_mail table still counts.
 async function heldTotal(env: Env): Promise<number> {
@@ -34,7 +34,7 @@ async function heldTotal(env: Env): Promise<number> {
     return 0;
   }
 }
-async function navCounts(env: Env): Promise<Counts> {
+export async function navCounts(env: Env): Promise<Counts> {
   try {
     const [review, missing, sales] = await env.DB.batch<{ n: number }>([
       env.DB.prepare("SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL"),
@@ -45,7 +45,7 @@ async function navCounts(env: Env): Promise<Counts> {
       // Unknown-sender emails wait in Review too.
       review: (review?.results[0]?.n ?? 0) + (await heldTotal(env)),
       missing: missing?.results[0]?.n ?? 0,
-      // The Invoices tab appears once invoice email is set up or an invoice exists.
+      // The Invoices you sent view appears once invoice email is set up or an invoice exists.
       invoices: !!config(env).invoicesAddress || (sales?.results[0]?.n ?? 0) > 0,
     };
   } catch {
@@ -157,24 +157,10 @@ thead th,th[scope=col]{font-size:.8125rem;color:var(--ink-soft);font-weight:600}
 td.n,th.n{text-align:right;white-space:nowrap}
 tfoot th,tfoot td{border-bottom:0;border-top:1.5px solid var(--ink);font:750 1.125rem/1.2 var(--display)}
 .slip table{background:transparent}.slip th,.slip td{padding:8px 0;border-bottom-style:dashed}.slip td.n{padding-left:12px}
-.todo,.plain{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.task{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px;align-items:center;background:var(--slip);border:1px solid var(--guilloche);border-radius:var(--r);padding:18px 22px;text-decoration:none}
-.task:hover{border-color:var(--ink)}
-.task.first{box-shadow:var(--shadow);border-color:var(--ink);padding:22px 24px}
-.task .t{display:block;font-weight:600;font-size:1.0625rem}
-.task .t b{font:750 1.375rem/1 var(--display);font-variant-numeric:tabular-nums}
-.task .s{display:block;color:var(--ink-soft);font-size:.9375rem;margin-top:2px}
-.task .go{font-weight:600;white-space:nowrap}
-.icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--ink);font:800 1rem/1 var(--display)}
-.icon.red{border-color:var(--stamp);color:var(--stamp)}
-.grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:32px;align-items:start}
-.side{display:grid;gap:20px}
-.steps{list-style:none;display:flex;margin:20px 0 4px;padding:0;counter-reset:s}
-.steps li{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.8125rem;font-weight:600;position:relative;color:var(--ink-soft)}
-.steps li::before{counter-increment:s;content:counter(s);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--ink-soft);background:var(--slip);position:relative;z-index:1}
-.steps li+li::after{content:"";position:absolute;top:14px;right:50%;width:100%;border-top:1.5px dotted var(--ink-soft)}
-.steps li.now{color:var(--ink)}.steps li.now::before{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.steps li.done::before{content:"\\2713";background:var(--mint);border-color:var(--ink);color:var(--ink)}
+.plain{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.welcome{max-width:640px}
+.bank-more{margin-top:40px}
+.waiting{margin:0 0 12px}
 .stepper{list-style:none;margin:0;padding:0;counter-reset:step}
 .step{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr);gap:0 16px;padding-bottom:14px}
 .step:last-child{padding-bottom:0}
@@ -337,7 +323,7 @@ ol.how{margin:4px 0 16px;padding-left:22px}ol.how li{margin:0 0 6px}
 .queue{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:8px}
 .queue li{display:flex;justify-content:space-between;gap:12px;background:var(--slip);border:1px solid var(--guilloche);border-radius:var(--r);padding:10px 14px;font-weight:600}
 .queue li .st{font-weight:400;color:var(--ink-soft)}.queue li.bad{border-left:4px solid var(--stamp)}.queue li.bad .st{color:var(--stamp)}
-@media (max-width:960px){.grid,.work{grid-template-columns:minmax(0,1fr)}.doc{position:static}.frame{max-height:260px}}
+@media (max-width:960px){.work{grid-template-columns:minmax(0,1fr)}.doc{position:static}.frame{max-height:260px}}
 @media (max-width:640px){
 .save .btn{width:100%}.sect .card{padding:4px 16px}
 .meta .linkbtn,.sc .warning .linkbtn,.why>summary{min-height:44px}.confirm label.check{min-height:44px}
@@ -352,13 +338,7 @@ table.stack td.lead{font-weight:600;font-size:1.0625rem;text-align:left}table.st
 table.stack td.lead a{min-height:44px;display:inline-flex;align-items:center}
 h1{font-size:1.75rem}
 main{padding-top:16px;padding-bottom:40px}.head{margin-bottom:16px}footer.foot{padding:20px var(--pad) 28px}
-.task{grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:12px 14px;align-items:start}.task.first{padding:14px}
-.task .icon{width:32px;height:32px;font-size:.875rem}.task .t{font-size:1rem;line-height:1.3}.task .t b{font-size:1.125rem}
-.task .s{font-size:.875rem;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.todo{gap:8px}.chips{margin-bottom:14px}
-.task .go{grid-column:1/-1}
-.task .go.btn{width:100%}
-.task:not(.first) .go{display:none}
+.chips{margin-bottom:14px}
 .slip{padding:20px 14px 14px}.rows{gap:2px 12px}
 .card{padding:16px 14px}.step .card{padding:14px}.flag{padding:0 12px}.fix details>.body.rowlist,.fix .note-card{padding:0 14px}
 .step{grid-template-columns:minmax(0,1fr)}
@@ -372,13 +352,10 @@ main{padding-top:16px;padding-bottom:40px}.head{margin-bottom:16px}footer.foot{p
 th,td{padding:8px}
 }
 nav.tabs{display:none}
-.menu{list-style:none;margin:0 0 16px;padding:0;background:var(--slip);border:1px solid var(--guilloche);border-radius:var(--r)}
-.menu li+li{border-top:1px solid var(--guilloche)}
-.menu a{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:14px;align-items:center;min-height:3.5rem;padding:8px 16px;text-decoration:none}
-.menu b{display:block;font-weight:600}.menu .s{display:block;font-size:.875rem;color:var(--ink-soft);line-height:1.35}
-.menu svg{width:24px;height:24px}.menu .chev{color:var(--ink-soft)}
-.menu a:active{background:var(--paper)}
-@media (hover:hover){.menu a:hover{background:var(--paper)}}
+.seg ul{display:inline-flex;max-width:100%;gap:3px;list-style:none;margin:0 0 16px;padding:3px;background:var(--slip);border:1px solid var(--guilloche);border-radius:var(--pill)}
+.seg a{display:flex;align-items:center;min-height:44px;padding:0 16px;border-radius:var(--pill);text-decoration:none;font-weight:600;font-size:.9375rem;color:var(--ink-soft);white-space:nowrap}
+.seg a[aria-current=page]{background:var(--ink);color:var(--paper)}
+@media (hover:hover){.seg a:not([aria-current]):hover{color:var(--ink);background:var(--paper)}}
 @media (max-width:879px){
 html{scroll-padding-bottom:calc(var(--tabs) + 16px)}
 body{padding-bottom:var(--tabs)}
@@ -398,7 +375,7 @@ nav.tabs .count{position:absolute;top:-5px;left:15px;padding:0 5px;line-height:1
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) nav.tabs{display:none}
 }
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--ink)}}
-@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.snav a,.btn,.task,nav.main a,nav.tabs a,.menu a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.snav a,.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
 }
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
 export const FAVICON_SVG =
@@ -411,62 +388,52 @@ const svg = (paths: string) =>
 const ICONS = {
   home: svg('<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>'),
   review: svg('<path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/>'),
-  payments: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>'),
-  month: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/>'),
-  more: svg('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
   receipts: svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/>'),
-  invoices: svg('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7m-7 4h5"/>'),
+  bank: svg('<path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/>'),
   settings: svg('<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
-  signOut: svg('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>'),
-  chevron: svg('<path d="m9 6 6 6-6 6"/>'),
 };
 const count = (n: number, what: string) =>
   n > 0 ? ` <span class="count">${n}<span class="vh"> ${what}</span></span>` : '';
 const badges = (counts: Counts): Partial<Record<NavKey, string>> => ({
   review: count(counts.review, 'waiting'),
-  payments: count(counts.missing, counts.missing === 1 ? 'missing a receipt' : 'missing receipts'),
+  bank: count(counts.missing, counts.missing === 1 ? 'missing a receipt' : 'missing receipts'),
 });
 const current = (on: boolean) => (on ? ' aria-current="page"' : '');
 
-function nav(active: NavKey | undefined, counts: Counts): string {
-  const badge = badges(counts);
-  const item = (key: NavKey, href: string, label: string) =>
-    `<li><a href="${href}"${current(key === active)}>${label}${badge[key] ?? ''}</a></li>`;
-  return `<nav class="main" aria-label="Main"><ul>${item('home', '/', 'Home')}${item('review', '/review', 'Review')}${item('receipts', '/receipts', 'All receipts')}${item('payments', '/payments', 'Payments')}${counts.invoices ? item('invoices', '/invoices', 'Invoices') : ''}${item('month', '/month', 'Month')}${item('settings', '/settings', 'Settings')}</ul></nav>`;
-}
-
-// The phone tab bar. Pages that live behind More light up the More tab.
-const TABS = [
+// One list for the wide header and the phone tab bar, so both always match.
+export const NAV: readonly { key: NavKey; href: string; label: string }[] = [
   { key: 'home', href: '/', label: 'Home' },
   { key: 'review', href: '/review', label: 'Review' },
-  { key: 'payments', href: '/payments', label: 'Payments' },
-  { key: 'month', href: '/month', label: 'Month' },
-  { key: 'more', href: '/more', label: 'More' },
-] as const;
-const UNDER_MORE: readonly (NavKey | undefined)[] = ['more', 'receipts', 'settings', 'invoices'];
+  { key: 'receipts', href: '/receipts', label: 'Receipts' },
+  { key: 'bank', href: '/payments', label: 'Bank' },
+  { key: 'settings', href: '/settings', label: 'Settings' },
+];
 
+function nav(active: NavKey | undefined, counts: Counts): string {
+  const badge = badges(counts);
+  return `<nav class="main" aria-label="Main"><ul>${NAV.map(
+    (t) => `<li><a href="${t.href}"${current(t.key === active)}>${t.label}${badge[t.key] ?? ''}</a></li>`,
+  ).join('')}</ul></nav>`;
+}
 function tabs(active: NavKey | undefined, counts: Counts): string {
   const badge = badges(counts);
-  const on = UNDER_MORE.includes(active) ? 'more' : active;
-  return `<nav class="tabs" aria-label="Main"><ul>${TABS.map(
+  return `<nav class="tabs" aria-label="Main"><ul>${NAV.map(
     (t) =>
-      `<li><a href="${t.href}"${current(t.key === on)}><span class="ti">${ICONS[t.key]}${badge[t.key] ?? ''}</span>${t.label}</a></li>`,
+      `<li><a href="${t.href}"${current(t.key === active)}><span class="ti">${ICONS[t.key]}${badge[t.key] ?? ''}</span>${t.label}</a></li>`,
   ).join('')}</ul></nav>`;
 }
 
-// The pages the phone tab bar has no room for.
-export async function morePage(env: Env): Promise<Response> {
-  const row = (href: string, icon: string, label: string, sub: string) =>
-    `<li><a href="${href}">${icon}<span><b>${label}</b><span class="s">${sub}</span></span><span class="chev">${ICONS.chevron}</span></a></li>`;
-  const rows = [
-    row('/receipts', ICONS.receipts, 'All receipts', 'Every receipt and invoice, newest first'),
-    (await navCounts(env)).invoices && row('/invoices', ICONS.invoices, 'Invoices', 'Sent invoices, paid or not'),
-    row('/settings', ICONS.settings, 'Settings', 'Accounts, email and OneDrive'),
-    config(env).access && row('/cdn-cgi/access/logout', ICONS.signOut, 'Sign out', 'End this session'),
-  ];
-  return page('More', `<ul class="menu">${rows.filter(Boolean).join('')}</ul>`, 200, env, {
-    nav: 'more',
-  });
+// Receipts has two views: every document, and the invoices you sent. The
+// second shows once invoice email is set up or an invoice exists.
+export function receiptsSegment(counts: Counts, active: 'all' | 'invoices'): string {
+  if (!counts.invoices && active === 'all') return '';
+  const link = (key: 'all' | 'invoices', href: string, label: string) =>
+    `<li><a href="${href}"${current(key === active)}>${label}</a></li>`;
+  return `<nav class="seg" aria-label="Receipts"><ul>${link('all', '/receipts', 'All receipts')}${link('invoices', '/invoices', 'Invoices you sent')}</ul></nav>`;
+}
+// The Access sign-out link, for the Settings page head on every screen size.
+export function signOutLink(env: Env): string {
+  return config(env).access ? '<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>' : '';
 }
 
 export async function page(

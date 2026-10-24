@@ -34,12 +34,16 @@ test('account picker and create/rename forms use immutable IDs and generic label
     body: new URLSearchParams({ label: 'Fake Savings', bank_name: 'Fake Bank', default_currency: 'EUR' }),
   });
   expect(created.status).toBe(303);
+  // Accounts are configuration: the forms live in Settings, and so does the way back.
+  expect(created.headers.get('Location')).toBe('/settings#accounts');
   const id = await env.DB.prepare("SELECT id FROM accounts WHERE label='Fake Savings'").first<string>('id');
   expect(id).toBeTruthy();
-  expect(
-    (await request('/accounts/' + id, { method: 'POST', body: new URLSearchParams({ label: 'Renamed Savings' }) }))
-      .status,
-  ).toBe(303);
+  const renamed = await request('/accounts/' + id, {
+    method: 'POST',
+    body: new URLSearchParams({ label: 'Renamed Savings' }),
+  });
+  expect(renamed.status).toBe(303);
+  expect(renamed.headers.get('Location')).toBe('/settings#accounts');
   expect(await env.DB.prepare('SELECT id FROM accounts WHERE label=?').bind('Renamed Savings').first('id')).toBe(id);
 });
 test('automatic matching searches all accounts and ambiguity across accounts stays unlinked', async () => {
@@ -88,15 +92,18 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   ).results;
   const debit = rows[0]!.id,
     credit = rows[1]!.id;
-  expect(
-    (
-      await request('/transfers', {
-        method: 'POST',
-        body: new URLSearchParams({ debit_id: debit, credit_id: credit, reason: 'Fake own transfer' }),
-      })
-    ).status,
-  ).toBe(303);
+  const paired = await request('/transfers', {
+    method: 'POST',
+    body: new URLSearchParams({ debit_id: debit, credit_id: credit, reason: 'Fake own transfer' }),
+  });
+  expect(paired.status).toBe(303);
+  // Transfers live on Bank now, in the month the money left.
+  expect(paired.headers.get('Location')).toBe('/payments?month=2026-09#transfers');
   const page = await (await request('/payments?month=2026-09')).text();
+  expect(page).toContain('<section class="sect" id="transfers" aria-labelledby="transfers-h">');
+  expect(page).toContain('<section class="sect" id="imports" aria-labelledby="imports-h">');
+  expect(page).toContain('<h2 id="imports-h">Statements imported</h2>');
+  expect(page).toContain('Fake Main → Fake Savings');
   expect(page).toContain('Own-account transfer');
   expect(page).toContain('Undo transfer');
   expect(page).not.toContain('class="warning">Missing receipt');
@@ -104,7 +111,10 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
     (await request('/payments/' + debit, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) }))
       .status,
   ).toBe(409);
-  expect((await request('/transfers/' + debit + '/undo', { method: 'POST' })).status).toBe(303);
+  const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
+  expect(undone.status).toBe(303);
+  expect(undone.headers.get('Location')).toBe('/payments?month=2026-09#transfers');
+  expect(await (await request('/payments?month=2026-09')).text()).toContain('No transfers paired yet.');
   expect(await env.DB.prepare('SELECT sum(receipt_required) n FROM bank_transactions').first('n')).toBe(2);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
   expect(await (await request('/payments?month=2026-09')).text()).toContain('Missing receipt');

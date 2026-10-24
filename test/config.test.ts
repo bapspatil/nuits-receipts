@@ -92,8 +92,9 @@ test('pages show the notices, configured labels and no private links', async () 
   expect(html).toContain(APP_NOTICE);
   expect(html).toContain('receipts@example.com');
   expect(html).not.toMatch(/github\.com/);
-  // The export and its notice live on the month page; products are listed in Settings.
-  const monthHtml = await (await as('owner', 'local-dummy-password', labelled, '/month')).text();
+  // The export and its notice live on Home once anything is in; products are listed in Settings.
+  await uploadPdf();
+  const monthHtml = await (await as('owner', 'local-dummy-password', labelled, '/')).text();
   expect(monthHtml).toContain(APP_NOTICE);
   expect(monthHtml).toContain(EXPORT_NOTICE);
   expect(monthHtml).toContain('<h2>Send to Example Books</h2>');
@@ -142,7 +143,7 @@ test('new receipts take the configured default product and exports use the prefi
 test('rows keep products that are no longer configured and show them for review', async () => {
   await uploadPdf();
   await env.DB.prepare("UPDATE receipts SET product='retired-product'").run();
-  const html = await (await as('owner', 'local-dummy-password', {}, '/month?month=2026-09')).text();
+  const html = await (await as('owner', 'local-dummy-password', {}, '/?month=2026-09')).text();
   expect(html).toContain('<th scope="row">retired-product (not configured)</th>');
   const id = (await env.DB.prepare('SELECT id FROM receipts').first<string>('id'))!;
   const page = await (await as('owner', 'local-dummy-password', {}, `/receipts/${id}`)).text();

@@ -5,7 +5,7 @@ import { config } from './config';
 import { requireInput } from './domain';
 import { invoiceName } from './invoices';
 import { recentMail, type MailRow } from './inbound';
-import { amount, day, emptyState, escape, page, pageHead, plural, uploadForm } from './ui';
+import { amount, day, emptyState, escape, navCounts, page, pageHead, plural, receiptsSegment, uploadForm } from './ui';
 
 export const PAGE_SIZE = 50;
 export const SHOW = {
@@ -17,6 +17,9 @@ export const SHOW = {
   unknown: 'Unknown sender',
 } as const;
 export type Show = keyof typeof SHOW;
+// Needs you and Unknown sender are Review's job: still accepted in the URL,
+// but not offered as chips here.
+const CHIPS: readonly Show[] = ['ready', 'reading', 'duplicate', 'sales'];
 export type AllRow = {
   type: 'receipt' | 'mail';
   id: string;
@@ -215,7 +218,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const filtered = !!(query.show || query.month || query.q);
   const chip = (key: Show | null, label: string) =>
     `<li><a href="${link(query, { show: key })}"${key === query.show ? ' aria-current="page"' : ''}>${escape(label)}</a></li>`;
-  const chips = `<ul class="chips" aria-label="Show">${chip(null, 'All')}${(Object.keys(SHOW) as Show[]).map((k) => chip(k, SHOW[k])).join('')}</ul>`;
+  const chips = `<ul class="chips" aria-label="Show">${chip(null, 'All')}${CHIPS.map((k) => chip(k, SHOW[k])).join('')}</ul>`;
   const find = `<form class="find" method="get" action="/receipts" role="search">${query.show ? `<input type="hidden" name="show" value="${query.show}">` : ''}<label class="q">Search<input name="q" type="search" value="${escape(query.q)}" placeholder="Vendor, client or sender" maxlength="100"></label><label class="m">Month received<input name="month" type="month" value="${escape(query.month ?? '')}"></label><button class="btn secondary">Show</button>${filtered ? `<a class="linkbtn" href="/receipts">Clear</a>` : ''}</form>`;
   const list = shown.length
     ? `<ul class="list all">${shown
@@ -251,11 +254,22 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
           uploadForm(config(env).receiptAddress, true),
         );
   const recent = query.offset ? '' : recentSection(await recentMail(env));
-  return page('All receipts', `${senderBanner(params)}${chips}${find}${list}${recent}`, 200, env, {
-    nav: 'receipts',
-    head: pageHead('All receipts', {
-      kicker: 'Receipts',
-      sub: 'Every receipt and invoice, newest first.',
-    }),
-  });
+  const counts = await navCounts(env);
+  const waiting = counts.review
+    ? `<p class="small waiting"><a href="/review">${counts.review} waiting in Review ›</a></p>`
+    : '';
+  return page(
+    'All receipts',
+    `${receiptsSegment(counts, 'all')}${senderBanner(params)}${waiting}${chips}${find}${list}${recent}`,
+    200,
+    env,
+    {
+      nav: 'receipts',
+      head: pageHead('All receipts', {
+        kicker: 'Receipts',
+        sub: 'Every receipt and invoice, newest first.',
+        aside: '<a class="btn secondary" href="/add">Add receipts</a>',
+      }),
+    },
+  );
 }

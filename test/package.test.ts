@@ -247,7 +247,7 @@ test('ZIP refuses empty months, too many files and bad input with plain messages
   const big = await request('/month/package.zip?month=2026-11');
   expect(big.status).toBe(413);
   expect(await big.text()).toContain('901 files, more than the 900');
-  const page = await (await request('/month?month=2026-11')).text();
+  const page = await (await request('/?month=2026-11')).text();
   expect(page).toContain('This month is too big for one package.');
   expect(page).not.toContain('/month/package.zip');
 });
@@ -256,7 +256,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   const pdf = await seed({ bytes: 'ready one', vendor: 'Alpha', issue_date: '2026-10-02' });
   const second = await seed({ bytes: 'ready two', vendor: 'Beta', issue_date: '2026-10-03' });
   // No bank statement: the month is not ready, so the ZIP is "anyway".
-  let html = await (await request('/month?month=2026-10')).text();
+  let html = await (await request('/?month=2026-10')).text();
   expect(html).toContain('No bank statement is imported.');
   expect(html).toContain('<form action="/month/package.zip" method="get">');
   expect(html).toContain('Download anyway</button>');
@@ -269,7 +269,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
       "INSERT INTO bank_transactions (id,account_key,import_id,booking_date,amount_minor,currency,merchant,raw_json,receipt_id) VALUES ('t','holvi','i','2026-10-02',-1250,'EUR','Alpha','{}',?)",
     ).bind(pdf.id),
   ]);
-  html = await (await request('/month?month=2026-10')).text();
+  html = await (await request('/?month=2026-10')).text();
   expect(html).toContain('<span class="stamp ready">Ready</span>');
   expect(html).toMatch(
     /<a class="btn primary" href="\/month\/package.zip\?month=2026-10">Download October ZIP \(\d+ KB\)<\/a>/,
@@ -293,21 +293,22 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
   const sent = await post({ month: '2026-10', receipts_hash: shownHash });
   expect(sent.status).toBe(303);
-  expect(sent.headers.get('Location')).toBe('/month?month=2026-10&sent=1#send');
+  expect(sent.headers.get('Location')).toBe('/?month=2026-10&sent=1#send');
   expect(
     await env.DB.prepare('SELECT month,method,file_count,total_minor,receipts_hash FROM month_sends').first(),
   ).toEqual({ month: '2026-10', method: 'download', file_count: 2, total_minor: 2500, receipts_hash: shownHash });
 
-  html = await (await request('/month?month=2026-10&sent=1')).text();
+  html = await (await request('/?month=2026-10&sent=1')).text();
   const today = new Date();
   const short = `${today.getUTCDate()} ${today.toUTCString().slice(8, 11)}`;
   expect(html).toContain(`<span class="stamp matched">Sent ${short}</span>`);
   expect(html).toContain('Marked October as sent.');
+  expect(html).toContain('<a href="/?month=2026-11">On to November ›</a>');
   expect(html).toContain('<li id="send" class="step done">');
   expect(html).not.toContain('action="/month/sent"');
   const home = await (await request('/?month=2026-10')).text();
   expect(home).toContain(`<span class="stamp matched">Sent ${short}</span>`);
-  expect(home).toContain(`Sent ${short}<span class="vh"> (done)</span>`);
+  expect(home).toContain('<li id="send" class="step done">');
 
   // Nothing changed yet, so there is no "changes" ZIP.
   const unchanged = await request('/month/package.zip?month=2026-10&changes=1');
@@ -317,7 +318,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   // A correction and a new receipt make it "changed"; only those two go in.
   await env.DB.prepare('UPDATE receipts SET revision=revision+1 WHERE id=?').bind(second.id).run();
   const added = await seed({ bytes: 'late arrival', vendor: 'Gamma', issue_date: '2026-10-20' });
-  html = await (await request('/month?month=2026-10')).text();
+  html = await (await request('/?month=2026-10')).text();
   expect(html).toContain(`Changed since you sent it on ${short}: 1 added and 1 corrected.`);
   expect(html).toContain('Download only what changed (2 files)');
   const { response, entries } = await zipOf('/month/package.zip?month=2026-10&changes=1&anyway=1');
@@ -347,7 +348,7 @@ test('package links and the sent form carry the base path; Access mode guards th
       }),
       based,
     );
-  const html = await (await at('/app/month?month=2026-10')).text();
+  const html = await (await at('/app/?month=2026-10')).text();
   expect(html).toContain('action="/app/month/package.zip"');
   expect(html).toContain('action="/app/month/sent"');
   expect(html).toContain('href="/app/export.csv?month=2026-10"');
@@ -361,7 +362,7 @@ test('package links and the sent form carry the base path; Access mode guards th
   form.set('month', '2026-10');
   form.set('receipts_hash', hash);
   const sent = await at('/app/month/sent', { method: 'POST', body: form });
-  expect(sent.headers.get('Location')).toBe('/app/month?month=2026-10&sent=1#send');
+  expect(sent.headers.get('Location')).toBe('/app/?month=2026-10&sent=1#send');
 
   const accessEnv = {
     ...env,

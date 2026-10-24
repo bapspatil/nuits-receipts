@@ -148,15 +148,22 @@ test('the page has a section nav, one Save per group and history tucked away', a
     'setup-business',
     'setup-email',
     'senders',
+    'accounts',
+    'rules',
     'setup-accountant',
     ...(config(env).oneDrive ? ['onedrive'] : []),
-    'accounts',
-    'imports',
-    'transfers',
-    'rules',
     'advanced',
   ]);
   for (const id of targets) expect(html).toContain(`<section class="sect" id="${id}"`);
+  // Imports and transfers are bookkeeping, so they moved to Bank; the old anchors say so.
+  expect(html).toContain(
+    '<p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p>',
+  );
+  expect(html).toContain(
+    '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>',
+  );
+  expect(html).not.toContain('<section class="sect" id="imports"');
+  expect(html).not.toContain('<section class="sect" id="transfers"');
   // Every group form has exactly one button of its own: Save.
   const forms = [...html.matchAll(/<form action="\/settings\/setup" method="post"[^>]*>([\s\S]*?)<\/form>/g)];
   expect(forms).toHaveLength(5);
@@ -193,7 +200,7 @@ test('an invalid saved value is ignored with a warning, never a 503', async () =
   expect(config(layered).exportPrefix).toBe('receipts');
   expect(config(layered).accountantLabel).toBe('your accountant');
   expect([...applied(layered).invalid.keys()].sort()).toEqual(['ACCOUNTANT_LABEL', 'EXPORT_PREFIX']);
-  expect((await request('/month')).status).toBe(200);
+  expect((await request('/')).status).toBe(200);
 });
 
 test('deploy-time keys in the table are never read', async () => {

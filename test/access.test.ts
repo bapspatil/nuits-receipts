@@ -156,17 +156,21 @@ test('in Access mode the app needs a valid Access token and ignores the password
   expect(html).toContain('href="/cdn-cgi/access/logout"');
   expect(html).not.toContain('href="/app/cdn-cgi');
   // Every page, error pages included, has the un-prefixed Access sign out.
-  for (const path of ['/app/review', '/app/month', '/app/settings', '/app/more', '/app/import', '/app/nope']) {
+  for (const path of ['/app/review', '/app/?month=2026-09', '/app/settings', '/app/import', '/app/nope']) {
     const page = await (await at(path, { 'Cf-Access-Jwt-Assertion': await token() })).text();
     expect(page, path).toContain('<a href="/cdn-cgi/access/logout" class="sign-out">Sign out</a>');
     expect(page, path).toContain('<nav class="main" aria-label="Main">');
     expect(page, path).toContain('<nav class="tabs" aria-label="Main">');
   }
-  // On phones Sign out lives on More, also un-prefixed.
-  const more = await (await at('/app/more', { 'Cf-Access-Jwt-Assertion': await token() })).text();
-  expect(more).toMatch(/<li><a href="\/cdn-cgi\/access\/logout">.*Sign out/);
-  expect(more).toContain('<a href="/app/settings">');
+  // On phones the header link is hidden; Settings carries Sign out, also un-prefixed.
+  const settings = await (await at('/app/settings', { 'Cf-Access-Jwt-Assertion': await token() })).text();
+  expect(settings).toContain('<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>');
+  // The old More address redirects only after sign-in.
+  const more = await at('/app/more', { 'Cf-Access-Jwt-Assertion': await token() });
+  expect(more.status).toBe(302);
+  expect(more.headers.get('Location')).toBe('/app/settings');
   expect((await at('/app/more', { Authorization: authorization })).status).toBe(403);
+  expect((await at('/app/month', { Authorization: authorization })).status).toBe(403);
 
   for (const headers of [
     {} as Record<string, string>,
