@@ -182,15 +182,52 @@ a {
   color: var(--color-paper);
 }
 
-/* Hero */
+/* Section slates. Every scene after the hero opens with its index, its short
+   name and a perforation running to the edge, so the page reads as one roll
+   filed in order. Decoration only (aria-hidden): the h2 is the heading. The
+   rule takes currentColor, so it is ink on paper and paper on ink. */
+
+.slate {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slate-n {
+  font-variant-numeric: tabular-nums;
+}
+
+.slate::after {
+  content: "";
+  flex: 1;
+  order: 1;
+  height: 1px;
+  background: var(--perforation);
+  transform-origin: 0 50%;
+}
+
+.slate-end {
+  order: 2;
+}
+
+/* Hero. Edge-anchored: the title runs to the right gutter and the slip lands
+   over its tail, then a hard rule and a two-column chit carry the sub and the
+   cost line like the foot of a receipt. */
 
 .hero {
+  --title-size: clamp(3.6rem, 1rem + 14vw, 13rem);
   position: relative;
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  gap: 3rem;
+  gap: 1.75rem;
   min-height: calc(100svh - 4.6rem);
   padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) 4rem;
   overflow: clip;
@@ -213,22 +250,25 @@ a {
   visibility: hidden;
 }
 
-.hero-copy {
-  display: grid;
-  gap: 1.5rem;
-  justify-items: start;
-}
-
 .hero-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(3.6rem, 1rem + 11vw, 10rem);
-  line-height: 0.86;
-  letter-spacing: -0.035em;
+  font-size: var(--title-size);
+  line-height: 0.84;
+  letter-spacing: -0.04em;
+  /* Optical edge: pull the S back onto the gutter line. */
+  margin-left: -0.04em;
 }
 
 .hero-title span {
   display: block;
+}
+
+.hero-chit {
+  display: grid;
+  gap: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--color-ink);
 }
 
 .hero-sub {
@@ -238,15 +278,76 @@ a {
   text-wrap: pretty;
 }
 
+/* The cost, printed as a total line between two perforations. */
 .hero-cost {
+  align-self: start;
+  max-width: 26rem;
+  padding: 0.85rem 0;
   font-weight: 600;
-  max-width: 31rem;
+  font-size: 1.0625rem;
+  background:
+    var(--perforation) top / 100% 1px no-repeat,
+    var(--perforation) bottom / 100% 1px no-repeat;
 }
 
 .hero-note {
   font-size: var(--text-small);
   color: var(--color-ink-soft);
-  max-width: 31rem;
+  max-width: 34rem;
+}
+
+/* The demo link as a small play chip. The triangle is drawn, not a glyph. */
+.play-chip {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  margin-top: 0.35rem;
+  padding: 0 1rem 0 0.4rem;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  position: relative;
+}
+
+.play-chip::before {
+  content: "";
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+}
+
+/* The triangle sits over the disc; clip-path draws it, so it is a shape in
+   token colours rather than a font glyph or an emoji. */
+.play-chip::after {
+  content: "";
+  position: absolute;
+  left: calc(0.4rem + 0.72rem);
+  top: 50%;
+  width: 0.7rem;
+  height: 0.8rem;
+  translate: 0 -50%;
+  background: var(--color-paper);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.play-chip:hover {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.play-chip:hover::before {
+  background: var(--color-paper);
+}
+
+.play-chip:hover::after {
+  background: var(--color-ink);
 }
 
 /* Receipt slips: white paper, torn zigzag foot, the one shadow. */
@@ -298,8 +399,9 @@ a {
 }
 
 .slip-hero {
-  width: min(19rem, 100%);
+  width: min(17rem, 100%);
   justify-self: end;
+  margin-top: 0.5rem;
   rotate: 2.5deg;
 }
 
@@ -350,7 +452,12 @@ a {
 
 /* Scenes */
 
+/* Every scene is a grid whose first row is its slate. */
 .scene {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 2.5rem;
   padding: clamp(4.5rem, 12vh, 8rem) var(--gutter);
 }
 
@@ -385,7 +492,7 @@ a {
 }
 
 .how-title {
-  margin-bottom: 3rem;
+  margin-bottom: 0.5rem;
 }
 
 .rail {
@@ -892,8 +999,37 @@ a {
   .hero {
     background-image: url("/field-fallback-wide.png");
     background-position: center;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: clamp(2rem, 4vw, 4rem);
+  }
+
+  .hero-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .hero-chit {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+
+  .hero-ctas,
+  .hero-note {
+    grid-column: 1;
+  }
+
+  /* The slip lands over the tail of the title: its top edge tucks under the
+     descender of the first line, so the two share space instead of sitting
+     in separate boxes. */
+  .slip-hero {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: start;
+    justify-self: start;
+    width: min(22rem, 100%);
+    margin-top: calc(var(--title-size) * 0.78);
+    rotate: 3deg;
   }
 
   .problem,
@@ -934,6 +1070,12 @@ a {
     align-items: start;
   }
 
+}
+
+@media (min-width: 80rem) {
+  .slip-hero {
+    margin-left: -2.5rem;
+  }
 }
 
 /* Motion off: the attribute stamped before first paint decides, and the media

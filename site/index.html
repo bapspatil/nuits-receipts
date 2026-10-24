@@ -49,25 +49,25 @@
     <main id="main">
       <section class="hero" id="top" aria-labelledby="hero-title">
         <canvas class="field" aria-hidden="true"></canvas>
-        <div class="hero-copy">
-          <h1 class="hero-title" id="hero-title">
-            <span class="wipe" style="--row: 0">Stop chasing</span>
-            <span class="wipe" style="--row: 1">receipts<span class="hero-dot">.</span></span>
-          </h1>
+        <h1 class="hero-title" id="hero-title">
+          <span class="wipe" style="--row: 0">Stop chasing</span>
+          <span class="wipe" style="--row: 1">receipts<span class="hero-dot">.</span></span>
+        </h1>
+        <div class="hero-chit">
           <p class="hero-sub wipe" style="--row: 2">
             A receipt inbox that runs in your own Cloudflare account, matches your bank export and flags what's
             missing.
           </p>
           <p class="hero-cost wipe" style="--row: 3">AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs.</p>
-          <div class="ctas wipe" style="--row: 4">
-            <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare"></a>
-            <a class="button button-secondary" href="https://github.com/bapspatil/nuits-receipts">Star on GitHub</a>
-          </div>
-          <p class="hero-note wipe" style="--row: 5">
-            Open source under the Apache License 2.0. Not a service: you deploy your own copy.
-            <a href="#demo">Watch the 53-second demo</a>.
-          </p>
         </div>
+        <div class="ctas hero-ctas wipe" style="--row: 4">
+          <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare"></a>
+          <a class="button button-secondary" href="https://github.com/bapspatil/nuits-receipts">Star on GitHub</a>
+        </div>
+        <p class="hero-note wipe" style="--row: 5">
+          Open source under the Apache License 2.0. Not a service: you deploy your own copy.
+          <a class="play-chip" href="#demo">Watch the 53-second demo.</a>
+        </p>
 
         <figure class="slip slip-hero" data-loop aria-label="Example: a receipt matched to a bank payment">
           <div class="slip-body">
@@ -86,6 +86,7 @@
       </section>
 
       <section class="scene problem" aria-labelledby="problem-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">01</span><span>The problem</span></div>
         <div class="problem-copy">
           <h2 class="title" id="problem-title">Receipts live everywhere except where you need them.</h2>
           <p class="lede">
@@ -105,6 +106,7 @@
       </section>
 
       <section class="scene how" id="how" aria-labelledby="how-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">02</span><span>How it works</span></div>
         <h2 class="title how-title" id="how-title">How it works</h2>
         <ol class="rail">
           <li class="step">
@@ -138,6 +140,7 @@
       </section>
 
       <section class="scene ledger" aria-labelledby="ledger-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">03</span><span>The match</span></div>
         <div class="ledger-head">
           <h2 class="title" id="ledger-title">Your bank export, with the receipts attached.</h2>
           <p class="lede">Every payment gets a receipt or a flag. Nothing gets quietly skipped.</p>
@@ -162,6 +165,7 @@
       </section>
 
       <section class="scene demo" id="demo" aria-labelledby="demo-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">04</span><span>Demo</span><span class="slate-end">53 s</span></div>
         <h2 class="title" id="demo-title">See it in under a minute.</h2>
         <figure class="demo-player">
           <media-controller class="player" defaultsubtitles autohide="-1">
@@ -196,6 +200,7 @@
       </section>
 
       <section class="scene cost" id="cost" aria-labelledby="cost-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">05</span><span>Cost</span></div>
         <div class="cost-copy">
           <h2 class="title" id="cost-title">AI reading: about 15 cents a month. Here's the arithmetic.</h2>
           <p class="lede">
@@ -249,6 +254,7 @@
       </section>
 
       <section class="scene proof" aria-labelledby="proof-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">06</span><span>So far</span></div>
         <h2 class="title" id="proof-title">What we can say so far.</h2>
         <ul class="facts">
           <li class="fact">
@@ -273,6 +279,7 @@
       </section>
 
       <section class="scene nope" aria-labelledby="nope-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">07</span><span>Limits</span></div>
         <div class="nope-letter">
           <h2 class="title" id="nope-title">What it doesn't do.</h2>
           <p class="lede">I built this for my own receipts. Here's what it won't do for yours, at least not yet.</p>
@@ -290,7 +297,8 @@
         </div>
       </section>
 
-      <section class="scene faq" aria-labelledby="faq-title">
+      <section class="scene faq" id="faq" aria-labelledby="faq-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">08</span><span>FAQ</span></div>
         <h2 class="title" id="faq-title">Questions, answered plainly.</h2>
         <div class="faq-list">
           <details>
@@ -328,6 +336,7 @@
       </section>
 
       <section class="scene close" aria-labelledby="close-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">09</span><span>Deploy</span></div>
         <!-- svg:export -->
         <h2 class="close-title" id="close-title">Deploy your own copy.<span class="caret" data-loop aria-hidden="true"></span></h2>
         <div class="ctas">
