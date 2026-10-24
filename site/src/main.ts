@@ -1,3 +1,5 @@
+import "./nav";
+
 type Motion = "on" | "off";
 
 const root = document.documentElement;

@@ -4,10 +4,25 @@
     <span class="wordmark-name">Nuits Receipts</span>
     <span class="wordmark-desc">a receipt inbox that runs on Cloudflare Workers</span>
   </a>
-  <nav class="bar-end" aria-label="Site">
-    <a class="bar-link" href="/docs/">Docs</a>
-    <button class="motion-switch" type="button" aria-pressed="true" hidden>
-      Motion <span class="motion-state">on</span>
-    </button>
+  <nav class="bar-nav" aria-label="Site">
+    <ul class="nav-list">
+      <!-- partial:nav -->
+    </ul>
+    <a class="bar-github" href="https://github.com/bapspatil/nuits-receipts">GitHub</a>
   </nav>
+  <button class="motion-switch" type="button" aria-pressed="true" hidden>
+    Motion <span class="motion-state">on</span>
+  </button>
+  <details class="menu">
+    <summary class="menu-trigger"><span class="menu-closed">Menu</span><span class="menu-opened">Close</span></summary>
+    <nav class="menu-panel" aria-label="Site">
+      <ul class="nav-list">
+        <!-- partial:nav -->
+      </ul>
+      <div class="menu-foot">
+        <a class="menu-deploy" href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare" width="184" height="39" /></a>
+        <a class="bar-github" href="https://github.com/bapspatil/nuits-receipts">GitHub</a>
+      </div>
+    </nav>
+  </details>
 </header>
