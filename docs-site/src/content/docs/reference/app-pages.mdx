@@ -14,7 +14,8 @@ On a wide screen (880 pixels or more), the header shows these links, in this ord
 | Link | Path | Badge |
 | --- | --- | --- |
 | Home | `/` | |
-| Review | `/review` | Number of documents waiting |
+| Review | `/review` | Number of documents and Unknown sender emails waiting |
+| All receipts | `/receipts` | |
 | Payments | `/payments` | Number of payments missing a receipt |
 | Invoices | `/invoices` | |
 | Month | `/month` | |
@@ -29,20 +30,21 @@ On a narrow screen the header links give way to a tab bar fixed to the bottom of
 | Tab | Path | Badge |
 | --- | --- | --- |
 | Home | `/` | |
-| Review | `/review` | Number of documents waiting |
+| Review | `/review` | Number of documents and Unknown sender emails waiting |
 | Payments | `/payments` | Number of payments missing a receipt |
 | Month | `/month` | |
 | More | `/more` | |
 
-**More** opens a list of the pages the bar has no room for: **Invoices** (only when the header would show it), **Settings**, and **Sign out** in Access mode. The More tab is marked on those pages too.
+**More** opens a list of the pages the bar has no room for: **All receipts**, **Invoices** (only when the header would show it), **Settings**, and **Sign out** in Access mode. The More tab is marked on those pages too.
 
 ## Pages
 
 | Path | Page title | Query parameters | What it shows |
 | --- | --- | --- | --- |
 | `/` | Home | `month` | Heading "Welcome" on first run, "Here's what needs you" with open tasks, or "All caught up". Tasks that need you and a summary of the month with a link to close it. After the first receipt, also an **Add a receipt** upload form. |
-| `/more` | More | | The phone's list of **Invoices**, **Settings** and **Sign out**. See [On a phone](#on-a-phone). |
-| `/review` | Review | `reason`: `info`, `amount` or `sender` | Documents with status `needs_review`, filtered by **Missing info**, **Check the amount** or **Email not verified**. Documents still being read are counted in a banner. |
+| `/more` | More | | The phone's list of **All receipts**, **Invoices**, **Settings** and **Sign out**. See [On a phone](#on-a-phone). |
+| `/review` | Review | `reason`: `info`, `amount` or `sender`; `approved`, `ignored`, `deleted` (result banners) | **Unknown senders** first: mail from senders not on your list, each with **Approve sender**, **Ignore sender** and **Delete**. Then documents with status `needs_review`, filtered by **Missing info**, **Check the amount** or **Email not verified**. Documents still being read are counted in a banner. |
+| `/receipts` | All receipts | `show`: `ready`, `needs`, `reading`, `duplicate`, `sales` or `unknown`; `month` (month received); `q` (search seller, client, file name, invoice number, sender or subject); `offset` | Every receipt, sales invoice and Unknown sender email, newest received first, 50 per page. Each row shows its status and links to the document (or to Review for Unknown sender). On the first page, **Recent mail** lists the last 20 emails that reached the app and what happened to each. With nothing yet, the receipt address to forward to. |
 | `/receipts/<id>` | The document's seller or file name | | The original (image preview, or a link to the PDF or email) beside the form: review flag cards, all fields, part of the business and kind of cost, due date, euro amount, duplicate choice, **Note for your accountant** and the approve, save and **Read it again** buttons. Also bank match suggestions and a form to add a vendor rule. Sales invoices also show **Move to receipts** and the paid-outside form. |
 | `/add` | Add documents | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or sales invoices, and the email addresses to forward to. |
 | `/payments` | Payments for `<month>` | `month`, `offset`, `show`: `missing`; `inserted`, `skipped`, `replayed` (import result) | Bank rows booked in the month from completed imports, 100 per page: matches, suggestions, payments with no receipt, exemption controls (**Not a purchase (no receipt needed)**, **Needs a receipt after all**) and own-account transfers. |
@@ -60,6 +62,7 @@ In page order. Each links from the side menu.
 | --- | --- | --- |
 | Business | `#setup-business` | App name, business names, parts of the business, default part, payment terms, new account currency. |
 | Email | `#setup-email` | Receipt address, invoice address, allowed senders, forward copy address. |
+| Senders | `#senders` | Approved senders (those from the deploy value marked **Default**) with **Remove**, **Add a sender**, and ignored senders with **Stop ignoring**. |
 | Export | `#setup-accountant` | Accountant, export file name, note under the month download. |
 | OneDrive | `#onedrive` | Shown only when `MS_CLIENT_ID` is set. Connect or disconnect a Microsoft account, the redirect URI for Microsoft Entra, and the destination folder. |
 | Bank accounts | `#accounts` | Accounts with bank, currency and ID; rename; **Add a bank account**. |

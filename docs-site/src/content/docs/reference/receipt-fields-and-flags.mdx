@@ -160,7 +160,12 @@ Any other code shows as "Something needs a look." in group Other.
 
 | Situation | Result |
 | --- | --- |
-| Envelope sender not in `ALLOWED_SENDER_EMAILS` | Dropped. Nothing stored. |
+| Sender not approved, and DMARC passed for the From domain or SPF passed for the envelope sender | Raw email stored and shown in **Review** as **Unknown sender**. Not read. Logged as `sender_not_allowed` with the domain only. |
+| Sender not approved and not proven | Dropped. Logged as `sender_auth_failed` or `sender_unverified`. Nothing stored. |
+| Sender ignored in Review | Logged as `sender_ignored`. Nothing stored. |
+| Same Message-ID already waiting or read | Logged as `duplicate`. Nothing stored. |
+| 50 Unknown sender emails waiting, or 10 from this sender | Logged as `held_limit`. Nothing stored. |
+| From address approved and DMARC passed for its domain | Read like mail from an approved envelope sender. |
 | Email over 20 MiB | Dropped. Logged as `email_too_large`. |
 | SPF `fail` or `softfail`, or DMARC `fail`, in Cloudflare's `Authentication-Results`, or a `Received-SPF` envelope sender that differs | Dropped. Logged as `sender_auth_failed`. |
 | No proof of sender | Raw email stored with `sender_unverified`. Not read. |

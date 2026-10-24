@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { createExecutionContext } from 'cloudflare:test';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import worker from '../src/index';
 import { parseConfig, parseProducts, parseSenders } from '../src/config';
 import { receiveEmail } from '../src/receipts';
@@ -69,15 +69,21 @@ test('invalid configuration fails closed with a clear error', async () => {
   expect(await response.text()).toContain('PRODUCTS_JSON');
 });
 
-test('an empty sender allowlist disables email ingestion', async () => {
-  const stream = new ReadableStream<Uint8Array>({ pull() {} });
+test('an empty sender allowlist reads no mail: authenticated mail waits as Unknown sender', async () => {
+  const raw = new Response(
+    'Authentication-Results: mx.cloudflare.net; spf=pass smtp.mailfrom=owner@example.com\r\nFrom: owner@example.com\r\nSubject: Receipt\r\n\r\nvendor: A',
+  ).body!;
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   await receiveEmail(
-    { from: 'owner@example.com', raw: stream },
+    { from: 'owner@example.com', to: 'receipts@example.com', raw },
     { ...env, ALLOWED_SENDER_EMAILS: '' } as Env,
     createExecutionContext(),
   );
+  warn.mockRestore();
   expect(await env.DB.prepare('SELECT count(*) AS n FROM receipts').first('n')).toBe(0);
-  await stream.cancel();
+  expect(await env.DB.prepare("SELECT sender FROM inbound_mail WHERE state='held'").first('sender')).toBe(
+    'owner@example.com',
+  );
 });
 
 test('pages show the notices, configured labels and no private links', async () => {

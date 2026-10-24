@@ -147,6 +147,7 @@ test('the page has a section nav, one Save per group and history tucked away', a
   expect(targets).toEqual([
     'setup-business',
     'setup-email',
+    'senders',
     'setup-accountant',
     ...(config(env).oneDrive ? ['onedrive'] : []),
     'accounts',

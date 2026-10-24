@@ -125,7 +125,7 @@ test('schema/ accepts configured products and rejects invalid product lengths', 
 });
 
 test.skipIf(!existsSync('migrations'))(
-  'populated migrations/0001..0007 preserve every legacy value, link and constraint',
+  'populated migrations/0001..0008 preserve every legacy value, link and constraint',
   () => {
     using db = apply('migrations', '0003_duplicate_integrity.sql');
     seedLegacy(db);
@@ -172,6 +172,19 @@ test.skipIf(!existsSync('migrations'))(
     expect(db.query('SELECT count(*) AS n FROM settings').get()).toEqual({ n: 0 });
     expect(() => db.exec("INSERT INTO settings VALUES ('APP_NAME','not json','now','x')")).toThrow();
     expect(() => db.exec("INSERT INTO settings VALUES ('','\"x\"','now','x')")).toThrow();
+    // 0008: the mail log and ignored senders start empty; receipts are untouched.
+    db.transaction(() => db.exec(readFileSync('migrations/0008_inbound_mail.sql', 'utf8')))();
+    expect(db.query('SELECT count(*) n FROM receipts').get()).toEqual({ n: 3 });
+    expect(db.query('SELECT count(*) AS n FROM inbound_mail').get()).toEqual({ n: 0 });
+    const mail = db.prepare(
+      "INSERT INTO inbound_mail (id,received_at,sender,message_id,state,reason) VALUES (?,'now','a@b.c',?,?,?)",
+    );
+    mail.run('m1', '<x@y>', 'held', 'sender_not_allowed');
+    expect(() => mail.run('m2', '<x@y>', 'held', 'sender_not_allowed')).toThrow();
+    mail.run('m3', '<x@y>', 'dropped', 'duplicate');
+    expect(() => mail.run('m4', null, 'waiting', 'x')).toThrow();
+    expect(() => mail.run('m5', null, 'held', '')).toThrow();
+    db.exec('DELETE FROM inbound_mail');
     healthy(db);
     using fresh = apply('schema');
     expect(shape(fresh)).toEqual(shape(db));
@@ -180,7 +193,7 @@ test.skipIf(!existsSync('migrations'))(
 );
 
 test.skipIf(!existsSync('migrations'))(
-  'schema/ and empty migrations/0001..0007 have identical tables, columns, indexes, triggers and foreign keys',
+  'schema/ and empty migrations/0001..0008 have identical tables, columns, indexes, triggers and foreign keys',
   () => {
     using fresh = apply('schema');
     using upgraded = apply('migrations');

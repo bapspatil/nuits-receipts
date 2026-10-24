@@ -34,6 +34,8 @@ beforeEach(async () => {
     env.DB.prepare('DELETE FROM onedrive_connection'),
     env.DB.prepare('DELETE FROM settings'),
     env.DB.prepare('DELETE FROM settings_audit'),
+    env.DB.prepare('DELETE FROM inbound_mail'),
+    env.DB.prepare('DELETE FROM ignored_senders'),
   ]);
   const objects = await env.ORIGINALS.list();
   for (const object of objects.objects) await env.ORIGINALS.delete(object.key);

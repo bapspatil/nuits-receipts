@@ -22,6 +22,8 @@ import type { Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
 import { withSettings } from './settings';
+import { approveSender, deleteHeld, ignoreSender, removeApproved, unignoreSender } from './inbound';
+import { allReceiptsPage } from './all';
 import { resetSetting, saveSetup } from './setup';
 import { markSent, options, packageZip, query } from './package';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
@@ -63,10 +65,34 @@ async function formData(request: Request, limit: number): Promise<FormData> {
     throw new InputError('Invalid form data', 400);
   }
 }
+// Approve, ignore, delete and the Settings > Senders list. Each form says
+// where to go back to: Review (default), Settings or All receipts.
+async function senderAction(request: Request, env: Env, path: string, who: string, ctx: Waiter): Promise<Response> {
+  const form = await formData(request, 4096);
+  const back = ({ settings: '/settings', receipts: '/receipts' } as Record<string, string>)[String(form.get('back'))];
+  const address = form.get('address');
+  let done: string;
+  if (path === '/senders/approve') done = `approved=${await approveSender(env, address, who, ctx)}`;
+  else if (path === '/senders/ignore') done = `ignored=${await ignoreSender(env, address, who)}`;
+  else if (path === '/senders/delete') {
+    const id = String(form.get('id') ?? '');
+    requireInput(/^[0-9a-f-]{36}$/.test(id), 'Invalid email', 400);
+    await deleteHeld(env, id);
+    done = 'deleted=1';
+  } else if (path === '/senders/remove') {
+    await removeApproved(env, address, who);
+    done = 'senders=removed';
+  } else if (path === '/senders/unignore') {
+    await unignoreSender(env, address);
+    done = 'senders=unignored';
+  } else return new Response('Not found', { status: 404 });
+  return redirect(back === '/settings' ? `/settings?${done}#senders` : `${back ?? '/review'}?${done}`);
+}
 function redirect(location: string): Response {
   return new Response(null, { status: 303, headers: { Location: location } });
 }
-async function route(request: Request, env: Env, base = ''): Promise<Response> {
+type Waiter = Pick<ExecutionContext, 'waitUntil'>;
+async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
   const who = await authorized(request, env);
   if (!who)
     // No Basic challenge in Access mode, so browsers never show a password prompt.
@@ -90,7 +116,7 @@ async function route(request: Request, env: Env, base = ''): Promise<Response> {
   if (request.method === 'GET' && path === '/') return home(env, month(url.searchParams.get('month')));
   if (request.method === 'GET' && path === '/review') {
     const reason = url.searchParams.get('reason') ?? '';
-    return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null);
+    return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
   }
   if (request.method === 'GET' && path === '/month')
     return monthPage(env, month(url.searchParams.get('month')), offset, url.searchParams);
@@ -112,6 +138,8 @@ async function route(request: Request, env: Env, base = ''): Promise<Response> {
     );
   }
   if (request.method === 'GET' && path === '/more') return morePage(env);
+  if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
+  if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
   if (request.method === 'POST' && path === '/settings/setup')
     return redirect(await saveSetup(env, await formData(request, 64 * 1024), who));
@@ -475,13 +503,18 @@ export default {
   async email(message: Parameters<typeof receiveEmail>[0], env: Env, ctx: ExecutionContext): Promise<void> {
     return receiveEmail(message, await withSettings(env), ctx);
   },
-  async fetch(request: Request, deploy: Env): Promise<Response> {
+  // ctx is optional so tests can call fetch(request, env); work handed to
+  // waitUntil then finishes before the response is returned.
+  async fetch(request: Request, deploy: Env, ctx?: Waiter): Promise<Response> {
     let response: Response;
     const env = await withSettings(deploy);
+    const pending: Promise<unknown>[] = [];
+    const waiter: Waiter = ctx ?? { waitUntil: (promise) => void pending.push(promise) };
     try {
       const base = config(env).basePath;
       const inner = base ? stripBase(request, base) : request;
-      response = inner ? await route(inner, env, base) : new Response('Not found', { status: 404 });
+      response = inner ? await route(inner, env, base, waiter) : new Response('Not found', { status: 404 });
+      await Promise.allSettled(pending);
       if (base) response = rebase(new Response(response.body, response), base);
     } catch (error) {
       response = await failure(request, env, error);

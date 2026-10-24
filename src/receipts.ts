@@ -4,7 +4,8 @@ import type { Env } from './env';
 import { previousInvoicesAddress } from './settings';
 import { extract, ExtractionFailure, FORWARDED_CONTEXT } from './ai';
 import { cacheFx, reconcile } from './banking';
-import { senderVerdict } from './sender';
+import { authenticatedSender, senderVerdict, type SenderVerdict } from './sender';
+import { holdUnknown, logMail, mailFacts } from './inbound';
 import { config, isProduct, parseForwardCopyTo } from './config';
 import {
   date,
@@ -320,7 +321,8 @@ export async function upload(
   return processReceipt(env, row.id);
 }
 
-// Only addresses in ALLOWED_SENDER_EMAILS are read. An empty list disables mail ingestion.
+// Mail from ALLOWED_SENDER_EMAILS is read. Other authenticated senders wait in
+// Review as Unknown sender (src/inbound.ts); everything else is logged only.
 type IncomingEmail = Pick<ForwardableEmailMessage, 'from' | 'raw'> &
   Partial<Pick<ForwardableEmailMessage, 'to' | 'forward'>>;
 
@@ -374,7 +376,7 @@ export function kindFor(env: Env, to: string | undefined): Kind {
     : 'expense';
 }
 async function ingestEmail(message: IncomingEmail, env: Env, ctx: Pick<ExecutionContext, 'waitUntil'>): Promise<void> {
-  if (!config(env).allowedSenders.has(message.from.trim().toLowerCase())) return;
+  const envelope = message.from.trim().toLowerCase();
   const kind = kindFor(env, message.to);
   let bytes: Uint8Array;
   try {
@@ -382,24 +384,54 @@ async function ingestEmail(message: IncomingEmail, env: Env, ctx: Pick<Execution
   } catch (error) {
     if (error instanceof InputError && error.status === 413) {
       console.warn(JSON.stringify({ reason: 'email_too_large' }));
+      await logMail(env, await mailFacts(null, envelope, message.to), 'dropped', 'email_too_large');
       return;
     }
     throw error;
   }
-  const verdict = senderVerdict(bytes, message.from);
+  const allowed = config(env).allowedSenders;
+  // Allowed by envelope (as before), or by a From address that passed DMARC.
+  let verdict: SenderVerdict,
+    identity = envelope;
+  if (allowed.has(envelope)) verdict = senderVerdict(bytes, envelope);
+  else {
+    const sender = authenticatedSender(bytes, envelope);
+    if (!sender || !allowed.has(sender)) {
+      // Not on the list: held for the owner to approve, or logged only.
+      await holdUnknown(env, bytes, envelope, message.to, sender);
+      return;
+    }
+    verdict = 'pass';
+    identity = sender;
+  }
+  const facts = await mailFacts(bytes, envelope, message.to, identity);
   if (verdict === 'fail') {
     console.warn(JSON.stringify({ reason: 'sender_auth_failed' }));
+    await logMail(env, facts, 'dropped', 'sender_auth_failed');
     return;
   }
   const emailKey = `emails/${await hash(bytes)}.eml`;
   await env.ORIGINALS.put(emailKey, bytes, {
     httpMetadata: { contentType: 'message/rfc822' },
   });
+  await logMail(env, { ...facts, emailKey }, 'imported', verdict === 'unknown' ? 'sender_unverified' : 'allowed');
   if (verdict === 'unknown') {
     // Kept for manual review, never extracted: no AI spend on unproven mail.
     await emailReview(env, bytes, emailKey, kind, 'sender_unverified');
     return;
   }
+  await importEmail(env, bytes, emailKey, kind, ctx);
+}
+
+// Reads an authenticated email that is already stored in R2 at emailKey: one
+// receipt per supported attachment, or the body when there is none.
+export async function importEmail(
+  env: Env,
+  bytes: Uint8Array,
+  emailKey: string,
+  kind: Kind,
+  ctx: Pick<ExecutionContext, 'waitUntil'>,
+): Promise<void> {
   const jobs: string[] = [];
   let context = '';
   try {

@@ -38,7 +38,7 @@ Select **Save**. Only one rule should use this pattern: if two do, only the firs
 In the app, open **Settings > Email** and fill in:
 
 - **Receipt address**: the address you just routed. It is shown next to the upload form. Routing, not this field, decides what reaches the Worker.
-- **Allowed senders**: one address per line. Only mail whose envelope sender is on this list is read. With an empty list, all mail is ignored.
+- **Allowed senders**: one address per line. Mail from these addresses is read. Mail from anyone else waits in **Review** as **Unknown sender** if Cloudflare's checks prove who sent it. You can also manage this list in **Settings** > **Senders**.
 
 Changing either field needs its confirmation tick in the same save: "I’ve added the Email Routing rule for this address" and "I’ve checked this list; mail from anyone else is ignored". Then press **Save email**.
 
@@ -62,7 +62,7 @@ Within a minute or so the receipt appears on **Home** and, if anything needs a l
 
 If nothing appears:
 
-- **The sender is not allowed.** Mail from anyone not on **Allowed senders** is dropped without being stored. Check the address that actually arrives: forwarding services and mailing lists can change the envelope sender.
+- **The sender is not approved yet.** Mail from anyone not on your approved senders waits in **Review** under **Unknown senders**. Press **Approve sender** to read it, and their later mail is read as it arrives. **All receipts** > **Recent mail** shows every email that arrived and what happened to it.
 - **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
 - **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept in **Review** with "We couldn't verify who sent this email." It is not read by AI. Download the original, check it, and upload it if it is genuine.
 - **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).
@@ -76,7 +76,7 @@ If nothing appears:
 
 ## Related
 
-- [Email and sender trust](/explanation/email-and-sender-trust/) explains the allowlist and the SPF check.
+- [Email and sender trust](/explanation/email-and-sender-trust/) explains approved senders, Unknown sender and the SPF check.
 - [Forward a copy of incoming mail](/how-to/forward-a-copy-of-incoming-mail/), for one-time codes sent to the receipt address.
 - [Keep sales invoices](/how-to/keep-sales-invoices/) with a second routed address.
 - [Configuration](/reference/configuration/) for `RECEIPT_ADDRESS` and `ALLOWED_SENDER_EMAILS`.

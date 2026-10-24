@@ -5,8 +5,11 @@ import { creditFit, eligible, eurValue, openSales, type EurValue, type Transacti
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
-import { config } from './config';
+import { config, MAX_ALLOWED_SENDERS, parseSenders } from './config';
 import { setupParts } from './setup';
+import { heldMail, ignoredSenders } from './inbound';
+import { heldSection, senderBanner } from './all';
+import { deployValue } from './settings';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
 import { invoiceName, overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
 import { TREATMENT_LABELS } from './sales';
@@ -302,8 +305,13 @@ export async function home(env: Env, selected: string): Promise<Response> {
 }
 
 // ---------- Review queue ----------
-export async function reviewPage(env: Env, filter: ReviewFilter | null): Promise<Response> {
+export async function reviewPage(
+  env: Env,
+  filter: ReviewFilter | null,
+  params = new URLSearchParams(),
+): Promise<Response> {
   const all = await reviewQueue(env);
+  const held = await heldMail(env);
   const rows = filter ? all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter)) : all;
   const reading = await env.DB.prepare(
     "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL",
@@ -329,23 +337,32 @@ export async function reviewPage(env: Env, filter: ReviewFilter | null): Promise
           `${plural(all.length, 'other receipt')} still ${all.length === 1 ? 'needs' : 'need'} a look.`,
           `<a class="btn primary" href="/review">Show all ${all.length}</a>`,
         )
-      : emptyState(
-          'Every receipt is ready.',
-          "Receipts land here when the reader isn't sure.",
-          uploadForm(config(env).receiptAddress, true),
-          '<span class="stamp ready">Nothing to check</span>',
-        );
+      : held.length
+        ? ''
+        : emptyState(
+            'Every receipt is ready.',
+            "Receipts land here when the reader isn't sure.",
+            uploadForm(config(env).receiptAddress, true),
+            '<span class="stamp ready">Nothing to check</span>',
+          );
   return page(
     'Review',
-    `${chips}${reading ? `<p class="banner" role="status">${plural(reading, 'receipt is', 'receipts are')} still being read. Refresh in a minute.</p>` : ''}${list}`,
+    `${senderBanner(params)}${heldSection(held)}${all.length || !held.length ? chips : ''}${reading ? `<p class="banner" role="status">${plural(reading, 'receipt is', 'receipts are')} still being read. Refresh in a minute.</p>` : ''}${list}`,
     200,
     env,
     {
       nav: 'review',
-      head: pageHead(all.length ? `${plural(all.length, 'receipt')} to check` : 'Nothing to check', {
-        kicker: 'Review',
-        sub: all.length ? 'Undated first, then oldest.' : '',
-      }),
+      head: pageHead(
+        all.length
+          ? `${plural(all.length, 'receipt')} to check`
+          : held.length
+            ? `${plural(held.length, 'email')} from unknown senders`
+            : 'Nothing to check',
+        {
+          kicker: 'Review',
+          sub: all.length ? 'Undated first, then oldest.' : '',
+        },
+      ),
     },
   );
 }
@@ -1071,6 +1088,33 @@ async function oneDrivePart(env: Env, params: URLSearchParams, origin: string): 
   );
 }
 
+// Settings > Senders: who is read automatically and who is ignored.
+async function sendersPart(env: Env, params: URLSearchParams): Promise<string> {
+  const allowed = [...config(env).allowedSenders].sort();
+  let defaults: ReadonlySet<string> = new Set();
+  try {
+    defaults = parseSenders(deployValue(env, 'ALLOWED_SENDER_EMAILS'), 1000);
+  } catch {
+    // An invalid deploy value is reported by the Email section.
+  }
+  const ignored = await ignoredSenders(env);
+  const row = (address: string, meta: string, action: string, button: string) =>
+    `<li class="srow"><div class="sl"><span class="flabel">${escape(address)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn">${button}<span class="vh"> ${escape(address)}</span></button></form></li>`;
+  const approved = allowed.length
+    ? `<ul class="plain card rowlist">${allowed.map((a) => row(a, defaults.has(a) ? 'Default' : '', '/senders/remove', 'Remove')).join('')}</ul>`
+    : '<p class="warning">No approved senders, so all mail waits in Review.</p>';
+  const ignoredList = ignored.length
+    ? `<h3>Ignored</h3><p class="hint">Mail from these addresses is not kept.</p><ul class="plain card rowlist">${ignored.map((i) => row(i.address, `Since ${escape(day(i.added_at))}`, '/senders/unignore', 'Stop ignoring')).join('')}</ul>`
+    : '';
+  const full = allowed.length >= MAX_ALLOWED_SENDERS;
+  const add = `<details class="add"${allowed.length ? '' : ' open'}><summary>Add a sender</summary><div class="body"><form action="/senders/approve" method="post"><input type="hidden" name="back" value="settings"><div class="fields">${input('address', '', 'email', 'Email address', { hint: 'Exact address, like billing@example.com', attrs: ' required maxlength="254" autocomplete="off"', wide: true })}</div><button class="btn secondary"${full ? ' disabled' : ''}>Add sender</button>${full ? `<p class="warning">You have ${MAX_ALLOWED_SENDERS} approved senders, the most the app keeps. Remove one first.</p>` : ''}</form></div></details>`;
+  return sect(
+    'senders',
+    'Senders',
+    `${senderBanner(params)}<p class="hint">Mail from approved senders is read automatically. Mail from anyone else waits in Review as Unknown sender. ${allowed.length} of ${MAX_ALLOWED_SENDERS} used.</p>${approved}${add}${ignoredList}`,
+  );
+}
+
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   const oneDrive = await oneDrivePart(env, params, origin);
@@ -1098,6 +1142,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
   const sections = [
     ['setup-business', 'Business'],
     ['setup-email', 'Email'],
+    ['senders', 'Senders'],
     ['setup-accountant', 'Export'],
     ...(oneDrive ? [['onedrive', 'OneDrive']] : []),
     ['accounts', 'Bank accounts'],
@@ -1107,7 +1152,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     ['advanced', 'Advanced'],
   ];
   const mail = settings.receiptAddress
-    ? `<p class="hint">Forward receipts to <code>${escape(settings.receiptAddress)}</code>${settings.invoicesAddress ? `, invoices you send to <code>${escape(settings.invoicesAddress)}</code>` : ''}. Only allowed senders are read.</p>${settings.allowedSenders.size ? '' : '<p class="warning">No allowed senders yet, so all mail is ignored.</p>'}`
+    ? `<p class="hint">Forward receipts to <code>${escape(settings.receiptAddress)}</code>${settings.invoicesAddress ? `, invoices you send to <code>${escape(settings.invoicesAddress)}</code>` : ''}. Approved senders are read automatically, others wait in Review. See <a href="#senders">Senders</a>.</p>`
     : '<p class="hint">Email intake is off until you set a receipt address. Upload from Home meanwhile.</p>';
   const accountsPart = sect(
     'accounts',
@@ -1161,7 +1206,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
   const style = `${sections.map(([id]) => `.settings:has(#${id}:target,#${id} :target) .snav a[href="#${id}"]`).join(',')}{color:var(--ink);border-color:var(--ink)}`;
   return page(
     'Settings',
-    `<div class="settings"><nav class="snav" aria-label="Settings sections"><ul>${sections.map(([id, label]) => `<li><a href="#${id}">${label}</a></li>`).join('')}</ul><ul class="key" aria-label="Where values come from"><li><span class="src app">App</span>set here</li><li><span class="src deploy">Deploy</span>Worker variable</li><li><span class="src default">Default</span>built in</li></ul></nav><div class="sbody">${sect('setup-business', 'Business', setup.business)}${sect('setup-email', 'Email', mail + setup.email)}${sect('setup-accountant', 'Export', setup.accountant)}${oneDrive}${accountsPart}${importsPart}${transfersPart}${rulesPart}${setup.advanced}</div></div>`,
+    `<div class="settings"><nav class="snav" aria-label="Settings sections"><ul>${sections.map(([id, label]) => `<li><a href="#${id}">${label}</a></li>`).join('')}</ul><ul class="key" aria-label="Where values come from"><li><span class="src app">App</span>set here</li><li><span class="src deploy">Deploy</span>Worker variable</li><li><span class="src default">Default</span>built in</li></ul></nav><div class="sbody">${sect('setup-business', 'Business', setup.business)}${sect('setup-email', 'Email', mail + setup.email)}${await sendersPart(env, params)}${sect('setup-accountant', 'Export', setup.accountant)}${oneDrive}${accountsPart}${importsPart}${transfersPart}${rulesPart}${setup.advanced}</div></div>`,
     200,
     env,
     { nav: 'settings', style },

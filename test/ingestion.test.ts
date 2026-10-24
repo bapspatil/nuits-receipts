@@ -25,14 +25,22 @@ test('HTML conversion keeps visible content without scripts and styles', async (
   expect(text).not.toContain('secret');
   expect(text).not.toContain('hidden');
 });
-test('envelope allowlist drops blocked senders before reading the message', async () => {
-  const start = vi.fn();
-  const stream = new ReadableStream<Uint8Array>({ pull: start });
-  const context = createExecutionContext();
-  await receiveEmail({ from: 'evil@example.com', raw: stream }, env, context);
+test('an unknown sender that fails or skips the checks is logged only, nothing stored', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  for (const auth of ['', 'Authentication-Results: mx.cloudflare.net; spf=fail smtp.mailfrom=evil@example.com\r\n']) {
+    const context = createExecutionContext();
+    const raw = new Response(`${auth}From: evil@example.com\r\nSubject: Pay me\r\n\r\nvendor: X`).body!;
+    await receiveEmail({ from: 'evil@example.com', to: 'receipts@example.com', raw }, env, context);
+  }
   expect(await env.DB.prepare('SELECT count(*) AS n FROM receipts').first('n')).toBe(0);
   expect((await env.ORIGINALS.list()).objects).toHaveLength(0);
-  await stream.cancel();
+  const log = (await env.DB.prepare('SELECT state,reason FROM inbound_mail ORDER BY reason').all()).results;
+  expect(log).toEqual([
+    { state: 'dropped', reason: 'sender_auth_failed' },
+    { state: 'dropped', reason: 'sender_unverified' },
+  ]);
+  expect(warn.mock.calls.flat().join(' ')).not.toContain('evil@');
+  warn.mockRestore();
 });
 // Headers Cloudflare Email Routing prepends after authenticating the envelope.
 export const cloudflarePass = 'Authentication-Results: mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass;\r\n';

@@ -10,7 +10,7 @@ import { authorization, htmlForm, request, uploadPdf } from './helpers';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
 // INVOICES_ADDRESS is set in wrangler.local.jsonc, so the Invoices tab shows.
-const NAV = ['/', '/review', '/payments', '/invoices', '/month', '/settings'];
+const NAV = ['/', '/review', '/receipts', '/payments', '/invoices', '/month', '/settings'];
 const TABS = ['/', '/review', '/payments', '/month', '/more'];
 
 async function flaggedImage(variant = 0) {
@@ -68,7 +68,7 @@ function visible(html: string) {
     .replace(/<[^>]*>/g, ' ');
 }
 // The phone tab for each desktop nav item: Invoices and Settings live behind More.
-const TAB_FOR: Record<string, string> = { '/invoices': '/more', '/settings': '/more' };
+const TAB_FOR: Record<string, string> = { '/receipts': '/more', '/invoices': '/more', '/settings': '/more' };
 function expectShell(html: string, current: string | null, tab = current && (TAB_FOR[current] ?? current)) {
   expect(navOf(html)).toEqual({ links: NAV, current });
   const { links, current: currentTabs } = tabsOf(html);
@@ -83,13 +83,15 @@ function expectShell(html: string, current: string | null, tab = current && (TAB
   expect(html).not.toContain('/cdn-cgi/access/logout');
 }
 
-test('every page, including error pages, has the same six-item nav', async () => {
+test('every page, including error pages, has the same seven-item nav', async () => {
   const { ready, flagged } = await seed();
   const pages: [string, string | null][] = [
     ['/', '/'],
     ['/?month=2026-09', '/'],
     ['/review', '/review'],
     ['/review?reason=sender', '/review'],
+    ['/receipts', '/receipts'],
+    ['/receipts?show=needs&month=2026-09&q=a', '/receipts'],
     ['/payments?month=2026-09', '/payments'],
     ['/payments?month=2026-09&show=missing', '/payments'],
     ['/month?month=2026-09', '/month'],

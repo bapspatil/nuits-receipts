@@ -13,6 +13,7 @@ The D1 schema for a new installation is in `schema/`, applied in file order by `
 | `schema/0002_month_package.sql` | `month_sends`, `onedrive_connection`, `onedrive_uploads` |
 | `schema/0003_sales_invoices.sql` | Sales invoice columns on `receipts` |
 | `schema/0004_settings.sql` | `settings`, `settings_audit` |
+| `schema/0005_inbound_mail.sql` | `inbound_mail`, `ignored_senders` |
 
 Conventions: money is an integer in minor units (`*_minor`). VAT rates are integers in hundredths of a percent (`*_bps`). Dates are `YYYY-MM-DD` text; timestamps are ISO 8601 text in UTC. JSON is stored as text in `*_json` columns.
 
@@ -210,6 +211,32 @@ Only keys listed in `FIELDS` in `src/settings.ts` are read.
 | `changed_at` | TEXT | |
 | `changed_by` | TEXT | |
 
+## `inbound_mail`
+
+One row per email the Worker received, and every Unknown sender email that is waiting. Rows other than waiting ones are trimmed to the newest 500.
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `id` | TEXT | Primary key | A random UUID. |
+| `received_at` | TEXT | Not null | |
+| `sender` | TEXT | At most 254 characters | The proven sender: the From address when DMARC passed for its domain, else the envelope sender. For mail that was not proven, the From address as written. |
+| `envelope` | TEXT | At most 254 characters | The envelope sender. |
+| `to_address` | TEXT | At most 254 characters | The address the mail was sent to. |
+| `subject` | TEXT | At most 300 characters | |
+| `message_id` | TEXT | At most 300 characters | The Message-ID header. Unique among waiting rows. |
+| `attachments`, `size_bytes` | INTEGER | | |
+| `email_key` | TEXT | | The R2 key of the stored email, when one was kept. |
+| `state` | TEXT | `imported`, `held`, `ignored` or `dropped` | `held` is an Unknown sender email waiting in Review. |
+| `reason` | TEXT | 1 to 40 characters | A reason code, such as `allowed`, `sender_not_allowed` or `sender_approved`. See [Email intake results](/reference/receipt-fields-and-flags/#email-intake-results). |
+
+## `ignored_senders`
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `address` | TEXT | Primary key. Mail from this address is logged, not kept. |
+| `added_at` | TEXT | |
+| `added_by` | TEXT | The Access email, or `password`. |
+
 ## Indexes
 
 | Index | Table | Columns |
@@ -222,6 +249,10 @@ Only keys listed in `FIELDS` in `src/settings.ts` are read.
 | `receipts_month` | `receipts` | `issue_date, product, expense_type` |
 | `receipts_kind_issue` | `receipts` | `kind, issue_date` |
 | `settings_audit_changed` | `settings_audit` | `changed_at` |
+| `inbound_mail_received` | `inbound_mail` | `received_at` |
+| `inbound_mail_sender` | `inbound_mail` | `sender, state` |
+| `inbound_mail_email` | `inbound_mail` | `email_key` where set |
+| `inbound_mail_held_message` | `inbound_mail` | `message_id`, unique where `state` is `held` |
 
 ## R2 keys
 
@@ -230,7 +261,7 @@ All objects are in the `ORIGINALS` bucket.
 | Key | Content type | Written when |
 | --- | --- | --- |
 | `receipts/<sha256>` | The document's media type | A document is uploaded, attached to an email, or an email body or held email is stored. `<sha256>` is the document ID. |
-| `emails/<sha256>.eml` | `message/rfc822` | An email from an allowed sender passes the sender check or is held as unverified. |
+| `emails/<sha256>.eml` | `message/rfc822` | An email from an allowed sender passes the sender check or is held as unverified, or an email from a proven sender who is not approved is kept as Unknown sender. |
 | `imports/<sha256>.csv` | `text/csv` | A bank CSV is imported. |
 
-Objects are written once per content hash and are not deleted by the app.
+Objects are written once per content hash. The app deletes only the stored email of an Unknown sender item you ignore or delete, and only when no receipt uses it.

@@ -21,11 +21,19 @@ export const EXPORT_NOTICE = 'Review flagged rows first. Your accountant decides
 export const MISSING_PAYMENTS =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL";
 
-export type NavKey = 'home' | 'review' | 'payments' | 'invoices' | 'month' | 'settings' | 'more';
+export type NavKey = 'home' | 'review' | 'receipts' | 'payments' | 'invoices' | 'month' | 'settings' | 'more';
 // style: extra page CSS, appended to the shared sheet.
 export type PageOptions = { nav?: NavKey; head?: string; style?: string };
 type Counts = { review: number; missing: number; invoices: boolean };
 
+// Its own query, so a database without the inbound_mail table still counts.
+async function heldTotal(env: Env): Promise<number> {
+  try {
+    return (await env.DB.prepare("SELECT count(*) n FROM inbound_mail WHERE state='held'").first<number>('n')) ?? 0;
+  } catch {
+    return 0;
+  }
+}
 async function navCounts(env: Env): Promise<Counts> {
   try {
     const [review, missing, sales] = await env.DB.batch<{ n: number }>([
@@ -34,7 +42,8 @@ async function navCounts(env: Env): Promise<Counts> {
       env.DB.prepare("SELECT count(*) n FROM (SELECT 1 FROM receipts WHERE kind='sales' LIMIT 1)"),
     ]);
     return {
-      review: review?.results[0]?.n ?? 0,
+      // Unknown-sender emails wait in Review too.
+      review: (review?.results[0]?.n ?? 0) + (await heldTotal(env)),
       missing: missing?.results[0]?.n ?? 0,
       // The Invoices tab appears once invoice email is set up or an invoice exists.
       invoices: !!config(env).invoicesAddress || (sales?.results[0]?.n ?? 0) > 0,
@@ -187,6 +196,13 @@ tfoot th,tfoot td{border-bottom:0;border-top:1.5px solid var(--ink);font:750 1.1
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:0;list-style:none}
 .chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1.5px solid var(--guilloche);border-radius:var(--pill);text-decoration:none;font-weight:600;font-size:.9375rem;background:var(--slip)}
 .chips a[aria-current=page]{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.held{margin:0 0 28px}.held h2,.recent h2{margin:0 0 4px}.held>.hint,.recent>.hint{margin:0 0 12px}
+.held ul{list-style:none;margin:0;padding:0}.held li{padding:14px 18px;margin:0 0 10px}
+.held .who{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0}.held .who b{overflow-wrap:anywhere;min-width:0}
+.held .subj{margin:6px 0 0;overflow-wrap:anywhere}.held .ok{margin:2px 0 0;color:var(--ink-soft);font-size:.875rem}.held .btns{margin:10px 0 0}
+.find{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:end;margin:0 0 18px}.find .q{flex:2 1 14rem}.find .m{flex:1 1 10rem}
+.list.all .ok .stamp{font-size:.6875rem;padding:4px 7px 3px;margin-right:4px}.list .who{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.recent{margin-top:32px}.recent .list .ok{overflow-wrap:anywhere}
 .work{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:32px;align-items:start}
 .doc{position:sticky;top:16px}
 .frame{background:#d5e2da;border:1px solid var(--guilloche);border-radius:var(--r);padding:16px;max-height:calc(100vh - 120px);overflow:auto}
@@ -398,6 +414,7 @@ const ICONS = {
   payments: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>'),
   month: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/>'),
   more: svg('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
+  receipts: svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/>'),
   invoices: svg('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7m-7 4h5"/>'),
   settings: svg('<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
   signOut: svg('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>'),
@@ -415,7 +432,7 @@ function nav(active: NavKey | undefined, counts: Counts): string {
   const badge = badges(counts);
   const item = (key: NavKey, href: string, label: string) =>
     `<li><a href="${href}"${current(key === active)}>${label}${badge[key] ?? ''}</a></li>`;
-  return `<nav class="main" aria-label="Main"><ul>${item('home', '/', 'Home')}${item('review', '/review', 'Review')}${item('payments', '/payments', 'Payments')}${counts.invoices ? item('invoices', '/invoices', 'Invoices') : ''}${item('month', '/month', 'Month')}${item('settings', '/settings', 'Settings')}</ul></nav>`;
+  return `<nav class="main" aria-label="Main"><ul>${item('home', '/', 'Home')}${item('review', '/review', 'Review')}${item('receipts', '/receipts', 'All receipts')}${item('payments', '/payments', 'Payments')}${counts.invoices ? item('invoices', '/invoices', 'Invoices') : ''}${item('month', '/month', 'Month')}${item('settings', '/settings', 'Settings')}</ul></nav>`;
 }
 
 // The phone tab bar. Pages that live behind More light up the More tab.
@@ -426,7 +443,7 @@ const TABS = [
   { key: 'month', href: '/month', label: 'Month' },
   { key: 'more', href: '/more', label: 'More' },
 ] as const;
-const UNDER_MORE: readonly (NavKey | undefined)[] = ['more', 'settings', 'invoices'];
+const UNDER_MORE: readonly (NavKey | undefined)[] = ['more', 'receipts', 'settings', 'invoices'];
 
 function tabs(active: NavKey | undefined, counts: Counts): string {
   const badge = badges(counts);
@@ -442,6 +459,7 @@ export async function morePage(env: Env): Promise<Response> {
   const row = (href: string, icon: string, label: string, sub: string) =>
     `<li><a href="${href}">${icon}<span><b>${label}</b><span class="s">${sub}</span></span><span class="chev">${ICONS.chevron}</span></a></li>`;
   const rows = [
+    row('/receipts', ICONS.receipts, 'All receipts', 'Every receipt and invoice, newest first'),
     (await navCounts(env)).invoices && row('/invoices', ICONS.invoices, 'Invoices', 'Sent invoices, paid or not'),
     row('/settings', ICONS.settings, 'Settings', 'Accounts, email and OneDrive'),
     config(env).access && row('/cdn-cgi/access/logout', ICONS.signOut, 'Sign out', 'End this session'),

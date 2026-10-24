@@ -1,7 +1,5 @@
 # Nuits Receipts
 
-[Documentation](https://receipts.nuits.net/docs/) | [Project site](https://receipts.nuits.net/) | [Releases](https://github.com/bapspatil/nuits-receipts/releases) | [Apache License 2.0](LICENSE) | [Security](SECURITY.md) | [Contributing](CONTRIBUTING.md)
-
 A self-hosted receipt and invoice reader that runs on Cloudflare Workers. You deploy it into your own Cloudflare account. It:
 
 - reads vendor, amounts, VAT and dates from your receipts (PDF uploads, photos, or receipts you forward by email);
@@ -14,13 +12,6 @@ You review everything; nothing is filed or submitted for you. It helps you get o
 > Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
 
 **Documentation: <https://receipts.nuits.net/docs/>.** Start with the [tutorials](https://receipts.nuits.net/docs/tutorials/), find a task in the [how-to guides](https://receipts.nuits.net/docs/how-to/), look things up in the [reference](https://receipts.nuits.net/docs/reference/), or read [how it works](https://receipts.nuits.net/docs/explanation/).
-
-<p align="center">
-  <img src="docs-site/src/assets/screenshots/home.png" alt="Nuits Receipts home screen with sample data: one payment has no receipt yet, and the month so far" width="48%">
-  <img src="docs-site/src/assets/screenshots/month.png" alt="Nuits Receipts month screen with sample data: check receipts, match payments, send to your accountant" width="48%">
-</p>
-
-The screenshots use sample data only.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts)
 
@@ -67,7 +58,7 @@ bun run setup     # asks for names, senders and products, finds or creates D1, d
 
 ### Email
 
-Email is optional. It needs a domain on Cloudflare DNS with Email Routing and a **Send to a Worker** rule for your receipt address; only the senders you allow are read. Follow [Set up email](https://receipts.nuits.net/docs/how-to/set-up-email/), and see [Forward a copy of incoming mail](https://receipts.nuits.net/docs/how-to/forward-a-copy-of-incoming-mail/) and [Keep sales invoices](https://receipts.nuits.net/docs/how-to/keep-sales-invoices/) for the optional extras.
+Email is optional. It needs a domain on Cloudflare DNS with Email Routing and a **Send to a Worker** rule for your receipt address; only the senders you allow are read, and mail from anyone else waits in Review until you approve or ignore the sender. Follow [Set up email](https://receipts.nuits.net/docs/how-to/set-up-email/), and see [Forward a copy of incoming mail](https://receipts.nuits.net/docs/how-to/forward-a-copy-of-incoming-mail/) and [Keep sales invoices](https://receipts.nuits.net/docs/how-to/keep-sales-invoices/) for the optional extras.
 
 ## Use it
 
@@ -118,10 +109,6 @@ bun run smoke         # with `bun run dev` running: auth, upload, import, matchi
 ```
 
 `scripts/sample-receipts/` holds synthetic receipts and a synthetic bank CSV; none of it is real financial data. `bun run samples` regenerates them. Releases follow Conventional Commits: [docs/RELEASING.md](docs/RELEASING.md), [CHANGELOG.md](CHANGELOG.md). Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [How it works](https://receipts.nuits.net/docs/explanation/how-it-works/).
-
-## Contributing and security
-
-Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Never paste real receipts, bank statements, account IDs or secrets into an issue or pull request. To report a security problem, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## License and trademarks
 

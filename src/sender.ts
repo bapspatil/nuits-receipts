@@ -99,3 +99,41 @@ export function senderVerdict(raw: Uint8Array, envelopeFrom: string): SenderVerd
   // say which domain signed, so it cannot prove the envelope address.
   return spfFailed || dmarcFailed ? 'fail' : 'unknown';
 }
+
+// The one address in the From header, lower case, or null when there is none
+// or more than one. Display names, comments and angle brackets are removed.
+export function headerFromAddress(raw: Uint8Array): string | null {
+  const values = headerFields(raw).filter(([f]) => f === 'from');
+  if (values.length !== 1) return null;
+  const value = stripComments(values[0]![1]).replace(/"(?:[^"\\]|\\.)*"/g, '');
+  const found = value.match(/[^\s<>()",;:@]+@[^\s<>()",;:@]+\.[^\s<>()",;:@]+/g) ?? [];
+  if (found.length !== 1 || value.includes(',')) return null;
+  const address = found[0]!.toLowerCase();
+  return address.length <= 254 ? address : null;
+}
+
+// The domain Cloudflare reports DMARC passed for (dmarc=pass header.from=...),
+// read from its own topmost Authentication-Results only; null otherwise.
+export function dmarcPassDomain(raw: Uint8Array): string | null {
+  const clauses = cloudflareResults(headerFields(raw), 'authentication-results');
+  if (!clauses) return null;
+  const dmarc = result(clauses, 'dmarc');
+  if (dmarc.some((d) => d.result !== 'pass')) return null;
+  const domains = new Set(dmarc.map((d) => d.props.get('header.from') ?? ''));
+  if (domains.size !== 1) return null;
+  const domain = [...domains][0]!;
+  return domain || null;
+}
+
+// Who sent this mail, as far as Cloudflare's checks prove it:
+// - the From header address when DMARC passed for its exact domain (this is
+//   what a person sees, and it stays the same for services whose envelope
+//   sender changes with every message), else
+// - the envelope sender when SPF passed for it (senderVerdict), else null.
+export function authenticatedSender(raw: Uint8Array, envelopeFrom: string): string | null {
+  const from = headerFromAddress(raw);
+  const dmarc = dmarcPassDomain(raw);
+  if (from && dmarc && from.slice(from.lastIndexOf('@') + 1) === dmarc) return from;
+  const envelope = envelopeFrom.trim().toLowerCase();
+  return senderVerdict(raw, envelope) === 'pass' ? envelope : null;
+}

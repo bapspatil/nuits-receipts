@@ -31,6 +31,9 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | Email size | 20 MiB. Larger mail is dropped. |
 | Attachments read per email | 10 supported attachments (PDF, PNG, JPEG, WebP). More are skipped and flagged `email_skipped_parts`. |
 | Allowed senders | 75 addresses of up to 254 characters. The longest list fits the 20,000-character limit on a stored setting. |
+| Unknown sender emails waiting | 50 in total and 10 from one sender. More are logged, not kept. |
+| Ignored senders | 500 addresses |
+| Mail log | The last 500 emails, plus every Unknown sender email still waiting. |
 | Forward copy | 1 address |
 | Seller names | 20 names of up to 100 characters |
 

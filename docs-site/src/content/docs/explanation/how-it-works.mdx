@@ -18,7 +18,7 @@ Optional pieces sit around this core: Email Routing to give you an inbox address
 
 ## What happens to a receipt
 
-1. **It arrives.** You upload a PDF or a photo, or Email Routing hands a message to the Worker. Email is checked first: only senders on your allowlist count, and their mail has to pass Cloudflare's SPF check before anything is read. See [Email and sender trust](/explanation/email-and-sender-trust/).
+1. **It arrives.** You upload a PDF or a photo, or Email Routing hands a message to the Worker. Email is checked first: only approved senders are read, and their mail has to pass Cloudflare's SPF or DMARC check. Mail from anyone else waits in Review as Unknown sender until you approve or ignore them. See [Email and sender trust](/explanation/email-and-sender-trust/).
 2. **The original is saved.** It goes into R2 untouched. Every later step works from this copy, which is why reading it again later gives you a fresh result from the same file.
 3. **It is read.** The text of the PDF (or the image itself) goes to Clairic, and the code then checks the answer against the document's own labelled lines and the VAT arithmetic. Anything unsettled is flagged for review. See [How reading works](/explanation/how-reading-works/).
 4. **It is sorted.** Your vendor rules give it a product and an expense type. If none match, Clef suggests one. See [How costs are sorted](/explanation/how-costs-are-sorted/).
