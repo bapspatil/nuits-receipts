@@ -454,14 +454,9 @@ function samePaymentFacts(receipt: Receipt, transaction: Transaction, tuning: Tu
     withinWindow(receipt.issue_date, transaction.booking_date, tuning)
   );
 }
-export function eligible(
-  receipt: Receipt,
-  transaction: Transaction,
-  rules: Rule[],
-  approximate = false,
-  tuning: Tuning = DEFAULT_TUNING,
-): boolean {
-  if (
+// Whether a receipt and a payment could be paired at all: both still open, money out, dated and priced.
+function pairable(receipt: Receipt, transaction: Transaction): boolean {
+  return !(
     receipt.kind === 'sales' ||
     !matchable(receipt) ||
     receipt.duplicate_of ||
@@ -471,8 +466,20 @@ export function eligible(
     transaction.amount_minor >= 0 ||
     receipt.total_minor === null ||
     !receipt.issue_date
-  )
-    return false;
+  );
+}
+// Same amount, currency and date window, whatever the names say. Worth showing, never matched alone.
+export function lookalike(receipt: Receipt, transaction: Transaction, tuning: Tuning = DEFAULT_TUNING): boolean {
+  return pairable(receipt, transaction) && samePaymentFacts(receipt, transaction, tuning);
+}
+export function eligible(
+  receipt: Receipt,
+  transaction: Transaction,
+  rules: Rule[],
+  approximate = false,
+  tuning: Tuning = DEFAULT_TUNING,
+): boolean {
+  if (!pairable(receipt, transaction)) return false;
   const exact = samePaymentFacts(receipt, transaction, tuning);
   const estimated =
     approximate &&
@@ -480,7 +487,7 @@ export function eligible(
     transaction.currency === 'EUR' &&
     receipt.fx_eur_minor !== null &&
     Math.abs(receipt.fx_eur_minor + transaction.amount_minor) <= Math.max(100, Math.abs(receipt.fx_eur_minor) * 0.03) &&
-    withinWindow(receipt.issue_date, transaction.booking_date, tuning);
+    withinWindow(receipt.issue_date!, transaction.booking_date, tuning);
   if (!exact && !estimated) return false;
   const alias = rules.some(
     (rule) =>

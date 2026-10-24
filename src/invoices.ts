@@ -4,6 +4,7 @@ import { DEFAULT_TUNING, money, type Receipt } from './domain';
 import { creditFit, eurValue, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
+import { STATUS } from './status';
 import { flagFor, reasonCodes } from './flags';
 import {
   amount,
@@ -22,7 +23,6 @@ import {
   receiptsSegment,
   shortDay,
   tag,
-  exceptionBox,
   matchError,
 } from './ui';
 
@@ -58,9 +58,9 @@ export function salesStatus(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays
 export function salesStamp(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays): string {
   switch (salesStatus(r, terms)) {
     case 'reading':
-      return tag('Reading');
+      return tag(STATUS.reading);
     case 'review':
-      return '<span class="stamp needs">Needs a look</span>';
+      return `<span class="stamp needs">${STATUS.needs}</span>`;
     case 'paid':
       return tag('Paid', true);
     case 'overdue':
@@ -140,9 +140,9 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     const paid = paidOn(r);
     switch (salesStatus(r, config(env).tuning.paymentTermsDays)) {
       case 'reading':
-        return tag('Reading');
+        return tag(STATUS.reading);
       case 'review':
-        return `<span class="stamp needs" title="${escape(firstFlag(r))}">Check</span>`;
+        return `<span class="stamp needs" title="${escape(firstFlag(r))}">${STATUS.needs}</span>`;
       case 'paid':
         return tag(`Paid ${escape(shortDay(paid!))}`, true);
       case 'overdue':
@@ -237,7 +237,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
             .slice(0, 5)
             .map(
               (t) =>
-                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
             )
             .join('')
         : due

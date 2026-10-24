@@ -39,25 +39,23 @@
     },
     {
       "journey": "b. Bank statement imported, every payment settled",
-      "clicks": 8,
-      "edits": 2,
+      "clicks": 6,
+      "edits": 1,
       "screens": [
         "/payments",
         "/import",
         "/imports/csv",
-        "/payments?month=2026-09&done=imported&inserted=6&skipped=0&replayed=0",
-        "/matches",
+        "/payments?month=2026-09&done=imported&inserted=6&skipped=0&replayed=0&auto=3",
         "/payments?month=2026-09&done=matched&tx=:id&rid=:id&name=DOMAINDESK*SAMPLE&kind=receipt",
         "/payments?month=2026-09&done=notPurchase&tx=:id&name=Sample+Missing+Vendor"
       ],
       "silentPosts": [],
       "deadEnds": [],
-      "inlineErrors": [
-        "/matches (422)"
-      ],
+      "inlineErrors": [],
       "notes": [
         "After import: 5 out, 3 matched, 2 missing",
-        "Matching without the exception box: \"Nothing was saved. This receipt and payment don't line up exactly. Tick the box to match them anyway. Go to it\"",
+        "Import banner: Added 6 payments. We matched 3 for you. See them",
+        "DOMAINDESK offers: Match anyway. This pair isn't exact: the names don't look alike. \"Match anyway\" says that is fine.",
         "Finally: 5 out, 4 matched, 0 missing"
       ]
     },
@@ -77,7 +75,7 @@
       "inlineErrors": [],
       "notes": [
         "After upload: /add says \"Add receipts or invoices 1 of 1 added. They are being read now. What are these? Receipts and bills Things the business paid for Invoices you sent Money clients \"",
-        "Money-in row: Sample Client Oy EUR 125.50 25 Sep Invoice More"
+        "Money-in row: Sample Client Oy EUR 125.50 25 Sep Matched automatically Invoice More"
       ]
     },
     {
@@ -197,7 +195,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/ec0f6bec509bf7c6f4c532c9f26ab591e759bd43d23489b3c3c15834ebfbc4e2",
+      "path": "/receipts/12214629f9034bfdfb0afd3018273a87838e72f421a74a5a14bd071f81e0f930",
       "viewport": "1440",
       "viewports": 1.06,
       "file": "screens/invoice-paid-1440.png",
@@ -205,7 +203,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/ec0f6bec509bf7c6f4c532c9f26ab591e759bd43d23489b3c3c15834ebfbc4e2",
+      "path": "/receipts/12214629f9034bfdfb0afd3018273a87838e72f421a74a5a14bd071f81e0f930",
       "viewport": "390",
       "viewports": 1.59,
       "file": "screens/invoice-paid-390.png",
@@ -215,7 +213,7 @@
       "name": "bank",
       "path": "/payments?month=2026-09&show=all",
       "viewport": "1440",
-      "viewports": 1.32,
+      "viewports": 1.39,
       "file": "screens/bank-1440.png",
       "axe": []
     },
@@ -223,7 +221,7 @@
       "name": "bank",
       "path": "/payments?month=2026-09&show=all",
       "viewport": "390",
-      "viewports": 1.36,
+      "viewports": 1.47,
       "file": "screens/bank-390.png",
       "axe": []
     },
@@ -289,6 +287,22 @@
       "viewport": "390",
       "viewports": 1,
       "file": "screens/settings-390.png",
+      "axe": []
+    },
+    {
+      "name": "bank-likely",
+      "path": "/payments?month=2026-09&show=missing",
+      "viewport": "1440",
+      "viewports": 2.77,
+      "file": "screens/bank-likely-1440.png",
+      "axe": []
+    },
+    {
+      "name": "bank-likely",
+      "path": "/payments?month=2026-09&show=missing",
+      "viewport": "390",
+      "viewports": 2.98,
+      "file": "screens/bank-likely-390.png",
       "axe": []
     }
   ]

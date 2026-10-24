@@ -26,7 +26,8 @@ import {
 } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
-import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
+import { clearBankReview, matchable, reconcile, type Transaction } from './banking';
+import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unmatchLikely } from './match';
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
@@ -463,9 +464,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         : null;
       if (was) {
         const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
-        exception = !(transaction.amount_minor > 0
-          ? creditFit(was, transaction, config(env).tuning) !== null
-          : eligible(was, transaction, rules, false, config(env).tuning));
+        exception = !fits(was, transaction, rules, config(env).tuning);
       }
       await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
         .bind(id)
@@ -480,7 +479,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
           transaction.receipt_required,
         'Payment cannot be linked',
       );
-      const row = await getReceipt(env, String(form.get('receipt_id_manual') || form.get('receipt_id')));
+      // An id from a button, or the label the person picked or typed in the search box.
+      const raw = String(form.get('receipt_id') ?? '').trim();
+      const row = await getReceipt(
+        env,
+        /^[a-f0-9]{64}$/.test(raw)
+          ? raw
+          : resolvePick(raw, await candidatesFor(env, transaction), transaction.booking_date.slice(0, 4)),
+      );
       requireInput(
         !row.duplicate_of && !row.discarded_at && matchable(row),
         'Approve receipt before matching',
@@ -497,20 +503,13 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       );
       const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
       requireInput(
-        (credit
-          ? creditFit(row, transaction, config(env).tuning) !== null
-          : eligible(row, transaction, rules, false, config(env).tuning)) || form.get('confirm_exception') === 'yes',
+        fits(row, transaction, rules, config(env).tuning) || form.get('confirm_exception') === 'yes',
         'Confirm match exceptions',
         422,
         'confirm_exception',
       );
       try {
-        const result = await env.DB.prepare(
-          `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')))`,
-        )
-          .bind(row.id, new Date().toISOString(), id, row.id, row.kind, row.revision)
-          .run();
-        requireInput(result.meta.changes === 1, 'Match changed. Reload.', 409);
+        requireInput(await linkMatch(env, transaction, row, new Date().toISOString()), 'Match changed. Reload.', 409);
         matchedTo = row.id;
       } catch (error) {
         if (error instanceof Error && error.message.includes('UNIQUE constraint'))
@@ -536,6 +535,38 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         },
       ),
     );
+  }
+  // Match all likely: each pair is checked again here and skipped if it changed or is no longer an exact fit.
+  if (request.method === 'POST' && path === '/matches/bulk') {
+    const form = await formData(request, 32768);
+    const payments = form.getAll('transaction_id').map(String),
+      receipts = form.getAll('receipt_id').map(String);
+    requireInput(payments.length > 0 && payments.length === receipts.length, 'Nothing to match');
+    const selected = month(String(form.get('month') ?? '') || null),
+      at = new Date().toISOString();
+    const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
+    const { matched, skipped } = await matchLikely(
+      env,
+      payments.map((id, i) => [id, receipts[i]!] as const),
+      rules,
+      config(env).tuning,
+      at,
+    );
+    await clearBankReview(env);
+    return redirect(
+      withDone('matchedMany', `/payments?month=${selected}`, {
+        n: matched,
+        skipped,
+        at: matched ? at : null,
+      }),
+    );
+  }
+  if (request.method === 'POST' && path === '/matches/undo') {
+    const form = await formData(request, 4096),
+      at = String(form.get('at') ?? '');
+    requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Nothing to match');
+    const selected = month(String(form.get('month') ?? '') || null);
+    return redirect(withDone('unmatchedMany', `/payments?month=${selected}`, { n: await unmatchLikely(env, at) }));
   }
   if (request.method === 'POST' && path === '/rules') {
     const form = await formData(request, 4096);

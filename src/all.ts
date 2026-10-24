@@ -2,6 +2,7 @@
 // newest first, and the Unknown senders block that Review shows.
 import type { Env } from './env';
 import { config } from './config';
+import { STATUS } from './status';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
 import { restoreForm } from './discard';
 import { invoiceName } from './invoices';
@@ -24,9 +25,9 @@ import {
 
 export const PAGE_SIZE = 50;
 export const SHOW = {
-  ready: 'Ready',
-  needs: 'Needs you',
-  reading: 'Being read',
+  ready: STATUS.ready,
+  needs: STATUS.needs,
+  reading: STATUS.reading,
   duplicate: 'Duplicate',
   discarded: 'Discarded',
   sales: 'Sales invoices',
@@ -111,9 +112,9 @@ export function chipOf(row: AllRow): { label: string; css: string } {
   if (row.discarded_at)
     return { label: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : 'Discarded', css: 'muted' };
   if (row.duplicate_of) return { label: 'Duplicate', css: 'muted' };
-  if (row.status === 'pending' || row.status === 'processing') return { label: 'Being read', css: 'muted' };
-  if (row.status === 'needs_review') return { label: 'Needs you', css: 'needs' };
-  return { label: 'Ready', css: 'ready' };
+  if (row.status === 'pending' || row.status === 'processing') return { label: STATUS.reading, css: 'muted' };
+  if (row.status === 'needs_review') return { label: STATUS.needs, css: 'needs' };
+  return { label: STATUS.ready, css: 'ready' };
 }
 function rowName(row: AllRow): string {
   if (row.type === 'mail') return row.sender ?? 'Unknown sender';

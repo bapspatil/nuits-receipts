@@ -1,7 +1,7 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
 import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule, type Tuning } from './domain';
-import { creditFit, eligible, eurValue, openSales, type EurValue, type Transaction } from './banking';
+import { creditFit, eligible, eurValue, lookalike, openSales, type EurValue, type Transaction } from './banking';
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
@@ -16,7 +16,7 @@ import { feedback } from './events';
 import { DISCARD_REASONS } from './domain';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
-import { invoiceName, overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
+import { overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
 import { TREATMENT_LABELS } from './sales';
 import { VAT_TREATMENTS } from './domain';
 import { connection, progress, redirectUri, type Connection } from './onedrive';
@@ -58,11 +58,23 @@ import {
   uploadForm,
   ariaFor,
   chosenReceipt,
+  errorId,
   errorLine,
-  exceptionBox,
   matchError,
 } from './ui';
 import { failureFor, kept } from './request';
+import { STATUS, matchStatus } from './status';
+import {
+  matchableReceipts,
+  matchAllLabel,
+  pairFacts,
+  pickLabels,
+  pickMatches,
+  receiptName,
+  whyLikely,
+  type Cell,
+  type PairFacts,
+} from './match';
 
 type Payment = Transaction & { account_name: string; bank_name: string };
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
@@ -99,24 +111,17 @@ function reasonWord(r: Receipt): string {
   const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
   return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
 }
-function receiptName(r: Receipt): string {
-  return r.kind === 'sales' ? invoiceName(r) : (r.vendor ?? r.filename);
-}
-// Receipts that can be matched to a bank row, the same set the /matches handler accepts.
-async function matchableReceipts(env: Env): Promise<Receipt[]> {
-  return (
-    await env.DB.prepare(
-      `SELECT * FROM receipts WHERE kind='expense' AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete') ORDER BY issue_date DESC,id`,
-    ).all<Receipt>()
-  ).results;
-}
+// Receipts that look like this payment: a fit by name, amount and date first, then ones with
+// the same amount and date under another name (the person decides those).
 function suggestionsFor(t: Transaction, receipts: Receipt[], rules: Rule[], tuning: Tuning): Receipt[] {
+  const near = (r: Receipt) => Math.abs(Date.parse(r.issue_date ?? '') - Date.parse(t.booking_date));
+  const rank = (r: Receipt) => (eligible(r, t, rules, true, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
   return receipts
-    .filter((r) => eligible(r, t, rules, true, tuning))
+    .filter((r) => rank(r) < 2)
     .sort(
       (a, b) =>
-        Math.abs(Date.parse(a.issue_date ?? '') - Date.parse(t.booking_date)) -
-          Math.abs(Date.parse(b.issue_date ?? '') - Date.parse(t.booking_date)) ||
+        rank(a) - rank(b) ||
+        near(a) - near(b) ||
         (a.issue_date ?? '').localeCompare(b.issue_date ?? '') ||
         a.id.localeCompare(b.id),
     );
@@ -605,7 +610,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const due = rows('due_date');
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
-  const heading = reading ? 'Reading' : needs ? `${cards.length} to check` : '';
+  const heading = reading ? STATUS.reading : needs ? `${cards.length} to check` : '';
   const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
     {
       id: 'f-approval_reason',
@@ -614,17 +619,18 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     },
   )}</div></details>`;
   const ready = r.status === 'ready';
-  const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
+  const linkedRow = await env.DB.prepare('SELECT match_method FROM bank_transactions WHERE receipt_id=? LIMIT 1')
     .bind(r.id)
-    .first());
+    .first<{ match_method: 'automatic' | 'manual' | null }>();
+  const linked = !!linkedRow;
   const status = gone
     ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
     : sales
       ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
-      : stamp(r, !!eur.transaction);
+      : stamp(r, linkedRow ? (linkedRow.match_method ?? 'manual') : null);
   // A ready receipt opens as its summary; Edit opens every field.
   const summary = ready
-    ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>${sales ? 'Payment' : 'Matched'}</dt><dd>${sales ? status : eur.transaction ? 'Matched to a payment' : 'Not matched yet'}</dd></div></dl>`
+    ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>Payment</dt><dd>${sales ? status : linkedRow ? matchStatus(linkedRow.match_method) : 'Not matched yet'}</dd></div></dl>`
     : '';
   const fold = ready ? 'Edit' : needs ? 'Other fields' : 'All fields';
   const verb = needs || reading ? 'approve' : 'save';
@@ -637,10 +643,11 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
     : suggestions.length
       ? `<section aria-labelledby="match-h" class="matchs"><h2 id="match-h">Payment?</h2>${suggestions
-          .map(
-            (t) =>
-              `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
-          )
+          .map((t) => {
+            // Only a pair that isn't an exact fit asks for the exception, and says why.
+            const facts = pairFacts(r, t, rules, config(env).tuning);
+            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>${matchError(t.id)}`;
+          })
           .join('')}</section>`
       : '';
   const move =
@@ -742,13 +749,85 @@ export async function payments(
   const missing = rows.filter(isMissing);
   const matched = out.filter((t) => t.receipt_id);
   // Missing first: it is the only thing Bank asks of you.
+  const automatic = rows.filter((t) => t.receipt_id && t.match_method === 'automatic');
   const show =
-    params.get('show') === 'all' || (params.get('show') !== 'missing' && !missing.length) ? 'all' : 'missing';
+    params.get('show') === 'auto' && automatic.length
+      ? 'auto'
+      : params.get('show') === 'all' || (params.get('show') !== 'missing' && !missing.length)
+        ? 'all'
+        : 'missing';
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
-  const shown = show === 'missing' ? missing : rows;
+  const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
+  const tuning = config(env).tuning;
+  const year = selected.slice(0, 4);
+  const ID = /^[a-f0-9]{64}$/;
+  // The receipt the person typed or picked before a refusal, when it names exactly one.
+  const chosenOf = (t: Payment, pool: Receipt[]): Receipt | undefined => {
+    const found = pickMatches(chosenReceipt(t.id), pool, year);
+    return found.length === 1 ? found[0] : undefined;
+  };
+  // One likely receipt for each missing payment, no receipt twice. Only exact fits go in Match all.
+  const taken = new Set<string>();
+  const likelyOf = new Map<string, Receipt>();
+  const bulk: { t: Payment; r: Receipt; facts: PairFacts }[] = [];
+  for (const t of missing) {
+    const list = suggestionsFor(t, receipts, rules, tuning);
+    const r = list.find((x) => !taken.has(x.id)) ?? list[0];
+    if (!r) continue;
+    likelyOf.set(t.id, r);
+    if (taken.has(r.id)) continue;
+    taken.add(r.id);
+    const facts = pairFacts(r, t, rules, tuning);
+    if (facts.exact) bulk.push({ t, r, facts });
+  }
+  // Receipts that would fit a payment but still need review: the person is sent there first.
+  const waiting = missing.some((t) => !likelyOf.has(t.id))
+    ? (
+        await env.DB.prepare(
+          `SELECT * FROM receipts WHERE kind='expense' AND status='needs_review' AND review_reasons_json<>'["missing_eur"]' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY issue_date DESC,id LIMIT 200`,
+        ).all<Receipt>()
+      ).results
+    : [];
+  const dayIn = (value: string | null, other: string) =>
+    value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
+  // Name, Date and Amount side by side, each marked in words, with the one button under it.
+  const likelyForm = (t: Payment, r: Receipt, noun: string, primary: boolean) => {
+    const facts = pairFacts(r, t, rules, tuning);
+    const scope = `match:${t.id}`;
+    const line = (label: string, bank: string, other: string, cell: Cell) =>
+      `<tr><th scope="row">${label}</th><td data-l="Bank">${bank}</td><td data-l="${noun}">${other}</td><td class="${cell.same ? 'same' : 'diff'}">${escape(cell.text)}</td></tr>`;
+    const why = facts.exact ? '' : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`;
+    const described = [
+      facts.exact ? '' : `e-why-${t.id}`,
+      failureFor(scope)?.field === 'confirm_exception' ? errorId(scope) : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn ${primary ? 'primary' : 'secondary'}" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>`;
+  };
+  // The search box: type a seller, a date or an amount, or pick from the list.
+  const picker = (t: Payment, listId: string, noun: string) => {
+    const typed = chosenReceipt(t.id);
+    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Type a seller, a date or an amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
+  };
+  // A likely pair first, the search box behind it; no pair, the search box alone.
+  const matchControls = (
+    t: Payment,
+    pool: Receipt[],
+    listId: string,
+    noun: string,
+    likely: Receipt | undefined,
+    primary: boolean,
+  ) => {
+    const lower = noun.toLowerCase();
+    const pair = chosenOf(t, pool) ?? likely;
+    return pair
+      ? `${likelyForm(t, pair, noun, primary)}<details${failureFor(`match:${t.id}`)?.field === 'receipt_id' ? ' open' : ''}><summary>Pick another ${lower}</summary><div class="body">${picker(t, listId, noun)}</div></details>`
+      : `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'ready receipt'} looks like this one.</p>${picker(t, listId, noun)}`;
+  };
   const items = shown
     .map((t) => {
       const pair = paired.get(t.id);
@@ -765,34 +844,35 @@ export async function payments(
           `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
         );
       } else if (t.receipt_id) {
-        status = `<a class="tag ok" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>`;
+        status = `${tag(matchStatus(t.match_method), true)} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>`;
         extra.push(
           `<form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
         );
       } else if (t.amount_minor >= 0) {
         status = tag('Money in');
-        const likely = invoices.filter((r) => creditFit(r, t, config(env).tuning) !== null);
-        const others = invoices.filter((r) => !likely.includes(r));
+        const likely = invoices.find((r) => creditFit(r, t, tuning) !== null);
         if (invoices.length && t.amount_minor > 0 && t.receipt_required)
-          controls = `<details${likely.length || failureFor(`match:${t.id}`) ? ' open' : ''}><summary>Find invoice</summary><div class="body"><form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Invoice"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose an invoice</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other open invoices">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}</div></details>`;
+          controls = `${matchControls(t, invoices, 'pick-invoices', 'Invoice', likely, false)}${matchError(t.id)}`;
       } else if (!t.receipt_required) {
-        status = tag('No receipt');
+        status = tag(STATUS.notPurchase);
         extra.push(
           `<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
         );
       } else {
-        status = '<span class="stamp missing">Missing</span>';
+        status = `<span class="stamp missing">${STATUS.missing}</span>`;
         const first = t.id === firstMissing;
-        const likely = suggestionsFor(t, receipts, rules, config(env).tuning);
-        const others = receipts.filter((r) => !likely.includes(r));
-        const find = receipts.length
-          ? `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><select name="receipt_id" aria-label="Receipt"${ariaFor(`match:${t.id}`, 'receipt_id')}><option value="">Choose a receipt</option>${likely.length ? `<optgroup label="Likely">${likely.map((r, i) => receiptOption(r, chosenReceipt(t.id) ? r.id === chosenReceipt(t.id) : i === 0)).join('')}</optgroup>` : ''}${others.length ? `<optgroup label="Other ready receipts">${others.map((r) => receiptOption(r, r.id === chosenReceipt(t.id))).join('')}</optgroup>` : ''}</select>${exceptionBox(t.id)}<button class="btn ${first ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`
-          : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
-        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">Not a purchase</button></form></div>${matchError(t.id)}`;
-        if (receipts.length)
-          extra.push(
-            `<form action="/matches" method="post" class="inline-edit"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="confirm_exception" value="yes"><input name="receipt_id_manual" autocomplete="off" aria-label="Receipt ID" placeholder="Receipt ID"><button class="btn secondary" name="action" value="link">Match</button></form>`,
-          );
+        const likely = likelyOf.get(t.id);
+        // Its receipt exists but needs review first: send the person there, offer no Match.
+        const wait = likely
+          ? undefined
+          : waiting.find((w) => eligible({ ...w, status: 'ready' }, t, rules, true, tuning));
+        const find = wait
+          ? `<p class="none">Its receipt needs you first. <a href="/receipts/${wait.id}">Check it.</a></p>`
+          : receipts.length
+            ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
+            : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
+        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${matchError(t.id)}`;
+        if (receipts.length && !wait) extra.push('<p><a href="/add">Add a receipt</a></p>');
         const sides = credits.filter(
           (c) => c.account_key !== t.account_key && c.currency === t.currency && c.amount_minor === -t.amount_minor,
         );
@@ -804,6 +884,20 @@ export async function payments(
       return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span>${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''} ${status}</span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
     })
     .join('');
+  const datalistOptions = (pool: Receipt[]) =>
+    [...pickLabels(pool, year).values()].map((label) => `<option value="${escape(label)}"></option>`).join('');
+  const lists = `${items.includes('list="pick-receipts"') ? `<datalist id="pick-receipts">${datalistOptions(receipts)}</datalist>` : ''}${items.includes('list="pick-invoices"') ? `<datalist id="pick-invoices">${datalistOptions(invoices)}</datalist>` : ''}`;
+  // What Match all will accept, pair by pair with its reason, before it is pressed.
+  const matchAll = bulk.length
+    ? `<form action="/matches/bulk" method="post" class="matchall"><input type="hidden" name="month" value="${selected}"><details open><summary>Will match ${plural(bulk.length, 'payment')}</summary><ul>${bulk
+        .map(
+          ({ t, r, facts }) =>
+            `<li>${escape(t.merchant)}, ${day(t.booking_date, false)}, ${amount(t.amount_minor, t.currency)} to ${escape(receiptName(r))}<span>${escape(whyLikely(facts))}</span></li>`,
+        )
+        .join(
+          '',
+        )}</ul></details>${bulk.map(({ t, r }) => `<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">`).join('')}<button class="btn secondary">${matchAllLabel(bulk.length)}</button></form>`
+    : '';
   const others = elsewhere.length
     ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="/payments?month=${e.m}&show=missing">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
@@ -811,9 +905,15 @@ export async function payments(
     { href: `/payments?month=${selected}&show=all`, label: 'All', count: rows.length, current: show === 'all' },
     {
       href: `/payments?month=${selected}&show=missing`,
-      label: 'Missing',
+      label: STATUS.missing,
       count: missing.length,
       current: show === 'missing',
+    },
+    {
+      href: `/payments?month=${selected}&show=auto`,
+      label: STATUS.matchedAuto,
+      count: automatic.length,
+      current: show === 'auto',
     },
   ]);
   const body = rows.length
@@ -824,7 +924,7 @@ export async function payments(
               'Every payment has a receipt.',
               `<a class="btn primary" href="/?month=${selected}">Close ${escape(monthName(selected, false))}</a>`,
             )
-      }${shown.length ? `<ol class="pays">${items}</ol>` : ''}${
+      }${matchAll}${shown.length ? `<ol class="pays">${items}</ol>${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
           : ''
@@ -1022,7 +1122,7 @@ async function sendStep(
   if (s.sent) {
     const next = shiftMonth(selected, 1);
     return {
-      status: `Sent ${escape(sentOn)}`,
+      status: `${STATUS.sent} ${escape(sentOn)}`,
       body: `<div class="card">${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
     };
   }
@@ -1032,7 +1132,7 @@ async function sendStep(
       upload && upload.pending.length
         ? `${uploadForm(chosen, upload.plan.files.length - upload.pending.length ? 'Continue upload' : `Upload to ${folder}`, kind)}${zip(chosen, download)}`
         : zip(chosen, download, kind);
-    return { status: 'Ready', body: panel(`${buttons}${markSent}`, destination) };
+    return { status: STATUS.ready, body: panel(`${buttons}${markSent}`, destination) };
   }
   // Not ready: download anyway, behind one fold.
   const undated = plan.undated

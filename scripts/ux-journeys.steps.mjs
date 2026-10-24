@@ -98,20 +98,13 @@ export const journeys = [
       await rec.click(button(page, 'Check the file'));
       await rec.click(page.getByRole('button', { name: /^Import \d+ payments$/ }));
       rec.note(`After import: ${(await page.locator('main p.summary').first().innerText()).trim()}`);
+      rec.note(`Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`);
       const row = (merchant) => page.locator('li.pay', { hasText: merchant });
-      if (await row('DOMAINDESK').locator('select').count()) {
-        await rec.select(row('DOMAINDESK').locator('select'), {
-          label: 'Sample Domain Desk · 12 Sep 2026 · EUR 12.00',
-        });
-        await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
-        // The refusal comes back on the Bank page, on that row, with the choice kept.
-        if (rec.inlineErrors.length) {
-          rec.note(
-            `Matching without the exception box: "${(await page.locator('main [role=alert]').innerText()).trim()}"`,
-          );
-          await rec.click(row('DOMAINDESK').locator('input[type=checkbox][name=confirm_exception]'));
-          await rec.click(row('DOMAINDESK').getByRole('button', { name: 'Match' }));
-        }
+      // A likely pair is one button: "Match", or "Match anyway" when the names differ.
+      const likely = row('DOMAINDESK').getByRole('button', { name: /^Match( anyway)?$/ });
+      if (await likely.count()) {
+        rec.note(`DOMAINDESK offers: ${(await likely.innerText()).trim()}. ${(await row('DOMAINDESK').locator('.likely__why').innerText()).trim()}`);
+        await rec.click(likely);
       }
       if (await row('Sample Missing Vendor').getByRole('button', { name: 'Not a purchase' }).count())
         await rec.click(row('Sample Missing Vendor').getByRole('button', { name: 'Not a purchase' }));
@@ -206,6 +199,23 @@ async function keyboardCheck(page, base) {
   console.log('keyboard: Review to first receipt, fill a field, Enter approves');
 }
 
+// Put three payments back to "Missing" so Bank shows likely pairs, a Match all and a payment nothing fits.
+async function unsettleBank(page, base) {
+  const bank = () => page.goto(base + '/payments?month=2026-09&show=all');
+  const open = async (merchant, button) => {
+    const row = page.locator('li.pay', { hasText: merchant });
+    await row.locator('summary', { hasText: 'More' }).click();
+    await row.getByRole('button', { name: button }).click();
+    await page.waitForLoadState('load');
+    await bank();
+  };
+  await bank();
+  // First, so its reconcile cannot match the others again.
+  await open('Sample Missing Vendor', 'Needs a receipt');
+  for (const merchant of ['Sample Cloud Lantern Oy', 'DOMAINDESK', 'Sample Train Line'])
+    await open(merchant, 'Remove match');
+}
+
 export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   await sendEmail(
     'tour-flagged',
@@ -238,5 +248,7 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'add', path: '/add' },
     { name: 'invoices', path: '/invoices?month=2026-09' },
     { name: 'settings', path: '/settings' },
+    // Last: it undoes the matches, so the screens above keep the settled month.
+    { name: 'bank-likely', path: '/payments?month=2026-09&show=missing', prepare: () => unsettleBank(page, base) },
   ];
 }
