@@ -13,6 +13,7 @@ import { mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import { feedback } from './events';
+import { arrivalMonth, type Arrival } from './arrival';
 import { DISCARD_REASONS } from './domain';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
@@ -54,6 +55,7 @@ import {
   shiftMonth,
   signOutLink,
   stamp,
+  stepWord,
   tag,
   uploadForm,
   ariaFor,
@@ -918,12 +920,7 @@ export async function payments(
   ]);
   const body = rows.length
     ? `<p class="summary"><span>${out.length} out, ${matched.length} matched, <span${missing.length ? ' class="red"' : ''}>${missing.length} missing</span></span></p>${filter}${
-        missing.length
-          ? ''
-          : emptyState(
-              'Every payment has a receipt.',
-              `<a class="btn primary" href="/?month=${selected}">Close ${escape(monthName(selected, false))}</a>`,
-            )
+        missing.length ? '' : await settled(env, selected)
       }${matchAll}${shown.length ? `<ol class="pays">${items}</ol>${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
@@ -939,9 +936,44 @@ export async function payments(
   });
 }
 
+// Bank when every payment has a receipt: say so, and offer the month's next step as the one
+// primary. Once the month is sent there is none, and a quiet link back to it.
+async function settled(env: Env, selected: string): Promise<string> {
+  const s = await monthState(env, selected);
+  const short = escape(monthName(selected, false));
+  const step = nextStep(s, selected);
+  const action = s.sent
+    ? `<p>${tag(`${short} is ${STATUS.sent.toLowerCase()}`, true)} <a href="/?month=${selected}#send">Open ${short}</a></p>`
+    : step
+      ? `<a class="btn primary" href="${step.href}">${step.label}</a>`
+      : s.docs
+        ? `<a class="btn primary" href="/?month=${selected}#send">Send ${short}</a>`
+        : '';
+  return emptyState('Every payment has a receipt.', action);
+}
+
 // ---------- Home: close the month ----------
+// What a month still lacks, in one phrase: "3 receipts need you".
+function lacks(s: MonthState): string {
+  if (s.flagged.length)
+    return `${plural(s.flagged.length, 'receipt')} ${s.flagged.length === 1 ? 'needs' : 'need'} you.`;
+  if (s.missing.length)
+    return `${plural(s.missing.length, 'payment')} ${s.missing.length === 1 ? 'needs' : 'need'} a receipt.`;
+  if (!s.imported) return 'It needs its bank statement.';
+  return 'It is ready to send.';
+}
+// The next step of a month and its place, shared by Home and Bank so both offer the same one primary action.
+// Null when nothing is left to do (the month is sent) or nothing can be sent yet.
+function nextStep(s: MonthState, selected: string): { label: string; href: string } | null {
+  if (s.docs === 0) return { label: 'Add receipts', href: '/add' };
+  if (!s.done.review) return { label: 'Check receipts', href: '/review' };
+  if (!s.imported) return { label: 'Import statement', href: '/import' };
+  if (!s.done.match) return { label: 'Find receipts', href: `/payments?month=${selected}&show=missing` };
+  return null;
+}
+
 // One status row per step (Check, Match, Send), and one panel for the current step.
-export async function home(env: Env, selected: string, params = new URLSearchParams()): Promise<Response> {
+export async function home(env: Env, requested: string | null, params = new URLSearchParams()): Promise<Response> {
   const settings = config(env);
   const ever = await env.DB.prepare(
     "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
@@ -954,12 +986,15 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
     ];
     return page(
       'home',
-      `<ol class="steps" aria-label="Set up">${setup.map(([href, label, done]) => `<li class="step${done ? ' done' : ''}"><a href="/settings${href}"><b>${label}</b><span>${done ? 'Done' : 'Set up'}</span></a></li>`).join('')}</ol><div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
+      `<ol class="steps" aria-label="Set up">${setup.map(([href, label, done]) => `<li class="step ${done ? 'done' : 'todo'}"><a href="/settings${href}">${stepWord(done ? 'done' : 'todo')}<b>${label}</b><span>${done ? 'Done' : 'Set up'}</span></a></li>`).join('')}</ol><div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
       200,
       env,
       { head: pageHead('Welcome') },
     );
   }
+  // No month in the address: open on the oldest one that is not sent.
+  const arrival: Arrival | null = requested ? null : await arrivalMonth(env);
+  const selected = requested ?? arrival!.month;
   const s: MonthState = await monthState(env, selected);
   const [queue, overdue] = await Promise.all([reviewQueue(env), overdueInvoices(env)]);
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
@@ -977,41 +1012,38 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
   const current = empty ? 1 : !s.done.review ? 1 : !s.done.match ? 2 : s.sent ? 4 : 3;
   const row = (n: number, label: string, status: string, href = '', red = false) => {
     const state = n === current ? 'now' : n < current ? 'done' : 'todo';
-    const inner = `<b>${label}</b><span${red ? ' class="red"' : ''}>${status}</span>`;
-    return `<li class="step ${state}"${n === 3 ? ' id="send"' : ''}${n === current ? ' aria-current="step"' : ''}>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+    const inner = `${stepWord(state)}<b>${label}</b><span${red ? ' class="red"' : ''}>${status}</span>`;
+    return `<li class="step ${state}"${n === current ? ' aria-current="step"' : ''}>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
   };
   const check = empty
-    ? row(1, 'Check', 'Nothing yet')
+    ? row(1, 'Check', 'Nothing yet', '/add')
     : s.flagged.length
       ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
       : undated
         ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'Done');
+        : row(1, 'Check', 'Done', `/receipts?month=${selected}`);
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
       ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
-      : row(2, 'Match', 'Done');
+      : row(2, 'Match', 'Done', `/payments?month=${selected}`);
   const send = await sendStep(env, s, selected, current, params);
-  const next =
-    current === 1
-      ? empty
-        ? `<a class="btn primary" href="/add">Add receipts</a>`
-        : `<a class="btn primary" href="/review">Check receipts</a>`
-      : current === 2
-        ? !s.imported
-          ? '<a class="btn primary" href="/import">Import statement</a>'
-          : `<a class="btn primary" href="/payments?month=${selected}&show=missing">Find receipts</a>`
-        : '';
+  const step = nextStep(s, selected);
+  const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';
   const dated = [
     s.rows.length ? plural(s.rows.length, 'receipt') : '',
     s.sales.length ? plural(s.sales.length, 'invoice') : '',
   ]
     .filter(Boolean)
     .join(', ');
+  // Why Home opened here, when it is not the current month.
+  const why =
+    arrival && arrival.month !== arrival.current
+      ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
+      : '';
   return page(
     'home',
-    `${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status)}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
+    `${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
     200,
     env,
     { detail: monthName(selected), head: monthHead('/', selected) },
@@ -1065,7 +1097,10 @@ async function sendStep(
     `<a class="btn ${cls}" href="/month/package.zip?${query(selected, o)}">${text}</a>`;
   const uploadForm = (o: Partial<PackageOptions>, text: string, cls = 'secondary') =>
     `<form action="/month/onedrive-upload" method="post">${optionFields(selected, o)}<button class="btn ${cls}">${text}</button></form>`;
-  const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}<button class="btn secondary">Mark as sent</button></form>`;
+  const short = escape(monthName(selected, false));
+  const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}<button class="btn secondary">Mark ${short} as sent</button></form>`;
+  // A download can't redirect, so the question sits next to the button for as long as the month is ready to send.
+  const didSend = `<div class="sentq"><h3>Did you send it?</h3>${markSent}</div>`;
   const line = `<p class="small">${escape(EXPORT_LINE)}</p>`;
   const destination = drive
     ? `<p class="small">OneDrive: <a href="${escape(drive.folder_web_url ?? '')}">${folder}</a> · <a href="/settings#onedrive">Change</a></p>`
@@ -1097,7 +1132,7 @@ async function sendStep(
   const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
-    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${manifest}${parts}</div>`;
+    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${parts}</div>`;
 
   if (changed) {
     const what = [
@@ -1114,7 +1149,7 @@ async function sendStep(
     return {
       status: 'Changed',
       body: panel(
-        `${buttons}${markSent}`,
+        buttons,
         `<p class="alert" role="note">Changed since you sent it on ${escape(sentOn)}${what.length ? `: ${joinAnd(what)}` : ''}.</p>`,
       ),
     };
@@ -1132,7 +1167,7 @@ async function sendStep(
       upload && upload.pending.length
         ? `${uploadForm(chosen, upload.plan.files.length - upload.pending.length ? 'Continue upload' : `Upload to ${folder}`, kind)}${zip(chosen, download)}`
         : zip(chosen, download, kind);
-    return { status: STATUS.ready, body: panel(`${buttons}${markSent}`, destination) };
+    return { status: STATUS.ready, body: panel(buttons, destination) };
   }
   // Not ready: download anyway, behind one fold.
   const undated = plan.undated
@@ -1143,7 +1178,7 @@ async function sendStep(
   }`;
   return {
     status: 'Not ready',
-    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${markSent}${line}${manifest}${parts}</div></details>`,
+    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${line}${didSend}${manifest}${parts}</div></details>`,
   };
 }
 

@@ -265,40 +265,43 @@ test('empty Settings sections say what to add', async () => {
   expect(settings).toContain('No rules yet.');
 });
 
-// INVOICES_ADDRESS is set in wrangler.local.jsonc, so the Invoices you sent view shows.
-test('Receipts offers Invoices you sent only once invoices are in use', async () => {
-  const segment = (html: string) => html.match(/<nav class="seg" aria-label="Receipts">([\s\S]*?)<\/nav>/)?.[1];
+test('Receipts and Invoices are two tabs with counts, always shown', async () => {
+  const segment = (html: string) =>
+    html.match(/<nav class="seg" aria-label="Receipts and invoices">([\s\S]*?)<\/nav>/)?.[1];
   const shown = await (await request('/receipts')).text();
   expect(segment(shown)).toBe(
-    '<ul><li><a href="/receipts" aria-current="page">Receipts</a></li><li><a href="/invoices">Invoices</a></li></ul>',
+    '<ul><li><a href="/receipts" aria-current="page">Receipts <span class="num">0</span></a></li><li><a href="/invoices">Invoices <span class="num">0</span></a></li></ul>',
   );
   const invoices = await (await request('/invoices')).text();
-  expect(segment(invoices)).toMatch(/<a href="\/invoices\?month=\d{4}-\d{2}" aria-current="page">Invoices<\/a>/);
-  // The month carries across the segment.
-  expect(segment(await (await request('/receipts?month=2026-09')).text())).toContain(
-    '<a href="/invoices?month=2026-09">Invoices</a>',
+  expect(segment(invoices)).toMatch(
+    /<a href="\/invoices\?month=\d{4}-\d{2}" aria-current="page">Invoices <span class="num">0<\/span><\/a>/,
   );
+  // The month carries across the tabs.
+  expect(segment(await (await request('/receipts?month=2026-09')).text())).toContain(
+    '<a href="/invoices?month=2026-09">Invoices <span class="num">0</span></a>',
+  );
+  // Without an invoice address the tabs are still there.
   const plain = { ...env, INVOICES_ADDRESS: '' } as Env;
   const at = async (path: string) =>
     (
       await worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), plain)
     ).text();
-  const hidden = await at('/receipts');
-  expect(segment(hidden)).toBeUndefined();
-  expect(hidden).not.toContain('href="/invoices"');
-  // The address keeps working, with the way back to Receipts.
-  expect(segment(await at('/invoices'))).toMatch(/<a href="\/receipts\?month=\d{4}-\d{2}">Receipts<\/a>/);
+  expect(segment(await at('/receipts'))).toContain('<a href="/invoices">Invoices <span class="num">0</span></a>');
+  expect(segment(await at('/invoices'))).toMatch(
+    /<a href="\/receipts\?month=\d{4}-\d{2}">Receipts <span class="num">0<\/span><\/a>/,
+  );
 });
 
 test('Receipts leaves Needs you and Unknown sender to Review, and offers Add', async () => {
   const empty = await (await request('/receipts')).text();
   expect(empty).not.toContain('in Review ›');
-  // Empty: Add receipts is the one primary, not also a head button.
-  expect(empty).toContain('<a class="btn primary" href="/add">Add receipts</a>');
-  expect(empty).not.toContain('<a class="btn secondary" href="/add">');
+  // Empty: Add receipt is the one primary, not also a head button.
+  expect(empty).toContain('<a class="btn primary" href="/add">Add receipt</a>');
+  expect(empty.match(/>Add receipt</g)).toHaveLength(1);
   const { ready } = await seed();
   const html = await (await request('/receipts')).text();
-  expect(html).toContain('<a class="btn secondary" href="/add">Add receipts</a>');
+  expect(html).toContain('<a class="btn primary" href="/add">Add receipt</a>');
+  expect(html.match(/>Add receipt</g)).toHaveLength(1);
   // No exceptions, no chips; one search field, no month input.
   expect(html).not.toContain('class="chips"');
   expect(html).not.toContain('type="month"');
@@ -407,9 +410,9 @@ test('home closes the month and lists what needs you, counting undated receipts'
   // Three status rows, one word each; the current step's action is the one primary.
   const steps = html.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)?.[1];
   expect(steps).toBe(
-    '<li class="step done"><a href="/review"><b>Check</b><span class="red">2 undated</span></a></li>' +
-      '<li class="step now" aria-current="step"><a href="/payments?month=2026-09&show=missing"><b>Match</b><span class="red">1 missing</span></a></li>' +
-      '<li class="step todo" id="send"><div><b>Send</b><span>Not ready</span></div></li>',
+    '<li class="step done"><a href="/review"><span class="vh">Done: </span><b>Check</b><span class="red">2 undated</span></a></li>' +
+      '<li class="step now" aria-current="step"><a href="/payments?month=2026-09&show=missing"><span class="vh">Next: </span><b>Match</b><span class="red">1 missing</span></a></li>' +
+      '<li class="step todo"><a href="#send"><span class="vh">To do: </span><b>Send</b><span>Not ready</span></a></li>',
   );
   expect(html).toContain(
     '<div class="next"><a class="btn primary" href="/payments?month=2026-09&show=missing">Find receipts</a></div>',
@@ -426,7 +429,9 @@ test('home closes the month and lists what needs you, counting undated receipts'
   // Once dated in the month, they count in the month's own step.
   await env.DB.prepare("UPDATE receipts SET issue_date='2026-09-20' WHERE status='needs_review'").run();
   const dated = await (await request('/?month=2026-09')).text();
-  expect(dated).toContain('<a href="/review"><b>Check</b><span class="red">2 to check</span></a>');
+  expect(dated).toContain(
+    '<a href="/review"><span class="vh">Next: </span><b>Check</b><span class="red">2 to check</span></a>',
+  );
   expect(dated).toContain('<a class="btn primary" href="/review">Check receipts</a>');
   expect(dated).not.toContain('undated');
   // First run says what to do next instead of showing zeros.
@@ -438,11 +443,11 @@ test('home closes the month and lists what needs you, counting undated receipts'
   const first = await (await request('/')).text();
   expect(first).toContain('<h1>Welcome</h1>');
   // A three-item setup checklist, then the upload.
-  expect([...first.matchAll(/<a href="\/settings(#[a-z-]+)"><b>(\w+)<\/b>/g)].map((m) => `${m[2]} ${m[1]}`)).toEqual([
-    'Business #setup-business',
-    'Email #setup-email',
-    'Accountant #setup-accountant',
-  ]);
+  expect(
+    [...first.matchAll(/<a href="\/settings(#[a-z-]+)"><span class="vh">[^<]*<\/span><b>(\w+)<\/b>/g)].map(
+      (m) => `${m[2]} ${m[1]}`,
+    ),
+  ).toEqual(['Business #setup-business', 'Email #setup-email', 'Accountant #setup-accountant']);
   expect(first).toContain('receipts@example.com');
   expect(primaries(first)).toBe(1);
 });

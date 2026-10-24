@@ -268,7 +268,7 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   const ids = async (query: Partial<Parameters<typeof allRows>[1]>) =>
     (await allRows(env, { show: null, month: null, q: '', offset: 0, ...query })).map((r) => r.id);
   const all = await ids({});
-  expect(all.slice(1)).toEqual([dup, sales, needs, ready]);
+  expect(all.slice(1)).toEqual([dup, needs, ready]);
   expect((await allRows(env, { show: null, month: null, q: '', offset: 0 }))[0]!.type).toBe('mail');
   expect(await ids({ show: 'ready' })).toEqual([sales, ready]);
   expect(await ids({ show: 'needs' })).toEqual([needs]);
@@ -306,7 +306,7 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
   const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
   expect(second).toContain('Newer');
-  expect([...second.matchAll(/<li><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(5);
+  expect([...second.matchAll(/<li><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(4);
 });
 
 test('Receipts empty states: one line and one action', async () => {

@@ -16,10 +16,12 @@ import {
   monthName,
   more,
   navCounts,
+  tabCounts,
+  addButton,
   page,
   pageHead,
   shortDay,
-  receiptsSegment,
+  receiptsTabs,
   tag,
 } from './ui';
 
@@ -76,7 +78,10 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
   const where: string[] = [],
     binds: unknown[] = [];
   // Discarded rows show only under their own chip.
-  where.push(query.show ? WHERE[query.show] : "(type='mail' OR discarded_at IS NULL)");
+  // Invoices have their own tab; a search looks in both.
+  where.push(
+    query.show ? WHERE[query.show] : `(type='mail' OR (discarded_at IS NULL${query.q ? '' : " AND kind<>'sales'"}))`,
+  );
   if (query.month) {
     // The document's month, like Home; undated ones by when they arrived.
     where.push('substr(coalesce(issue_date,received_at),1,7)=?');
@@ -215,22 +220,20 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
         : filtered || query.offset
           ? emptyState('Nothing here.', '<a class="btn primary" href="/receipts">Show all</a>')
           : query.month
-            ? emptyState(
-                `Nothing dated ${escape(monthName(query.month, false))}.`,
-                '<a class="btn primary" href="/add">Add receipts</a>',
-              )
+            ? emptyState(`Nothing dated ${escape(monthName(query.month, false))}.`, addButton('all', true))
             : emptyState(
                 config(env).receiptAddress
                   ? `No receipts yet. Forward to <code>${escape(config(env).receiptAddress)}</code>.`
                   : 'No receipts yet.',
-                '<a class="btn primary" href="/add">Add receipts</a>',
+                addButton('all', true),
               );
   const counts = await navCounts(env);
   const waiting = counts.review
     ? `<p class="small waiting"><a href="/review">${counts.review} in Review ›</a></p>`
     : '';
-  const add = shown.length ? '<a class="btn secondary" href="/add">Add receipts</a>' : '';
-  return page('receipts', `${receiptsSegment(counts, 'all', query.month)}${waiting}${chips}${find}${list}`, 200, env, {
+  const add = shown.length ? addButton('all', true) : '';
+  const tabs = receiptsTabs(await tabCounts(env, query.month), 'all', query.month);
+  return page('receipts', `${tabs}${waiting}${chips}${find}${list}`, 200, env, {
     detail: query.month ? monthName(query.month) : undefined,
     head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),
   });

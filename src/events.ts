@@ -244,7 +244,18 @@ export const EVENTS = {
         : null,
   },
   // ---------- Month ----------
-  sent: { text: (p) => `Marked ${monthLabel(p.get('month'))} as sent.` },
+  // Undo drops that one send, so the month is back as it was before: the earlier send, or not sent.
+  sent: {
+    text: (p) => `Marked ${monthLabel(p.get('month'))} as sent.`,
+    undo: (p) => {
+      const at = p.get('at') ?? '',
+        month = p.get('month') ?? '';
+      return /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && MONTH.test(month)
+        ? { action: '/month/sent/undo', fields: { month, at } }
+        : null;
+    },
+  },
+  sentUndone: { text: (p) => `${monthLabel(p.get('month'))} is not marked as sent any more.` },
   driveDone: { text: () => 'Uploaded to OneDrive. Marked as sent.' },
   driveMore: {
     text: (p) =>

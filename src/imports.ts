@@ -13,7 +13,7 @@ import {
   savePreset,
   type ParsedImport,
 } from './banking';
-import { ariaFor, day, errorLine, escape, input, page, pageHead, select } from './ui';
+import { ariaFor, day, errorLine, escape, input, page, pageHead, select, stepWord } from './ui';
 import { failureFor, kept } from './request';
 import { withDone } from './events';
 
@@ -95,7 +95,7 @@ export function wizard(step: 1 | 2 | 3): string {
   return `<ol class="wizard" aria-label="Import steps">${['Choose file', 'Check', 'Import']
     .map(
       (name, i) =>
-        `<li${i + 1 === step ? ' aria-current="step"' : i + 1 < step ? ' class="done"' : ''}>${name}${i + 1 < step ? '<span class="vh"> (done)</span>' : ''}</li>`,
+        `<li${i + 1 === step ? ' aria-current="step"' : i + 1 < step ? ' class="done"' : ''}>${stepWord(i + 1 === step ? 'now' : i + 1 < step ? 'done' : 'todo')}${name}</li>`,
     )
     .join('')}</ol>`;
 }
