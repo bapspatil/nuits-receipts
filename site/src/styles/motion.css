@@ -31,9 +31,20 @@
 }
 
 .ill-inbox {
-  width: 10rem;
+  width: 11rem;
   height: auto;
-  margin-top: 0.5rem;
+}
+
+/* On the desk the envelope sits at the centre of the plate, and the scraps
+   are scattered around it (and pile onto it in the reel). */
+@media (min-width: 48rem) {
+  .desk .ill-inbox {
+    position: absolute;
+    left: 50%;
+    bottom: 1.5rem;
+    width: 15rem;
+    translate: -50% 0;
+  }
 }
 
 .step {
@@ -41,17 +52,19 @@
 }
 
 .step .ill-icon {
-  position: absolute;
-  top: 1.25rem;
-  right: 0;
-  width: 3.5rem;
-  height: 3.5rem;
+  grid-row: 1;
+  grid-column: 2;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-paper);
 }
 
 @media (min-width: 64rem) {
   .how.is-reel .step .ill-icon {
     width: 7rem;
     height: 7rem;
+    padding: 0.9rem;
   }
 }
 
@@ -166,7 +179,7 @@
 
 .how-meter {
   height: 2px;
-  margin: -2rem 0 2rem;
+  margin-top: -1.5rem;
   max-width: 18rem;
   background: var(--color-paper);
   transform-origin: 0 50%;

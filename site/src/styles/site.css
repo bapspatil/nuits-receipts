@@ -461,21 +461,58 @@ a {
   padding: clamp(4.5rem, 12vh, 8rem) var(--gutter);
 }
 
-.problem {
-  display: grid;
-  gap: 3rem;
-  border-top: var(--rule);
+:root {
+  --title-xl: clamp(2.5rem, 1rem + 4.2vw, 5rem);
 }
+
+/* The problem. Overlap on a desk: the copy on the left, and a framed plate
+   on the right where the scraps lie scattered around the envelope they are
+   about to go into. */
 
 .problem-copy {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
+  align-content: start;
+}
+
+.problem .title {
+  font-size: var(--title-xl);
+  max-width: 13ch;
+}
+
+/* The answer to the problem, set as a pull line with a mint bar under each
+   line of it. Mint is a fill here, never the text colour. */
+.pull {
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 1rem + 1.6vw, 2.25rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.pull span {
+  background: linear-gradient(var(--color-mint) 0 0) 0 92% / 100% 0.3em no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.desk {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 1.75rem;
+  padding: 1.5rem 1rem 1.25rem;
+  border: 1px dashed var(--color-ink);
+  background: repeating-linear-gradient(var(--color-guilloche) 0 1px, transparent 1px 1.75rem) var(--color-paper);
 }
 
 .scatter {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  justify-content: center;
+  gap: 0.75rem 0.85rem;
 }
 
 .scrap {
@@ -483,8 +520,12 @@ a {
   box-shadow: var(--shadow-system);
   padding: 0.85rem 1.1rem;
   font-weight: 600;
+  white-space: nowrap;
   rotate: calc((var(--i) - 2) * 3deg);
 }
+
+/* How it works. Three printed tickets on the ink rail: a huge numeral, the
+   icon in a paper-ruled square, then the step, the heading and the body. */
 
 .how {
   background: var(--color-ink);
@@ -492,28 +533,44 @@ a {
 }
 
 .how-title {
-  margin-bottom: 0.5rem;
+  font-size: var(--title-xl);
 }
 
 .rail {
   display: grid;
-  gap: 2.5rem;
+  gap: 3rem;
 }
 
 .step {
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
   align-content: start;
-  max-width: 26rem;
+  max-width: 28rem;
   padding-top: 1.25rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
+  border-top: 2px solid var(--color-paper);
+}
+
+.step > :not(.step-n, .ill-icon) {
+  grid-column: 1 / -1;
 }
 
 .step-n {
+  grid-row: 1;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 5rem;
-  line-height: 0.9;
+  line-height: 0.8;
+  letter-spacing: -0.03em;
+}
+
+.step-of {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .ledger {
@@ -976,10 +1033,37 @@ a {
     gap: 3rem;
   }
 
-  .scatter {
-    position: relative;
+  /* Perforated separators between the tickets on the static grid. */
+  .rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .step {
+    max-width: none;
+    padding: 1.25rem 2rem 0;
+    border-left: 1px dashed var(--color-paper);
+  }
+
+  .step:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .step:last-child {
+    padding-right: 0;
+  }
+
+  .desk {
     display: block;
-    min-height: 22rem;
+    min-height: 30rem;
+    padding: 0;
+  }
+
+  .scatter {
+    position: absolute;
+    inset: 0;
+    display: block;
   }
 
   .scrap {
@@ -988,11 +1072,11 @@ a {
     top: calc(var(--y) * 1%);
   }
 
-  .scrap:nth-child(1) { --x: 4; --y: 6; }
-  .scrap:nth-child(2) { --x: 46; --y: 0; }
-  .scrap:nth-child(3) { --x: 20; --y: 40; }
-  .scrap:nth-child(4) { --x: 58; --y: 52; }
-  .scrap:nth-child(5) { --x: 8; --y: 78; }
+  .scrap:nth-child(1) { --x: 6; --y: 8; }
+  .scrap:nth-child(2) { --x: 58; --y: 6; }
+  .scrap:nth-child(3) { --x: 4; --y: 46; }
+  .scrap:nth-child(4) { --x: 70; --y: 52; }
+  .scrap:nth-child(5) { --x: 8; --y: 82; }
 }
 
 @media (min-width: 64rem) {
@@ -1032,7 +1116,12 @@ a {
     rotate: 3deg;
   }
 
-  .problem,
+  .problem {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    align-items: center;
+  }
+
   .cost {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
     align-items: center;
