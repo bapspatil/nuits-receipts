@@ -122,7 +122,9 @@ test('every page, including error pages, has the same five-item nav', async () =
   expect(missing.headers.get('Content-Type')).toContain('text/html');
   const missingHtml = await missing.text();
   expectShell(missingHtml, null);
-  expect(missingHtml).toContain('<div class="alert" role="alert"><p><strong>Not found</strong></p></div>');
+  expect(missingHtml).toContain(
+    '<div class="alert" role="alert"><p><strong>We couldn&#39;t find that page.</strong></p></div>',
+  );
   expect(missingHtml).toContain('<a class="btn primary" href="/review">Go back</a>');
   const body = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   body.set('action', 'approve');
@@ -134,7 +136,9 @@ test('every page, including error pages, has the same five-item nav', async () =
   expect(refused.status).toBe(422);
   const refusedHtml = await refused.text();
   expectShell(refusedHtml, null);
-  expect(refusedHtml).toContain('role="alert"><p><strong>Complete required facts before approval</strong>');
+  expect(refusedHtml).toContain(
+    'role="alert"><p><strong>Fill in the seller, date, currency, total, amount before VAT and VAT, then approve.</strong>',
+  );
   expect(refusedHtml).toContain('href="/">Go back</a>');
   // A server failure renders the same way with the same message.
   const prepare = env.DB.prepare.bind(env.DB);

@@ -55,7 +55,7 @@ test('overlapping files with IDs remain idempotent and conflicting bank facts ar
   await importCsv();
   await importCsv(csv + 'c;2026-09-09;-4,00;EUR;Sample Other;other\n');
   expect(await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions').first('n')).toBe(3);
-  await expect(importCsv(csv.replace('-125,50', '-120,50'))).rejects.toThrow('conflicting');
+  await expect(importCsv(csv.replace('-125,50', '-120,50'))).rejects.toThrow('the same ID');
 });
 test('fallback overlap requires a decision; identical distinct rows remain visible', async () => {
   const text = 'Date;Amount;Payee\n2026-09-01;-10,00;Sample\n2026-09-01;-10,00;Sample\n';
@@ -65,7 +65,9 @@ test('fallback overlap requires a decision; identical distinct rows remain visib
     bytes = new TextEncoder().encode(other),
     identity = await importIdentity('holvi', bytes);
   expect(await collisions(env, parsed, identity.id)).toHaveLength(2);
-  await expect(importBankCsv(env, { bytes, parsed, collision: '' })).rejects.toThrow('Confirm overlapping');
+  await expect(importBankCsv(env, { bytes, parsed, collision: '' })).rejects.toThrow(
+    'look like ones you already imported',
+  );
   await importBankCsv(env, { bytes, parsed, collision: 'additional' });
   await importBankCsv(env, { bytes, parsed, collision: 'additional' });
   expect(await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions').first('n')).toBe(4);

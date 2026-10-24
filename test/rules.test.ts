@@ -83,7 +83,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   // Two rules can't share the same seller and context text.
   const clash = await post(`/rules/${id}`, rule({ vendor_contains: 'Fake Shop', context_contains: 'card' }));
   expect(clash.status).toBe(409);
-  expect(await clash.text()).toContain('A rule with the same seller text already exists');
+  expect(await clash.text()).toContain('You already have a rule for that seller text');
   expect((await post('/rules', rule({ vendor_contains: 'Fake Shop', context_contains: 'card' }))).status).toBe(409);
   // Unknown or malformed IDs are not found; other sites can't post.
   expect((await post('/rules/999999', rule())).status).toBe(404);

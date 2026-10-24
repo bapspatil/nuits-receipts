@@ -1,3 +1,4 @@
+import { plain } from './messages';
 export const EXPENSE_TYPES = ['infra', 'AI APIs', 'subscriptions', 'other'] as const;
 export const EXPONENTS: Record<string, number> = {
   EUR: 2,
@@ -149,16 +150,20 @@ export const emptyFacts: Facts = {
   vat_rate_bps: null,
   line_items_json: null,
 };
+// A refused request. message is a key of MESSAGES (src/messages.ts) and is
+// replaced by its plain words; one with no entry is shown as written.
+// field names the form control at fault, so the page can mark it.
 export class InputError extends Error {
   constructor(
     message: string,
     public status = 422,
+    public field?: string,
   ) {
-    super(message);
+    super(plain(message));
   }
 }
-export function requireInput(condition: unknown, message: string, status = 422): asserts condition {
-  if (!condition) throw new InputError(message, status);
+export function requireInput(condition: unknown, message: string, status = 422, field?: string): asserts condition {
+  if (!condition) throw new InputError(message, status, field);
 }
 export function object(value: unknown): Record<string, unknown> {
   requireInput(value !== null && typeof value === 'object' && !Array.isArray(value), 'Expected object');

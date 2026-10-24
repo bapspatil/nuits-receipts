@@ -144,7 +144,7 @@ async function accountFromForm(env: Env, form: FormData): Promise<AccountChoice>
 function column(form: FormData, key: string, optional = false): number | null {
   const value = String(form.get(key) ?? '');
   if (optional && value === '') return null;
-  requireInput(/^\d+$/.test(value), `Map ${key}`);
+  requireInput(/^\d+$/.test(value), 'Choose a column for every field the file needs', 422, key);
   return Number(value);
 }
 function mappingFromEditor(form: FormData, base: CsvMapping): CsvMapping {
@@ -244,6 +244,18 @@ function mappingEditor(mapping: CsvMapping, headers: string[], currency: string,
       c.kind,
     )}${pick('default_currency', Object.keys(EXPONENTS), c.kind === 'default' ? c.currency : currency)}${col('map_currency', c.kind === 'column' ? c.column : null)}${pick('currency_blank_default', ['', ...Object.keys(EXPONENTS)], c.kind === 'column' ? c.blankDefault : '')}${col('map_merchant', mapping.merchant)}${col('map_reference', mapping.reference)}${col('map_external_id', mapping.externalId)}${col('map_original_amount', mapping.original?.amount ?? null)}${col('map_original_currency', mapping.original?.currency ?? null)}</div></fieldset>`;
 }
+// What a row problem calls the column it is about.
+const ISSUE_FIELDS: Record<string, string> = {
+  date: 'date',
+  merchant: 'paid to',
+  currency: 'currency',
+  amount: 'amount',
+  original_currency: 'original currency',
+  original_amount: 'original amount',
+  csv: 'file',
+  mapping: 'column settings',
+  row: 'columns',
+};
 type ImportState = { overlaps: string[]; otherAccounts: string[] };
 async function currentState(env: Env, parsed: ParsedImport, bytes: Uint8Array): Promise<ImportState> {
   const identity = await importIdentity(parsed.rows[0]!.account_key, bytes);
@@ -393,7 +405,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
           .slice(0, 100)
           .map(
             (e) =>
-              `<p class="warning">Row ${e.record}, ${escape(e.field)}: ${escape(e.message)} <span class="small">(${escape(e.code)})</span></p>`,
+              `<p class="warning">Row ${e.record}, ${escape(ISSUE_FIELDS[e.field] ?? e.field)}: ${escape(e.message)}</p>`,
           )
           .join('')}<p class="small">Adjust how we read the file below, then check it again.</p></div>`
       : '';

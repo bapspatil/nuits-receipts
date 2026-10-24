@@ -97,7 +97,7 @@ test('manual approval needs complete tax facts and records an exception reason',
         approval_reason: 'No printed number',
       }),
     ),
-  ).rejects.toThrow('Complete required');
+  ).rejects.toThrow('Fill in the seller');
   await correctReceipt(
     env,
     row.id,
