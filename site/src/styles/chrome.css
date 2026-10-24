@@ -218,13 +218,11 @@
 }
 
 .menu-panel {
-  position: absolute;
   inset: 0 0 auto;
   z-index: 40;
   display: grid;
   grid-template-rows: 1fr auto;
   gap: 2.5rem;
-  min-height: calc(100svh + var(--tooth));
   padding: calc(44px + 1.75rem + clamp(1.5rem, 5svh, 3.5rem)) var(--gutter) calc(1.75rem + var(--tooth));
   color: var(--color-paper);
   background: var(--color-ink);
@@ -233,14 +231,10 @@
     conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
 }
 
-/* The sheet is fixed, also with no script: the bar is sticky, so an absolute
-   sheet would travel with it anyway. With no script, following an in-page
-   link lands under the open sheet, and Close (still on the bar) shows it. */
+/* Fixed, also with no script: the bar is sticky, so an absolute sheet would
+   travel with it anyway. With no script, following an in-page link lands
+   under the open sheet, and Close (still on the bar) shows it. */
 .menu-panel {
-  position: fixed;
-}
-
-html.menu-js .menu-panel {
   position: fixed;
   height: calc(100dvh + var(--tooth));
   min-height: 0;
