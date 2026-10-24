@@ -562,30 +562,6 @@ a {
   color: var(--color-ink-soft);
 }
 
-.transcript {
-  max-width: 48rem;
-  border-top: var(--rule);
-  border-bottom: var(--rule);
-}
-
-.transcript summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  min-height: 44px;
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-.transcript-text {
-  display: grid;
-  gap: 0.75rem;
-  max-width: var(--measure);
-  padding-bottom: 1.25rem;
-}
-
 .cost {
   display: grid;
   gap: 3rem;
