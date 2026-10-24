@@ -1,5 +1,6 @@
 @import "./theme.css";
 @import "./wipe.css";
+@import "./chrome.css";
 
 @font-face {
   font-family: "Bricolage";
@@ -103,74 +104,6 @@ a {
   max-width: var(--measure);
   color: var(--color-ink-soft);
   text-wrap: pretty;
-}
-
-/* Bar */
-
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem var(--gutter);
-  border-bottom: var(--rule);
-}
-
-.wordmark {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 0.75rem;
-  text-decoration: none;
-}
-
-.wordmark-mark {
-  width: 1.4rem;
-  height: 1.4rem;
-  align-self: center;
-}
-
-.wordmark-name {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.25rem;
-  letter-spacing: -0.01em;
-}
-
-.wordmark-desc {
-  font-size: var(--text-small);
-  color: var(--color-ink-soft);
-}
-
-.bar-end {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  flex-shrink: 0;
-}
-
-.bar-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 0.5rem;
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.motion-switch {
-  font: inherit;
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-ink);
-  background: var(--color-paper);
-  border: var(--rule);
-  border-radius: var(--radius-pill);
-  padding: 0.55rem 1rem;
-  min-height: 44px;
-  cursor: pointer;
-  white-space: nowrap;
 }
 
 /* Buttons. Colours swap instantly on hover: a transitioned inversion passes
@@ -867,46 +800,6 @@ a {
   outline-color: var(--color-paper);
 }
 
-/* Footer: the tail of the receipt. */
-
-.footer {
-  display: grid;
-  gap: 2.5rem;
-  padding: 3rem var(--gutter) 3.5rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
-}
-
-.smallprint {
-  display: grid;
-  gap: 0.75rem;
-  max-width: 48rem;
-  font-size: var(--text-small);
-  line-height: var(--text-small--line-height);
-}
-
-.smallprint-title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-heading);
-}
-
-.footer-legal {
-  display: grid;
-  gap: 0.5rem;
-  max-width: 48rem;
-  font-size: var(--text-small);
-}
-
-.footer-tail {
-  display: grid;
-  gap: 0.25rem;
-  font-size: var(--text-small);
-}
-
-.footer-joke {
-  color: var(--color-ink-soft);
-}
-
 /* Narrow: each statement row becomes two lines, so the amount and the stamp
    stay on screen instead of behind a horizontal scroll. */
 @media (max-width: 47.99rem) {
@@ -1041,18 +934,6 @@ a {
     align-items: start;
   }
 
-  .footer {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-  }
-
-  .smallprint {
-    grid-column: 1 / -1;
-  }
-
-  .footer-tail {
-    text-align: right;
-  }
 }
 
 /* Motion off: the attribute stamped before first paint decides, and the media
