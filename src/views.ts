@@ -180,11 +180,19 @@ async function monthState(env: Env, selected: string) {
   const reading = [...rows, ...sales].filter(isReading);
   const send = await sendStatus(env, selected, [...rows, ...sales]);
   const docs = rows.length + sales.length;
+  const sent = !!send.last && !send.changed && docs > 0;
+  // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
+  // while any is left (a month already sent stays closed).
+  const undated =
+    (await env.DB.prepare(
+      "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
+    ).first<number>('n')) ?? 0;
   return {
     send,
     // Marked as sent, and nothing added or corrected since.
-    sent: !!send.last && !send.changed && docs > 0,
+    sent,
     docs,
+    undated,
     sales,
     invoiced,
     unpaid: sales.filter((r) => ['unpaid', 'overdue'].includes(salesStatus(r, config(env).tuning.paymentTermsDays))),
@@ -202,7 +210,7 @@ async function monthState(env: Env, selected: string) {
     missing,
     matched: out.filter((t) => t.receipt_id),
     imported,
-    done: { review: flagged.length === 0, match: !!imported && missing.length === 0 },
+    done: { review: flagged.length === 0 && (undated === 0 || sent), match: !!imported && missing.length === 0 },
   };
 }
 
@@ -748,21 +756,10 @@ export async function payments(
       .bind(selected)
       .all<{ m: string; n: number }>()
   ).results;
-  const isMissing = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
+  const unmatched = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
+  const open = rows.filter(unmatched);
   const out = rows.filter((t) => t.amount_minor < 0 && !paired.has(t.id));
-  const missing = rows.filter(isMissing);
   const matched = out.filter((t) => t.receipt_id);
-  // Missing first: it is the only thing Bank asks of you.
-  const automatic = rows.filter((t) => t.receipt_id && t.match_method === 'automatic');
-  const show =
-    params.get('show') === 'auto' && automatic.length
-      ? 'auto'
-      : params.get('show') === 'all' || (params.get('show') !== 'missing' && !missing.length)
-        ? 'all'
-        : 'missing';
-  const firstMissing = missing[0]?.id;
-  const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
-  const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
   const tuning = config(env).tuning;
@@ -777,7 +774,7 @@ export async function payments(
   const taken = new Set<string>();
   const likelyOf = new Map<string, Receipt>();
   const bulk: { t: Payment; r: Receipt; facts: PairFacts }[] = [];
-  for (const t of missing) {
+  for (const t of open) {
     const list = suggestionsFor(t, receipts, rules, tuning);
     const r = list.find((x) => !taken.has(x.id)) ?? list[0];
     if (!r) continue;
@@ -788,13 +785,34 @@ export async function payments(
     if (facts.exact) bulk.push({ t, r, facts });
   }
   // Receipts that would fit a payment but still need review: the person is sent there first.
-  const waiting = missing.some((t) => !likelyOf.has(t.id))
+  const waiting = open.some((t) => !likelyOf.has(t.id))
     ? (
         await env.DB.prepare(
           `SELECT * FROM receipts WHERE kind='expense' AND status='needs_review' AND review_reasons_json<>'["missing_eur"]' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY issue_date DESC,id LIMIT 200`,
         ).all<Receipt>()
       ).results
     : [];
+  const waitOf = new Map<string, Receipt>();
+  for (const t of open) {
+    const w = likelyOf.has(t.id)
+      ? undefined
+      : waiting.find((r) => eligible({ ...r, status: 'ready' }, t, rules, true, tuning));
+    if (w) waitOf.set(t.id, w);
+  }
+  // Missing is a real gap. A payment whose receipt is still in Review is not one.
+  const isMissing = (t: Payment) => unmatched(t) && !waitOf.has(t.id);
+  const missing = open.filter(isMissing);
+  // Missing first: it is the only thing Bank asks of you.
+  const automatic = rows.filter((t) => t.receipt_id && t.match_method === 'automatic');
+  const show =
+    params.get('show') === 'auto' && automatic.length
+      ? 'auto'
+      : params.get('show') === 'all' || (params.get('show') !== 'missing' && !missing.length)
+        ? 'all'
+        : 'missing';
+  const firstMissing = missing[0]?.id;
+  const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
+  const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
   const droppedRecently = missing.length ? await hasRecentDropped(env) : false;
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
@@ -866,13 +884,13 @@ export async function payments(
           `<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
         );
       } else {
-        status = `<span class="stamp missing">${STATUS.missing}</span>`;
         const first = t.id === firstMissing;
         const likely = likelyOf.get(t.id);
         // Its receipt exists but needs review first: send the person there, offer no Match.
-        const wait = likely
-          ? undefined
-          : waiting.find((w) => eligible({ ...w, status: 'ready' }, t, rules, true, tuning));
+        const wait = waitOf.get(t.id);
+        status = wait
+          ? `<span class="stamp needs">${STATUS.needs}</span>`
+          : `<span class="stamp missing">${STATUS.missing}</span>`;
         const find = wait
           ? `<p class="none">Its receipt needs you first. <a href="/receipts/${wait.id}">Check it.</a></p>`
           : receipts.length
@@ -928,8 +946,8 @@ export async function payments(
     },
   ]);
   const body = rows.length
-    ? `<p class="summary"><span>${out.length} out, ${matched.length} matched, <span${missing.length ? ' class="red"' : ''}>${missing.length} missing</span></span></p>${filter}${
-        missing.length ? '' : await settled(env, selected)
+    ? `<p class="summary"><span>${out.length} out, ${matched.length} matched, <span${missing.length ? ' class="red"' : ''}>${missing.length} missing</span>${waitOf.size ? `, ${waitOf.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
+        open.length ? '' : await settled(env, selected)
       }${matchAll}${shown.length ? `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
@@ -1010,9 +1028,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
     : unverified
       ? `<a href="/review?reason=sender">${plural(unverified, 'email')} not verified ›</a>`
       : '';
-  const undated = await env.DB.prepare(
-    "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
-  ).first<number>('n');
+  const undated = s.undated;
   const short = monthName(selected, false);
   const empty = s.docs === 0;
   // 4 means nothing is left: the month was sent and hasn't changed since.
@@ -1047,7 +1063,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
   // Why Home opened here, when it is not the current month.
   const why =
     arrival && arrival.month !== arrival.current
-      ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s, undated ?? 0)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
+      ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s, undated)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
       : '';
   return page(
     'home',

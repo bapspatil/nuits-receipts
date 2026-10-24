@@ -410,13 +410,13 @@ test('home closes the month and lists what needs you, counting undated receipts'
   // Three status rows, one word each; the current step's action is the one primary.
   const steps = html.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)?.[1];
   expect(steps).toBe(
-    '<li class="step done"><a href="/review"><span class="vh">Done: </span><b>Check</b><span class="red">2 undated</span></a></li>' +
-      '<li class="step now" aria-current="step"><a href="/payments?month=2026-09&show=missing"><span class="vh">Next: </span><b>Match</b><span class="red">1 missing</span></a></li>' +
+    // Undated receipts wait in Review, so Check is not done while any is left.
+    '<li class="step now" aria-current="step"><a href="/review"><span class="vh">Next: </span><b>Check</b><span class="red">2 undated</span></a></li>' +
+      '<li class="step todo"><a href="/payments?month=2026-09&show=missing"><span class="vh">To do: </span><b>Match</b><span class="red">1 missing</span></a></li>' +
       '<li class="step todo"><a href="#send"><span class="vh">To do: </span><b>Send</b><span>Not ready</span></a></li>',
   );
-  expect(html).toContain(
-    '<div class="next"><a class="btn primary" href="/payments?month=2026-09&show=missing">Find receipts</a></div>',
-  );
+  expect(html).not.toContain('Done: </span><b>Check</b>');
+  expect(html).toContain('<div class="next"><a class="btn primary" href="/review">Check receipts</a></div>');
   expect(primaries(html)).toBe(1);
   expect(html).toMatch(/Review <span class="count">2<span class="vh"> waiting<\/span><\/span>/);
   expect(html).toMatch(/Bank <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);

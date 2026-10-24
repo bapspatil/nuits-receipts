@@ -108,3 +108,26 @@ test('saved presets are labelled as layouts too', async () => {
   expect(html).toContain('>Monthly · Synthetic (CSV layout)</option>');
   expect(html.match(/Not affiliated/g)).toHaveLength(1);
 });
+
+test('an unknown layout asks for the columns first and holds row errors until they are mapped', async () => {
+  const csv = 'Ref;When;Sum;Who\nX1;2026-09-01;-12.50;Synthetic Shop\nX2;not a date;-3.00;Other Shop\n';
+  const initial = await preview(csv);
+  expect(initial.status).toBe(422);
+  const html = await initial.text();
+  expect(html).toContain('No preset maps these headers.');
+  // No row errors from a guessed mapping, and no table of guessed rows.
+  expect(html).not.toMatch(/Row \d+, /);
+  expect(html).not.toContain('<table class="stack">');
+  expect(html).toContain('<details open><summary>The columns look wrong?');
+  // Once mapped, the real row errors show.
+  const edit = htmlForm(html, '/imports/csv/preview');
+  edit.set('map_booking_date', '1');
+  edit.set('map_amount', '2');
+  edit.set('map_merchant', '3');
+  const mapped = await request('/imports/csv/preview', { method: 'POST', body: edit });
+  const after = await mapped.text();
+  expect(mapped.status).toBe(422);
+  expect(after).toMatch(/Row 3, /);
+  expect(after).not.toMatch(/Row 2, /);
+  expect(after).not.toContain('No preset maps these headers.');
+});
