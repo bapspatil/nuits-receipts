@@ -19,6 +19,10 @@ export const MESSAGES: Readonly<Record<string, string>> = {
     'One of these payments changed. Look at both payments again before you link them.',
   'Transfer unavailable': "That transfer isn't there any more. Reload the page.",
 
+  // package
+  'Send already replaced':
+    "You marked this month as sent again since, or it isn't marked as sent any more. There is nothing to undo.",
+
   // all
   'Choose a month like 2026-10': 'Choose a month like 2026-10.',
 

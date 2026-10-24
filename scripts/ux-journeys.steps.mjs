@@ -76,8 +76,8 @@ export const journeys = [
       await this.seed(page, helpers);
       await rec.goto('/');
       const home = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
-      rec.note(`Home on arrival (current month): ${home.slice(0, 140)}`);
-      await rec.click(nav(page, '/review'));
+      rec.note(`Home on arrival (oldest month not sent): ${home.slice(0, 200)}`);
+      await rec.click(page.locator('main .steps a[href="/review"]'));
       const queue = await page.locator('main a[href^="/receipts/"]').count();
       rec.note(`Review lists ${queue} receipts.`);
       await rec.click(page.locator('main a.btn.primary[href^="/receipts/"]'));
@@ -127,8 +127,8 @@ export const journeys = [
         'total: 125.50',
       ]);
       await rec.click(nav(page, '/receipts'));
-      await rec.click(page.locator('main a[href="/invoices"]'));
-      await rec.click(page.locator('main a[href^="/add"]'));
+      await rec.click(page.locator('main nav.seg a[href^="/invoices"]'));
+      await rec.click(link(page, 'Add invoice'));
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
       await rec.upload(page.locator('input[name=file]'), file);
@@ -139,7 +139,7 @@ export const journeys = [
       );
       if (await button(page, approve).count()) await fixAndApprove(page, rec);
       await rec.click(nav(page, '/payments'));
-      if (!page.url().includes('2026-09')) await rec.click(page.locator('main a[href$="month=2026-09"]'));
+      if (!(await page.locator('main h1', { hasText: 'September' }).count())) await rec.click(page.locator('main a[href$="month=2026-09"]'));
       if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
         await rec.click(page.locator('main a[href*="show=all"]'));
       const money = page.locator('li.pay', { hasText: 'Sample Client Oy' });
@@ -154,8 +154,7 @@ export const journeys = [
     name: 'c. September closed and marked sent',
     async run(page, rec) {
       await rec.click(nav(page, '/'));
-      await rec.click(page.locator('main a[href$="month=2026-09"]'));
-      rec.note(`Home for September: ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`);
+      rec.note(`Home on arrival (September, the oldest month not sent): ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`);
       const download = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
       const zip = page
         .getByRole('link', { name: /ZIP|Download/ })
@@ -238,7 +237,8 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   return [
     { name: 'receipt-flagged', path: flagged },
     { name: 'home-sep', path: '/?month=2026-09' },
-    { name: 'home-oct', path: '/' },
+    { name: 'home-arrival', path: '/' },
+    { name: 'home-oct', path: `/?month=${new Date().toISOString().slice(0, 7)}` },
     { name: 'review', path: '/review' },
     { name: 'receipts', path: '/receipts?month=2026-09' },
     { name: 'receipt-ready', path: ready },

@@ -16,11 +16,12 @@ import {
   chipRow,
   monthHead,
   monthName,
-  navCounts,
+  tabCounts,
+  addButton,
   page,
   pageHead,
   plural,
-  receiptsSegment,
+  receiptsTabs,
   shortDay,
   tag,
   matchError,
@@ -166,10 +167,10 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
                 ? `Copy <code>${escape(settings.invoicesAddress)}</code> when you send one.`
                 : 'Set an invoice address in <a href="/settings#setup-email">Settings</a>.'
             }`,
-        '<a class="btn primary" href="/add?kind=sales">Add invoice</a>',
+        addButton('invoices', true),
       );
   const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const body = `${receiptsSegment(await navCounts(env), 'invoices', selected)}${
+  const body = `${receiptsTabs(await tabCounts(env, selected), 'invoices', selected)}${
     month.length
       ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`
       : ''
@@ -185,7 +186,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           .join(', ')}</p>`
       : ''
   }${month.length ? `<div class="csv"><a class="btn secondary" href="/export-sales.csv?month=${selected}">CSV</a><p class="small">${EXPORT_LINE}</p></div>` : ''}`;
-  const add = shown.length ? '<a class="btn primary" href="/add?kind=sales">Add invoice</a>' : '';
+  const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
     head: across ? pageHead(SHOWS[show], add) : monthHead('/invoices', selected, add),

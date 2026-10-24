@@ -6,7 +6,7 @@ import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
-import { STATUS, matchStatus } from './status';
+import { STATUS, STEP, matchStatus, type StepState } from './status';
 import { failureFor, kept, requestState } from './request';
 
 export function escape(value: unknown): string {
@@ -53,7 +53,7 @@ export const PAGES = {
 export type PageKey = keyof typeof PAGES;
 // detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
 export type PageOptions = { detail?: string; head?: string; style?: string };
-export type Counts = { review: number; missing: number; invoices: boolean };
+export type Counts = { review: number; missing: number };
 
 // Its own query, so a database without the inbound_mail table still counts.
 async function heldTotal(env: Env): Promise<number> {
@@ -65,23 +65,20 @@ async function heldTotal(env: Env): Promise<number> {
 }
 export async function navCounts(env: Env): Promise<Counts> {
   try {
-    const [review, missing, sales] = await env.DB.batch<{ n: number }>([
+    const [review, missing] = await env.DB.batch<{ n: number }>([
       env.DB.prepare(
         "SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
       ),
       env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
-      env.DB.prepare("SELECT count(*) n FROM (SELECT 1 FROM receipts WHERE kind='sales' LIMIT 1)"),
     ]);
     return {
       // Unknown-sender emails wait in Review too.
       review: (review?.results[0]?.n ?? 0) + (await heldTotal(env)),
       missing: missing?.results[0]?.n ?? 0,
-      // The Invoices you sent view appears once invoice email is set up or an invoice exists.
-      invoices: !!config(env).invoicesAddress || (sales?.results[0]?.n ?? 0) > 0,
     };
   } catch {
     // An error page must still render when the database is the problem.
-    return { review: 0, missing: 0, invoices: !!config(env).invoicesAddress };
+    return { review: 0, missing: 0 };
   }
 }
 
@@ -205,6 +202,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1.5px solid var(--border-strong);fo
 .steps b{font:700 var(--text-lg)/1.2 var(--font-display);flex:1}
 .steps span{color:var(--text-muted);font-weight:600}.steps span.red{color:var(--danger)}
 .steps a::after{content:"›";color:var(--text-muted);font-weight:600}
+.sentq{margin:var(--space-4) 0 0;padding-top:var(--space-3);border-top:1.5px dashed var(--border)}.sentq h3{margin:0 0 var(--space-2)}.why strong{color:var(--text)}.why a{font-weight:600}
 .next{margin:0 0 var(--space-4)}.send .btns{margin:var(--space-3) 0}.dated{margin:var(--space-4) 0 0}.dated a{display:inline-flex;align-items:center;min-height:44px}
 .checks li:first-child a.btn{justify-self:start;margin:var(--space-1) 0}
 .fixes>details.more{margin-top:var(--space-4)}
@@ -372,6 +370,7 @@ th,td{padding:var(--space-2)}
 nav.tabs{display:none}
 .seg ul{display:inline-flex;max-width:100%;gap:var(--space-1);list-style:none;margin:0 0 var(--space-4);padding:var(--space-1);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-pill)}
 .seg a{display:flex;align-items:center;min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-pill);text-decoration:none;font-weight:600;font-size:.9375rem;color:var(--text-muted);white-space:nowrap}
+.seg .num{font-weight:500;margin-left:var(--space-1)}
 .seg a[aria-current=page]{background:var(--accent);color:var(--text-on-accent)}
 @media (hover:hover){.seg a:not([aria-current]):hover{color:var(--text);background:var(--surface-page)}}
 @media (max-width:879px){
@@ -460,14 +459,34 @@ function tabs(active: NavKey | undefined, counts: Counts): string {
   ).join('')}</ul></nav>`;
 }
 
-// Receipts has two views: every document, and the invoices you sent. The
-// second shows once invoice email is set up or an invoice exists.
-// The month carries across.
-export function receiptsSegment(counts: Counts, active: 'all' | 'invoices', month: string | null = null): string {
-  if (!counts.invoices && active === 'all') return '';
-  const link = (key: 'all' | 'invoices', href: string, label: string) =>
-    `<li><a href="${href}${month ? `?month=${month}` : ''}"${current(key === active)}>${label}</a></li>`;
-  return `<nav class="seg" aria-label="Receipts"><ul>${link('all', '/receipts', 'Receipts')}${link('invoices', '/invoices', 'Invoices')}</ul></nav>`;
+// Receipts and Invoices are two tabs of one page, always shown, each with its
+// count. One Add button follows the open tab. The month carries across.
+export type TabCounts = { receipts: number; invoices: number };
+export async function tabCounts(env: Env, selected: string | null): Promise<TabCounts> {
+  // The same month each list uses: a receipt by its date or arrival, an invoice by its date.
+  const count = (kind: string, dated: string) =>
+    env.DB.prepare(
+      `SELECT count(*) n FROM receipts WHERE kind='${kind}' AND duplicate_of IS NULL AND discarded_at IS NULL${selected ? ` AND substr(${dated},1,7)=?` : ''}`,
+    ).bind(...(selected ? [selected] : []));
+  const [receipts, invoices] = await env.DB.batch<{ n: number }>([
+    count('expense', 'coalesce(issue_date,received_at)'),
+    count('sales', 'issue_date'),
+  ]);
+  return { receipts: receipts?.results[0]?.n ?? 0, invoices: invoices?.results[0]?.n ?? 0 };
+}
+export function receiptsTabs(counts: TabCounts, active: 'all' | 'invoices', month: string | null = null): string {
+  const link = (key: 'all' | 'invoices', href: string, label: string, n: number) =>
+    `<li><a href="${href}${month ? `?month=${month}` : ''}"${current(key === active)}>${label} <span class="num">${n}</span></a></li>`;
+  return `<nav class="seg" aria-label="Receipts and invoices"><ul>${link('all', '/receipts', 'Receipts', counts.receipts)}${link('invoices', '/invoices', 'Invoices', counts.invoices)}</ul></nav>`;
+}
+// The one Add button of the Receipts page; its label and target follow the open tab.
+export function addButton(active: 'all' | 'invoices', primary: boolean): string {
+  const [href, label] = active === 'invoices' ? ['/add?kind=sales', 'Add invoice'] : ['/add', 'Add receipt'];
+  return `<a class="btn ${primary ? 'primary' : 'secondary'}" href="${href}">${label}</a>`;
+}
+// The words of a step marker, for screen readers: the same three everywhere.
+export function stepWord(state: StepState): string {
+  return `<span class="vh">${STEP[state]}: </span>`;
 }
 // The Access sign-out link, for the Settings page head on every screen size.
 export function signOutLink(env: Env): string {

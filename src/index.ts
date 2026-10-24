@@ -39,7 +39,8 @@ import { approveSender, deleteHeld, ignoreSender, removeApproved, unignoreSender
 import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup } from './setup';
-import { markSent, options, packageZip, query } from './package';
+import { arrivalMonth } from './arrival';
+import { markSent, options, packageZip, query, unmarkSent } from './package';
 import { withDone, type EventKey } from './events';
 import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
@@ -188,7 +189,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const offset = Number(url.searchParams.get('offset') ?? 0);
   requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page');
   if (request.method === 'GET' && path === '/')
-    return home(env, month(url.searchParams.get('month')), url.searchParams);
+    return home(env, url.searchParams.has('month') ? month(url.searchParams.get('month')) : null, url.searchParams);
   // Old addresses: the month close is Home now, and the phone's More menu is gone.
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
@@ -229,8 +230,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/month/sent') {
     const form = await formData(request, 4096),
       selected = month(String(form.get('month') ?? ''));
-    await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
-    return redirect(withDone('sent', `/?month=${selected}#send`));
+    const at = await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
+    return redirect(withDone('sent', `/?month=${selected}#send`, { at }));
+  }
+  if (request.method === 'POST' && path === '/month/sent/undo') {
+    const form = await formData(request, 4096),
+      selected = month(String(form.get('month') ?? ''));
+    await unmarkSent(env, selected, String(form.get('at') ?? ''));
+    return redirect(withDone('sentUndone', `/?month=${selected}#send`));
   }
   if (request.method === 'POST' && path === '/month/onedrive-upload') {
     const form = await formData(request, 4096),
@@ -289,7 +296,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       headers: { 'Content-Type': 'font/woff2', 'Cache-Control': 'private, max-age=31536000, immutable' },
     });
   if (request.method === 'GET' && path === '/payments')
-    return payments(env, month(url.searchParams.get('month')), offset, url.searchParams);
+    return payments(
+      env,
+      url.searchParams.has('month') ? month(url.searchParams.get('month')) : (await arrivalMonth(env)).month,
+      offset,
+      url.searchParams,
+    );
   if (request.method === 'POST' && path === '/imports/csv')
     return importPreview(env, await formData(request, MAX_CSV_BYTES + 64 * 1024));
   if (request.method === 'POST' && path === '/imports/csv/preview')

@@ -376,7 +376,9 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   );
   expect(flagged.status).toBe('needs_review');
   month = await (await request('/?month=2026-09')).text();
-  expect(month).toContain('<a href="/review"><b>Check</b><span class="red">1 to check</span></a>');
+  expect(month).toContain(
+    '<a href="/review"><span class="vh">Next: </span><b>Check</b><span class="red">1 to check</span></a>',
+  );
   const csv = await request('/export-sales.csv?month=2026-09');
   expect(csv.headers.get('Content-Disposition')).toContain('receipts-sales-2026-09.csv');
   expect((await csv.text()).split('\n').length).toBeGreaterThan(2);

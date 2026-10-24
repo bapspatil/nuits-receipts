@@ -275,7 +275,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   expect(html).toMatch(
     /<a class="btn primary" href="\/month\/package.zip\?month=2026-10">Download ZIP \(\d+ KB\)<\/a>/,
   );
-  expect(html).toContain('<button class="btn secondary">Mark as sent</button>');
+  expect(html).toContain('<button class="btn secondary">Mark October as sent</button>');
   expect(html).toContain('<ul class="manifest" aria-label="Files in the package"><li>receipts-2026-10/</li>');
   expect(html.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
   const shownHash = html.match(/name="receipts_hash" value="([a-f0-9]{64})"/)![1]!;
@@ -295,22 +295,24 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
   const sent = await post({ month: '2026-10', receipts_hash: shownHash });
   expect(sent.status).toBe(303);
-  expect(locationOf(sent)).toBe('/?month=2026-10&done=sent#send');
+  expect(locationOf(sent)).toMatch(/^\/\?month=2026-10&done=sent&at=[^&#]+#send$/);
+  const sentLocation = locationOf(sent);
   expect(
     await env.DB.prepare('SELECT month,method,file_count,total_minor,receipts_hash FROM month_sends').first(),
   ).toEqual({ month: '2026-10', method: 'download', file_count: 2, total_minor: 2500, receipts_hash: shownHash });
 
-  html = await (await request(await signed('/?month=2026-10&done=sent'))).text();
+  html = await (await request(await signed(sentLocation.replace(/#send$/, '')))).text();
+  expect(html).toContain('<form method="post" action="/month/sent/undo">');
   const today = new Date();
   const short = `${today.getUTCDate()} ${today.toUTCString().slice(8, 11)}`;
   expect(html).toContain(`<b>Send</b><span>Sent ${short}</span>`);
   expect(html).toContain('Marked October 2026 as sent.');
   expect(html).toContain('<a href="/?month=2026-11">On to November ›</a>');
-  expect(html).toContain('<li class="step done" id="send">');
+  expect(html).toContain('<li class="step done"><a href="#send">');
   expect(html).not.toContain('action="/month/sent"');
   const home = await (await request('/?month=2026-10')).text();
   expect(home).toContain(`<b>Send</b><span>Sent ${short}</span>`);
-  expect(home).toContain('<li class="step done" id="send">');
+  expect(home).toContain('<li class="step done"><a href="#send">');
 
   // Nothing changed yet, so there is no "changes" ZIP.
   const unchanged = await request('/month/package.zip?month=2026-10&changes=1');
@@ -364,7 +366,7 @@ test('package links and the sent form carry the base path; Access mode guards th
   form.set('month', '2026-10');
   form.set('receipts_hash', hash);
   const sent = await at('/app/month/sent', { method: 'POST', body: form });
-  expect(locationOf(sent)).toBe('/app/?month=2026-10&done=sent#send');
+  expect(locationOf(sent)).toMatch(/^\/app\/\?month=2026-10&done=sent&at=[\d\-T:.%A-Za-z]+#send$/);
 
   const accessEnv = {
     ...env,

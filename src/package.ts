@@ -399,7 +399,7 @@ export async function markSent(
   month: string,
   shownHash: string,
   method: 'download' | 'onedrive',
-): Promise<void> {
+): Promise<string> {
   const rows = await documentRows(env, month);
   requireInput(rows.length > 0, 'There are no receipts dated in this month to send.');
   const status = await sendStatus(env, month, rows);
@@ -410,9 +410,23 @@ export async function markSent(
   );
   let total = 0;
   for (const r of rows) if (r.kind !== 'sales') total += (await eurValue(env, r)).minor ?? 0;
+  const at = new Date().toISOString();
   await env.DB.prepare(
     'INSERT INTO month_sends (month,sent_at,method,file_count,total_minor,receipts_hash,receipts_json) VALUES (?,?,?,?,?,?,?)',
   )
-    .bind(month, new Date().toISOString(), method, rows.length, total, status.hash, JSON.stringify(status.list))
+    .bind(month, at, method, rows.length, total, status.hash, JSON.stringify(status.list))
     .run();
+  return at;
+}
+
+// The inverse of markSent: drop the send stamped at, so the month goes back to the
+// state it had before (the send before it, or not sent). Only the latest send can go;
+// an older one is history that a later send already replaced.
+export async function unmarkSent(env: Env, month: string, at: string): Promise<void> {
+  const removed = await env.DB.prepare(
+    'DELETE FROM month_sends WHERE month=? AND sent_at=? AND sent_at=(SELECT max(sent_at) FROM month_sends WHERE month=?)',
+  )
+    .bind(month, at, month)
+    .run();
+  requireInput(removed.meta.changes > 0, 'Send already replaced');
 }
