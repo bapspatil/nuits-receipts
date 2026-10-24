@@ -18,14 +18,14 @@ Screens: `/` → `/receipts/:id?done=uploaded` → `/` → `/settings` → `/set
 
 - Welcome screen says: Welcome Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare The
 - Landed on /receipts/:id with title "Sample Cloud Lantern Oy"
-- Home after the first receipt: Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c
+- Home after the first receipt: Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare Then forward one receipt to check it. Any email that reaches the app co
 - Saved: Saved your accountant.
 
 ### a. Mail arrives, every receipt approved
 
 Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast&month=2026-09&step=import`
 
-- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done DONE: Business name added So invoices you send are told apart from receipts. DONE: Email Routing confirmed A receipt arrived by email, so it wo
+- Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done DONE: Business name added So invoices you send are told apart from receipts. DONE: Email Routing confirmed An email reached the app, so it work
 - Review lists 3 receipts.
 - Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review.
 
@@ -47,7 +47,7 @@ Screens: `/receipts` → `/invoices` → `/add?kind=sales` → `/payments`
 
 ### c. September closed and marked sent
 
-Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A23%3A18.071Z`
+Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A48%3A03.733Z`
 
 - Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check All checked DONE: Match All matched NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Chec
 - Downloaded receipts-2026-09.zip
@@ -81,9 +81,11 @@ Screens: `/` → `/?month=2026-09&done=sent&at=2026-10-24T16%3A23%3A18.071Z`
 | [invoices](screens/invoices-1440.png) | 1440 | 1 | 0 |
 | [invoices](screens/invoices-390.png) | 390 | 1 | 0 |
 | [settings](screens/settings-1440.png) | 1440 | 1 | 0 |
-| [settings](screens/settings-390.png) | 390 | 1 | 0 |
-| [bank-likely](screens/bank-likely-1440.png) | 1440 | 2.5 | 0 |
-| [bank-likely](screens/bank-likely-390.png) | 390 | 2.67 | 0 |
+| [settings](screens/settings-390.png) | 390 | 1.04 | 0 |
+| [settings-mail](screens/settings-mail-1440.png) | 1440 | 1.16 | 0 |
+| [settings-mail](screens/settings-mail-390.png) | 390 | 1.31 | 0 |
+| [bank-likely](screens/bank-likely-1440.png) | 1440 | 2.54 | 0 |
+| [bank-likely](screens/bank-likely-390.png) | 390 | 2.71 | 0 |
 | [help](screens/help-1440.png) | 1440 | 1.58 | 0 |
 | [help](screens/help-390.png) | 390 | 2.24 | 0 |
 | [help-flags](screens/help-flags-1440.png) | 1440 | 1.78 | 0 |

@@ -9,7 +9,7 @@ import { config, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts, SETTINGS_CSP } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
-import { heldMail, ignoredSenders } from './inbound';
+import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
 import { heldSection } from './all';
 import { mergePlan } from './dedupe';
 import { readableText } from './receipts';
@@ -795,6 +795,7 @@ export async function payments(
         ).all<Receipt>()
       ).results
     : [];
+  const droppedRecently = missing.length ? await hasRecentDropped(env) : false;
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
@@ -877,7 +878,11 @@ export async function payments(
           : receipts.length
             ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
             : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
-        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${matchError(t.id)}`;
+        const dropped =
+          droppedRecently && !likely && !wait
+            ? `<p class="small"><a href="/settings?open=mail#mail">Check mail we didn't keep</a></p>`
+            : '';
+        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
         if (receipts.length && !wait) extra.push('<p><a href="/add">Add a receipt</a></p>');
         const sides = credits.filter(
           (c) => c.account_key !== t.account_key && c.currency === t.currency && c.amount_minor === -t.amount_minor,
@@ -1278,12 +1283,32 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
   return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
 }
 
+// Settings > Mail we didn't keep: what reached the app and was not read, from
+// the log that is already stored. Never the message itself.
+async function mailLogPart(env: Env, open: boolean): Promise<string> {
+  const rows = await droppedMail(env);
+  const allowed = config(env).allowedSenders;
+  const item = (m: (typeof rows)[number]) => {
+    const when = day(m.received_at.slice(0, 10), m.received_at.slice(0, 4) !== String(new Date().getUTCFullYear()));
+    const offer =
+      reasonAllows(m.reason) && !allowed.has(m.sender) && m.sender.includes('@') && !/[\s<>]/.test(m.sender);
+    const action = offer
+      ? `<form class="sc" action="/senders/approve" method="post"><input type="hidden" name="address" value="${escape(m.sender)}"><input type="hidden" name="back" value="mail"><button class="linkbtn" aria-label="Allow ${escape(m.sender)}">Allow this sender</button></form>`
+      : '';
+    return `<li class="srow"><div class="sl"><span class="flabel">${escape(m.sender)}</span><span class="meta">${escape(when)}${m.subject ? ` · ${escape(m.subject)}` : ''}</span><span class="meta">${escape(reasonWords(m.reason))}</span></div>${action}</li>`;
+  };
+  const body = rows.length
+    ? `<p class="meta">The latest ${rows.length === 1 ? 'one' : rows.length} that reached the app and were not read. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
+    : '<p>Every email that reached the app was kept.</p>';
+  return sect('mail', "Mail we didn't keep", rows.length ? String(rows.length) : 'None', body, open);
+}
+
 // The form that adds a bank account in Settings, as a failure scope names it.
 export const NEW_ACCOUNT = 'account:new';
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
-  const opened = feedback(params)?.section ?? '';
+  const opened = feedback(params)?.section ?? (params.get('open') === 'mail' ? 'mail' : '');
   const oneDrive = await oneDrivePart(env, opened === 'onedrive', origin);
   const setup = await setupParts(env, params, opened);
   const [accounts, rules] = await Promise.all([
@@ -1334,6 +1359,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     ),
     sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
     await sendersPart(env, opened === 'senders'),
+    await mailLogPart(env, opened === 'mail'),
     accountsPart,
     rulesPart,
     sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),

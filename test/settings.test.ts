@@ -157,6 +157,7 @@ test('the page is one fold per section, one Save per group and history tucked aw
     'setup-business',
     'setup-email',
     'senders',
+    'mail',
     'accounts',
     'rules',
     'setup-accountant',

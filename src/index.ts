@@ -37,7 +37,7 @@ import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
 import { FIELD, withSettings, type SettingKey } from './settings';
-import { approveSender, deleteHeld, ignoreSender, removeApproved, unignoreSender } from './inbound';
+import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
@@ -92,7 +92,9 @@ async function formData(request: Request, limit: number): Promise<FormData> {
 // where to go back to: Review (default), Settings or All receipts.
 async function senderAction(request: Request, env: Env, path: string, who: string, ctx: Waiter): Promise<Response> {
   const form = await formData(request, 4096);
-  const back = ({ settings: '/settings', receipts: '/receipts' } as Record<string, string>)[String(form.get('back'))];
+  const back = ({ settings: '/settings', mail: '/settings', receipts: '/receipts' } as Record<string, string>)[
+    String(form.get('back'))
+  ];
   const address = form.get('address');
   let event: EventKey, n: number | undefined;
   if (path === '/senders/approve') [event, n] = ['mailAllowed', await approveSender(env, address, who, ctx)];
@@ -109,6 +111,9 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
     await unignoreSender(env, address);
     event = 'senderUnignored';
   } else return new Response('Not found', { status: 404 });
+  // Allow this sender, from the mail log: the banner names them and offers Undo.
+  if (path === '/senders/approve' && form.get('back') === 'mail')
+    return redirect(withDone('senderAllowed', '/settings#mail', { sender: senderAddress(address), n }));
   const settings = back === '/settings';
   return redirect(
     withDone(event, settings ? '/settings#senders' : (back ?? '/review'), { n, from: settings ? 'settings' : null }),

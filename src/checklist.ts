@@ -29,8 +29,12 @@ export async function setupSteps(env: Env): Promise<SetupStep[]> {
   const address = !!settings.receiptAddress;
   // The migration seeds one account, "Bank account"; until it is renamed or another is added, the person has none of their own.
   const own = accounts.some((a) => !(a.id === 'default-account' && a.label === 'Bank account' && !a.bank_name));
-  // Email Routing can't be asked of Cloudflare, so a receipt that arrived by email is the proof.
-  const routed = address && !!state?.mail;
+  // Email Routing can't be asked of Cloudflare, so an email that reached the app is the proof, even one that was not kept.
+  // The log has a row for every email that arrived, kept or not. Missing before its migration.
+  const logged = await env.DB.prepare('SELECT EXISTS(SELECT 1 FROM inbound_mail) n')
+    .first<number>('n')
+    .catch(() => 0);
+  const routed = address && (!!state?.mail || !!logged);
   return [
     {
       id: 'business',
@@ -46,9 +50,9 @@ export async function setupSteps(env: Env): Promise<SetupStep[]> {
       action: address ? 'Confirm Email Routing in Cloudflare' : 'Set your receipt address',
       finished: 'Email Routing confirmed',
       why: routed
-        ? 'A receipt arrived by email, so it works.'
+        ? 'An email reached the app, so it works.'
         : address
-          ? 'Then forward one receipt to check it. A receipt that arrives by email completes this.'
+          ? 'Then forward one receipt to check it. Any email that reaches the app completes this.'
           : 'So receipts you forward are read.',
       href: address ? '/settings?routing=1#setup-email' : '/settings#f-RECEIPT_ADDRESS',
     },

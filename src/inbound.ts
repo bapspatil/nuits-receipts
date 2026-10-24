@@ -47,6 +47,58 @@ export type MailFacts = {
   emailKey?: string | null;
 };
 
+// What each logged reason means, in words for the person. `allow` marks the
+// reasons where the sender was simply not on the list, so the log offers
+// "Allow this sender". test/mail-log.test.ts holds this to every reason the code logs.
+export const MAIL_REASONS = {
+  allowed: { words: 'Read normally.', allow: false },
+  sender_approved: { words: 'Read after you allowed the sender.', allow: false },
+  sender_unverified: { words: "We couldn't confirm who sent it.", allow: false },
+  sender_auth_failed: {
+    words: 'Failed the sender check (SPF or DKIM), so it may not be from who it says.',
+    allow: false,
+  },
+  sender_not_allowed: { words: 'Sender not allowed. Waiting in Review.', allow: true },
+  sender_ignored: { words: 'Sender not allowed: you chose to ignore them.', allow: true },
+  held_limit: { words: 'Sender not allowed, and too many of their emails were already waiting.', allow: true },
+  deleted: { words: 'Sender not allowed: you deleted this email from Review.', allow: true },
+  duplicate: { words: 'Already received: the same message is waiting or was read.', allow: false },
+  email_too_large: { words: 'Too large to read.', allow: false },
+  original_missing: { words: 'Its saved copy was gone, so it could not be read.', allow: false },
+} as const satisfies Record<string, { words: string; allow: boolean }>;
+export const reasonWords = (reason: string): string =>
+  (MAIL_REASONS as Record<string, { words: string }>)[reason]?.words ?? 'Not kept.';
+export const reasonAllows = (reason: string): boolean =>
+  (MAIL_REASONS as Record<string, { allow: boolean }>)[reason]?.allow ?? false;
+
+// Mail that was not kept, newest first. Only what the log stores, never the message.
+export type DroppedMail = Pick<MailRow, 'id' | 'received_at' | 'sender' | 'subject' | 'reason'>;
+export async function droppedMail(env: Env, limit = 50): Promise<DroppedMail[]> {
+  try {
+    return (
+      await env.DB.prepare(
+        "SELECT id,received_at,sender,subject,reason FROM inbound_mail WHERE state IN ('dropped','ignored') ORDER BY received_at DESC,id DESC LIMIT ?",
+      )
+        .bind(limit)
+        .all<DroppedMail>()
+    ).results;
+  } catch {
+    return [];
+  }
+}
+export async function hasRecentDropped(env: Env, days = 60): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    return !!(await env.DB.prepare(
+      "SELECT 1 FROM inbound_mail WHERE state IN ('dropped','ignored') AND received_at>=? LIMIT 1",
+    )
+      .bind(since)
+      .first());
+  } catch {
+    return false;
+  }
+}
+
 export function domainOf(address: string): string {
   return address.slice(address.lastIndexOf('@') + 1);
 }

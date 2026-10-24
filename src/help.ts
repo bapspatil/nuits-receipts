@@ -58,6 +58,11 @@ const GLOSSARY: readonly HelpEntry[] = [
     term: 'Email Routing',
     text: 'A Cloudflare feature that hands the mail sent to your receipt address to this app. You add a rule once, in Cloudflare under Email, Email Routing, with the action Send to a Worker. The app can’t add it for you. It is confirmed when a forwarded receipt arrives.',
   },
+  {
+    ids: ['mail-not-kept'],
+    term: "Mail we didn't keep",
+    text: 'Email that reached the app but was not read: from a sender that is not allowed, one that failed the sender check, a duplicate, or one too large. Settings, Email shows the latest 50 with the date, sender, subject and why. The message itself is never shown. If the sender is one you trust, press Allow this sender.',
+  },
 ];
 
 const MATCHING: readonly HelpEntry[] = [

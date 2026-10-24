@@ -161,6 +161,22 @@ export const EVENTS = {
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
   mailDeleted: { text: () => 'Email deleted.', section: (p) => (p.get('from') === 'settings' ? 'senders' : null) },
+  // Allow this sender, from Settings > Mail we didn't keep. Undo takes them off the list again.
+  senderAllowed: {
+    text: (p) => {
+      const sender = words(p, 'sender', 'The sender');
+      return count(p, 'n')
+        ? `Allowed ${sender}. Reading ${plural(count(p, 'n'), 'email')}.`
+        : `Allowed ${sender}. Their next emails will be read.`;
+    },
+    undo: (p) => {
+      const sender = p.get('sender') ?? '';
+      return /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/.test(sender) && sender.length <= 254
+        ? { action: '/senders/remove', fields: { address: sender, back: 'settings' } }
+        : null;
+    },
+    section: () => 'mail',
+  },
   senderRemoved: { text: () => 'Sender removed.', section: () => 'senders' },
   senderUnignored: { text: () => 'No longer ignored.', section: () => 'senders' },
   // ---------- Bank ----------

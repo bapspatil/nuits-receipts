@@ -250,6 +250,16 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     receiptHtml({ vendor: 'Sample Poster Studio', issue_date: '2026-09-21' }),
   );
   await page.waitForTimeout(1500);
+  // One email from a sender that is not allowed, then ignored, so Settings > Mail we didn't keep has a row.
+  await sendEmail(
+    'tour-unknown',
+    'billing@unknown-shop.example',
+    receiptHtml({ vendor: 'Sample Unknown Shop', issue_date: '2026-09-22' }),
+  );
+  await page.waitForTimeout(1000);
+  await page.goto(base + '/review');
+  await page.getByRole('button', { name: 'Ignore billing@unknown-shop.example', exact: true }).click();
+  await page.waitForLoadState('load');
   await page.goto(base + '/review');
   const flagged = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
   await page.goto(base + '/invoices?month=2026-09');
@@ -277,6 +287,7 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'add', path: '/add' },
     { name: 'invoices', path: '/invoices?month=2026-09' },
     { name: 'settings', path: '/settings' },
+    { name: 'settings-mail', path: '/settings?open=mail#mail' },
     // Last: it undoes the matches, so the screens above keep the settled month.
     { name: 'bank-likely', path: '/payments?month=2026-09&show=missing', prepare: () => unsettleBank(page, base) },
     { name: 'help', path: '/help' },
