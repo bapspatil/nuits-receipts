@@ -11,6 +11,7 @@ import { holdUnknown, logMail, mailFacts } from './inbound';
 import { config, isProduct, parseForwardCopyTo } from './config';
 import {
   date,
+  decimalText,
   minor,
   EXPENSE_TYPES,
   EXPONENTS,
@@ -38,6 +39,7 @@ import {
   type SalesFacts,
 } from './domain';
 import { SALES_DERIVED, salesReview } from './sales';
+import { REQUIRED_FIELDS, REQUIRED_SALES_FIELDS } from './flags';
 import { parseDocument } from './parse';
 
 export async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
@@ -156,6 +158,27 @@ export async function documentText(bytes: Uint8Array, media: string): Promise<st
   if (media === 'text/plain') return cleanText(new TextDecoder().decode(bytes));
   requireInput(media.startsWith('image/'), 'unsupported_document');
   return '';
+}
+// The text of an original that can't be shown as an image (what the reader read), for the receipt
+// page. Null when there is none, or it can't be read.
+export async function readableText(
+  env: Env,
+  r: Pick<Receipt, 'original_key' | 'media_type'>,
+  limit = 20000,
+): Promise<string | null> {
+  try {
+    const stored = await env.ORIGINALS.get(r.original_key);
+    if (!stored) return null;
+    const bytes = new Uint8Array(await stored.arrayBuffer());
+    let text: string;
+    if (r.media_type === 'message/rfc822') {
+      const mail = await PostalMime.parse(bytes);
+      text = cleanText(mail.text || (await visibleText(mail.html || '')));
+    } else text = await documentText(bytes, r.media_type);
+    return text.trim().slice(0, limit) || null;
+  } catch {
+    return null;
+  }
 }
 export async function getReceipt(env: Env, id: string): Promise<Receipt> {
   const row = await env.DB.prepare('SELECT * FROM receipts WHERE id=?').bind(id).first<Receipt>();
@@ -619,10 +642,10 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
   if (facts.due_date) inField('due_date', () => date(facts.due_date!));
   if (facts.currency) requireInput(/^[A-Z]{3}$/.test(facts.currency), 'Invalid currency', 422, 'currency');
   for (const key of ['total', 'net', 'vat'] as const) {
-    const value = String(form.get(key) ?? '').trim();
+    const value = decimalText(String(form.get(key) ?? ''));
     facts[`${key}_minor`] = value ? inField(key, () => minor(value, facts.currency ?? '')) : null;
   }
-  const rate = String(form.get('vat_rate') ?? '').trim();
+  const rate = decimalText(String(form.get('vat_rate') ?? ''));
   facts.vat_rate_bps = rate ? inField('vat_rate', () => minor(rate, 'EUR')) : null;
   requireInput(
     facts.vat_rate_bps === null || (facts.vat_rate_bps >= 0 && facts.vat_rate_bps <= 10000),
@@ -641,7 +664,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     422,
     'product',
   );
-  const eur = String(form.get('eur_override') ?? '').trim(),
+  const eur = decimalText(String(form.get('eur_override') ?? '')),
     eurReason = String(form.get('eur_override_reason') ?? '').trim();
   requireInput(!eur || eurReason.length > 0, 'EUR override needs reason', 422, 'eur_override_reason');
   const override = eur ? inField('eur_override', () => minor(eur, 'EUR')) : null;
@@ -678,6 +701,15 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     ]),
   ];
   if (approved) {
+    const missing: Record<string, boolean> = {
+      vendor: !facts.vendor,
+      issue_date: !facts.issue_date,
+      currency: !facts.currency || EXPONENTS[facts.currency] === undefined,
+      total: facts.total_minor === null,
+      net: facts.net_minor === null,
+      vat: facts.vat_minor === null,
+      client: isSales && !sales.client,
+    };
     requireInput(approval.length > 0, 'Approval needs a reason', 422, 'approval_reason');
     requireInput(
       facts.vendor &&
@@ -693,16 +725,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
         : 'Complete required facts before approval',
       422,
       // The first missing fact, in the order the form lists them.
-      (
-        [
-          ['vendor', !facts.vendor],
-          ['issue_date', !facts.issue_date],
-          ['currency', !facts.currency || EXPONENTS[facts.currency] === undefined],
-          ['total', facts.total_minor === null],
-          ['net', facts.net_minor === null],
-          ['vat', facts.vat_minor === null],
-        ] as const
-      ).find(([, missing]) => missing)?.[0] ?? 'client',
+      (isSales ? REQUIRED_SALES_FIELDS : REQUIRED_FIELDS).find((f) => missing[f]) ?? 'client',
     );
   }
   const manual = {

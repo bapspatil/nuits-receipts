@@ -187,6 +187,17 @@ export function date(value: string): string {
   );
   return value;
 }
+// What a person types for an amount, as the dot form minor() reads: "30,00" and "30.00"
+// are both thirty; "1.234,56" and "1,234.56" are both 1234.56; spaces only group digits.
+export function decimalText(value: string): string {
+  const text = value.trim().replace(/[\s\u00a0\u202f']/g, '');
+  const comma = text.lastIndexOf(','),
+    dot = text.lastIndexOf('.');
+  if (comma < 0) return text;
+  const commas = text.split(',').length - 1;
+  if (dot < 0 && commas > 1) return text.replaceAll(',', '');
+  return dot > comma ? text.replaceAll(',', '') : text.replaceAll('.', '').replace(',', '.');
+}
 export function minor(value: string | number, currency: string): number {
   const exponent = EXPONENTS[currency];
   requireInput(exponent !== undefined, 'Unsupported currency');

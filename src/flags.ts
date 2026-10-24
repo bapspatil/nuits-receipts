@@ -43,6 +43,22 @@ export type Flag = {
   action?: 'retry' | 'upload' | 'move';
 };
 
+// The facts Approve refuses without, in the order the form lists them. A flag is
+// required when it asks for one of these; every other flag is optional: it never
+// blocks Approve, so it is shown neutral. 'client' is for sales invoices only.
+export const REQUIRED_FIELDS = [
+  'vendor',
+  'issue_date',
+  'currency',
+  'total',
+  'net',
+  'vat',
+] as const satisfies readonly FlagField[];
+export const REQUIRED_SALES_FIELDS = [...REQUIRED_FIELDS, 'client'] as const satisfies readonly FlagField[];
+export function isRequired(flag: Pick<Flag, 'fields'>): boolean {
+  return flag.fields.some((f) => (REQUIRED_SALES_FIELDS as readonly string[]).includes(f));
+}
+
 const CORE: readonly FlagField[] = ['vendor', 'issue_date', 'currency', 'total', 'net', 'vat'];
 const seller: Flag = {
   group: 'Seller',
