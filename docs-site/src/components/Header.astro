@@ -65,7 +65,7 @@ const resolveSectionHref = (href: string): string =>
     <div class="flex items-center gap-3 min-w-0">
       <slot name="brand">
         {/* The mark alone; the site title stays as the link's accessible name. */}
-        <a href={homeHref} class="flex shrink-0 items-center text-foreground transition-opacity hover:opacity-70">
+        <a href={homeHref} class="relative flex shrink-0 items-center text-foreground transition-opacity hover:opacity-70 max-sm:after:absolute max-sm:after:-inset-2.5">
           <Logo class="h-6 w-6 shrink-0" />
           <span class="ms-2 hidden font-display text-[1.0625rem] font-bold tracking-tight sm:inline">{config.title}</span>
           <span class="sr-only sm:hidden">{config.title}</span>
@@ -92,7 +92,7 @@ const resolveSectionHref = (href: string): string =>
       )}
     </div>
 
-    <div class="flex items-center gap-2 shrink-0">
+    <div data-header-actions class="flex items-center gap-3 md:gap-2 shrink-0">
       <slot name="actions" />
       <a href="https://receipts.nuits.net/" class="hidden rounded-md px-2 py-1 text-[0.8125rem] font-medium text-muted-foreground no-underline transition-colors hover:bg-accent/60 hover:text-foreground sm:inline">Home</a>
       {config.search !== false && <SearchTrigger />}

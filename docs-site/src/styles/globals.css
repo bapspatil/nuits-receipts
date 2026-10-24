@@ -451,6 +451,12 @@ pre.astro-code span {
 	.nb-code-copy {
 		opacity: 1;
 	}
+	/* The 28px button gets a 44px hit area for a finger. */
+	.nb-code-copy::after {
+		content: "";
+		position: absolute;
+		inset: -8px;
+	}
 	.nb-code-figure[data-nb-lang]:not(.nb-code-figure-titled)::before {
 		display: none;
 	}
@@ -813,5 +819,29 @@ body:not(:has([data-mobile-sidebar])) [data-menu-btn] {
 @media (max-width: 47.999rem) {
 	:root:has([data-nb-header-tabs]) {
 		--nb-header-height: 6rem;
+	}
+}
+
+/* Phones: small controls get an invisible 44px hit area. The header's icon
+   controls draw at 32-34px; the 12px gap between them on phones
+   (Header.astro) keeps neighbouring hit areas from overlapping. */
+@media (max-width: 47.999rem) {
+	[data-header-actions] > :is(a, button) {
+		position: relative;
+	}
+	[data-header-actions] > :is(a, button)::after {
+		content: "";
+		position: absolute;
+		inset: -6px;
+	}
+	/* Copy page and View as Markdown: 28px rows, 44px to a finger. */
+	[data-nb-page-actions] > :is(a, button) {
+		position: relative;
+	}
+	[data-nb-page-actions] > :is(a, button)::after {
+		content: "";
+		position: absolute;
+		inset-block: -8px;
+		inset-inline: 0;
 	}
 }

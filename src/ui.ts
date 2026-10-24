@@ -93,14 +93,16 @@ function styles(base: string): string {
 ${TOKENS_CSS}
 :root{--pad:max(clamp(16px,4vw,32px),env(safe-area-inset-left),env(safe-area-inset-right))}
 *,*::before,*::after{box-sizing:border-box}
+button{font:inherit}
 html{background:var(--surface-page);color:var(--text);font:400 var(--text-base)/1.5 var(--font-ui);font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;overflow-wrap:break-word}
 a{color:var(--accent);text-underline-offset:.2em;text-decoration-thickness:1px}
 a:hover{text-decoration-thickness:2px}
 :focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;box-shadow:0 0 0 2px var(--surface-page)}
-.skip{position:absolute;left:-9999px;top:8px}.skip:focus{left:16px;z-index:9;background:var(--surface-raised);padding:var(--space-2) var(--space-3);border:1px solid var(--border-strong)}
+.skip{position:absolute;left:16px;top:8px}.skip:not(:focus){width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.skip:focus{z-index:9;background:var(--surface-raised);padding:var(--space-2) var(--space-3);border:1px solid var(--border-strong)}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-h1,h2,h3{color:var(--text)}
+h1,h2,h3{color:var(--text);text-wrap:balance}
+p,li,dd{text-wrap:pretty}
 h1{font-family:var(--font-display);font-size:var(--text-2xl);line-height:1.15;font-weight:700;margin:0}
 h2{font-size:var(--text-lg);line-height:1.2;font-weight:600;margin:0 0 var(--space-3)}
 h3{font-size:var(--text-base);line-height:1.25;font-weight:600;margin:0 0 var(--space-2)}
@@ -128,9 +130,9 @@ footer.foot a{color:var(--text-muted)}
 .warning{color:var(--danger);font-weight:600}
 .months{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1);flex:1 1 auto;min-width:0}
 .months h1{order:-1;flex:1 1 12rem}
-.months a{flex:none;padding:0 var(--space-3);min-height:44px;display:inline-flex;align-items:center;text-decoration:none;font-size:var(--text-sm);font-weight:500;color:var(--text-muted);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.months a{flex:none;padding:0 var(--space-3);min-height:44px;display:inline-flex;align-items:center;gap:var(--space-1);text-decoration:none;font-size:var(--text-sm);font-weight:500;color:var(--text-muted);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-sm)}
 .months a:hover{color:var(--text);border-color:var(--border-strong)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--btn-height);padding:0 var(--space-4);border-radius:var(--radius-sm);font:600 var(--text-sm)/1.2 var(--font-ui);text-decoration:none;border:1px solid var(--border-strong);cursor:pointer;text-align:center;background:var(--surface-raised);color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--btn-height);padding:0 var(--space-4);border-radius:var(--radius-sm);font:600 var(--text-base)/1.2 var(--font-ui);text-decoration:none;border:1px solid var(--border-strong);cursor:pointer;text-align:center;background:var(--surface-raised);color:var(--text)}
 .btn:hover{border-color:var(--text)}
 .btn.primary{background:var(--btn-primary-bg);color:var(--btn-primary-text);border-color:var(--btn-primary-bg)}
 .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
@@ -162,7 +164,9 @@ label.check{display:flex;gap:var(--space-2);align-items:center;min-height:44px;f
 label.check input{width:22px;height:22px;min-height:0;margin:1px 0 0;flex:none;accent-color:var(--accent)}
 input,select,textarea{font:400 var(--text-base)/1.3 var(--font-ui);min-height:var(--field-height);padding:var(--space-2) var(--space-3);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-raised);color:var(--text);width:100%;max-width:100%}
 input:hover,select:hover,textarea:hover{border-color:var(--text)}
-input[type=file]{padding:var(--space-2)}
+input[type=file]{padding:var(--space-2);cursor:pointer}
+input[type=file]::file-selector-button{font:600 var(--text-sm)/1.2 var(--font-ui);color:var(--text);background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);margin-right:var(--space-3);cursor:pointer}
+input[type=file]:hover::file-selector-button{border-color:var(--text)}
 input[aria-invalid=true],select[aria-invalid=true],textarea[aria-invalid=true]{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
 input[type=checkbox][aria-invalid=true],input[type=radio][aria-invalid=true]{outline:2px solid var(--danger);outline-offset:2px}
 input::placeholder{color:var(--text-muted);opacity:1}
@@ -227,9 +231,11 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .setup .small a,.settings>.small a{display:inline-flex;align-items:center;min-height:44px}
 .sentq{margin:var(--space-4) 0 0;padding-top:var(--space-3);border-top:1px solid var(--border)}.sentq h3{margin:0 0 var(--space-2)}.why strong{color:var(--text)}.why a{font-weight:600}
 .next{margin:0 0 var(--space-5)}
-.next .btn.primary{min-height:calc(var(--btn-height) + var(--space-1));padding:0 var(--space-5);font-size:var(--text-base)}
+.next .btn.primary{min-height:calc(var(--btn-height) + var(--space-1));padding:0 var(--space-5)}
 .send .btns{margin:var(--space-3) 0}.dated{margin:var(--space-4) 0 0}.dated a{display:inline-flex;align-items:center;min-height:44px}
 .fixes>details.more{margin-top:var(--space-4)}
+details.more>.body>p>a{display:inline-flex;align-items:center;min-height:44px}
+details.more>.body .linkbtn{padding-inline:0;font-weight:400}
 .crumbs{display:flex;align-items:center;gap:var(--space-2) var(--space-4);margin:0 0 var(--space-2);font-size:var(--text-sm)}.crumbs a,.crumbs .linkbtn{min-height:44px;display:inline-flex;align-items:center}.crumbs a+a,.crumbs .linkbtn{margin-left:auto;padding:0}
 .head .amt{font:600 var(--text-lg)/1.2 var(--font-ui);margin-left:auto}
 .fix h2{margin:0 0 var(--space-2)}.fix details.all,.fix details.note{margin:var(--space-3) 0 0}
@@ -256,7 +262,7 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .fix .srow{grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:var(--space-1) var(--space-4);padding:var(--space-2) 0}
 .fix .sl .meta{line-height:1.35}
 .match{background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:var(--space-4);margin-bottom:var(--space-3)}
-.sbar{position:sticky;bottom:0;z-index:4;background:var(--surface-raised);border-top:1px solid var(--border-strong);padding:var(--space-2) 0;margin-top:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);align-items:center}
+.sbar{position:sticky;bottom:0;z-index:4;background:var(--surface-raised);border-top:1px solid var(--border-strong);padding:var(--space-2);margin-top:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);align-items:center}
 .sbar .prog{font-size:var(--text-sm);font-weight:600;white-space:nowrap}
 .sbar>.btn:last-child{margin-left:auto}
 .sbar>.linkbtn{padding:0 var(--space-2)}
@@ -342,6 +348,7 @@ details.add>.scroll{padding:0 var(--space-4) var(--space-4)}
 details.group>summary{font:600 var(--text-base)/1.3 var(--font-ui)}
 .kv{margin:0}
 .kv>div{display:grid;grid-template-columns:minmax(0,14rem) minmax(0,1fr);gap:var(--space-1) var(--space-5);padding:var(--space-3) 0;border-bottom:1px solid var(--border)}
+.kv>div:last-child{border-bottom:0}
 .kv dt{font-weight:600}.kv dd{margin:0;min-width:0}
 .cta{margin:var(--space-3) 0}
 .parts{gap:var(--space-2)}
@@ -389,7 +396,6 @@ ol.how{margin:var(--space-1) 0 var(--space-4);padding-left:var(--space-5)}ol.how
 }
 @media (max-width:640px){
 .save .btn{width:100%}
-.btn{font-size:var(--text-base)}
 table.stack,table.stack tbody,table.stack tr,table.stack td{display:block;width:100%}
 table.stack thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 table.stack tr{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border)}
@@ -451,6 +457,7 @@ details.discard>summary{padding:0 0 0 var(--space-2);font-size:var(--text-sm);co
 details.discard>summary::-webkit-details-marker{display:none}
 details.discard[open]{grid-column:1/-1;grid-row:3;justify-self:stretch}
 details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
+.sbar>details.discard>.body{padding:var(--space-3) var(--space-4)}
 .reasons{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
 .chip{min-height:44px;padding:0 var(--space-4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-raised);font:inherit;font-weight:600;font-size:var(--text-sm);color:var(--text);cursor:pointer}
 .chip:hover,.chip:focus-visible{border-color:var(--text)}
@@ -758,11 +765,13 @@ export function plural(n: number, one: string, many = one + 's'): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 export function monthSwitcher(path: string, selected: string): string {
-  const link = (m: string, text: string) =>
-    `<a href="${path}?month=${m}" aria-label="${escape(monthName(m))}">${text}</a>`;
+  // The name keeps the visible "Aug" and adds the year, so it says what the
+  // link shows (WCAG 2.5.3) and the arrows stay out of it.
+  const label = (m: string) => `${monthName(m, false).slice(0, 3)}<span class="vh"> ${m.slice(0, 4)}</span>`;
+  const link = (m: string, text: string) => `<a href="${path}?month=${m}">${text}</a>`;
   const prev = shiftMonth(selected, -1),
     next = shiftMonth(selected, 1);
-  return `<div class="months" role="group" aria-label="Month">${link(prev, `‹ ${monthName(prev, false).slice(0, 3)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${monthName(next, false).slice(0, 3)} ›`)}</div>`;
+  return `<div class="months" role="group" aria-label="Month">${link(prev, `<span aria-hidden="true">‹</span>${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}<span aria-hidden="true">›</span>`)}</div>`;
 }
 // A stamp only when the receipt needs you; quiet text otherwise, nothing when ready.
 export function stamp(receipt: Pick<Receipt, 'status'>, match: 'automatic' | 'manual' | null = null): string {
