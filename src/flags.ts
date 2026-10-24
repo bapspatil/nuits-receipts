@@ -1,3 +1,6 @@
+// A flag's title is a question when it asks for a fact ("What was the total?") and a short
+// instruction when there is something to do ("Type the key numbers in."). Never a statement of
+// what is wrong; the body says that. test/flags.test.ts holds every title to one of the two.
 // Plain-language copy for every review reason code the app emits (see
 // docs/APP-REDESIGN-PLAN.md §6). Codes that describe the same problem share one
 // entry, so the receipt page shows one card per problem. Raw codes stay in the
@@ -68,8 +71,8 @@ const seller: Flag = {
 };
 const issueDate: Flag = {
   group: 'Date',
-  title: 'No date on it.',
-  body: 'Copy the issue date from the receipt.',
+  title: 'What is the date?',
+  body: 'There is no date on it. Copy the issue date from the receipt.',
   fields: ['issue_date'],
 };
 const currency: Flag = {
@@ -86,13 +89,13 @@ const total: Flag = {
 };
 const net: Flag = {
   group: 'Amounts',
-  title: 'Amount before VAT is missing.',
-  body: "Enter it, or the total if there's no VAT.",
+  title: 'What was the amount before VAT?',
+  body: "It's missing. Enter it, or the total if there's no VAT.",
   fields: ['net'],
 };
 const vat: Flag = {
   group: 'Amounts',
-  title: 'VAT amount is missing.',
+  title: 'What was the VAT amount?',
   body: 'Enter 0 if the receipt has no VAT.',
   fields: ['vat'],
 };
@@ -120,8 +123,9 @@ export const FLAGS: Readonly<Record<string, Flag>> = {
   uncertain_currency: currency,
   unsupported_currency: {
     group: 'Amounts',
-    title: "We don't know this currency.",
-    body: (r) => `${r.currency ?? 'This code'} can't be converted. Fix it, or enter the euro amount.`,
+    title: 'What is this currency in euros?',
+    body: (r) =>
+      `We don't know ${r.currency ?? 'this currency'}, so it can't be converted. Fix it, or enter the euro amount.`,
     fields: ['currency', 'eur_override'],
   },
   missing_total: total,
@@ -134,31 +138,31 @@ export const FLAGS: Readonly<Record<string, Flag>> = {
   uncertain_vat_rate: vatRate,
   vat_mismatch: {
     group: 'Amounts',
-    title: "The numbers don't add up.",
+    title: 'Do the amounts add up?',
     body: 'Before VAT plus VAT should equal the total.',
     fields: ['net', 'vat', 'total'],
   },
   vat_rate_mismatch: {
     group: 'Amounts',
-    title: "VAT doesn't match the rate.",
+    title: 'Does the VAT match the rate?',
     body: "The VAT isn't that % of the amount before VAT.",
     fields: ['vat', 'vat_rate'],
   },
   credit_or_sign: {
     group: 'Amounts',
-    title: 'This looks like a refund or credit note.',
+    title: 'Is this a refund or credit note?',
     body: "One of the amounts is negative. Approve it if that's right.",
     fields: [],
   },
   missing_invoice_number: {
     group: 'Details',
-    title: 'No receipt number.',
-    body: "Leave it blank if there isn't one.",
+    title: 'What is the receipt number?',
+    body: "There isn't one on it. Leave it blank if the receipt has none.",
     fields: ['invoice_number'],
   },
   missing_eur: {
     group: 'Euro amount',
-    title: 'No euro amount yet.',
+    title: 'Why is there no euro amount?',
     body: "It fills in from your bank or the ECB rate. Different on your bank? See 'Paid in another currency?'.",
     fields: [],
   },
@@ -176,67 +180,76 @@ export const FLAGS: Readonly<Record<string, Flag>> = {
   },
   classification_failed: {
     group: 'Filing',
-    title: "We couldn't file this automatically.",
-    body: 'Pick where it belongs.',
+    title: 'Where does this belong?',
+    body: "We couldn't file it automatically. Pick where it belongs.",
     fields: ['product', 'expense_type'],
   },
   rule_conflict: {
     group: 'Filing',
-    title: 'Two of your rules disagree.',
-    body: 'Several vendor rules match. Pick one here; tidy them in Settings.',
+    title: 'Which rule should win?',
+    body: 'Two of your rules disagree. Pick one here; tidy them in Settings.',
     fields: ['product', 'expense_type'],
   },
   probable_duplicate: {
     group: 'Duplicate',
-    title: 'Looks like one we already have.',
-    body: 'Same seller, number, date and total as another. Pick it to keep it out of the export.',
+    title: 'Is this one we already have?',
+    body: 'It looks like it: same seller, number, date and total as another. Pick it to keep it out of the export.',
     fields: ['duplicate_of'],
   },
   sender_unverified: {
     group: 'Source',
-    title: "We couldn't verify who sent this email.",
-    body: 'Kept but not read. Check the email is genuine, then have it read.',
+    title: 'Is this email genuine?',
+    body: "We couldn't verify who sent it. Kept but not read. Check it, then have it read.",
     fields: [],
     action: 'retry',
   },
-  email_skipped_parts: typeIn('Some attachments were skipped.', 'Download the email to check nothing is missing.'),
-  mime_failed: typeIn("We couldn't open this email.", 'Download it, then type the numbers in or upload the receipt.'),
+  email_skipped_parts: typeIn(
+    'Is anything missing from the email?',
+    'Some attachments were skipped. Download the email to check.',
+  ),
+  mime_failed: typeIn(
+    'Open the email and type the numbers in.',
+    "We couldn't open it. Download it, then type the numbers in or upload the receipt.",
+  ),
   pdf_no_text: {
-    ...typeIn('This PDF has no readable text.', 'Probably a scan. Type the numbers in, or upload a photo.'),
+    ...typeIn('Type the numbers in, or upload a photo.', 'This PDF has no readable text. Probably a scan.'),
     action: 'upload',
   },
-  pdf_too_large: typeIn('This PDF is too big to read.', 'Type the key numbers in from the original.'),
-  pdf_too_many_pages: typeIn('This PDF has too many pages to read.', 'Type the key numbers in from the original.'),
+  pdf_too_large: typeIn('Type the key numbers in.', 'This PDF is too big to read. Copy them from the original.'),
+  pdf_too_many_pages: typeIn(
+    'Type the key numbers in.',
+    'This PDF has too many pages to read. Copy them from the original.',
+  ),
   unsupported_document: {
-    ...typeIn("We can't read this file type.", 'Upload a PDF or a photo instead, or type the numbers in.'),
+    ...typeIn('Upload a PDF or a photo.', "We can't read this file type. Or type the numbers in."),
     action: 'upload',
   },
   original_missing: {
-    ...typeIn('The original file is missing.', 'Upload it again if you have it.'),
+    ...typeIn('Upload the original again.', 'The original file is missing. Upload it if you still have it.'),
     action: 'upload',
   },
   input_truncated: {
     group: 'Source',
-    title: 'This was long, so we only read the start.',
-    body: 'Check the amounts against the original.',
+    title: 'Do the amounts match the original?',
+    body: 'This was long, so we only read the start. Check the amounts against the original.',
     fields: ['total', 'net', 'vat'],
   },
   model_truncated: retry(
-    'The reader stopped early.',
-    'Some details may be missing. Check them, or have it read again.',
+    'Check the details, or read it again.',
+    'The reader stopped early, so some details may be missing.',
   ),
   // ---------- Sales invoices ----------
   seller_mismatch: {
     group: 'Seller',
-    title: "This doesn't look like an invoice you sent.",
+    title: 'Did you send this invoice?',
     body: "The seller isn't one of your business names. Fix it, or move it to receipts.",
     fields: ['vendor'],
     action: 'move',
   },
   invoice_no_attachment: {
     group: 'Source',
-    title: 'The email had no invoice attached.',
-    body: 'Forward it again with the PDF attached, or upload the invoice here.',
+    title: 'Where is the invoice?',
+    body: 'The email had no invoice attached. Forward it again with the PDF attached, or upload the invoice here.',
     fields: [],
     action: 'upload',
   },
@@ -254,8 +267,8 @@ export const FLAGS: Readonly<Record<string, Flag>> = {
   },
   reverse_charge_without_vat_id: {
     group: 'Details',
-    title: "Reverse charge needs the client's VAT number.",
-    body: 'As on the invoice, for example DE123456789.',
+    title: "What is the client's VAT number?",
+    body: 'Reverse charge needs it, as on the invoice, for example DE123456789.',
     fields: ['client_vat_id', 'client_country'],
   },
   reverse_charge_domestic_client: {
@@ -266,26 +279,26 @@ export const FLAGS: Readonly<Record<string, Flag>> = {
   },
   vat_treatment_mismatch: {
     group: 'Amounts',
-    title: "The VAT doesn't fit how it was handled.",
+    title: 'Does the VAT fit how it was handled?',
     body: 'Only invoices with Finnish VAT charged have VAT.',
     fields: ['vat', 'vat_treatment'],
   },
   domestic_rate_unexpected: {
     group: 'Amounts',
-    title: "That isn't a Finnish VAT rate.",
-    body: 'Rates are 25.5 %, 14 % and 10 % (24 % before September 2024).',
+    title: 'Which Finnish VAT rate applies?',
+    body: "That isn't one of them. Rates are 25.5 %, 14 % and 10 % (24 % before September 2024).",
     fields: ['vat_rate', 'vat'],
   },
-  invalid_model_output: retry('The reader got confused.', 'Have it read again, or type the numbers in.'),
-  extraction_failed: retry('Reading failed.', 'Something went wrong. Try reading it again in a minute.'),
+  invalid_model_output: retry('Read it again, or type the numbers in.', 'The reader got confused.'),
+  extraction_failed: retry('Try reading it again.', 'Reading failed. Wait a minute, then try again.'),
 };
 
 export function flagFor(code: string): Flag {
   return (
     FLAGS[code] ?? {
       group: 'Other',
-      title: 'Something needs a look.',
-      body: 'Check the details against the original.',
+      title: 'Check the details against the original.',
+      body: 'Something needs a look.',
       fields: [],
     }
   );

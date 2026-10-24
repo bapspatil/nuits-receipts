@@ -466,7 +466,7 @@ test('raw reason codes and payment IDs appear only in technical details', async 
   expect(receipt).toContain('<details class="tech">');
   expect(receipt).toContain('uncertain_vendor');
   expect(receipt).toContain('Who is this from?');
-  expect(receipt).toContain('No date on it.');
+  expect(receipt).toContain('What is the date?');
   expect(receipt.match(/Who is this from\?/g)).toHaveLength(1);
   for (const path of ['/', '/review', '/?month=2026-09', `/receipts/${flagged.id}`, '/payments?month=2026-09']) {
     const html = await (await request(path)).text();
@@ -648,19 +648,18 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
   }
   const bank = await (await request('/payments?month=2026-09&show=all')).text();
   expect(bank).toMatch(
-    /<span class="tag ok">Matched (?:automatically|by you)<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
+    /<span class="tag ok(?: auto)?">Matched (?:automatically|by you)<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
   );
   expect(bank).toContain('<span class="stamp missing">Missing</span>');
   expect(bank).toContain('<span class="tag">Money in</span>');
   // A ready receipt has no stamp at all; one that needs you keeps it, tilted on its own page only.
   expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
-    /<span class="tag ok">Matched (?:automatically|by you)<\/span>/,
+    /<span class="tag ok(?: auto)?">Matched (?:automatically|by you)<\/span>/,
   );
   expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
     '<span class="stamp needs">Needs you</span>',
   );
-  expect(bank).toContain('.head .stamp{transform:rotate(-2deg)}');
-  expect(bank.match(/\n\.stamp\{[^}]*\}/)?.[0]).not.toContain('rotate');
+  expect(bank).not.toMatch(/\.stamp[^{]*\{[^}]*rotate/);
 });
 
 test('filter chips show only when they filter something', async () => {
@@ -719,8 +718,8 @@ test('rarely used things sit behind one More per object, named for screen reader
 test('one type and spacing scale, 44px targets, and a footer clear of the tab bar', async () => {
   const html = await (await request('/')).text();
   const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
-  expect(css).toContain('h1{font-size:var(--text-2xl);');
-  expect(css).toMatch(/@media \(max-width:640px\)\{[\s\S]*h1\{font-size:var\(--text-xl\)\}/);
+  expect(css).toContain('h1{font-family:var(--font-display);font-size:var(--text-2xl);');
+  expect(css).toMatch(/@media\(max-width:720px\)\{:root\{--text-base:16px;--text-2xl:26px;\}\}/);
   expect(css).toContain('h2{font-size:var(--text-lg);');
   expect(css).toContain('font:400 var(--text-base)/1.5 var(--font-ui)');
   // No text under 12px, in the type tokens or in a raw length.
@@ -736,7 +735,7 @@ test('one type and spacing scale, 44px targets, and a footer clear of the tab ba
   for (const rule of ['label.check{', '.list a{', '.why>summary{', '.chips a{'])
     expect(css.slice(css.indexOf(rule)).split('}')[0], rule).toContain('min-height:44px');
   // Chip borders reach 3:1 against the page.
-  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--text-muted)');
+  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--border-strong)');
   expect(css).not.toContain('.kicker');
 });
 
@@ -858,7 +857,7 @@ test('required flags are red; an optional one is neutral, labelled, and never in
     .run();
   const optional = await (await request(`/receipts/${flagged.id}`)).text();
   expect(optional).toMatch(
-    /<li class="flag opt">[\s\S]*?No receipt number\.<\/label><span class="meta">Optional<\/span>/,
+    /<li class="flag opt">[\s\S]*?What is the receipt number\?<\/label><span class="meta">Optional<\/span>/,
   );
   expect(optional).not.toContain('aria-invalid="true"');
   expect(optional).not.toContain('class="flag req"');

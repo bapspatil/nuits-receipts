@@ -151,7 +151,7 @@ test('a bill sent to the invoices address is flagged and can be moved to receipt
   expect(r.status).toBe('needs_review');
   expect(JSON.parse(r.review_reasons_json)).toContain('seller_mismatch');
   const page = await (await request(`/receipts/${r.id}`)).text();
-  expect(page).toContain('look like an invoice you sent.');
+  expect(page).toContain('Did you send this invoice?');
   expect(page).toContain('formaction="/receipts/' + r.id + '/kind"');
   const form = new FormData();
   form.set('kind', 'expense');
@@ -172,7 +172,7 @@ test('reverse charge without the client VAT number is flagged and fixed on the i
   const r = await sales(text, 'novat.txt');
   expect(JSON.parse(r.review_reasons_json)).toContain('reverse_charge_without_vat_id');
   const html = await (await request(`/receipts/${r.id}`)).text();
-  expect(html).toContain('Reverse charge needs the client');
+  expect(html).toContain('What is the client&#39;s VAT number?');
   const body = htmlForm(html, `/receipts/${r.id}`);
   body.set('client_vat_id', 'de 123.456.789');
   body.set('action', 'approve');
