@@ -330,7 +330,12 @@ async function audit(browser, urls) {
       await page.addScriptTag({ content: axeSource });
       const violations = await page.evaluate(async () => {
         const r = await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] });
-        return r.violations.map((x) => ({ id: x.id, impact: x.impact, nodes: x.nodes.length }));
+        return r.violations.map((x) => ({
+          id: x.id,
+          impact: x.impact,
+          nodes: x.nodes.length,
+          where: x.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+        }));
       });
       screens.push({
         name: url.name,

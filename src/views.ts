@@ -1,6 +1,6 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
-import { EXPENSE_TYPES, EXPONENTS, money, type Receipt, type Rule, type Tuning } from './domain';
+import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule, type Tuning } from './domain';
 import { creditFit, eligible, eurValue, openSales, type EurValue, type Transaction } from './banking';
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
@@ -10,6 +10,7 @@ import { setupParts } from './setup';
 import { heldMail, ignoredSenders } from './inbound';
 import { heldSection } from './all';
 import { mergePlan } from './dedupe';
+import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import { feedback } from './events';
 import { DISCARD_REASONS } from './domain';
@@ -23,6 +24,7 @@ import {
   bodyOf,
   flagCards,
   flagFor,
+  isRequired,
   matchesFilter,
   reasonCodes,
   REVIEW_FILTERS,
@@ -195,6 +197,14 @@ async function monthState(env: Env, selected: string) {
   };
 }
 
+// What to do once the last receipt is checked: the month it belonged to (this month when it had no
+// date) and the first step it still lacks, for the approvedLast banner.
+export async function afterLastReview(env: Env, issueDate: string | null): Promise<{ month: string; step: string }> {
+  const month = issueDate?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
+  const s = await monthState(env, month);
+  return { month, step: !s.imported ? 'import' : s.missing.length ? 'match' : 'send' };
+}
+
 // ---------- Review queue ----------
 export async function reviewPage(
   env: Env,
@@ -207,6 +217,7 @@ export async function reviewPage(
   const reading = await env.DB.prepare(
     "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
   ).first<number>('n');
+  const undated = all.filter((r) => r.issue_date === null).length;
   const mergeable = (await mergePlan(env)).length;
   const merge = mergeable
     ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
@@ -262,7 +273,7 @@ export async function reviewPage(
     {
       head: pageHead(
         all.length
-          ? `${all.length} to check`
+          ? `${all.length} to check${undated ? `, ${undated} undated` : ''}`
           : held.length
             ? `${plural(held.length, 'email')} to allow`
             : 'All checked',
@@ -292,13 +303,18 @@ const FIELD_LABELS: Record<FlagField | 'due_date', string> = {
   vat_treatment: 'VAT handling',
   reference_number: 'Reference',
 };
-// Hints are placeholders: visible in an empty field, never extra text on the page.
+// Placeholders that don't look like a value; guidance lives in a hint line under the field.
 const FIELD_HINTS: Partial<Record<FlagField | 'due_date', string>> = {
-  vat: '0 if none',
-  vat_rate: '25.5',
-  client_country: 'DE',
   eur_override: 'Only if your bank differs',
 };
+// Which way the document writes decimals, from its text: true for 30,00, false for 30.00, null if it
+// doesn't say. Dates such as 18.09.2026 are not amounts.
+function decimalComma(text: string | null): boolean | null {
+  if (!text) return null;
+  const commas = (text.match(/\d,\d{2}(?![\d,])/g) ?? []).length;
+  const dots = (text.match(/\d\.\d{2}(?![\d]|\.\d)/g) ?? []).length;
+  return commas === dots ? null : commas > dots;
+}
 const EUR_SOURCE: Record<string, string> = {
   manual: 'yours',
   bank: 'from your bank',
@@ -384,21 +400,65 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     client_country: r.client_country,
     reference_number: r.reference_number,
   };
+  // The original as text when it isn't an image; its number format is echoed in the hints.
+  const shown = previewable(r) ? null : await readableText(env, r);
+  const comma = decimalComma(shown);
+  const eg = (n: string) => (comma ? n.replace('.', ',') : n);
+  // A value is the reader's while the person hasn't saved the form: a save keeps every field as typed.
+  const typed = (() => {
+    try {
+      return object(JSON.parse(r.manual_fields_json));
+    } catch {
+      return {};
+    }
+  })();
+  const MANUAL_KEY: Record<string, string> = {
+    net: 'net_minor',
+    vat: 'vat_minor',
+    total: 'total_minor',
+    vat_rate: 'vat_rate_bps',
+  };
+  const current: Record<string, unknown> = { ...values, currency: r.currency, vat_treatment: r.vat_treatment };
+  const blank = (name: string) => current[name] === null || current[name] === undefined || current[name] === '';
+  const readByReader = (name: string) => !blank(name) && (typed[MANUAL_KEY[name] ?? name] ?? null) === null;
+  // One line under an empty field, in place of a placeholder that would look like a value.
+  const noteFor = (name: FlagField | 'due_date'): string => {
+    if (!blank(name)) return '';
+    switch (name) {
+      case 'issue_date':
+        return 'Which month does this belong to? Your accountant needs a date.';
+      case 'vat':
+        return 'Enter 0 if the receipt has no VAT.';
+      case 'vat_rate':
+        return `As printed on the receipt, for example ${eg('25.5')}.`;
+      case 'total':
+      case 'net':
+        return comma === null ? '' : `Type it as on the receipt, for example ${eg('30.00')}.`;
+      case 'client_country':
+        return 'Two letters, for example DE.';
+      default:
+        return '';
+    }
+  };
   // Every control has an id, so its row label (or a flag's question) names it.
-  type Control = { id: string; label: string; html: string };
-  const controls = (name: FlagField | 'due_date', flagged = false): Control[] => {
+  type Control = { id: string; label: string; html: string; note?: string };
+  type Tier = 'req' | 'opt';
+  const controls = (name: FlagField | 'due_date', tier?: Tier): Control[] => {
     placed.add(name);
     const id = `f-${name}`;
     const label = sales && name === 'total' ? 'Total invoiced' : FIELD_LABELS[name];
     const hint = FIELD_HINTS[name];
-    // A refused field says so; otherwise a flagged empty one is marked.
+    // After a refusal only the field that failed is marked. Before one, a required flag marks its empty
+    // field; an optional flag never does.
     const refused = ariaFor(RECEIPT, name);
-    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${refused || (flagged && (values[name] === null || values[name] === '') ? ' aria-invalid="true"' : '')}`;
+    const marked = refused || (tier === 'req' && !failureFor(RECEIPT) && blank(name) ? ' aria-invalid="true"' : '');
+    const note = noteFor(name);
+    const attrs = ` id="${id}"${hint ? ` placeholder="${escape(hint)}"` : ''}${marked}${note && !refused ? ` aria-describedby="h-${name}"` : ''}`;
     const text = (type: string, extra = '', value = values[name]) =>
       `<input name="${name}" value="${escape(kept(RECEIPT, name, value))}" type="${type}"${extra}${attrs}>`;
     const choose = (list: { v: string; l: string }[], current: string) =>
-      `<select name="${name}" id="${id}"${refused || (flagged ? ' aria-invalid="true"' : '')}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === kept(RECEIPT, name, current) ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
-    const one = (html: string): Control[] => [{ id, label, html }];
+      `<select name="${name}" id="${id}"${marked}>${list.map((o) => `<option value="${escape(o.v)}"${o.v === kept(RECEIPT, name, current) ? ' selected' : ''}>${escape(o.l)}</option>`).join('')}</select>`;
+    const one = (html: string): Control[] => [{ id, label, html, note }];
     switch (name) {
       case 'vat_treatment':
         return one(
@@ -465,64 +525,80 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     }
   };
   // One row: the label on the left, the control on the right.
-  const row = (c: Control, label = escape(c.label), title = '') =>
-    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label></div><div class="sc">${c.html}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
+  const row = (c: Control, label = escape(c.label), title = '', meta = '') =>
+    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label>${meta ? `<span class="meta">${meta}</span>` : ''}</div><div class="sc">${c.html}${c.note ? `<p class="meta" id="h-${c.id.slice(2)}">${escape(c.note)}</p>` : ''}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
   const rows = (name: FlagField | 'due_date') =>
     controls(name)
       .map((c) => row(c))
       .join('');
-  const retryButton = (label: string, kind: 'primary' | 'secondary') =>
-    `<button class="btn ${kind}" formaction="/receipts/${r.id}/retry">${label}</button>`;
+  const retryButton = (label: string, kind: 'primary' | 'secondary', outside = false) =>
+    `<button class="btn ${kind}"${outside ? ' form="fix"' : ''} formaction="/receipts/${r.id}/retry">${label}</button>`;
+  // The flag's own badge: what the person must do about it.
+  const badge = (tier: Tier, names: readonly string[]) =>
+    tier === 'req' ? (names.some(blank) ? '<span class="warning">Required</span>' : 'Check it') : 'Optional';
   // Each flag holds only its field, labelled by the flag's question; the longer
   // sentence is a tooltip, shown in full only when the flag has no field to fix.
-  const flagList = cards.length
-    ? `<ol class="flags">${cards
-        .map(({ flag }, i) => {
-          const id = `flag-${i + 1}`;
-          const names = flag.fields.filter((f) => !placed.has(f));
-          const body = bodyOf(flag, r);
-          const extra =
-            flag.action === 'retry' && !unverified
-              ? `<div class="fx">${retryButton('Read again', 'secondary')}</div>`
-              : flag.action === 'upload'
-                ? `<div class="fx"><a href="#upload">Upload a copy</a></div>`
-                : flag.action === 'move'
-                  ? `<div class="fx"><button class="btn secondary" formaction="/receipts/${r.id}/kind" name="kind" value="expense">Move to receipts</button></div>`
-                  : '';
-          if (names.length === 1) {
-            const [first, ...more] = controls(names[0]!, true);
-            return `<li class="flag">${row(first!, escape(flag.title), body)}${more.map((c) => row(c)).join('')}${extra}</li>`;
-          }
-          if (!names.length)
-            return `<li class="flag info"><p class="fh"><strong id="${id}-t">${escape(flag.title)}</strong> <span class="meta">${escape(body)}</span></p>${extra}</li>`;
-          return `<li class="flag" role="group" aria-labelledby="${id}-t"><p class="fh"><strong id="${id}-t" title="${escape(body)}">${escape(flag.title)}</strong></p>${names
-            .flatMap((n) => controls(n, true))
-            .map((c) => row(c))
-            .join('')}${extra}</li>`;
-        })
-        .join('')}</ol>`
+  // Required flags come first, red; optional ones are neutral and never block Approve.
+  const items = [...cards]
+    .sort((a, b) => Number(isRequired(b.flag)) - Number(isRequired(a.flag)))
+    .map(({ flag }, i) => {
+      const id = `flag-${i + 1}`;
+      const names = flag.fields.filter((f) => !placed.has(f));
+      const tier: Tier = isRequired(flag) ? 'req' : 'opt';
+      const body = bodyOf(flag, r);
+      const extra =
+        flag.action === 'retry' && !unverified
+          ? `<div class="fx">${retryButton('Read again', 'secondary')}</div>`
+          : flag.action === 'upload'
+            ? `<div class="fx"><a href="/add${sales ? '?kind=sales' : ''}">Upload a copy</a></div>`
+            : flag.action === 'move'
+              ? `<div class="fx"><button class="btn secondary" formaction="/receipts/${r.id}/kind" name="kind" value="expense">Move to receipts</button></div>`
+              : '';
+      if (names.length === 1) {
+        const [first, ...more] = controls(names[0]!, tier);
+        return `<li class="flag ${tier}">${row(first!, escape(flag.title), body, badge(tier, names))}${more.map((c) => row(c)).join('')}${extra}</li>`;
+      }
+      if (!names.length)
+        return `<li class="flag info"><p class="fh"><strong id="${id}-t">${escape(flag.title)}</strong> <span class="meta">${escape(body)}</span></p>${extra}</li>`;
+      return `<li class="flag ${tier}" role="group" aria-labelledby="${id}-t"><p class="fh"><strong id="${id}-t" title="${escape(body)}">${escape(flag.title)}</strong> <span class="meta">${badge(tier, names)}</span></p>${names
+        .flatMap((n) => controls(n, tier))
+        .map((c) => row(c))
+        .join('')}${extra}</li>`;
+    });
+  const fieldOrder = sales
+    ? ([
+        'client',
+        'invoice_number',
+        'issue_date',
+        'total',
+        'currency',
+        'net',
+        'vat',
+        'vat_rate',
+        'vat_treatment',
+        'client_vat_id',
+        'client_country',
+        'reference_number',
+        'vendor',
+      ] as const)
+    : (['vendor', 'invoice_number', 'issue_date', 'total', 'currency', 'net', 'vat', 'vat_rate'] as const);
+  // VAT % is part of the money work, so it is not left in the fold when an amount is flagged.
+  if (needs && ['net', 'vat', 'total'].some((n) => placed.has(n)) && !placed.has('vat_rate') && blank('vat_rate'))
+    items.push(`<li class="flag opt">${row(controls('vat_rate', 'opt')[0]!, undefined, '', 'Optional')}</li>`);
+  const flagList = items.length ? `<ol class="flags">${items.join('')}</ol>` : '';
+  // What the reader already filled in stays in view, marked, so it is checked against the original.
+  const readRows = needs
+    ? fieldOrder
+        .filter((f) => !placed.has(f) && !blank(f))
+        .map(
+          (f) =>
+            `<li class="flag read">${row(controls(f)[0]!, undefined, '', readByReader(f) ? 'Read from the document, check it' : '')}</li>`,
+        )
+    : [];
+  const readList = readRows.length
+    ? `<h2 class="grph">Already filled in</h2><ol class="flags">${readRows.join('')}</ol>`
     : '';
-  const rest = (
-    sales
-      ? ([
-          'client',
-          'invoice_number',
-          'issue_date',
-          'total',
-          'currency',
-          'net',
-          'vat',
-          'vat_rate',
-          'vat_treatment',
-          'client_vat_id',
-          'client_country',
-          'reference_number',
-          'vendor',
-        ] as const)
-      : (['vendor', 'invoice_number', 'issue_date', 'total', 'currency', 'net', 'vat', 'vat_rate'] as const)
-  )
-    .filter((f) => !placed.has(f))
-    .map(rows);
+  const rest = fieldOrder.filter((f) => !placed.has(f)).map(rows);
   const filing = (sales ? (['product'] as const) : (['product', 'expense_type'] as const))
     .filter((f) => !placed.has(f))
     .map(rows);
@@ -537,15 +613,26 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
       html: `<input name="approval_reason" value="${escape(kept(RECEIPT, 'approval_reason', 'Checked against the original'))}" type="text" id="f-approval_reason"${ariaFor(RECEIPT, 'approval_reason')}>`,
     },
   )}</div></details>`;
-  const primary = reading || unverified ? 'secondary' : 'primary';
-  const actions = `<div class="actions">${unverified ? retryButton('Read it', 'primary') : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}${
-    needs || reading
-      ? `<button class="btn ${primary}" name="action" value="approve">Approve</button>`
-      : '<button class="btn primary" name="action" value="save">Save</button>'
-  }</div>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}
-    <details class="all"${cards.length && !failureFor(RECEIPT) ? '' : ' open'}><summary>All fields</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
-    ${note}${actions}</form>`;
+  const ready = r.status === 'ready';
+  const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
+    .bind(r.id)
+    .first());
+  const status = gone
+    ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
+    : sales
+      ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
+      : stamp(r, !!eur.transaction);
+  // A ready receipt opens as its summary; Edit opens every field.
+  const summary = ready
+    ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>${sales ? 'Payment' : 'Matched'}</dt><dd>${sales ? status : eur.transaction ? 'Matched to a payment' : 'Not matched yet'}</dd></div></dl>`
+    : '';
+  const fold = ready ? 'Edit' : needs ? 'Other fields' : 'All fields';
+  const verb = needs || reading ? 'approve' : 'save';
+  // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
+  const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}
+    <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
+    ${note}</form>`;
   const matches = sales
     ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
     : suggestions.length
@@ -556,7 +643,6 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
           )
           .join('')}</section>`
       : '';
-  const uploadFlag = cards.some((c) => c.flag.action === 'upload');
   const move =
     sales || config(env).invoicesAddress
       ? `<form action="/receipts/${r.id}/kind" method="post">${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
@@ -565,11 +651,20 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     ? ''
     : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
   const tech = `<details class="tech"><summary>Technical details</summary><div class="body"><p class="hint">Status <code>${escape(r.status)}</code>. Reason codes:</p><pre tabindex="0">${escape(r.review_reasons_json)}</pre><p class="hint">Euro amount: ${escape(eur.source)}${eur.transaction ? `. Bank transaction <code>${escape(eur.transaction)}</code> · Account ${escape(eur.accountName)}` : '. No bank match.'}</p><pre tabindex="0">${escape(r.ai_json)}\n${escape(r.manual_fields_json)}</pre><p class="hint">Receipt ID <code>${r.id}</code></p></div></details>`;
-  const extras = `<details class="more" id="upload"${uploadFlag ? ' open' : ''}><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}${tech}</div></details>`;
+  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}${tech}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
+  // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
+  const open = `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
+  const docTitle = previewable(r)
+    ? 'The original'
+    : shown
+      ? pdf
+        ? 'The PDF, as text'
+        : 'The text that was read'
+      : 'The original';
   const doc = previewable(r)
     ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`
-    : `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
+    : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
   const back = gone
     ? '<a href="/receipts?show=discarded">‹ Discarded</a>'
     : needs
@@ -577,34 +672,25 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
       : sales
         ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
         : '<a href="/receipts">‹ Receipts</a>';
-  const where = needs && position >= 0 ? `<span class="small">${position + 1} of ${total}</span>` : '';
-  const skip = gone
-    ? ''
-    : needs && next && next !== r.id
+  const nextLink = !gone && !needs && next ? `<a href="/receipts/${next}">Next to check ›</a>` : '';
+  const skip =
+    needs && next && next !== r.id
       ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
-      : !needs && next
-        ? `<a href="/receipts/${next}">Next to check ›</a>`
-        : '';
-  const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
-    .bind(r.id)
-    .first());
-  const discard = gone
-    ? ''
-    : discardControl(r.id, { back: needs ? 'queue' : '/receipts', matched: linked, revision: r.revision });
+      : '';
+  const discard = discardControl(r.id, { back: needs ? 'queue' : '/receipts', matched: linked, revision: r.revision });
   const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true)}</section>`;
-  const status = gone
-    ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
-    : sales
-      ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
-      : stamp(r, !!eur.transaction);
+  const primary = reading || unverified ? 'secondary' : 'primary';
+  const verbLabel = verb === 'save' ? 'Save' : sales ? 'Approve invoice' : 'Approve receipt';
+  // One bar on every width: where you are, the quiet actions, and the one primary.
+  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
-    `<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
+    `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>`,
     200,
     env,
     {
       detail: receiptName(r),
-      head: `<div class="crumbs">${back}${where}${skip}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
+      head: `<div class="crumbs">${back}${nextLink}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
   );
 }

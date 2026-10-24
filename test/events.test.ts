@@ -21,6 +21,7 @@ const SAMPLE: Partial<Record<EventKey, Record<string, string>>> = {
   merged: { n: '2' },
   imported: { inserted: '3', skipped: '1' },
   sent: { month: '2026-09' },
+  approvedLast: { month: '2026-09', step: 'match' },
   driveMore: { n: '2', of: '5' },
   filesAdded: { added: '2' },
   settingReset: { label: 'App name', group: 'business', to: 'deploy' },
@@ -167,4 +168,22 @@ test('an unknown event says nothing', async () => {
   // Unknown or forged events say nothing rather than guess.
   const html = await (await request('/review?done=nope')).text();
   expect(html).not.toContain('role="status"');
+});
+
+test('the last approval points at the next step for its month, or just says it is done', () => {
+  const said = (extra: string) => feedback(new URLSearchParams(`done=approvedLast${extra}`));
+  expect(said('&month=2026-09&step=match')).toMatchObject({
+    text: "Every receipt is checked. Next, match September's payments.",
+    link: { href: '/payments?month=2026-09&show=missing', label: 'Open Bank' },
+  });
+  expect(said('&month=2026-09&step=send')).toMatchObject({
+    text: 'Every receipt is checked. Next, send September to your accountant.',
+    link: { href: '/?month=2026-09#send', label: 'Open September' },
+  });
+  expect(said('&month=2026-09&step=import')?.link?.href).toBe('/import');
+  // Params that don't parse never build a link: the plain message and Bank.
+  expect(said('&month=nope&step=send')).toMatchObject({
+    text: 'Every receipt is checked.',
+    link: { href: '/payments' },
+  });
 });

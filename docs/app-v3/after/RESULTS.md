@@ -7,7 +7,7 @@ Instance: fresh local database, mock AI, 2026-10-24.
 | Journey | Clicks | Field edits | Screens | POSTs with no feedback | Dead-end error pages | Errors fixed in place |
 | --- | --- | --- | --- | --- | --- | --- |
 | d. First run to first receipt read | 2 | 1 | 2 | 0 | 0 | 0 |
-| a. Mail arrives, every receipt approved | 8 | 9 | 5 | 0 | 0 | 0 |
+| a. Mail arrives, every receipt approved | 6 | 9 | 5 | 0 | 0 | 0 |
 | b. Bank statement imported, every payment settled | 8 | 2 | 7 | 0 | 0 | 1 |
 | e. Sales invoice added, money in matched | 6 | 1 | 5 | 0 | 0 | 0 |
 | c. September closed and marked sent | 4 | 0 | 3 | 0 | 0 | 0 |
@@ -22,7 +22,7 @@ Screens: `/` → `/receipts/:id?done=uploaded`
 
 ### a. Mail arrives, every receipt approved
 
-Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast`
+Screens: `/` → `/review` → `/receipts/:id` → `/receipts/:id?done=approved` → `/review?done=approvedLast&month=2026-09&step=import`
 
 - Home on arrival (current month): ‹ Sep October 2026 Nov › Check Nothing yet Match No statement Send Nothing yet Add receipts
 - Review lists 3 receipts.
@@ -56,8 +56,8 @@ Screens: `/` → `/?month=2026-09` → `/?month=2026-09&done=sent`
 
 | Screen | Width | Height (viewports) | axe violations |
 | --- | --- | --- | --- |
-| [receipt-flagged](screens/receipt-flagged-1440.png) | 1440 | 1.18 | 0 |
-| [receipt-flagged](screens/receipt-flagged-390.png) | 390 | 1.48 | 0 |
+| [receipt-flagged](screens/receipt-flagged-1440.png) | 1440 | 1.52 | 0 |
+| [receipt-flagged](screens/receipt-flagged-390.png) | 390 | 2.09 | 0 |
 | [home-sep](screens/home-sep-1440.png) | 1440 | 1.16 | 0 |
 | [home-sep](screens/home-sep-390.png) | 390 | 1.37 | 0 |
 | [home-oct](screens/home-oct-1440.png) | 1440 | 1 | 0 |
@@ -66,8 +66,10 @@ Screens: `/` → `/?month=2026-09` → `/?month=2026-09&done=sent`
 | [review](screens/review-390.png) | 390 | 1 | 0 |
 | [receipts](screens/receipts-1440.png) | 1440 | 1.47 | 0 |
 | [receipts](screens/receipts-390.png) | 390 | 1.61 | 0 |
-| [invoice-paid](screens/invoice-paid-1440.png) | 1440 | 2.26 | 0 |
-| [invoice-paid](screens/invoice-paid-390.png) | 390 | 3.09 | 0 |
+| [receipt-ready](screens/receipt-ready-1440.png) | 1440 | 1 | 0 |
+| [receipt-ready](screens/receipt-ready-390.png) | 390 | 1.16 | 0 |
+| [invoice-paid](screens/invoice-paid-1440.png) | 1440 | 1.06 | 0 |
+| [invoice-paid](screens/invoice-paid-390.png) | 390 | 1.59 | 0 |
 | [bank](screens/bank-1440.png) | 1440 | 1.32 | 0 |
 | [bank](screens/bank-390.png) | 390 | 1.36 | 0 |
 | [import](screens/import-1440.png) | 1440 | 1.06 | 0 |

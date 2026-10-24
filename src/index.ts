@@ -13,7 +13,17 @@ import {
 } from './receipts';
 import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
-import { home, importPage, payments, previewable, queueAround, receiptPage, reviewPage, settingsPage } from './views';
+import {
+  afterLastReview,
+  home,
+  importPage,
+  payments,
+  previewable,
+  queueAround,
+  receiptPage,
+  reviewPage,
+  settingsPage,
+} from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
 import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
@@ -364,8 +374,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const after = await getReceipt(env, id);
     // Approve and Skip move on through the queue; the last one lands on Review.
     if (before.status === 'needs_review' && (action === 'approve' || action === 'skip')) {
-      const event = action === 'approve' ? (next ? 'approved' : 'approvedLast') : 'skipped';
-      return redirect(withDone(event, next ? `/receipts/${next}` : '/review'));
+      if (action === 'approve' && !next)
+        return redirect(withDone('approvedLast', '/review', await afterLastReview(env, after.issue_date)));
+      return redirect(withDone(action === 'approve' ? 'approved' : 'skipped', next ? `/receipts/${next}` : '/review'));
     }
     // Saving a ready receipt checks it again; new flags send it back to Review.
     if (before.status === 'ready' && after.status === 'needs_review')

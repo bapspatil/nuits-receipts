@@ -188,7 +188,7 @@ test('each work screen has exactly one primary button, empty or busy', async () 
     .run();
   const unverified = await (await request(`/receipts/${email.id}`)).text();
   expect(primaries(unverified)).toBe(1);
-  expect(unverified).toContain(`<button class="btn primary" formaction="/receipts/${email.id}/retry">`);
+  expect(unverified).toContain(`<button class="btn primary" form="fix" formaction="/receipts/${email.id}/retry">`);
   expect(primaries(await (await request('/review?reason=sender')).text())).toBe(1);
   // All matched: the month close is the next step.
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
@@ -252,7 +252,7 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(phone).toContain('env(safe-area-inset-bottom)');
   expect(phone).toContain('body{padding-bottom:var(--tabbar-height)}');
   expect(phone).toContain('html{scroll-padding-bottom:');
-  expect(phone).toContain('textarea:focus) :is(nav.tabs,.fix .actions){display:none}');
+  expect(phone).toContain('textarea:focus) :is(nav.tabs,.sbar){display:none}');
   expect(phone).not.toContain(':hover');
   expect(html).toContain('nav.tabs{display:none}');
 });
@@ -385,12 +385,15 @@ test('flagged fields are one compact row: the question labels the input, its sen
   // Every row label points at a control.
   const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
   for (const [, target] of html.matchAll(/<label[^>]*\sfor="([^"]+)"/g)) expect(ids.has(target), target).toBe(true);
-  // Phones keep Approve above the tab bar, never over the focused field: it hides while typing,
+  // One sticky bar on every width. Phones keep it above the tab bar (and on a receipt in Review the
+  // tab bar goes, so only one fixed bar remains), never over the focused field: it hides while typing,
   // and scrolling into view leaves room for it.
   const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
-  expect(phone).toContain('.fix .actions{position:sticky;bottom:var(--tabbar-height);');
+  expect(phone).toContain('.sbar{position:sticky;bottom:var(--tabbar-height);');
+  expect(phone).toContain('body.p-reviewItem nav.tabs{display:none}');
+  expect(html).toContain('<body class="p-reviewItem">');
   expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
-  expect(html).not.toMatch(/\n\.actions\{[^}]*position:sticky/);
+  expect(html).toMatch(/\n\.sbar\{position:sticky;bottom:0;/);
 });
 
 test('home closes the month and lists what needs you, counting undated receipts', async () => {
@@ -489,7 +492,13 @@ test('Approve receipt posts the prefilled note and keeps every field name', asyn
     ].sort(),
   );
   expect(form.get('approval_reason')).toBe('Checked against the original');
-  expect(html).toContain('<button class="btn primary" name="action" value="approve">Approve</button>');
+  // Approve sits in the sticky bar, tied to the form; a hidden first button makes Enter approve.
+  expect(html).toContain(
+    '<button class="btn primary" form="fix" name="action" value="approve">Approve receipt</button>',
+  );
+  expect(html).toMatch(
+    /<form [^>]*id="fix">\s*<button class="vh" name="action" value="approve" tabindex="-1" aria-hidden="true">/,
+  );
   // Skip is the only "later"; there is no second save button.
   expect(html).not.toContain('Save, decide later');
   expect(html).not.toContain('Approve again');
@@ -711,7 +720,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   const { flagged } = await seed();
   const second = await flaggedImage(1);
   const first = await (await request(`/receipts/${flagged.id}`)).text();
-  expect(first).toContain('<span class="small">1 of 2</span>');
+  expect(first).toContain('<span class="prog">1 of 2 to check</span>');
   expect(first).toContain('<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>');
   // Skip saves what was typed and opens the next one.
   const skip = htmlForm(first, `/receipts/${flagged.id}`);
@@ -734,22 +743,23 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   const last = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
   last.set('action', 'approve');
-  expect(locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }))).toBe(
-    '/review?done=approvedLast',
-  );
-  // The empty Review says what happened and points at the next step.
-  const empty = await (await request(await signed('/review?done=approvedLast'))).text();
+  const landing = locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }));
+  expect(landing).toBe('/review?done=approvedLast&month=2026-09&step=match');
+  // The empty Review says it is done and points at the next step, for the month the receipt belongs to.
+  const empty = await (await request(await signed(landing))).text();
   expect(empty).toContain(
-    '<p class="banner" role="status">That was the last one. Everything is checked. <a href="/payments">Match your bank payments</a></p>',
+    '<p class="banner" role="status">Every receipt is checked. Next, match September&#39;s payments. <a href="/payments?month=2026-09&amp;show=missing">Open Bank</a></p>',
   );
 });
 
 test('a ready receipt has one Save; a new problem sends it back to Review', async () => {
   const { ready } = await seed();
   const html = await (await request(`/receipts/${ready.id}`)).text();
-  expect(html).toContain('<button class="btn primary" name="action" value="save">Save</button>');
+  expect(html).toContain('<button class="btn primary" form="fix" name="action" value="save">Save</button>');
   expect(html).not.toContain('value="approve"');
-  expect(html).toContain('<details class="all" open><summary>All fields</summary>');
+  // A ready receipt opens as its summary; Edit opens every field.
+  expect(html).toContain('<details class="all"><summary>Edit</summary>');
+  expect(html).toContain('<dl class="kv sum">');
   const form = htmlForm(html, `/receipts/${ready.id}`);
   form.set('action', 'save');
   expect(locationOf(await request(`/receipts/${ready.id}`, { method: 'POST', body: form }))).toBe(
@@ -765,16 +775,14 @@ test('a ready receipt has one Save; a new problem sends it back to Review', asyn
   );
 });
 
-test('the receipt page: flags first, All fields closed, rare actions under one More', async () => {
+test('the receipt page: flags first, Other fields closed, rare actions under one More', async () => {
   const { flagged } = await seed();
   const html = await (await request(`/receipts/${flagged.id}`)).text();
   expect(html).toContain('<h2 id="fix-h">5 to check</h2>');
-  expect(html).toContain('<details class="all"><summary>All fields</summary>');
+  expect(html).toContain('<details class="all"><summary>Other fields</summary>');
   expect(html).toContain('<details class="note"><summary>Note</summary>');
   const more =
-    html.match(
-      /<details class="more" id="upload"><summary>More<\/summary>([\s\S]*)<\/section><section class="doc"/,
-    )?.[1] ?? '';
+    html.match(/<details class="more"><summary>More<\/summary>([\s\S]*?)<\/div><\/section><\/div>/)?.[1] ?? '';
   for (const action of [
     'Read again',
     'Move to invoices',
@@ -794,8 +802,10 @@ test('the receipt page: flags first, All fields closed, rare actions under one M
     'Everything else we read',
   ])
     expect(html, gone).not.toContain(gone);
-  // Fields first; the original comes after them (a thumbnail on phones).
-  expect(html.indexOf('class="fixes"')).toBeLessThan(html.indexOf('class="doc"'));
+  // The original comes first, beside the fields on wide screens and above them on phones, so the
+  // reading order matches the page; a skip link jumps past it to the fields.
+  expect(html.indexOf('class="doc"')).toBeLessThan(html.indexOf('class="fixes"'));
+  expect(html).toContain('<a class="skip" href="#fix">Skip to the fields</a>');
   expect(html).toContain(`<a class="frame" href="/originals/${flagged.id}?view=inline">`);
   // Review rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/review')).text();
@@ -804,4 +814,90 @@ test('the receipt page: flags first, All fields closed, rare actions under one M
   );
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('Start reviewing');
+});
+
+test('required flags are red; an optional one is neutral, labelled, and never invalid', async () => {
+  const { flagged } = await seed();
+  const html = await (await request(`/receipts/${flagged.id}`)).text();
+  // Required flags come first, each empty one invalid and labelled "Required".
+  expect(html.match(/<li class="flag req">/g)).toHaveLength(5);
+  expect(html.match(/<span class="warning">Required<\/span>/g)).toHaveLength(4);
+  expect(html.match(/aria-invalid="true"/g)).toHaveLength(4);
+  // VAT % is in view, optional and neutral, not hidden in a fold.
+  expect(html).toMatch(
+    /<li class="flag opt">[\s\S]*?for="f-vat_rate">VAT %<\/label><span class="meta">Optional<\/span>/,
+  );
+  expect(html).not.toMatch(/id="f-vat_rate"[^>]*aria-invalid/);
+  // Only a receipt number is missing: that is optional, so nothing is invalid.
+  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_invoice_number"]' WHERE id=?`)
+    .bind(flagged.id)
+    .run();
+  const optional = await (await request(`/receipts/${flagged.id}`)).text();
+  expect(optional).toMatch(
+    /<li class="flag opt">[\s\S]*?No receipt number\.<\/label><span class="meta">Optional<\/span>/,
+  );
+  expect(optional).not.toContain('aria-invalid="true"');
+  expect(optional).not.toContain('class="flag req"');
+});
+
+test('a refused approve marks only the field that failed', async () => {
+  const { flagged } = await seed();
+  const form = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
+  form.set('action', 'approve');
+  const refused = await request(`/receipts/${flagged.id}`, { method: 'POST', body: form });
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(html.match(/aria-invalid="true"/g)).toHaveLength(1);
+  expect(html).toMatch(/id="f-vendor" aria-invalid="true" aria-describedby="e-receipt"/);
+});
+
+test('an undated receipt says why the date matters; Review counts it as undated', async () => {
+  const { flagged } = await seed();
+  const html = await (await request(`/receipts/${flagged.id}`)).text();
+  expect(html).toContain(
+    '<p class="meta" id="h-issue_date">Which month does this belong to? Your accountant needs a date.</p>',
+  );
+  expect(html).toContain('id="f-issue_date" aria-invalid="true" aria-describedby="h-issue_date"');
+  expect(html).toContain('<p class="meta" id="h-vat">Enter 0 if the receipt has no VAT.</p>');
+  expect(html).not.toContain('placeholder="0 if none"');
+  expect(await (await request('/review')).text()).toContain('<h1>1 to check, 1 undated</h1>');
+});
+
+test('amounts accept a decimal comma or point, and the hint echoes the document', async () => {
+  const { flagged } = await seed();
+  const form = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
+  for (const [k, v] of Object.entries({
+    vendor: 'Fake Shop',
+    issue_date: '2026-09-03',
+    net: '1.234,56',
+    vat: '15,67',
+    total: '1 250,23',
+    vat_rate: '25,5',
+  }))
+    form.set(k, v);
+  form.set('action', 'approve');
+  expect((await request(`/receipts/${flagged.id}`, { method: 'POST', body: form })).status).toBe(303);
+  const saved = await getReceipt(env, flagged.id);
+  expect([saved.net_minor, saved.vat_minor, saved.total_minor, saved.vat_rate_bps]).toEqual([
+    123456, 1567, 125023, 2550,
+  ]);
+  // A document that writes 30,00 gets a comma in its examples, and its text is shown beside the fields.
+  const note = await preserve(env, {
+    bytes: new TextEncoder().encode('Sample Print Shop\nPosters 18.09.2026\nTotal 30,00 EUR\nVAT 6,10 EUR'),
+    media: 'text/plain',
+    filename: 'note.txt',
+    source: 'upload',
+  });
+  await env.DB.prepare(`UPDATE receipts SET status='needs_review',review_reasons_json='["missing_total"]' WHERE id=?`)
+    .bind(note.id)
+    .run();
+  const page = await (await request(`/receipts/${note.id}`)).text();
+  expect(page).toContain('Type it as on the receipt, for example 30,00.');
+  expect(page).toContain('As printed on the receipt, for example 25,5.');
+  expect(page).toMatch(/class="doch">The text that was read<\/h2><pre class="paper" tabindex="0">Sample Print Shop/);
+  // A PDF is shown as its text, not embedded: the page's CSP allows no frames or objects.
+  const { ready } = await seed();
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
+    /class="doch">The PDF, as text<\/h2><pre class="paper"/,
+  );
 });
