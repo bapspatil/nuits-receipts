@@ -1,5 +1,6 @@
 @import "./theme.css";
 @import "./wipe.css";
+@import "./chrome.css";
 
 @font-face {
   font-family: "Bricolage";
@@ -105,74 +106,6 @@ a {
   text-wrap: pretty;
 }
 
-/* Bar */
-
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem var(--gutter);
-  border-bottom: var(--rule);
-}
-
-.wordmark {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 0.75rem;
-  text-decoration: none;
-}
-
-.wordmark-mark {
-  width: 1.4rem;
-  height: 1.4rem;
-  align-self: center;
-}
-
-.wordmark-name {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.25rem;
-  letter-spacing: -0.01em;
-}
-
-.wordmark-desc {
-  font-size: var(--text-small);
-  color: var(--color-ink-soft);
-}
-
-.bar-end {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  flex-shrink: 0;
-}
-
-.bar-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 0.5rem;
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.motion-switch {
-  font: inherit;
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-ink);
-  background: var(--color-paper);
-  border: var(--rule);
-  border-radius: var(--radius-pill);
-  padding: 0.55rem 1rem;
-  min-height: 44px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 /* Buttons. Colours swap instantly on hover: a transitioned inversion passes
    through 1:1 text halfway, so only the press moves. */
 
@@ -249,15 +182,52 @@ a {
   color: var(--color-paper);
 }
 
-/* Hero */
+/* Section slates. Every scene after the hero opens with its index, its short
+   name and a perforation running to the edge, so the page reads as one roll
+   filed in order. Decoration only (aria-hidden): the h2 is the heading. The
+   rule takes currentColor, so it is ink on paper and paper on ink. */
+
+.slate {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slate-n {
+  font-variant-numeric: tabular-nums;
+}
+
+.slate::after {
+  content: "";
+  flex: 1;
+  order: 1;
+  height: 1px;
+  background: var(--perforation);
+  transform-origin: 0 50%;
+}
+
+.slate-end {
+  order: 2;
+}
+
+/* Hero. Edge-anchored: the title runs to the right gutter and the slip lands
+   over its tail, then a hard rule and a two-column chit carry the sub and the
+   cost line like the foot of a receipt. */
 
 .hero {
+  --title-size: clamp(3.6rem, 1rem + 14vw, 13rem);
   position: relative;
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  gap: 3rem;
+  gap: 1.75rem;
   min-height: calc(100svh - 4.6rem);
   padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) 4rem;
   overflow: clip;
@@ -280,22 +250,25 @@ a {
   visibility: hidden;
 }
 
-.hero-copy {
-  display: grid;
-  gap: 1.5rem;
-  justify-items: start;
-}
-
 .hero-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(3.6rem, 1rem + 11vw, 10rem);
-  line-height: 0.86;
-  letter-spacing: -0.035em;
+  font-size: var(--title-size);
+  line-height: 0.84;
+  letter-spacing: -0.04em;
+  /* Optical edge: pull the S back onto the gutter line. */
+  margin-left: -0.04em;
 }
 
 .hero-title span {
   display: block;
+}
+
+.hero-chit {
+  display: grid;
+  gap: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--color-ink);
 }
 
 .hero-sub {
@@ -305,15 +278,76 @@ a {
   text-wrap: pretty;
 }
 
+/* The cost, printed as a total line between two perforations. */
 .hero-cost {
+  align-self: start;
+  max-width: 26rem;
+  padding: 0.85rem 0;
   font-weight: 600;
-  max-width: 31rem;
+  font-size: 1.0625rem;
+  background:
+    var(--perforation) top / 100% 1px no-repeat,
+    var(--perforation) bottom / 100% 1px no-repeat;
 }
 
 .hero-note {
   font-size: var(--text-small);
   color: var(--color-ink-soft);
-  max-width: 31rem;
+  max-width: 34rem;
+}
+
+/* The demo link as a small play chip. The triangle is drawn, not a glyph. */
+.play-chip {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  margin-top: 0.35rem;
+  padding: 0 1rem 0 0.4rem;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  position: relative;
+}
+
+.play-chip::before {
+  content: "";
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+}
+
+/* The triangle sits over the disc; clip-path draws it, so it is a shape in
+   token colours rather than a font glyph or an emoji. */
+.play-chip::after {
+  content: "";
+  position: absolute;
+  left: calc(0.4rem + 0.72rem);
+  top: 50%;
+  width: 0.7rem;
+  height: 0.8rem;
+  translate: 0 -50%;
+  background: var(--color-paper);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.play-chip:hover {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.play-chip:hover::before {
+  background: var(--color-paper);
+}
+
+.play-chip:hover::after {
+  background: var(--color-ink);
 }
 
 /* Receipt slips: white paper, torn zigzag foot, the one shadow. */
@@ -365,8 +399,9 @@ a {
 }
 
 .slip-hero {
-  width: min(19rem, 100%);
+  width: min(17rem, 100%);
   justify-self: end;
+  margin-top: 0.5rem;
   rotate: 2.5deg;
 }
 
@@ -417,25 +452,67 @@ a {
 
 /* Scenes */
 
+/* Every scene is a grid whose first row is its slate. */
 .scene {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 2.5rem;
   padding: clamp(4.5rem, 12vh, 8rem) var(--gutter);
 }
 
-.problem {
-  display: grid;
-  gap: 3rem;
-  border-top: var(--rule);
+:root {
+  --title-xl: clamp(2.5rem, 1rem + 4.2vw, 5rem);
 }
+
+/* The problem. Overlap on a desk: the copy on the left, and a framed plate
+   on the right where the scraps lie scattered around the envelope they are
+   about to go into. */
 
 .problem-copy {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
+  align-content: start;
+}
+
+.problem .title {
+  font-size: var(--title-xl);
+  max-width: 13ch;
+}
+
+/* The answer to the problem, set as a pull line with a mint bar under each
+   line of it. Mint is a fill here, never the text colour. */
+.pull {
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 1rem + 1.6vw, 2.25rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.pull span {
+  background: linear-gradient(var(--color-mint) 0 0) 0 92% / 100% 0.3em no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.desk {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 1.75rem;
+  padding: 1.5rem 1rem 1.25rem;
+  border: 1px dashed var(--color-ink);
+  background: repeating-linear-gradient(var(--color-guilloche) 0 1px, transparent 1px 1.75rem) var(--color-paper);
 }
 
 .scatter {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  justify-content: center;
+  gap: 0.75rem 0.85rem;
 }
 
 .scrap {
@@ -443,8 +520,12 @@ a {
   box-shadow: var(--shadow-system);
   padding: 0.85rem 1.1rem;
   font-weight: 600;
+  white-space: nowrap;
   rotate: calc((var(--i) - 2) * 3deg);
 }
+
+/* How it works. Three printed tickets on the ink rail: a huge numeral, the
+   icon in a paper-ruled square, then the step, the heading and the body. */
 
 .how {
   background: var(--color-ink);
@@ -452,45 +533,71 @@ a {
 }
 
 .how-title {
-  margin-bottom: 3rem;
+  font-size: var(--title-xl);
 }
 
 .rail {
   display: grid;
-  gap: 2.5rem;
+  gap: 3rem;
 }
 
 .step {
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
   align-content: start;
-  max-width: 26rem;
+  max-width: 28rem;
   padding-top: 1.25rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
+  border-top: 2px solid var(--color-paper);
+}
+
+.step > :not(.step-n, .ill-icon) {
+  grid-column: 1 / -1;
 }
 
 .step-n {
+  grid-row: 1;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 5rem;
-  line-height: 0.9;
+  line-height: 0.8;
+  letter-spacing: -0.03em;
 }
 
-.ledger {
-  display: grid;
-  gap: 2.5rem;
+.step-of {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
+
+/* The match. The statement is the specimen: a bank statement slip with its
+   caption as a header band, ruled columns, the amounts in display figures,
+   then the stamps it printed, tallied. */
 
 .ledger-head {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.ledger .title {
+  font-size: var(--title-xl);
+  max-width: 11ch;
 }
 
 .statement {
+  --tooth: 10px;
+  --inset: clamp(1rem, 3vw, 2rem);
   background: var(--color-slip);
   box-shadow: var(--shadow-system);
-  padding: 1.25rem clamp(1rem, 3vw, 2rem) 1.5rem;
+  padding-bottom: 2.5rem;
   overflow-x: auto;
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
+    conic-gradient(from -45deg at 50% 0, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
 }
 
 .statement table {
@@ -500,11 +607,14 @@ a {
 }
 
 .statement caption {
+  caption-side: top;
   text-align: left;
+  padding: 0.9rem var(--inset);
+  background: var(--color-ink);
+  color: var(--color-paper);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.25rem;
-  padding-bottom: 0.75rem;
 }
 
 .statement th {
@@ -512,40 +622,113 @@ a {
   font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-ink-soft);
-  padding: 0.5rem 0.75rem 0.5rem 0;
-  border-bottom: var(--rule);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .statement td {
-  padding: 0.85rem 0.75rem 0.85rem 0;
+  padding: 0.75rem;
   border-bottom: 1px solid var(--color-guilloche);
+}
+
+/* Ruled columns, like a printed statement. */
+.statement :is(th, td) + :is(th, td) {
+  border-left: 1px solid var(--color-ink);
+}
+
+.statement :is(th, td):first-child {
+  padding-left: var(--inset);
+}
+
+.statement :is(th, td):last-child {
+  padding-right: var(--inset);
 }
 
 .statement .num {
   text-align: right;
-  padding-right: 2rem;
+}
+
+.statement td.num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3125rem;
+  letter-spacing: -0.01em;
 }
 
 .statement .stamp {
   font-size: 1rem;
 }
 
+.stamp-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  padding: 1.25rem var(--inset) 0;
+}
+
+.stamp-tally li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.stamp-count {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.stamp-tally .stamp {
+  font-size: 0.875rem;
+}
+
 .statement-foot {
   margin-top: 1.25rem;
+  padding: 1rem var(--inset) 0;
+  border-top: 1px dashed var(--color-ink);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.375rem;
+  line-height: 1.2;
 }
 
+/* Demo. A screening room: the section turns ink and the player sits in a
+   film strip, sprocket holes printed along its top and bottom edges. */
+
 .demo {
-  display: grid;
-  gap: 2rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.demo :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.demo .title {
+  max-width: 10ch;
 }
 
 .demo-player {
+  /* 44px bar plus 8px of ink above it: Chrome sets a caption line a few pixels
+     past the video edge, and it must not sit under the bar. */
+  --player-plate: 52px;
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
   max-width: 64rem;
+}
+
+/* The strip is the container, so the controller's height formula below reads
+   the strip's width. Its padding is fixed, so the frame never shifts the
+   page when Media Chrome arrives. The holes are paper squares on the film
+   base, decoration on the box itself, so they take no layout. */
+.film {
+  container-type: inline-size;
+  padding-block: 28px;
+  background:
+    linear-gradient(90deg, var(--color-paper) 0 14px, transparent 14px) 9px 8px / 32px 12px repeat-x,
+    linear-gradient(90deg, var(--color-paper) 0 14px, transparent 14px) 9px calc(100% - 8px) / 32px 12px repeat-x,
+    var(--color-ink-soft);
 }
 
 .demo-player video {
@@ -557,64 +740,138 @@ a {
   background: var(--color-ink);
 }
 
-.demo-player figcaption {
+/* Media Chrome wraps the same <video>. Before it registers (or without
+   JavaScript) the controller is a plain 16/9 box around the native player, so
+   nothing moves when the components arrive. */
+.demo-player media-controller {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: calc((100cqw - 4px) * 9 / 16 + var(--player-plate) + 4px);
+  border: 2px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-ui);
   font-size: var(--text-small);
-  color: var(--color-ink-soft);
+  font-weight: 600;
+  --media-font-family: var(--font-ui);
+  --media-font-size: var(--text-small);
+  --media-font-weight: 600;
+  --media-primary-color: var(--color-paper);
+  --media-secondary-color: var(--color-ink);
+  --media-text-color: var(--color-paper);
+  --media-icon-color: var(--color-paper);
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  --media-control-height: 24px;
+  --media-control-padding: 10px;
+  --media-focus-box-shadow: inset 0 0 0 2px var(--color-paper);
+  --media-range-bar-color: var(--color-mint);
+  --media-range-track-background: var(--color-ink-soft);
+  --media-range-thumb-background: var(--color-mint);
+  --media-range-thumb-border: 2px solid var(--color-ink);
+  --media-range-thumb-border-radius: 0;
+  --media-range-track-border-radius: 0;
+  --media-range-track-height: 6px;
+  --media-range-thumb-opacity: 1;
+  --media-tooltip-display: none;
+  --media-button-icon-transition: none;
+  --media-control-transition-in: none;
+  --media-control-transition-out: none;
+  --media-range-thumb-transition: none;
+  --media-range-track-transition: none;
+  --media-range-segment-transition: none;
 }
 
-.transcript {
-  max-width: 48rem;
-  border-top: var(--rule);
-  border-bottom: var(--rule);
+.demo-player media-controller:not(:defined) > :not(video) {
+  display: none;
 }
 
-.transcript summary {
-  display: flex;
-  justify-content: space-between;
+.demo-player media-controller video {
+  width: 100%;
+  height: calc(100% - var(--player-plate));
+  border: 0;
+  object-fit: contain;
+}
+
+.demo-player .player-bar {
+  width: 100%;
+  height: 44px;
   align-items: center;
-  gap: 1rem;
-  min-height: 44px;
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-weight: 700;
+  background: var(--color-ink);
 }
 
-.transcript-text {
-  display: grid;
-  gap: 0.75rem;
-  max-width: var(--measure);
-  padding-bottom: 1.25rem;
+.demo-player .player-big {
+  --media-control-height: 40px;
+  --media-control-padding: 16px;
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  border: 2px solid var(--color-paper);
 }
+
+/* The big button is for starting playback. While the film runs it would sit
+   over the picture, so it shows only while Media Chrome reports paused. */
+.demo-player media-controller:not([mediapaused]) .player-big {
+  display: none;
+}
+
+/* inkSoft fails on ink, so the caption is paper. */
+.demo-player figcaption {
+  max-width: 44rem;
+  font-size: var(--text-small);
+  color: var(--color-paper);
+}
+
+/* Cost. A specimen with annotation: the slip is the plate, the arithmetic
+   copy hangs beside it as margin notes on hairline leaders. */
 
 .cost {
-  display: grid;
-  gap: 3rem;
   background: var(--color-guilloche);
 }
 
 .cost-copy {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
   align-content: start;
+}
+
+.cost .title {
+  font-size: var(--title-xl);
+  max-width: 14ch;
 }
 
 .cost .lede {
   color: var(--color-ink);
 }
 
-.caveat {
+.cost-copy > p {
+  position: relative;
   max-width: var(--measure);
-  padding-left: 1rem;
-  border-left: 3px solid var(--color-stamp);
 }
 
-.credit {
-  font-weight: 600;
+/* The caveat is a note pinned to the specimen: a slip of its own, ruled in
+   stamp red, which DESIGN.md allows as a fill and a rule but never as text. */
+.caveat {
+  padding: 1rem 1.25rem;
+  background: var(--color-slip);
+  border-left: 3px solid var(--color-stamp);
+  box-shadow: var(--shadow-system);
 }
 
 .slip-cost {
-  width: min(30rem, 100%);
+  width: min(34rem, 100%);
   rotate: -1.5deg;
+  padding: 2rem 2rem 3rem;
+}
+
+.slip-cost .slip-vendor {
+  font-size: 1.625rem;
+}
+
+.slip-cost .slip-seal {
+  width: 5.5rem;
+  height: 5.5rem;
 }
 
 .tally {
@@ -654,43 +911,61 @@ a {
   padding-top: 0.6rem !important;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.375rem;
+  font-size: 1.625rem;
 }
 
-.proof {
-  display: grid;
-  gap: 2.5rem;
-}
+/* So far. A spec sheet, not a card row: one full-width ruled line per fact,
+   its index in the gutter and the figure set at display size. */
 
 .facts {
-  display: grid;
-  gap: 2rem 2.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  counter-reset: fact;
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .fact {
+  counter-increment: fact;
   display: grid;
-  gap: 0.4rem;
-  align-content: start;
-  padding-top: 1rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  padding: 1.5rem 0;
   border-top: 2px solid var(--color-ink);
+}
+
+.fact::before {
+  content: counter(fact, decimal-leading-zero);
+  grid-row: 1 / span 2;
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .fact-figure {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 2rem;
-  line-height: 1.05;
+  font-size: clamp(2.5rem, 1.2rem + 4.5vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
 }
 
-.nope {
-  border-top: var(--rule);
+.fact > p:last-child {
+  max-width: var(--measure);
+  font-size: 1.125rem;
 }
+
+/* Limits. A letter on a slip: the title stays on the ground, everything Baps
+   says to the reader is printed on the paper object. */
 
 .nope-letter {
   display: grid;
   gap: 1.5rem;
-  max-width: 42rem;
+}
+
+.nope-slip {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 44rem;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem) clamp(2.5rem, 5vw, 3.5rem);
 }
 
 .nope-list {
@@ -700,9 +975,8 @@ a {
 
 .nope-list li {
   position: relative;
-  padding-left: 2rem;
+  padding-left: 2.25rem;
   font-size: 1.125rem;
-  max-width: 36rem;
 }
 
 /* A struck-through box per line: the list is things it won't do. */
@@ -717,12 +991,11 @@ a {
   background: linear-gradient(45deg, transparent 45%, var(--color-stamp) 45% 55%, transparent 55%);
 }
 
-/* The required disclaimer sits on a plate so it reads as a statement, not as
-   one more line of the letter around it. */
+/* The required disclaimer sits on its own ruled plate inside the letter, so
+   it reads as a statement, not as one more line of the letter. */
 .disclaimer {
-  max-width: 36rem;
   padding: 1rem 1.25rem;
-  background: var(--color-slip);
+  background: var(--color-paper);
   border-left: 3px solid var(--color-ink);
   font-weight: 500;
 }
@@ -730,37 +1003,39 @@ a {
 .signoff {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 2rem;
+  font-size: clamp(1.75rem, 1rem + 2vw, 2.5rem);
   rotate: -4deg;
-  justify-self: start;
+  justify-self: end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-ink);
 }
 
-.faq {
-  display: grid;
-  gap: 2rem;
-  border-top: var(--rule);
-}
+/* FAQ. An index: each question carries its number at display size, the
+   answer hangs under the question's column, and the plus sits in a ruled
+   square that turns to a cross. */
 
 .faq-list {
-  max-width: 48rem;
-  border-top: var(--rule);
+  counter-reset: q;
+  border-top: 2px solid var(--color-ink);
 }
 
 .faq details {
+  counter-increment: q;
   border-bottom: var(--rule);
 }
 
 .faq summary {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
   gap: 1rem;
   align-items: center;
-  padding: 1.15rem 0;
+  padding: 1.25rem 0;
   min-height: 44px;
   cursor: pointer;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
+  line-height: 1.15;
   list-style: none;
 }
 
@@ -768,11 +1043,32 @@ a {
   display: none;
 }
 
+.faq summary::before {
+  content: counter(q, decimal-leading-zero);
+  font-size: clamp(1.75rem, 1.2rem + 1.5vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
 .faq summary::after {
   content: "+";
-  font-size: 1.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 400;
   line-height: 1;
   transition: rotate 180ms var(--ease);
+}
+
+/* Colours swap instantly, as on the buttons. */
+.faq summary:hover::after {
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
 .faq details[open] summary::after {
@@ -780,25 +1076,33 @@ a {
 }
 
 .faq details p {
-  padding-bottom: 1.25rem;
-  max-width: var(--measure);
+  padding: 0 3.75rem 1.5rem;
+  max-width: calc(var(--measure) + 7.5rem);
+  font-size: 1.125rem;
 }
 
+/* Close. A full-bleed statement: the largest type on the page, then the two
+   actions, then the footer tears off underneath. */
+
 .close {
-  display: grid;
-  gap: 2rem;
+  gap: 2.5rem;
   justify-items: start;
   background: var(--color-ink);
   color: var(--color-paper);
+  padding-bottom: clamp(5rem, 14vh, 9rem);
+}
+
+.close .slate {
+  justify-self: stretch;
 }
 
 .close-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(3rem, 1rem + 8vw, 7.5rem);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  max-width: 12ch;
+  font-size: clamp(3.5rem, 1rem + 10.5vw, 11rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  max-width: 11ch;
 }
 
 .close .button-secondary {
@@ -815,46 +1119,6 @@ a {
 
 .close :focus-visible {
   outline-color: var(--color-paper);
-}
-
-/* Footer: the tail of the receipt. */
-
-.footer {
-  display: grid;
-  gap: 2.5rem;
-  padding: 3rem var(--gutter) 3.5rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
-}
-
-.smallprint {
-  display: grid;
-  gap: 0.75rem;
-  max-width: 48rem;
-  font-size: var(--text-small);
-  line-height: var(--text-small--line-height);
-}
-
-.smallprint-title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-heading);
-}
-
-.footer-legal {
-  display: grid;
-  gap: 0.5rem;
-  max-width: 48rem;
-  font-size: var(--text-small);
-}
-
-.footer-tail {
-  display: grid;
-  gap: 0.25rem;
-  font-size: var(--text-small);
-}
-
-.footer-joke {
-  color: var(--color-ink-soft);
 }
 
 /* Narrow: each statement row becomes two lines, so the amount and the stamp
@@ -877,11 +1141,13 @@ a {
     grid-template-columns: 1fr auto;
     align-items: center;
     column-gap: 1rem;
-    padding: 0.75rem 0;
+    padding: 0.75rem var(--inset);
     border-bottom: 1px solid var(--color-guilloche);
   }
 
-  .statement td {
+  .statement td,
+  .statement td:is(:first-child, :last-child),
+  .statement :is(th, td) + :is(th, td) {
     padding: 0;
     border: 0;
   }
@@ -926,10 +1192,37 @@ a {
     gap: 3rem;
   }
 
-  .scatter {
-    position: relative;
+  /* Perforated separators between the tickets on the static grid. */
+  .rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .step {
+    max-width: none;
+    padding: 1.25rem 2rem 0;
+    border-left: 1px dashed var(--color-paper);
+  }
+
+  .step:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .step:last-child {
+    padding-right: 0;
+  }
+
+  .desk {
     display: block;
-    min-height: 22rem;
+    min-height: 30rem;
+    padding: 0;
+  }
+
+  .scatter {
+    position: absolute;
+    inset: 0;
+    display: block;
   }
 
   .scrap {
@@ -938,70 +1231,149 @@ a {
     top: calc(var(--y) * 1%);
   }
 
-  .scrap:nth-child(1) { --x: 4; --y: 6; }
-  .scrap:nth-child(2) { --x: 46; --y: 0; }
-  .scrap:nth-child(3) { --x: 20; --y: 40; }
-  .scrap:nth-child(4) { --x: 58; --y: 52; }
-  .scrap:nth-child(5) { --x: 8; --y: 78; }
+  .scrap:nth-child(1) { --x: 6; --y: 8; }
+  .scrap:nth-child(2) { --x: 58; --y: 6; }
+  .scrap:nth-child(3) { --x: 4; --y: 46; }
+  .scrap:nth-child(4) { --x: 70; --y: 52; }
+  .scrap:nth-child(5) { --x: 8; --y: 82; }
 }
 
 @media (min-width: 64rem) {
   .hero {
     background-image: url("/field-fallback-wide.png");
     background-position: center;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: clamp(2rem, 4vw, 4rem);
+  }
+
+  .hero-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .hero-chit {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+
+  .hero-ctas,
+  .hero-note {
+    grid-column: 1;
+  }
+
+  /* The slip lands over the tail of the title: its top edge tucks under the
+     descender of the first line, so the two share space instead of sitting
+     in separate boxes. */
+  .slip-hero {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: start;
+    justify-self: start;
+    width: min(22rem, 100%);
+    margin-top: calc(var(--title-size) * 0.78);
+    rotate: 3deg;
+  }
+
+  .problem {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
     align-items: center;
   }
 
-  .problem,
+  /* The specimen on the left, its notes on the right, each note with a
+     hairline leader reaching back to the slip. */
   .cost {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: center;
+  }
+
+  .cost-copy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .slip-cost {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .cost-copy > p::before {
+    content: "";
+    position: absolute;
+    top: 0.8em;
+    right: calc(100% + 0.75rem);
+    width: clamp(1.5rem, 3vw, 3.5rem);
+    border-top: 1px solid var(--color-ink);
   }
 
   .ledger {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
     align-items: center;
   }
 
+  .demo {
+    grid-template-columns: minmax(0, 0.34fr) minmax(0, 1fr);
+    column-gap: clamp(2rem, 4vw, 4rem);
+    align-items: start;
+  }
+
+  .demo-player {
+    max-width: none;
+  }
+
   .slip-cost {
-    justify-self: center;
+    justify-self: end;
   }
 
   .nope-letter {
-    max-width: none;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    column-gap: 4rem;
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: start;
   }
 
-  .nope-letter > * {
-    grid-column: 1;
+  .nope-letter .title {
+    font-size: var(--title-xl);
   }
 
-  .nope-letter > .nope-list {
+  .nope-slip {
     grid-column: 2;
-    grid-row: 1 / span 4;
-    align-self: center;
+    grid-row: 1 / span 2;
+    rotate: -1deg;
   }
 
   .faq {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    column-gap: 4rem;
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
     align-items: start;
   }
 
-  .footer {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
+  /* The question index scrolls past a title that holds its place. CSS
+     sticky, not a pin, so it costs nothing without JavaScript. */
+  .faq .title {
+    position: sticky;
+    top: 2rem;
+    font-size: var(--title-xl);
   }
 
-  .smallprint {
-    grid-column: 1 / -1;
+  .fact {
+    grid-template-columns: 4rem minmax(0, 1.1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+    padding: 2rem 0;
   }
 
-  .footer-tail {
-    text-align: right;
+  .fact::before {
+    grid-row: auto;
+  }
+
+}
+
+@media (min-width: 80rem) {
+  .slip-hero {
+    margin-left: -2.5rem;
   }
 }
 

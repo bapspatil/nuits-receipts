@@ -2,7 +2,7 @@
 
 ## Identity
 
-The page is money paper. Cheque-mint ground, petrol ink, white receipt slips with torn feet, and rubber stamps that say what happened to each payment. The memorable element is the stamp: it appears on the hero slip, on every row of the example statement, and nowhere else.
+The page is money paper. Cheque-mint ground, petrol ink, white receipt slips with torn feet, and rubber stamps that say what happened to each payment. The memorable element is the stamp: it appears on the hero slip, on every row of the example statement and in the statement's own tally, and nowhere else.
 
 Audience: freelancers and sole traders who already use Cloudflare and dread month end. Job of the page: say what the product is, why it exists and what to click, in that order, then show the arithmetic.
 
@@ -117,13 +117,32 @@ Storyboard (desktop, motion on; everything else gets the static end state):
 | The problem | statement plus scattered scraps | assemble | scraps slide into one pile; the slip sinks into the envelope |
 | How it works | rail | track, pinned 1.4 screens | three steps pass under a held title, a meter tracks them, rows print behind |
 | The match | ledger | stamp, pinned 1.2 screens | stamps land row by row (narrow screens: native view timelines) |
-| Demo, proof, limits, FAQ | documents | none | facts rise a little; the won't-do boxes get struck through |
-| Cost | document | none | the cost slip rises into place |
-| Close | statement | none | the words step down onto one baseline, ink bleeds in, the caret blinks: the end |
+| Demo | screening room, ink | none | the player sits in a film strip; nothing moves until the reader presses play |
+| Cost | specimen with margin notes | none | the cost slip rises into place |
+| So far | spec sheet, ruled rows | none | each row rises a little |
+| Limits | a letter on a slip | none | the won't-do boxes get struck through |
+| FAQ | numbered index, title held by CSS sticky | none | the plus turns to a cross |
+| Close | full-bleed statement | none | the words step down onto one baseline, ink bleeds in, the caret blinks, then the footer tears off: the end |
 
 Every section title also wipes in word by word just before it arrives, and every illustration traces its ink outlines on, then fills them. A 3px reading-progress line runs along the top edge, driven by a native scroll timeline.
 
 Rules: words never fade. A heading is split into words only when it is about to enter the viewport, and the wipe then runs to the end on its own clock, so a heading on screen is either whole or actively revealing. Illustrations keep their paper and mint regions painted while their ink traces, so a half-drawn icon is never an empty box. Loops pause off screen. Native scroll timelines sit behind `@supports (animation-timeline: view())` and `html[data-motion="on"]`, so a browser without them is never left at a keyframe's start. Nothing waits hidden for a trigger; scrubbed tweens only move content that is already painted (the one exception is the ledger stamps, which wipe in while their rows stay visible). Pins come from script only. Reduced motion, the on-page switch set to off, narrow screens and no JavaScript all get no pins, a still field and no wipe delays. Reduced motion, the switch set to off and no JavaScript also get no loops, no scroll timelines, no split-word wipes and no WebGL: the ink sections show their fallback print.
+
+## Sections
+
+Every scene after the hero opens with a slate: a two-digit index, the scene's short name in spaced capitals, and a perforation running to the right edge. The slate is `aria-hidden` decoration; the h2 is the heading. It is ink on paper and paper on ink, so the page reads as one roll filed in order, 01 The problem to 09 Deploy.
+
+Each scene composes one paper object against its ground differently, so no two neighbours share a shape: the hero sets the title edge to edge with the slip landing over its tail and the sub and cost line as a two-column chit; the problem puts the scraps and the envelope on a ruled desk; How it works is printed tickets on a rail; the match is a bank statement slip with an ink header band, ruled columns and a tally of its stamps (counted from the example rows); the demo is the one ink scene that is not an ink field, a screening room with the player in a film strip; cost is the slip as a specimen with the copy hung beside it as margin notes; so far is a spec sheet of three ruled rows; limits is a letter printed on a slip; the FAQ is a numbered index; the close is the largest type on the page.
+
+## The demo player
+
+Media Chrome (`media-chrome`, pinned) wraps the real `<video>`, which keeps its native `controls` in the HTML. `src/player.ts` loads the components when the demo comes within a screen of view (or at once on `/#demo`) and removes `controls` only after they register, so a failed chunk leaves the native player. The controller's height is computed from its container's width, so the bar arriving shifts nothing. The big play button shows only while paused. Captions are on by default with and without JavaScript. Colours come from token variables; transitions are off inside the components because the page's motion clamp cannot reach their shadow DOM.
+
+## Chrome
+
+The bar is a plate of paper with a torn foot, not sticky, so it never sits over the reel's pins or the ink scenes. Wide screens show the nav inline as a numbered index (01 How it works, 02 Demo, 03 Cost, 04 FAQ), then Docs and Privacy, GitHub and the motion switch. Narrow screens get a native `<details>` menu whose panel prints down out of the bar as a white slip. It is absolutely positioned rather than fixed, so following an in-page link with no JavaScript scrolls away from it instead of leaving it over the section. On the home page `src/nav.ts` adds closing on link click, outside click and Escape (focus returns to the trigger), and a scroll spy that sets `aria-current="location"`, marked by an underline and the index turning ink, never by colour alone. The nav list lives once, in `src/partials/nav.html`, and the partials plugin expands it into the bar twice and the footer once.
+
+The footer is the receipt's stub: a torn top edge, the wordmark at display size with the footer nav and the Deploy badge, the small print in two columns, the trader identification and licence and trademark lines, and a centred tail ending on "No receipt needed for this page."
 
 ## Don'ts
 

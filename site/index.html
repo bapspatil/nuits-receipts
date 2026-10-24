@@ -49,25 +49,25 @@
     <main id="main">
       <section class="hero" id="top" aria-labelledby="hero-title">
         <canvas class="field" aria-hidden="true"></canvas>
-        <div class="hero-copy">
-          <h1 class="hero-title" id="hero-title">
-            <span class="wipe" style="--row: 0">Stop chasing</span>
-            <span class="wipe" style="--row: 1">receipts<span class="hero-dot">.</span></span>
-          </h1>
+        <h1 class="hero-title" id="hero-title">
+          <span class="wipe" style="--row: 0">Stop chasing</span>
+          <span class="wipe" style="--row: 1">receipts<span class="hero-dot">.</span></span>
+        </h1>
+        <div class="hero-chit">
           <p class="hero-sub wipe" style="--row: 2">
             A receipt inbox that runs in your own Cloudflare account, matches your bank export and flags what's
             missing.
           </p>
           <p class="hero-cost wipe" style="--row: 3">AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs.</p>
-          <div class="ctas wipe" style="--row: 4">
-            <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare"></a>
-            <a class="button button-secondary" href="https://github.com/bapspatil/nuits-receipts">Star on GitHub</a>
-          </div>
-          <p class="hero-note wipe" style="--row: 5">
-            Open source under the Apache License 2.0. Not a service: you deploy your own copy.
-            <a href="#demo">Watch the 53-second demo</a>.
-          </p>
         </div>
+        <div class="ctas hero-ctas wipe" style="--row: 4">
+          <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare"></a>
+          <a class="button button-secondary" href="https://github.com/bapspatil/nuits-receipts">Star on GitHub</a>
+        </div>
+        <p class="hero-note wipe" style="--row: 5">
+          Open source under the Apache License 2.0. Not a service: you deploy your own copy.
+          <a class="play-chip" href="#demo">Watch the 53-second demo.</a>
+        </p>
 
         <figure class="slip slip-hero" data-loop aria-label="Example: a receipt matched to a bank payment">
           <div class="slip-body">
@@ -86,36 +86,42 @@
       </section>
 
       <section class="scene problem" aria-labelledby="problem-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">01</span><span>The problem</span></div>
         <div class="problem-copy">
           <h2 class="title" id="problem-title">Receipts live everywhere except where you need them.</h2>
           <p class="lede">
             A PDF in your inbox. A photo on your phone. A paper one in a coat pocket. Then the month ends, the bank
             export has a line for every payment, and your accountant would like a receipt for each of them.
           </p>
-          <p class="lede">Nuits Receipts puts them in one inbox and tells you which ones you still owe.</p>
+          <p class="pull"><span>Nuits Receipts puts them in one inbox and tells you which ones you still owe.</span></p>
+        </div>
+        <div class="desk">
+          <ul class="scatter" data-loop aria-label="Where receipts usually end up">
+            <li class="scrap" style="--i: 0">Inbox, page 4</li>
+            <li class="scrap" style="--i: 1">Downloads folder</li>
+            <li class="scrap" style="--i: 2">Camera roll</li>
+            <li class="scrap" style="--i: 3">Coat pocket</li>
+            <li class="scrap" style="--i: 4">Glovebox</li>
+          </ul>
           <!-- svg:inbox -->
         </div>
-        <ul class="scatter" data-loop aria-label="Where receipts usually end up">
-          <li class="scrap" style="--i: 0">Inbox, page 4</li>
-          <li class="scrap" style="--i: 1">Downloads folder</li>
-          <li class="scrap" style="--i: 2">Camera roll</li>
-          <li class="scrap" style="--i: 3">Coat pocket</li>
-          <li class="scrap" style="--i: 4">Glovebox</li>
-        </ul>
       </section>
 
       <section class="scene how" id="how" aria-labelledby="how-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">02</span><span>How it works</span></div>
         <h2 class="title how-title" id="how-title">How it works</h2>
         <ol class="rail">
           <li class="step">
             <span class="step-n" aria-hidden="true">1</span>
             <!-- svg:send -->
+            <span class="step-of" aria-hidden="true">Step 1 of 3</span>
             <h3 class="heading">Send it in</h3>
             <p>Forward a receipt to your inbox address, or upload a PDF or a photo.</p>
           </li>
           <li class="step">
             <span class="step-n" aria-hidden="true">2</span>
             <!-- svg:read -->
+            <span class="step-of" aria-hidden="true">Step 2 of 3</span>
             <h3 class="heading">It gets read</h3>
             <p>
               Cloudflare's Clairic model on Workers AI (a preview model; its behaviour and pricing may change) reads the
@@ -127,6 +133,7 @@
           <li class="step">
             <span class="step-n" aria-hidden="true">3</span>
             <!-- svg:match -->
+            <span class="step-of" aria-hidden="true">Step 3 of 3</span>
             <h3 class="heading">It gets matched</h3>
             <p>
               Import a CSV export from your bank; you map the columns once. It suggests matches between payments and
@@ -138,6 +145,7 @@
       </section>
 
       <section class="scene ledger" aria-labelledby="ledger-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">03</span><span>The match</span></div>
         <div class="ledger-head">
           <h2 class="title" id="ledger-title">Your bank export, with the receipts attached.</h2>
           <p class="lede">Every payment gets a receipt or a flag. Nothing gets quietly skipped.</p>
@@ -157,44 +165,54 @@
               <tr><td>28 Oct</td><td>Lunch with a client</td><td class="num">−€46.20</td><td><span class="stamp stamp-missing">Missing</span></td></tr>
             </tbody>
           </table>
+          <ul class="stamp-tally">
+            <li><span class="stamp-count">3</span> <span class="stamp stamp-matched">Matched</span></li>
+            <li><span class="stamp-count">2</span> <span class="stamp stamp-missing">Missing</span></li>
+            <li><span class="stamp-count">1</span> <span class="stamp stamp-review">Check me</span></li>
+          </ul>
           <p class="statement-foot">Two missing. You know exactly which two.</p>
         </div>
       </section>
 
       <section class="scene demo" id="demo" aria-labelledby="demo-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">04</span><span>Demo</span><span class="slate-end">53 s</span></div>
         <h2 class="title" id="demo-title">See it in under a minute.</h2>
         <figure class="demo-player">
-          <video
-            controls
-            preload="metadata"
-            playsinline
-            width="1280"
-            height="720"
-            poster="/media/receipts-demo-v3-poster.webp"
-            aria-describedby="demo-note"
-          >
-            <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
-            <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
-            <p>Your browser can't play this video. The transcript is below.</p>
-          </video>
+          <div class="film">
+            <media-controller class="player" defaultsubtitles autohide="-1">
+              <video
+                slot="media"
+                controls
+                preload="metadata"
+                playsinline
+                width="1280"
+                height="720"
+                poster="/media/receipts-demo-v3-poster.webp"
+                aria-describedby="demo-note"
+              >
+                <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
+                <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
+                <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
+              </video>
+              <media-play-button slot="centered-chrome" class="player-big"></media-play-button>
+              <media-control-bar class="player-bar">
+                <media-play-button></media-play-button>
+                <media-time-display></media-time-display>
+                <media-time-range></media-time-range>
+                <media-mute-button></media-mute-button>
+                <media-captions-button></media-captions-button>
+                <media-fullscreen-button></media-fullscreen-button>
+              </media-control-bar>
+            </media-controller>
+          </div>
           <figcaption id="demo-note">
             53 seconds, with narration and captions. Made-up example data. Figures are read automatically and can be wrong.
           </figcaption>
         </figure>
-        <details class="transcript">
-          <summary>Read the transcript</summary>
-          <div class="transcript-text">
-              <p>This is Nuits Receipts, a receipt inbox you deploy yourself. It's open source, and it runs on Cloudflare Workers, in your own account.</p>
-              <p>Forward a receipt by email, or upload a PDF or a photo. It reads the vendor, the amounts, the VAT and the date, and it flags anything it's unsure about.</p>
-              <p>Import your bank statement as a CSV, or map any other layout, and add more than one account.</p>
-              <p>Each payment is matched to a receipt, and the missing ones are listed, so you know what to chase.</p>
-              <p>When the month is done, it prepares a ZIP and a CSV for your accountant. Check it before you send it.</p>
-              <p>AI usage is about fifteen cents a month at two hundred receipts. Reading PDFs needs Workers Paid, at five dollars a month. The code is on GitHub, under Apache 2.0.</p>
-          </div>
-        </details>
       </section>
 
       <section class="scene cost" id="cost" aria-labelledby="cost-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">05</span><span>Cost</span></div>
         <div class="cost-copy">
           <h2 class="title" id="cost-title">AI reading: about 15 cents a month. Here's the arithmetic.</h2>
           <p class="lede">
@@ -203,7 +221,7 @@
             Cloudflare bill.
           </p>
           <p class="caveat">
-            One honest caveat. A PDF upload measured about 186 ms of CPU in production, far over the 10 ms the Workers
+            <strong>One honest caveat.</strong> A PDF upload measured about 186 ms of CPU in production, far over the 10 ms the Workers
             Free plan allows. If you upload PDFs, plan on Workers Paid, a $5 a month minimum for the whole account.
             Forwarded email bodies may fit in Free.
           </p>
@@ -248,6 +266,7 @@
       </section>
 
       <section class="scene proof" aria-labelledby="proof-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">06</span><span>So far</span></div>
         <h2 class="title" id="proof-title">What we can say so far.</h2>
         <ul class="facts">
           <li class="fact">
@@ -272,24 +291,28 @@
       </section>
 
       <section class="scene nope" aria-labelledby="nope-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">07</span><span>Limits</span></div>
         <div class="nope-letter">
           <h2 class="title" id="nope-title">What it doesn't do.</h2>
           <p class="lede">I built this for my own receipts. Here's what it won't do for yours, at least not yet.</p>
-          <p class="disclaimer">
-            Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting
-            advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
-          </p>
-          <ul class="nope-list">
-            <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
-            <li>Bank CSV column mapping is new. It has been tested with Holvi exports so far, and other banks' files are less tested.</li>
-            <li>It's for one person with one inbox.</li>
-            <li>There's no mobile app.</li>
-          </ul>
-          <p class="signoff">Baps, who built it</p>
+          <div class="slip nope-slip">
+            <p class="disclaimer">
+              Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting
+              advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
+            </p>
+            <ul class="nope-list">
+              <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
+              <li>Bank CSV column mapping is new. It has been tested with Holvi exports so far, and other banks' files are less tested.</li>
+              <li>It's for one person with one inbox.</li>
+              <li>There's no mobile app.</li>
+            </ul>
+            <p class="signoff">Baps, who built it</p>
+          </div>
         </div>
       </section>
 
-      <section class="scene faq" aria-labelledby="faq-title">
+      <section class="scene faq" id="faq" aria-labelledby="faq-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">08</span><span>FAQ</span></div>
         <h2 class="title" id="faq-title">Questions, answered plainly.</h2>
         <div class="faq-list">
           <details>
@@ -327,6 +350,7 @@
       </section>
 
       <section class="scene close" aria-labelledby="close-title">
+        <div class="slate" aria-hidden="true"><span class="slate-n">09</span><span>Deploy</span></div>
         <!-- svg:export -->
         <h2 class="close-title" id="close-title">Deploy your own copy.<span class="caret" data-loop aria-hidden="true"></span></h2>
         <div class="ctas">

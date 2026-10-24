@@ -11,11 +11,12 @@ export function startReel(): () => void {
   const ctx = gsap.context(() => {
     const scraps = gsap.utils.toArray<HTMLElement>(".scrap");
     const scatter = document.querySelector<HTMLElement>(".scatter")!;
-    // The scraps drift from where they were dropped into one tidy pile,
-    // scrubbed by the scroll that carries the section past.
+    // The scraps drift from where they were dropped on the desk into one
+    // pile over the envelope, scrubbed by the scroll that carries it past.
     gsap.to(scraps, {
-      left: "30%",
-      top: (i) => `${18 + i * 11}%`,
+      left: "50%",
+      xPercent: -50,
+      top: (i) => `${4 + i * 7}%`,
       rotate: (i) => (i % 2 ? 1.5 : -1.5),
       ease: "none",
       scrollTrigger: { trigger: scatter, start: "top 85%", end: "bottom 35%", scrub: 0.6 },
@@ -50,7 +51,7 @@ export function startReel(): () => void {
 
     // The ledger: rows already printed, stamps land one by one as you scroll.
     const ledger = document.querySelector<HTMLElement>(".ledger")!;
-    const stamps = gsap.utils.toArray<HTMLElement>(".statement .stamp");
+    const stamps = gsap.utils.toArray<HTMLElement>(".statement tbody .stamp");
     const foot = ledger.querySelector<HTMLElement>(".statement-foot")!;
     gsap
       .timeline({
