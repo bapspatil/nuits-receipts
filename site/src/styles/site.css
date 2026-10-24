@@ -66,11 +66,16 @@ a {
   outline-offset: 3px;
 }
 
+/* Anchors land below the sticky bar, not under it. */
+[id] {
+  scroll-margin-top: calc(var(--bar-h) + 0.5rem);
+}
+
 .skip {
   position: absolute;
   left: var(--gutter);
   top: -4rem;
-  z-index: 10;
+  z-index: 70;
   padding: 0.5rem 1rem;
   background: var(--color-ink);
   color: var(--color-paper);
@@ -1355,7 +1360,7 @@ a {
      sticky, not a pin, so it costs nothing without JavaScript. */
   .faq .title {
     position: sticky;
-    top: 2rem;
+    top: calc(var(--bar-h) + 2rem);
     font-size: var(--title-xl);
   }
 

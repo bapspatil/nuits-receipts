@@ -35,11 +35,22 @@
 
 /* Bar: the wordmark, one primary action and the menu. Everything else lives
    in the full-screen menu, so the bar is the same three things at every
-   width. */
+   width.
+
+   Sticky, in CSS alone, so it holds with and without script. It is an opaque
+   paper plate (no blur, no translucency under text), so whatever scrolls
+   under it never shows through. --bar-h is its height plus the cutter, for
+   scroll-margin-top on anchors and for anything else sticky below it. */
+
+:root {
+  --bar-h: calc(44px + 1.75rem + 5px);
+}
 
 .bar {
   --bar-controls: 50;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -193,10 +204,8 @@
    torn foot, and the links rising behind their perforations.
 
    A native disclosure, so it opens, closes and announces itself with no
-   script on every page. With no script the sheet is absolute at the top of
-   the document, not fixed: following an in-page link then scrolls away from
-   it instead of leaving it over the section. src/nav.ts makes it fixed, locks
-   the page, traps focus, animates the close and scrolls after closing. */
+   script on every page. src/nav.ts locks the page, traps focus, animates the
+   close and scrolls after closing. */
 
 .menu {
   --menu-ease: cubic-bezier(0.7, 0, 0.2, 1);
@@ -222,6 +231,13 @@
   mask:
     linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
     conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
+}
+
+/* The sheet is fixed, also with no script: the bar is sticky, so an absolute
+   sheet would travel with it anyway. With no script, following an in-page
+   link lands under the open sheet, and Close (still on the bar) shows it. */
+.menu-panel {
+  position: fixed;
 }
 
 html.menu-js .menu-panel {
@@ -661,4 +677,10 @@ html.menu-locked {
   .smallprint p {
     break-inside: avoid;
   }
+}
+
+/* The reading-progress line sits above the sticky bar, but not over the open
+   menu. */
+html:has(.menu[open]) .progress {
+  visibility: hidden;
 }
