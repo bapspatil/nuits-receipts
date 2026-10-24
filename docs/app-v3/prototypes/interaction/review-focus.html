@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Review focus · Nuits Receipts (prototype)</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="wide">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar"><a class="brand" href="#"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>Nuits Receipts</a><nav class="main" aria-label="Main"><ul><li><a href="#">Home</a></li><li><a href="#" aria-current="page">Review <span class="count">3<span class="vh"> waiting</span></span></a></li><li><a href="#">Receipts</a></li><li><a href="#">Bank <span class="count">3<span class="vh"> missing receipts</span></span></a></li><li><a href="#">Settings</a></li></ul></nav></div></header>
+<nav class="tabs" aria-label="Main"><ul><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>Home</a></li><li><a href="#" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/></svg> <span class="count">3<span class="vh"> waiting</span></span></span>Review</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg></span>Receipts</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/></svg> <span class="count">3<span class="vh"> missing receipts</span></span></span>Bank</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>Settings</a></li></ul></nav>
+<main id="main" class="wide">
+<p class="protonote"><strong>Prototype.</strong> Focus mode. One question at a time, over the document with its line highlighted. The sections below are stacked so you can read the flow; in the app each is one screen. Next moves on, Approve is only at the end. Receipt number is on the last step, optional.</p>
+<div class="crumbs"><a href="#">&lsaquo; Review</a><span class="small"><span class="num">3 of 3</span> to check</span></div>
+<div class="head tight"><h1>Sample Print Shop</h1><span class="stamp needs">Needs you</span></div>
+<ol class="wizard stepnav" aria-label="Steps"><li><a href="#step-1">total</a></li><li><a href="#step-2">currency</a></li><li><a href="#step-3">amount before VAT</a></li><li><a href="#step-4">VAT amount</a></li><li><a href="#step-5">VAT %</a></li><li><a href="#step-6">Approve</a></li></ol>
+<form class="fix focusform" action="#" method="post">
+<div class="fsteps">
+<section class="fstep" id="step-1" aria-labelledby="sh-1">
+<h2 id="sh-1"><span class="num">1 of 5</span>: What was the total?</h2>
+<div class="fgrid">
+<div><div class="paper tight" role="img" aria-label="The receipt as read. The line to look at: Total 30,00 EUR"><div aria-hidden="true"><p class="title">SAMPLE PRINT SHOP</p><p class="dim">Receipt</p><p class="dim">18.09.2026</p><p class="dim">2 x A2 poster print 30,00 EUR</p><p class="dim">incl. VAT 25.5% 6,10</p><p><mark class="on">Total 30,00 EUR</mark></p><p class="dim">Paid by card</p></div></div></div>
+<div class="ask-field"><label for="f-total">What was the total</label><input id="f-total" name="total" inputmode="decimal" autocomplete="off" aria-required="true" aria-describedby="h1"><p class="meta" id="h1">Look for the line marked on the receipt.</p>
+<div class="fnav"><a class="btn primary" href="#step-2">Next</a></div>
+<p class="small">Next only moves on. Nothing is saved until Approve.</p></div>
+</div></section>
+<section class="fstep" id="step-2" aria-labelledby="sh-2">
+<h2 id="sh-2"><span class="num">2 of 5</span>: Which currency?</h2>
+<div class="fgrid">
+<div><div class="paper tight" role="img" aria-label="The receipt as read. The line to look at: 2 x A2 poster print 30,00 EUR"><div aria-hidden="true"><p class="title">SAMPLE PRINT SHOP</p><p class="dim">Receipt</p><p class="dim">18.09.2026</p><p><mark class="on">2 x A2 poster print 30,00 EUR</mark></p><p class="dim">incl. VAT 25.5% 6,10</p><p class="dim">Total 30,00 EUR</p><p class="dim">Paid by card</p></div></div></div>
+<div class="ask-field"><label for="f-currency">Which currency</label><select id="f-currency" name="currency" aria-required="true" aria-describedby="h2"><option value="" selected>Not known yet</option><option>EUR</option><option>USD</option><option>GBP</option><option>SEK</option></select><p class="meta" id="h2">The amounts on the receipt end in the currency.</p>
+<div class="fnav"><a class="btn secondary" href="#step-1">Back</a><a class="btn primary" href="#step-3">Next</a></div>
+<p class="small">Next only moves on. Nothing is saved until Approve.</p></div>
+</div></section>
+<section class="fstep" id="step-3" aria-labelledby="sh-3">
+<h2 id="sh-3"><span class="num">3 of 5</span>: What was the amount before VAT?</h2>
+<div class="fgrid">
+<div><div class="paper tight" role="img" aria-label="The receipt as read. The line to look at: Total 30,00 EUR"><div aria-hidden="true"><p class="title">SAMPLE PRINT SHOP</p><p class="dim">Receipt</p><p class="dim">18.09.2026</p><p class="dim">2 x A2 poster print 30,00 EUR</p><p class="dim">incl. VAT 25.5% 6,10</p><p><mark class="on">Total 30,00 EUR</mark></p><p class="dim">Paid by card</p></div></div></div>
+<div class="ask-field"><label for="f-net">What was the amount before VAT</label><input id="f-net" name="net" inputmode="decimal" autocomplete="off" aria-required="true" aria-describedby="h3"><p class="meta" id="h3">The receipt does not print it. Total minus VAT is 30,00 minus 6,10.</p>
+<div class="fnav"><a class="btn secondary" href="#step-2">Back</a><a class="btn primary" href="#step-4">Next</a></div>
+<p class="small">Next only moves on. Nothing is saved until Approve.</p></div>
+</div></section>
+<section class="fstep" id="step-4" aria-labelledby="sh-4">
+<h2 id="sh-4"><span class="num">4 of 5</span>: What was the VAT amount?</h2>
+<div class="fgrid">
+<div><div class="paper tight" role="img" aria-label="The receipt as read. The line to look at: incl. VAT 25.5% 6,10"><div aria-hidden="true"><p class="title">SAMPLE PRINT SHOP</p><p class="dim">Receipt</p><p class="dim">18.09.2026</p><p class="dim">2 x A2 poster print 30,00 EUR</p><p><mark class="on">incl. VAT 25.5% 6,10</mark></p><p class="dim">Total 30,00 EUR</p><p class="dim">Paid by card</p></div></div></div>
+<div class="ask-field"><label for="f-vat">What was the VAT amount</label><input id="f-vat" name="vat" inputmode="decimal" autocomplete="off" aria-required="true" aria-describedby="h4" placeholder="0 if none"><p class="meta" id="h4">Write 0 if the receipt shows none.</p>
+<div class="fnav"><a class="btn secondary" href="#step-3">Back</a><a class="btn primary" href="#step-5">Next</a></div>
+<p class="small">Next only moves on. Nothing is saved until Approve.</p></div>
+</div></section>
+<section class="fstep" id="step-5" aria-labelledby="sh-5">
+<h2 id="sh-5"><span class="num">5 of 5</span>: What was the VAT %?</h2>
+<div class="fgrid">
+<div><div class="paper tight" role="img" aria-label="The receipt as read. The line to look at: incl. VAT 25.5% 6,10"><div aria-hidden="true"><p class="title">SAMPLE PRINT SHOP</p><p class="dim">Receipt</p><p class="dim">18.09.2026</p><p class="dim">2 x A2 poster print 30,00 EUR</p><p><mark class="on">incl. VAT 25.5% 6,10</mark></p><p class="dim">Total 30,00 EUR</p><p class="dim">Paid by card</p></div></div></div>
+<div class="ask-field"><label for="f-rate">What was the VAT %</label><input id="f-rate" name="vat_rate" inputmode="decimal" autocomplete="off" aria-required="true" aria-describedby="h5"><p class="meta" id="h5">It is printed beside the VAT amount.</p>
+<div class="fnav"><a class="btn secondary" href="#step-4">Back</a><a class="btn primary" href="#step-6">Next</a></div>
+<p class="small">Next only moves on. Nothing is saved until Approve.</p></div>
+</div></section>
+<section class="fstep" id="step-6" aria-labelledby="sh-6">
+<h2 id="sh-6">Approve receipt</h2>
+<div class="fgrid">
+<div>
+<dl class="kv sum">
+<div><dt>Seller</dt><dd>Sample Print Shop <span class="tag ok">Read</span></dd></div>
+<div><dt>Date</dt><dd>18 Sep 2026 <span class="tag ok">Read</span></dd></div>
+<div><dt>Total</dt><dd>EUR 30.00</dd></div>
+<div><dt>Before VAT</dt><dd>23.90</dd></div>
+<div><dt>VAT</dt><dd>6.10 (25.5%)</dd></div>
+</dl>
+<p class="meta">The summary shows your five answers, as they would look once typed.</p>
+</div>
+<div class="ask-field"><label for="f-number">Receipt number <span class="meta">Optional</span></label><input id="f-number" name="number" autocomplete="off" aria-describedby="hn"><p class="meta" id="hn">The receipt doesn't print one. You can leave this empty.</p>
+<div class="fnav"><a class="btn secondary" href="#step-5">Back</a><button class="btn primary">Approve receipt</button><a class="linkbtn" href="#">Discard</a></div></div>
+</div></section>
+</div>
+</form>
+</main>
+<footer class="foot"><p class="notice">Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p><p>Nuits Receipts v1.5.0</p></footer>
+</body>
+</html>

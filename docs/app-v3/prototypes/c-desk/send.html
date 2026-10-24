@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Send September 2026, Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="desk.css">
+<style>
+  .eyebrow { font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .send { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-7); margin-top: var(--space-6); align-items: start; }
+  .cover { padding: var(--space-6); padding-bottom: calc(var(--space-6) + var(--tear)); }
+  .to { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); }
+  .cover h2 { font-size: 40px; margin: var(--space-2) 0 var(--space-4); }
+  .stamps { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-5); }
+  .lines { margin: 0 0 var(--space-5); }
+  .lines p { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) 0; }
+  .lines .k { color: var(--text-muted); }
+  .lines .v { font-weight: 600; }
+  .lines .total .v { font: 800 var(--text-2xl)/1 var(--font-display); font-variation-settings: "opsz" 96, "wdth" 82; }
+  .files { margin-top: var(--space-4); }
+  .files ul { list-style: none; margin: var(--space-2) 0 0; padding: 0 0 0 var(--space-5); font-size: var(--text-sm); }
+  .files li { padding: var(--space-2) 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; display: flex; justify-content: space-between; gap: var(--space-3); }
+  .sent-q h2 { margin-bottom: var(--space-3); }
+  .sent-q p { margin-bottom: var(--space-4); }
+  .after { margin-top: var(--space-5); }
+  .after .slip { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; }
+  @media (max-width: 960px) { .send { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); } }
+  @media (max-width: 720px) {
+    .cover { padding: var(--space-5) var(--space-4); padding-bottom: calc(var(--space-5) + var(--tear)); }
+    .cover h2 { font-size: 32px; }
+    .btn { width: 100%; }
+    .files ul { padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar"><div class="bar-in">
+  <a class="brand" href="home.html">Nuits Receipts</a>
+  <nav class="nav" aria-label="Main">
+    <a href="home.html" aria-current="page">Home</a>
+    <a href="review.html">Review</a>
+    <a href="#">Receipts</a>
+    <a href="bank.html">Bank</a>
+    <a href="#">Settings</a>
+  </nav>
+</div></header>
+<nav class="tabbar" aria-label="Main, phone"><div class="nav">
+  <a href="home.html" aria-current="page">Home</a>
+  <a href="review.html">Review</a>
+  <a href="#">Receipts</a>
+  <a href="bank.html">Bank</a>
+  <a href="#">Settings</a>
+</div></nav>
+
+<main id="main">
+  <div class="month">
+    <a href="#"><span aria-hidden="true">&lsaquo;</span> August <span class="stamp stamp--sent">Sent</span></a>
+    <h1>September 2026</h1>
+    <a href="#">October <span aria-hidden="true">&rsaquo;</span></a>
+  </div>
+  <p class="lede">Every receipt is checked and every payment has one. September is ready to send.</p>
+
+  <div class="send">
+    <section aria-labelledby="cover-h">
+      <div class="lift"><div class="slip torn cover">
+        <div class="to">
+          <p class="eyebrow">For Example Accounting Oy</p>
+          <span class="stamp stamp--plain">Not sent yet</span>
+        </div>
+        <h2 id="cover-h">September 2026</h2>
+        <p class="stamps">
+          <span class="stamp stamp--auto">All checked</span>
+          <span class="stamp stamp--auto">All matched</span>
+        </p>
+        <div class="lines">
+          <p><span class="k">Receipts</span><span class="dots" aria-hidden="true"></span><span class="v num">6</span></p>
+          <p><span class="k">Invoices</span><span class="dots" aria-hidden="true"></span><span class="v num">1</span></p>
+          <p><span class="k">ZIP file</span><span class="dots" aria-hidden="true"></span><span class="v num">4 KB</span></p>
+          <p class="total"><span class="k">Spent</span><span class="dots" aria-hidden="true"></span><span class="v num">EUR 250.22</span></p>
+        </div>
+        <a class="btn btn--primary" href="#">Download for Example Accounting Oy</a>
+        <details class="files">
+          <summary>What's in the ZIP, 8 files</summary>
+          <ul>
+            <li><span>september-2026.csv</span><span class="muted">all rows</span></li>
+            <li><span>2026-09-04 Sample Cloud Lantern Oy.pdf</span><span class="num muted">EUR 125.50</span></li>
+            <li><span>2026-09-06 Sample Mail Meadow Oy.pdf</span><span class="num muted">EUR 50.20</span></li>
+            <li><span>2026-09-12 Sample Domain Desk.pdf</span><span class="num muted">EUR 12.00</span></li>
+            <li><span>2026-09-15 Sample Train Line.pdf</span><span class="num muted">EUR 23.40</span></li>
+            <li><span>2026-09-18 Sample Print Shop.eml</span><span class="num muted">EUR 30.00</span></li>
+            <li><span>2026-09-20 Sample Coffee Corner.jpg</span><span class="num muted">EUR 9.12</span></li>
+            <li><span>INV-2026-001 Sample Client Oy.pdf</span><span class="num muted">EUR 125.50 in</span></li>
+          </ul>
+        </details>
+      </div></div>
+    </section>
+
+    <section class="sent-q" aria-labelledby="sent-h">
+      <div class="lift"><form class="slip torn" action="#" method="post">
+        <h2 id="sent-h">Did you send it?</h2>
+        <p>Once the ZIP is with Example Accounting Oy, mark September sent. If anything in it changes later, Home will say so.</p>
+        <button class="btn" type="submit">Mark September as sent</button>
+      </form></div>
+      <div class="after">
+        <p class="state-label">State 2, after marking it sent</p>
+        <div class="lift"><div class="slip torn">
+          <span>September 2026, for Example Accounting Oy. Sent 24 Oct.</span>
+          <span class="stamp stamp--sent">Sent</span>
+        </div></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p>
+  <p>Nuits Receipts v1.5.0</p>
+</footer>
+</body>
+</html>

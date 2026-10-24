@@ -1,0 +1,143 @@
+/* Direction A, Ledger evolved. The only file with hex values. */
+
+@font-face { font-family: "Bricolage"; src: url("../../../../site/public/fonts/bricolage.woff2") format("woff2"); font-weight: 600 800; font-display: swap; }
+@font-face { font-family: "Instrument Sans"; src: url("../../../../site/public/fonts/instrument-sans.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+
+/* Primitives */
+:root {
+  --c-ink: #0D3A36;
+  --c-ink-hover: #072724;
+  --c-ink-soft: #355650;
+  --c-paper: #E6EFE9;
+  --c-slip: #FFFFFF;
+  --c-sunken: #D7E4DC;
+  --c-guilloche: #C2D8CB;
+  --c-mint: #9FD3BC;
+  --c-mint-wash: #DCEFE4;
+  --c-stamp: #A8123F;
+  --c-stamp-wash: #FBEEF2;
+  --c-on-stamp: #FFFFFF;
+
+  --c-night: #0B1F1C;
+  --c-night-raised: #133029;
+  --c-night-sunken: #071513;
+  --c-night-line: #2A4943;
+  --c-night-line-strong: #7C9E95;
+  --c-night-muted: #A6C0B6;
+  --c-night-hover: #FFFFFF;
+  --c-night-ok: #9FD3BC;
+  --c-night-ok-wash: #16403A;
+  --c-night-needs: #FF9AB0;
+  --c-night-needs-wash: #3A1621;
+
+  --shadow-ink: 0 1px 0 rgb(13 58 54 / 0.08), 0 8px 24px -16px rgb(13 58 54 / 0.35);
+  --shadow-night: 0 1px 0 rgb(0 0 0 / 0.3), 0 8px 24px -16px rgb(0 0 0 / 0.8);
+}
+
+/* Semantic */
+:root {
+  color-scheme: light;
+  --surface-page: var(--c-paper);
+  --surface-raised: var(--c-slip);
+  --surface-sunken: var(--c-sunken);
+  --text: var(--c-ink);
+  --text-muted: var(--c-ink-soft);
+  --text-on-accent: var(--c-paper);
+  --border: var(--c-guilloche);
+  --border-strong: var(--c-ink-soft);
+  --accent: var(--c-ink);
+  --accent-hover: var(--c-ink-hover);
+  --danger: var(--c-stamp);
+  --danger-surface: var(--c-stamp-wash);
+  --on-danger: var(--c-on-stamp);
+  --success: var(--c-ink);
+  --success-surface: var(--c-mint-wash);
+  --success-fill: var(--c-mint);
+  --focus-ring: var(--c-ink);
+
+  --font-display: "Bricolage", "Arial Narrow", system-ui, sans-serif;
+  --font-ui: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;    /* 12 / 16 */
+  --text-sm: 0.875rem;   /* 14 / 20 */
+  --text-md: 1rem;       /* 16 / 24 */
+  --text-lg: 1.125rem;   /* 18 / 24 */
+  --text-xl: 1.375rem;   /* 22 / 28 */
+  --text-2xl: 1.75rem;   /* 28 / 32 */
+  --lh-xs: 1rem;
+  --lh-sm: 1.25rem;
+  --lh-md: 1.5rem;
+  --lh-lg: 1.5rem;
+  --lh-xl: 1.75rem;
+  --lh-2xl: 2rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-pill: 999px;
+  --shadow-raised: var(--shadow-ink);
+  --hairline: 1px;
+  --rule: 1.5px;
+}
+
+/* Component */
+:root {
+  --btn-primary-bg: var(--accent);
+  --btn-primary-bg-hover: var(--accent-hover);
+  --btn-primary-text: var(--text-on-accent);
+  --btn-height: 44px;
+  --nav-height: 56px;
+  --tabbar-height: 56px;
+  --field-height: 44px;
+  --row-height: 48px;
+  --page-max: 1200px;
+  --page-pad: var(--space-6);
+
+  --stamp-needs: var(--danger);
+  --stamp-ok: var(--success-fill);
+  --stamp-ok-text: var(--text);
+  --stamp-missing: var(--danger);
+  --stamp-missing-text: var(--on-danger);
+  --flag-required: var(--danger);
+  --flag-optional: var(--border-strong);
+  --flag-read: var(--success-fill);
+  --field-bg: var(--surface-raised);
+}
+
+/* Night ledger: app-only dark theme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface-page: var(--c-night);
+    --surface-raised: var(--c-night-raised);
+    --surface-sunken: var(--c-night-sunken);
+    --text: var(--c-paper);
+    --text-muted: var(--c-night-muted);
+    --text-on-accent: var(--c-ink);
+    --border: var(--c-night-line);
+    --border-strong: var(--c-night-line-strong);
+    --accent: var(--c-paper);
+    --accent-hover: var(--c-night-hover);
+    --danger: var(--c-night-needs);
+    --danger-surface: var(--c-night-needs-wash);
+    --on-danger: var(--c-night);
+    --success: var(--c-night-ok);
+    --success-surface: var(--c-night-ok-wash);
+    --success-fill: var(--c-night-ok-wash);
+    --focus-ring: var(--c-paper);
+    --shadow-raised: var(--shadow-night);
+
+    --stamp-ok-text: var(--c-night-ok);
+    --flag-read: var(--c-night-ok);
+    --field-bg: var(--surface-sunken);
+  }
+}

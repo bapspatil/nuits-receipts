@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Send September 2026, Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--hairline); background: var(--surface-raised); margin: 0 0 var(--space-6); padding: 0; list-style: none; }
+  .step { padding: var(--space-3) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); border-right: var(--hairline); min-height: var(--row-height); }
+  .step:last-child { border-right: 0; box-shadow: inset 0 3px 0 var(--accent); }
+  .step h2 { font-size: var(--text-md); font-weight: 600; }
+  .step span.label { margin-right: var(--space-2); }
+
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-5); }
+  .send { grid-column: span 7; background: var(--surface-raised); border: var(--hairline); border-top: 3px solid var(--accent); padding: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
+  .send h2 { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.01em; }
+  .send p { color: var(--text-muted); }
+  .sum { grid-column: span 5; background: var(--surface-raised); border: var(--hairline); padding: var(--space-5); align-content: start; display: grid; gap: var(--space-2); }
+  .sum__fig { font-size: var(--text-2xl); font-weight: 600; letter-spacing: -0.015em; line-height: 1.1; }
+  .sum dl { display: grid; grid-template-columns: 1fr auto; margin: var(--space-3) 0 0; border-top: var(--hairline); }
+  .sum dt, .sum dd { margin: 0; padding: var(--space-2) 0; border-bottom: var(--hairline); font-size: var(--text-sm); }
+  .sum dd { text-align: right; }
+  .sent { grid-column: span 7; border: var(--hairline); padding: var(--space-5); display: grid; gap: var(--space-3); background: var(--surface-page); }
+  .sent h2 { font-size: var(--text-lg); font-weight: 600; }
+  .sent p { color: var(--text-muted); font-size: var(--text-sm); max-width: 56ch; }
+
+  .files { margin-top: var(--space-6); border: var(--hairline); background: var(--surface-raised); }
+  .files summary { min-height: var(--row-height); padding: 0 var(--space-4); display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
+  .files summary .label { font-weight: 600; }
+  .files .table { border: 0; border-top: var(--hairline); }
+  .files .table td { font-size: var(--text-sm); }
+
+  @media (max-width: 720px) {
+    .steps { grid-template-columns: 1fr; }
+    .step { border-right: 0; border-bottom: var(--hairline); padding: var(--space-2) var(--space-4); }
+    .step:last-child { border-bottom: 0; box-shadow: inset 3px 0 0 var(--accent); }
+    .send, .sum, .sent { grid-column: 1 / -1; }
+    .send .btn, .sent .btn { width: 100%; }
+    .files .table th:nth-child(2), .files .table td:nth-child(2) { display: none; }
+    .files .table td, .files .table th { padding-left: var(--space-3); padding-right: var(--space-3); }
+    .fname { word-break: break-all; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="topbar__in">
+    <a class="brand" href="home.html">Nuits Receipts</a>
+    <nav aria-label="Main"><ul class="nav">
+      <li><a href="home.html" aria-current="page">Home</a></li>
+      <li><a href="review.html">Review</a></li>
+      <li><a href="#">Receipts</a></li>
+      <li><a href="bank.html">Bank</a></li>
+      <li><a href="#">Settings</a></li>
+    </ul></nav>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div class="pagehead">
+    <div class="pagehead__row">
+      <span class="label">Home, oldest month not sent</span>
+      <nav class="months" aria-label="Month">
+        <a href="#" aria-label="August 2026">&lsaquo; Aug</a>
+        <a href="#" aria-label="October 2026">Oct &rsaquo;</a>
+      </nav>
+    </div>
+    <div class="pagehead__title">
+      <h1>September 2026</h1>
+      <span class="stamp stamp--ok">Ready to send</span>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step"><h2><span class="label">1</span>Check</h2><span class="status status--ok">All checked</span></li>
+    <li class="step"><h2><span class="label">2</span>Match</h2><span class="status status--ok">All matched</span></li>
+    <li class="step"><h2><span class="label">3</span>Send</h2><span class="status status--quiet">Not sent yet</span></li>
+  </ol>
+
+  <div class="grid">
+    <section class="send" aria-labelledby="send-h">
+      <span class="label">Next</span>
+      <h2 id="send-h">Send September to your accountant</h2>
+      <p>One ZIP with every receipt, the invoice and a CSV of the month. Email it to Example Accounting Oy yourself.</p>
+      <div class="actions">
+        <a class="btn btn--primary btn--lg" href="#" download>Download for Example Accounting Oy</a>
+        <a class="btn btn--quiet" href="#">CSV only</a>
+      </div>
+      <p class="muted">ZIP, 4 KB.</p>
+    </section>
+
+    <section class="sum" aria-labelledby="sum-h">
+      <span class="label" id="sum-h">Spent in September</span>
+      <p class="sum__fig">EUR 250.22</p>
+      <dl>
+        <dt>Receipts</dt><dd>6</dd>
+        <dt>Invoices</dt><dd>1</dd>
+        <dt>Payments matched</dt><dd>6 of 6</dd>
+      </dl>
+    </section>
+
+    <section class="sent" aria-labelledby="sent-h">
+      <h2 id="sent-h">Did you send it?</h2>
+      <p>Mark it sent once it's with Example Accounting Oy. If a receipt changes after that, Home tells you what changed.</p>
+      <form action="#" method="post" class="actions">
+        <button class="btn" type="submit">Mark September as sent</button>
+      </form>
+    </section>
+  </div>
+
+  <details class="files">
+    <summary><span>In the ZIP, 8 files</span><span class="label">Show list</span></summary>
+    <table class="table">
+      <thead><tr><th scope="col">File</th><th scope="col">Date</th><th scope="col" class="num">Total</th></tr></thead>
+      <tbody>
+        <tr><td class="fname">2026-09-04 Sample Cloud Lantern Oy SAMPLE-1001.pdf</td><td>4 Sep</td><td class="num">EUR 125.50</td></tr>
+        <tr><td class="fname">2026-09-06 Sample Mail Meadow Oy SAMPLE-1003.pdf</td><td>6 Sep</td><td class="num">EUR 50.20</td></tr>
+        <tr><td class="fname">2026-09-12 Sample Domain Desk SAMPLE-1004.pdf</td><td>12 Sep</td><td class="num">EUR 12.00</td></tr>
+        <tr><td class="fname">2026-09-15 Sample Train Line.pdf</td><td>15 Sep</td><td class="num">EUR 23.40</td></tr>
+        <tr><td class="fname">2026-09-18 Sample Print Shop.pdf</td><td>18 Sep</td><td class="num">EUR 30.00</td></tr>
+        <tr><td class="fname">Sample Coffee Corner SAMPLE-1005.pdf</td><td>Dated by you</td><td class="num">EUR 9.12</td></tr>
+        <tr><td class="fname">Invoice INV-2026-001 Sample Client Oy.pdf</td><td>25 Sep</td><td class="num">EUR 125.50</td></tr>
+        <tr><td class="fname">september-2026.csv</td><td></td><td class="num"></td></tr>
+      </tbody>
+    </table>
+  </details>
+</main>
+
+<footer class="footer">
+  <div class="footer__in">
+    <p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p>
+    <p>Nuits Receipts v1.5.0</p>
+  </div>
+</footer>
+
+<nav class="tabbar" aria-label="Main, phone"><ul class="nav">
+  <li><a href="home.html" aria-current="page">Home</a></li>
+  <li><a href="review.html">Review</a></li>
+  <li><a href="#">Receipts</a></li>
+  <li><a href="bank.html">Bank</a></li>
+  <li><a href="#">Settings</a></li>
+</ul></nav>
+</body>
+</html>

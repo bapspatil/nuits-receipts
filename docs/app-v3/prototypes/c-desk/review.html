@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample Print Shop, Review, Nuits Receipts</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="desk.css">
+<style>
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .back { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; font-weight: 500; }
+  .progress { display: flex; align-items: center; gap: var(--space-3); font-weight: 600; }
+  .pips { display: flex; gap: var(--space-1); }
+  .pips span { width: 28px; height: 8px; border-radius: var(--radius-pill); border: 2px solid var(--border-strong); }
+  .pips .done { background: var(--accent); }
+  .title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin-top: var(--space-3); }
+  .key { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-4); font-size: var(--text-sm); color: var(--text-muted); }
+  .key span { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .k-req { width: 4px; height: 20px; background: var(--danger); }
+  .k-opt { width: 18px; height: 18px; border: 1px dashed var(--text-muted); }
+
+  .desk { margin-top: var(--space-6); }
+  .cols, .row { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); }
+  .cols { margin-bottom: var(--space-3); align-items: center; }
+  .cols p { font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+  .cols .orig { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding-right: var(--space-2); }
+  .cols .orig a { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--text-sm); text-transform: none; letter-spacing: 0; }
+  .cols > p:last-child { padding-left: var(--space-6); }
+
+  .sheet { filter: var(--shadow-drop); }
+  .line { background: var(--surface-raised); padding: var(--space-3) var(--space-6) var(--space-3) var(--space-3); display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; font-size: var(--text-lg); line-height: 1.4; }
+  .row:first-child .line { padding-top: var(--space-6); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .row.last .line { padding-bottom: calc(var(--space-7) + var(--tear)); -webkit-mask: conic-gradient(from -45deg at bottom, transparent, black 1deg 89deg, transparent 90deg) 50% / calc(var(--tear) * 2) 100%; mask: conic-gradient(from -45deg at bottom, transparent, black 1deg 89deg, transparent 90deg) 50% / calc(var(--tear) * 2) 100%; }
+  .ln { font-size: var(--text-xs); color: var(--text-muted); padding-top: 5px; }
+  .txt { display: flex; justify-content: space-between; gap: var(--space-4); padding: 0 var(--space-2); }
+  .txt.c { justify-content: center; }
+  .shop { font-weight: 700; letter-spacing: 0.06em; }
+  mark { color: var(--text); padding: 0 4px; margin: 0 -4px; border-radius: var(--radius-sm); }
+  mark.got { background: var(--success-surface); }
+  mark.need { background: var(--danger-surface); box-shadow: inset 0 -2px 0 var(--danger); }
+
+  .note { position: relative; padding: var(--space-1) 0 var(--space-2) var(--space-6); }
+  .note.has::before { content: ""; position: absolute; left: 0; top: 22px; width: 24px; border-top: 2px dotted var(--text-muted); }
+  .note.need::before { top: 30px;  border-top-color: var(--danger); border-top-style: solid; }
+  .f { display: grid; gap: var(--space-2); }
+  .f + .f { margin-top: var(--space-3); }
+  .lab { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-weight: 600; }
+  .lab .from { font-weight: 400; font-size: var(--text-sm); color: var(--text-muted); }
+  .req { font-size: var(--text-sm); font-weight: 700; color: var(--danger); }
+  .opt { font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); }
+  input, select, textarea { font: inherit; color: var(--text); height: var(--field-height); padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface-raised); width: 100%; max-width: 360px; }
+  textarea { height: auto; min-height: 96px; padding: var(--space-3); }
+  .need-card { background: var(--surface-raised); border-left: 4px solid var(--danger); padding: var(--space-3) var(--space-4); }
+  .need-card.f, .opt-card.f { gap: var(--space-1); }
+  .need-card input, .need-card select { border-width: 2px; }
+  .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 170px)); gap: var(--space-3); }
+  .pair .f + .f { margin-top: 0; }
+  .hint { font-size: var(--text-sm); color: var(--text-muted); }
+  .got-val { display: flex; align-items: center; gap: var(--space-3); }
+  .opt-card { border: 1px dashed var(--text-muted); padding: var(--space-3) var(--space-4); }
+  .opt-card input { border-style: dashed; border-color: var(--text-muted); max-width: 240px; }
+  .off-title { font-weight: 600; padding: var(--space-5) 0 var(--space-2) var(--space-6); }
+  .row.off .line { background: none; }
+  .row.off .note::before { display: none; }
+
+  .finish { display: grid; gap: var(--space-4); padding: var(--space-5) 0 0 var(--space-6); border-top: 2px dashed var(--border-strong); margin-top: var(--space-4); }
+  .finish .actions { gap: var(--space-2) var(--space-4); }
+  .finish details { max-width: 520px; }
+  .finish details > div { display: grid; gap: var(--space-4); padding: var(--space-3) 0 var(--space-2) var(--space-5); }
+
+  @media (max-width: 960px) {
+    .cols, .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .line { padding-right: var(--space-4); font-size: var(--text-md); }
+  }
+  @media (max-width: 720px) {
+    .cols { display: none; }
+    .doc-cap { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; }
+    .doc-cap a { display: inline-flex; align-items: center; min-height: 44px; }
+    .row { display: block; background: var(--surface-raised); }
+    .row:first-child { padding-top: var(--space-3); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+    .row:first-child .line { padding-top: var(--space-3); }
+    .line { padding: var(--space-2) var(--space-3); font-size: var(--text-md); grid-template-columns: 24px minmax(0, 1fr); }
+    .row.last { background: none; }
+    .row.last .line { padding-bottom: calc(var(--space-5) + var(--tear)); }
+    .note { padding: 0 var(--space-3) var(--space-3) var(--space-3); }
+    .note:not(.has) { display: none; }
+    .note.has::before { display: none; }
+    .note.got-note { padding-left: 36px; }
+    .need-card { background: var(--danger-surface); margin-left: 0; }
+    .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    input, select { max-width: none; }
+    .opt-card input { max-width: none; }
+    .row.off { background: none; }
+    .row.off .line { display: none; }
+    .row.off .note { padding: 0; margin-top: var(--space-3); }
+    .row.off .need-card { background: var(--surface-raised); }
+    .off-title { padding: var(--space-5) 0 0; }
+    .finish { padding-left: 0; }
+    .finish .btn--primary { width: 100%; }
+  }
+  @media (min-width: 721px) { .doc-cap { display: none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar"><div class="bar-in">
+  <a class="brand" href="home.html">Nuits Receipts</a>
+  <nav class="nav" aria-label="Main">
+    <a href="home.html">Home</a>
+    <a href="review.html" aria-current="page">Review <span class="badge">3<span class="vh"> to check</span></span></a>
+    <a href="#">Receipts</a>
+    <a href="bank.html">Bank</a>
+    <a href="#">Settings</a>
+  </nav>
+</div></header>
+<nav class="tabbar" aria-label="Main, phone"><div class="nav">
+  <a href="home.html">Home</a>
+  <a href="review.html" aria-current="page">Review <span class="badge">3<span class="vh"> to check</span></span></a>
+  <a href="#">Receipts</a>
+  <a href="bank.html">Bank</a>
+  <a href="#">Settings</a>
+</div></nav>
+
+<main id="main">
+  <div class="top">
+    <a class="back" href="#"><span aria-hidden="true">&lsaquo;</span> Review</a>
+    <p class="progress">3 of 3 to check <span class="pips" aria-hidden="true"><span class="done"></span><span class="done"></span><span></span></span></p>
+  </div>
+  <div class="title">
+    <h1>Sample Print Shop</h1>
+    <span class="stamp stamp--needs">Needs you</span>
+  </div>
+  <p class="lede">From email, 18 Sep. Five fields need you; the receipt number can stay empty.</p>
+  <p class="key" aria-label="How to read this page">
+    <span><span class="stamp stamp--read">Read</span> the reader got it</span>
+    <span><span class="k-req" aria-hidden="true"></span> Required, fill it in</span>
+    <span><span class="k-opt" aria-hidden="true"></span> Optional</span>
+  </p>
+
+  <form class="desk" action="#" method="post">
+    <div class="cols">
+      <div class="orig"><p>The receipt, as the reader saw it</p><a href="#">Open original</a></div>
+      <p>Fields</p>
+    </div>
+    <p class="doc-cap"><span>The receipt, line by line</span><a href="#">Open original</a></p>
+
+    <div class="sheet" role="group" aria-label="Receipt lines with the fields read from them">
+      <div class="row">
+        <div class="line"><span class="ln">1</span><span class="txt c shop"><mark class="got">SAMPLE PRINT SHOP</mark></span></div>
+        <div class="note has got-note">
+          <div class="f">
+            <span class="lab"><label for="seller">Seller</label><span class="stamp stamp--read">Read</span><span class="from">from line 1</span></span>
+            <input id="seller" name="seller" value="Sample Print Shop">
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="line"><span class="ln">2</span><span class="txt c">Receipt</span></div>
+        <div class="note"></div>
+      </div>
+      <div class="row">
+        <div class="line"><span class="ln">3</span><span class="txt c"><mark class="got">18.09.2026</mark></span></div>
+        <div class="note has got-note">
+          <div class="f">
+            <span class="lab"><label for="date">Date</label><span class="stamp stamp--read">Read</span><span class="from">from line 3</span></span>
+            <input id="date" name="date" value="18 Sep 2026">
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="line"><span class="ln">4</span><span class="txt"><span>2 x A2 poster print</span><span class="num">30,00 <mark class="need">EUR</mark></span></span></div>
+        <div class="note has need">
+          <div class="f need-card">
+            <span class="lab"><label for="cur">Currency</label><span class="req">Required</span></span>
+            <select id="cur" name="currency" required aria-describedby="cur-h">
+              <option value="" selected>Choose currency</option>
+              <option>EUR</option><option>USD</option><option>SEK</option><option>GBP</option>
+            </select>
+            <span class="hint" id="cur-h">Printed on lines 4 and 6.</span>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="line"><span class="ln">5</span><span class="txt"><span>incl. VAT <mark class="need">25.5%</mark></span><span class="num"><mark class="need">6,10</mark></span></span></div>
+        <div class="note has need">
+          <div class="need-card">
+            <div class="pair">
+              <div class="f">
+                <span class="lab"><label for="rate">VAT %</label><span class="req">Required</span></span>
+                <input id="rate" name="vat_rate" inputmode="decimal" required aria-describedby="vat-h">
+              </div>
+              <div class="f">
+                <span class="lab"><label for="vat">VAT</label><span class="req">Required</span></span>
+                <input id="vat" name="vat" inputmode="decimal" required aria-describedby="vat-h">
+              </div>
+            </div>
+            <p class="hint" id="vat-h" style="margin-top: var(--space-2)">Both are printed on line 5.</p>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="line"><span class="ln">6</span><span class="txt"><strong>Total</strong><strong class="num"><mark class="need">30,00 EUR</mark></strong></span></div>
+        <div class="note has need">
+          <div class="f need-card">
+            <span class="lab"><label for="total">Total</label><span class="req">Required</span></span>
+            <input id="total" name="total" inputmode="decimal" required aria-describedby="tot-h">
+            <span class="hint" id="tot-h">Printed on line 6.</span>
+          </div>
+        </div>
+      </div>
+      <div class="row last">
+        <div class="line"><span class="ln">7</span><span class="txt">Paid by card</span></div>
+        <div class="note"></div>
+      </div>
+    </div>
+
+    <div class="row off"><div class="line"></div><p class="off-title">Not printed on this receipt</p></div>
+    <div class="row off">
+      <div class="line"></div>
+      <div class="note has need">
+        <div class="f need-card">
+          <span class="lab"><label for="net">Before VAT</label><span class="req">Required</span></span>
+          <input id="net" name="before_vat" inputmode="decimal" required aria-describedby="net-h">
+          <span class="hint" id="net-h">Total minus VAT.</span>
+        </div>
+      </div>
+    </div>
+    <div class="row off">
+      <div class="line"></div>
+      <div class="note has">
+        <div class="f opt-card">
+          <span class="lab"><label for="no">Receipt number</label><span class="opt">Optional</span></span>
+          <input id="no" name="number" aria-describedby="no-h">
+          <span class="hint" id="no-h">Leave it empty if the receipt has none.</span>
+        </div>
+      </div>
+    </div>
+    <div class="row off">
+      <div class="line"></div>
+      <div class="finish">
+        <div class="actions">
+          <button class="btn btn--primary" type="submit">Approve receipt</button>
+          <button class="btn btn--quiet" type="submit" formaction="#discard">Discard</button>
+        </div>
+        <details>
+          <summary>More</summary>
+          <div>
+            <div class="f">
+              <span class="lab"><label for="part">Part of the business</label><span class="stamp stamp--read">Read</span></span>
+              <select id="part" name="part"><option selected>General</option><option>App</option><option>Website</option><option>Hosting</option></select>
+            </div>
+            <div class="f">
+              <span class="lab"><label for="kind">Kind</label><span class="stamp stamp--read">Read</span></span>
+              <select id="kind" name="kind"><option>infra</option><option>AI APIs</option><option>subscriptions</option><option selected>other</option></select>
+            </div>
+            <div class="f">
+              <label class="lab" for="note">Note</label>
+              <textarea id="note" name="note"></textarea>
+            </div>
+            <div class="actions">
+              <button class="btn" type="submit" formaction="#read-again">Read it again</button>
+              <a class="btn btn--quiet" href="#">Open original</a>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  </form>
+</main>
+
+<footer class="foot">
+  <p>Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p>
+  <p>Nuits Receipts v1.5.0</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Review split · Nuits Receipts (prototype)</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="wide">
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar"><a class="brand" href="#"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 1h12v14l-2-1.3L10 15l-2-1.3L6 15l-2-1.3L2 15zM4.5 4v1.4h7V4zm0 3v1.4h7V7zm0 3v1.4H9V10z"/></svg>Nuits Receipts</a><nav class="main" aria-label="Main"><ul><li><a href="#">Home</a></li><li><a href="#" aria-current="page">Review <span class="count">3<span class="vh"> waiting</span></span></a></li><li><a href="#">Receipts</a></li><li><a href="#">Bank <span class="count">3<span class="vh"> missing receipts</span></span></a></li><li><a href="#">Settings</a></li></ul></nav></div></header>
+<nav class="tabs" aria-label="Main"><ul><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>Home</a></li><li><a href="#" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/></svg> <span class="count">3<span class="vh"> waiting</span></span></span>Review</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg></span>Receipts</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/></svg> <span class="count">3<span class="vh"> missing receipts</span></span></span>Bank</a></li><li><a href="#"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>Settings</a></li></ul></nav>
+<main id="main" class="wide">
+<p class="protonote"><strong>Prototype.</strong> Split view. The original stays at full height beside the fields (sticky on wide screens, first on phones). Numbers pair each line with its field. Required flags are red and say "Required". The receipt number is neutral and says "Optional". Values the reader got are marked "Read".</p>
+<div class="crumbs"><a href="#">&lsaquo; Review</a><span class="small"><span class="num">3 of 3</span> to check</span></div>
+<div class="head tight"><h1>Sample Print Shop</h1><span class="stamp needs">Needs you</span></div>
+<form class="fix splitform" action="#" method="post">
+<div class="split">
+<section class="docpane" aria-label="Original">
+<h2 class="doch">The receipt, as it was read</h2>
+<div class="paper" role="img" aria-label="The receipt as read: Sample Print Shop, 18.09.2026, 2 x A2 poster print 30,00 EUR, incl. VAT 25.5% 6,10, Total 30,00 EUR, paid by card">
+<div aria-hidden="true">
+<p class="title">SAMPLE PRINT SHOP</p>
+<p>Receipt</p>
+<p>18.09.2026</p>
+<p><mark class="on">2 x A2 poster print 30,00 EUR</mark><span class="pins"><span class="pin">2</span></span></p>
+<p><mark class="on">incl. VAT 25.5% 6,10</mark><span class="pins"><span class="pin">4</span><span class="pin">5</span></span></p>
+<p><mark class="on">Total 30,00 EUR</mark><span class="pins"><span class="pin">1</span><span class="pin">3</span></span></p>
+<p>Paid by card</p>
+</div>
+</div>
+</section>
+<section aria-label="Fields">
+<h2 class="grph">Read from the receipt</h2>
+<ol class="flags">
+<li class="flag read"><div class="srow"><div class="sl"><label class="flabel" for="seller">Seller</label><span class="meta"><span class="tag ok">Read</span></span></div><div class="sc"><input id="seller" name="seller" value="Sample Print Shop" autocomplete="off"></div></div></li>
+<li class="flag read"><div class="srow"><div class="sl"><label class="flabel" for="date">Date</label><span class="meta"><span class="tag ok">Read</span></span></div><div class="sc"><input id="date" name="date" value="18 Sep 2026" autocomplete="off"></div></div></li>
+</ol>
+<h2 class="grph">To check <span class="small">5 required</span></h2>
+<ol class="flags">
+<li class="flag req"><div class="srow"><div class="sl"><span class="pin" aria-hidden="true">1</span><label class="flabel" for="total">What was the total?</label><span class="meta"><span class="warning">Required</span></span></div><div class="sc"><input id="total" name="total" value="" inputmode="decimal" autocomplete="off" aria-required="true"></div></div></li>
+<li class="flag req"><div class="srow"><div class="sl"><span class="pin" aria-hidden="true">2</span><label class="flabel" for="currency">Which currency?</label><span class="meta"><span class="warning">Required</span></span></div><div class="sc"><select id="currency" name="currency" aria-required="true"><option value="" selected>Not known yet</option><option>EUR</option><option>USD</option><option>GBP</option><option>SEK</option></select></div></div></li>
+<li class="flag req"><div class="srow"><div class="sl"><span class="pin" aria-hidden="true">3</span><label class="flabel" for="net">Amount before VAT</label><span class="meta"><span class="warning">Required</span></span></div><div class="sc"><input id="net" name="net" value="" inputmode="decimal" autocomplete="off" aria-required="true"></div></div></li>
+<li class="flag req"><div class="srow"><div class="sl"><span class="pin" aria-hidden="true">4</span><label class="flabel" for="vat">VAT amount</label><span class="meta"><span class="warning">Required</span></span></div><div class="sc"><input id="vat" name="vat" value="" inputmode="decimal" autocomplete="off" aria-required="true" placeholder="0 if none"></div></div></li>
+<li class="flag req"><div class="srow"><div class="sl"><span class="pin" aria-hidden="true">5</span><label class="flabel" for="rate">VAT %</label><span class="meta"><span class="warning">Required</span></span></div><div class="sc"><input id="rate" name="vat_rate" value="" inputmode="decimal" autocomplete="off" aria-required="true"></div></div></li>
+</ol>
+<h2 class="grph">Optional</h2>
+<ol class="flags">
+<li class="flag opt"><div class="srow"><div class="sl"><label class="flabel" for="number">Receipt number</label><span class="meta">Optional</span></div><div class="sc"><input id="number" name="number" autocomplete="off"><p class="meta">The receipt doesn't print one. You can leave this empty.</p></div></div></li>
+</ol>
+</section>
+</div>
+<div class="sbar" role="group" aria-label="Actions">
+<span class="prog"><span class="num">3 of 3</span> to check<span class="small"> &middot; 0 of 5 required filled</span></span>
+<a class="linkbtn" href="#">Discard</a>
+<a class="linkbtn" href="#">More</a>
+<button class="btn primary">Approve receipt</button>
+</div>
+</form>
+</main>
+<footer class="foot"><p class="notice">Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.</p><p>Nuits Receipts v1.5.0</p></footer>
+</body>
+</html>
