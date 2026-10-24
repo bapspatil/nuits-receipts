@@ -251,12 +251,12 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     : '';
   const add = shown.length ? '<a class="btn secondary" href="/add">Add receipts</a>' : '';
   return page(
-    query.month ? `Receipts ${query.month}` : 'Receipts',
+    'receipts',
     `${receiptsSegment(counts, 'all', query.month)}${senderBanner(params)}${discardBanner(params, '/receipts')}${waiting}${chips}${find}${list}`,
     200,
     env,
     {
-      nav: 'receipts',
+      detail: query.month ? monthName(query.month) : undefined,
       head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),
     },
   );

@@ -249,12 +249,11 @@ export async function reviewPage(
         ? ''
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
-    'Review',
+    'review',
     `${senderBanner(params)}${discardBanner(params, '/review')}${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
-      nav: 'review',
       head: pageHead(
         all.length
           ? `${all.length} to check`
@@ -593,12 +592,12 @@ export async function receiptPage(env: Env, r: Receipt, params = new URLSearchPa
       ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
       : stamp(r, !!eur.transaction);
   return page(
-    receiptName(r),
+    needs && !gone ? 'reviewItem' : 'receipt',
     `${banner}${discardBanner(params, `/receipts/${r.id}`)}<div class="work"><section class="fixes" aria-label="Fields">${gone ? restore : `${form}${discard}${matches}`}${extras}</section><section class="doc" aria-label="Original">${doc}</section></div>`,
     200,
     env,
     {
-      nav: needs && !gone ? 'review' : 'receipts',
+      detail: receiptName(r),
       head: `<div class="crumbs">${back}${where}${skip}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
   );
@@ -752,12 +751,12 @@ export async function payments(
         '<a class="btn primary" href="/import">Import statement</a>',
       );
   return page(
-    `Payments for ${selected}`,
+    'bank',
     `<p role="status" class="banner">${result ? `Import done: ${escape(result)}.` : ''}</p>${others}${body}${await statements(env)}`,
     200,
     env,
     {
-      nav: 'bank',
+      detail: monthName(selected),
       head: monthHead('/payments', selected),
     },
   );
@@ -777,11 +776,11 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
       ['#setup-accountant', 'Accountant', settings.accountantLabel !== 'your accountant'],
     ];
     return page(
-      'Home',
+      'home',
       `<ol class="steps" aria-label="Set up">${setup.map(([href, label, done]) => `<li class="step${done ? ' done' : ''}"><a href="/settings${href}"><b>${label}</b><span>${done ? 'Done' : 'Set up'}</span></a></li>`).join('')}</ol><div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
       200,
       env,
-      { nav: 'home', head: pageHead('Welcome') },
+      { head: pageHead('Welcome') },
     );
   }
   const s: MonthState = await monthState(env, selected);
@@ -834,11 +833,11 @@ export async function home(env: Env, selected: string, params = new URLSearchPar
     .filter(Boolean)
     .join(', ');
   return page(
-    'Home',
+    'home',
     `${alert ? `<p class="alert" role="note">${alert}</p>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status)}</ol>${next ? `<div class="next">${next}</div>` : ''}${send.body}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
     200,
     env,
-    { nav: 'home', head: monthHead('/', selected) },
+    { detail: monthName(selected), head: monthHead('/', selected) },
   );
 }
 
@@ -1148,16 +1147,15 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     sect('advanced', 'Advanced', '', setup.advanced, opens('review') || opens('integrations')),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
-  return page('Settings', `<div class="settings">${body}</div>`, 200, env, {
-    nav: 'settings',
+  return page('settings', `<div class="settings">${body}</div>`, 200, env, {
     head: pageHead('Settings', signOutLink(env)),
   });
 }
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
-  return page('Import a bank statement', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
-    nav: 'bank',
+  return page('import', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
+    detail: 'Import a bank statement',
     head: pageHead('Import a bank statement'),
   });
 }

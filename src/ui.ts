@@ -28,8 +28,28 @@ export const MISSING_PAYMENTS =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL";
 
 export type NavKey = 'home' | 'review' | 'receipts' | 'bank' | 'settings';
-// style: extra page CSS, appended to the shared sheet.
-export type PageOptions = { nav?: NavKey; head?: string; style?: string };
+// Every page's place in the nav and its tab title, in one table, so the
+// highlighted tab and the title can't drift apart: a page's title is its nav
+// label. A page names itself with one of these keys and adds a detail (a
+// month, a vendor) after the title.
+export const PAGES = {
+  home: { nav: 'home', title: 'Home' },
+  review: { nav: 'review', title: 'Review' },
+  reviewItem: { nav: 'review', title: 'Review' },
+  receipts: { nav: 'receipts', title: 'Receipts' },
+  receipt: { nav: 'receipts', title: 'Receipts' },
+  invoices: { nav: 'receipts', title: 'Receipts' },
+  add: { nav: 'receipts', title: 'Receipts' },
+  bank: { nav: 'bank', title: 'Bank' },
+  import: { nav: 'bank', title: 'Bank' },
+  settings: { nav: 'settings', title: 'Settings' },
+  // Errors keep the nav quiet: no tab is current.
+  rejected: { title: "That didn't work" },
+  failed: { title: 'Something went wrong' },
+} as const satisfies Record<string, { nav?: NavKey; title: string }>;
+export type PageKey = keyof typeof PAGES;
+// detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
+export type PageOptions = { detail?: string; head?: string; style?: string };
 export type Counts = { review: number; missing: number; invoices: boolean };
 
 // Its own query, so a database without the inbound_mail table still counts.
@@ -430,7 +450,7 @@ export function signOutLink(env: Env): string {
 }
 
 export async function page(
-  title: string,
+  view: PageKey,
   body: string,
   status: number,
   env: Env,
@@ -441,10 +461,13 @@ export async function page(
   const release = sourceRepository
     ? `<a href="${escape(sourceRepository)}/releases/tag/v${version}">${escape(appName)} v${version}</a>`
     : `${escape(appName)} v${version}`;
-  const head = options.head ?? pageHead(escape(title));
+  const entry: { nav?: NavKey; title: string } = PAGES[view];
+  const { title } = entry;
+  const heading = options.detail ? `${title} · ${options.detail}` : title;
+  const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(title)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(options.nav, counts)}${signOut}</div></header>${tabs(options.nav, counts)}<main id="main">${head}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${BRAND_ICON}${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release}</p></footer></body></html>`,
     { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
   );
 }
@@ -489,15 +512,12 @@ export function chipRow(label: string, chips: readonly Chip[]): string {
 
 // InputError and 500 responses, inside the layout. Status and message are unchanged.
 export function errorPage(env: Env, status: number, message: string, back: string): Promise<Response> {
-  const title = status >= 500 ? 'Something went wrong' : "That didn't work";
+  const view = status >= 500 ? 'failed' : 'rejected';
   return page(
-    title,
+    view,
     `<div class="alert" role="alert"><p><strong>${escape(message)}</strong></p></div><div class="btns"><a class="btn primary" href="${escape(back)}">Go back</a><a class="linkbtn" href="/">Home</a></div>`,
     status,
     env,
-    {
-      head: pageHead(title),
-    },
   );
 }
 

@@ -440,8 +440,8 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
     confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><details><summary>Save this layout for next time</summary><div class="body"><div class="fields">${input('preset_bank', savedAccount.bank_name, 'text', 'Bank')}${input('preset_name', '', 'text', 'Layout name', { hint: 'Optional. Used for files with the same columns.' })}</div></div></details><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
   }
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${table}${exclusions}${confirm}${editor}</form>`;
-  return page('Check the file', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
-    nav: 'bank',
+  return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
+    detail: 'Check the file',
     head: pageHead('Check the file'),
   });
 }
@@ -526,11 +526,11 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
       });
     } catch (error) {
       return page(
-        'Import complete',
+        'import',
         `${wizard(3)}<div class="banner" role="status">Transactions were imported. Preset was not saved.</div><p class="lede">${escape(error instanceof InputError ? error.message : 'Storage unavailable. Try saving the mapping again.')}</p><a class="btn primary" href="/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}">Match receipts</a>`,
         200,
         env,
-        { nav: 'bank' },
+        { detail: 'Import complete' },
       );
     }
   }
