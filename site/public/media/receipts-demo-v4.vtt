@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00.550 --> 00:04.140
+This is Nuits Receipts, a receipt inbox you deploy yourself.
+
+00:04.700 --> 00:08.900
+It's open source, and it runs on Cloudflare Workers, in your own account.
+
+00:09.500 --> 00:13.290
+Forward a receipt by email, or upload a PDF or a photo.
+
+00:13.900 --> 00:17.230
+It reads the vendor, the amounts, the VAT and the date,
+
+00:17.570 --> 00:20.000
+and anything it's unsure about waits in Review.
+
+00:20.560 --> 00:22.810
+Import your bank statement as a CSV,
+
+00:23.220 --> 00:26.630
+or map any other layout, and payments are matched to their receipts.
+
+00:27.200 --> 00:29.560
+Likely matches are shown side by side,
+
+00:29.950 --> 00:32.610
+and the missing ones are listed, so you know what to chase.
+
+00:33.170 --> 00:36.560
+Home takes the month in three steps: check, match, send.
+
+00:37.040 --> 00:39.860
+You get a ZIP and a CSV for your accountant.
+
+00:40.340 --> 00:41.700
+Check them before you send them.
+
+00:42.270 --> 00:45.990
+AI usage is about fifteen cents a month at two hundred receipts.
+
+00:46.530 --> 00:50.360
+Reading PDFs needs Workers Paid, at five dollars a month.
+
+00:50.910 --> 00:54.040
+The code is on GitHub, under Apache 2.0.

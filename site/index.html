@@ -66,7 +66,7 @@
         </div>
         <p class="hero-note wipe" style="--row: 5">
           Open source under the Apache License 2.0. Not a service: you deploy your own copy.
-          <a class="play-chip" href="#demo">Watch the 53-second demo.</a>
+          <a class="play-chip" href="#demo">Watch the 57-second demo.</a>
         </p>
 
         <figure class="slip slip-hero" data-loop aria-label="Example: a receipt matched to a bank payment">
@@ -116,7 +116,7 @@
             <!-- svg:send -->
             <span class="step-of" aria-hidden="true">Step 1 of 3</span>
             <h3 class="heading">Send it in</h3>
-            <p>Forward a receipt to your inbox address, or upload a PDF or a photo.</p>
+            <p>Tick off the setup checklist, then forward a receipt to your inbox address or upload a PDF or a photo.</p>
           </li>
           <li class="step">
             <span class="step-n" aria-hidden="true">2</span>
@@ -125,7 +125,7 @@
             <h3 class="heading">It gets read</h3>
             <p>
               Cloudflare's Clairic model on Workers AI (a preview model; its behaviour and pricing may change) reads the
-              vendor, date, totals and VAT. Anything it isn't sure of goes to a review pile for you to check. When no
+              vendor, date, totals and VAT. Anything it isn't sure of waits in Review, beside the original. When no
               vendor rule of yours matches, Cloudflare's Clef model picks which of your products and which expense
               category the receipt belongs to; rules you set always win.
             </p>
@@ -136,9 +136,9 @@
             <span class="step-of" aria-hidden="true">Step 3 of 3</span>
             <h3 class="heading">It gets matched</h3>
             <p>
-              Import a CSV export from your bank; you map the columns once. It suggests matches between payments and
-              receipts, flags payments with no receipt yet, and gives you a monthly cost view plus a CSV for your
-              accountant.
+              Import a CSV from your bank in three steps; you map the columns once. Sure matches are made for you,
+              likely ones are shown side by side, and payments with no receipt are flagged. Home then takes the
+              month through Check, Match and Send, ending in a ZIP and a CSV for your accountant.
             </p>
           </li>
         </ol>
@@ -161,21 +161,21 @@
               <tr><td>05 Oct</td><td>Train ticket</td><td class="num">−€38.90</td><td><span class="stamp stamp-matched">Matched</span></td></tr>
               <tr><td>09 Oct</td><td>Design software</td><td class="num">−€14.99</td><td><span class="stamp stamp-missing">Missing</span></td></tr>
               <tr><td>17 Oct</td><td>Coworking day pass</td><td class="num">−€25.00</td><td><span class="stamp stamp-matched">Matched</span></td></tr>
-              <tr><td>23 Oct</td><td>Domain renewal</td><td class="num">−€11.60</td><td><span class="stamp stamp-review">Check me</span></td></tr>
+              <tr><td>23 Oct</td><td>Domain renewal</td><td class="num">−€11.60</td><td><span class="stamp stamp-review">Likely</span></td></tr>
               <tr><td>28 Oct</td><td>Lunch with a client</td><td class="num">−€46.20</td><td><span class="stamp stamp-missing">Missing</span></td></tr>
             </tbody>
           </table>
           <ul class="stamp-tally">
             <li><span class="stamp-count">3</span> <span class="stamp stamp-matched">Matched</span></li>
             <li><span class="stamp-count">2</span> <span class="stamp stamp-missing">Missing</span></li>
-            <li><span class="stamp-count">1</span> <span class="stamp stamp-review">Check me</span></li>
+            <li><span class="stamp-count">1</span> <span class="stamp stamp-review">Likely</span></li>
           </ul>
           <p class="statement-foot">Two missing. You know exactly which two.</p>
         </div>
       </section>
 
       <section class="scene demo" id="demo" aria-labelledby="demo-title">
-        <div class="slate" aria-hidden="true"><span class="slate-n">04</span><span>Demo</span><span class="slate-end">53 s</span></div>
+        <div class="slate" aria-hidden="true"><span class="slate-n">04</span><span>Demo</span><span class="slate-end">57 s</span></div>
         <h2 class="title" id="demo-title">See it in under a minute.</h2>
         <figure class="demo-player">
           <div class="film">
@@ -187,12 +187,12 @@
                 playsinline
                 width="1280"
                 height="720"
-                poster="/media/receipts-demo-v3-poster.webp"
+                poster="/media/receipts-demo-v4-poster.webp"
                 aria-describedby="demo-note"
               >
-                <source src="/media/receipts-demo-v3.mp4" type="video/mp4" />
-                <track kind="captions" src="/media/receipts-demo-v3.vtt" srclang="en" label="English" default />
-                <p>Your browser can't play this video. <a href="/media/receipts-demo-v3.mp4">Download the MP4</a>.</p>
+                <source src="/media/receipts-demo-v4.mp4" type="video/mp4" />
+                <track kind="captions" src="/media/receipts-demo-v4.vtt" srclang="en" label="English" default />
+                <p>Your browser can't play this video. <a href="/media/receipts-demo-v4.mp4">Download the MP4</a>.</p>
               </video>
               <media-play-button slot="centered-chrome" class="player-big"></media-play-button>
               <media-control-bar class="player-bar">
@@ -206,7 +206,7 @@
             </media-controller>
           </div>
           <figcaption id="demo-note">
-            53 seconds, with narration and captions. Made-up example data. Figures are read automatically and can be wrong.
+            57 seconds, with narration and captions. Made-up example data. Figures are read automatically and can be wrong.
           </figcaption>
         </figure>
       </section>

@@ -13,7 +13,7 @@ Use this guide to make sure every payment out in a month has a receipt, or a rea
 - A bank statement imported for the month. See [Import a bank CSV](/how-to/import-a-bank-csv/).
 - The receipts for that month approved. Only approved receipts can be matched. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
 
-![The Bank page with matched payments and one payment missing a receipt](../../../assets/screenshots/payments.png)
+![The Bank page for September 2026, with one payment matched automatically and one missing a receipt, with Match and Not a purchase](../../../assets/screenshots/payments.png)
 
 ## Match the missing payments
 
@@ -23,32 +23,34 @@ Use this guide to make sure every payment out in a month has a receipt, or a rea
 Select **Bank** in the top bar (on a phone, the tab bar at the bottom) and pick the month. It opens on **Missing** when any payment out has no receipt; **All** shows every payment. The **Match** row on **Home** links here too, from **Find receipts**.
 
   </Step>
-  <Step title="Pick the receipt">
+  <Step title="Compare the likely receipt">
 
-Each missing payment has a receipt picker. Likely matches are listed first under **Likely**, and every other approved, unmatched receipt under **Other ready receipts**. Choose one.
-
-To use a receipt ID instead, open the payment's **More** and paste it in **Receipt ID**.
+When a ready receipt looks like the payment, it is shown beside it as **Likely**, with the seller, date and amount. A small table puts the **Bank** and **Receipt** values side by side under **Compared**, so you can see what differs.
 
   </Step>
-  <Step title="Confirm exceptions if needed">
+  <Step title="Match it, or pick another">
 
-If the amount or date does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), tick **Not exact, still this**. Without it, the app refuses a match that does not fit.
+If it is the right receipt, select **Match**. If it does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), the app says why and the button is **Match anyway**.
+
+If it is the wrong receipt, open **Pick another receipt** and type the seller, date or amount. With no likely receipt, the payment says "No ready receipt looks like this one." and shows the same search box. Choose one and select **Match**. You can also paste a receipt ID there.
 
   </Step>
-  <Step title="Match">
+  <Step title="Match the rest at once">
 
-Select **Match**. The payment now shows a **Receipt** link instead of the **Missing** stamp.
+When several payments have an exact likely receipt, **Will match N payments** above the list shows each pair and why. Select **Match all N likely** (or **Match the likely one**) to match them together.
+
+The payment now shows a **Receipt** link instead of the **Missing** stamp.
 
   </Step>
 </Steps>
 
-You can also match from the receipt side. A receipt page shows **Payment?** when an unmatched payment fits it; select **Match**.
+You can also match from the receipt side. A receipt page shows **Payment?** when an unmatched payment fits it; select **Match** (or **Match anyway**).
 
 If no approved receipt exists yet, the payment says "No receipt found yet." with **Add receipt**. Upload it, approve it, then come back.
 
 ## Mark payments that need no receipt
 
-Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Select **Not a purchase** on the payment. It now shows **No receipt** and no longer counts as missing.
+Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Select **Not a purchase** on the payment. It now shows **Not a purchase** and no longer counts as missing. The banner offers **Undo**.
 
 To reverse it, open the payment's **More** and select **Needs a receipt**.
 
@@ -60,7 +62,7 @@ On a matched payment, open **More** and select **Remove match**. The payment cou
 
 ## Check that it worked
 
-- The line at the top of **Bank** reads, for example, "12 out, 12 matched, 0 missing", and the page says **Every payment has a receipt.**
+- The line at the top of **Bank** reads, for example, "12 out, 12 matched, 0 missing", and the page says **Every payment has a receipt.** with **Send** and the month, for example **Send September**.
 - On **Home**, the **Match** row shows **Done**.
 - If other months still have gaps, **Bank** links them under "Also missing", for example "Also missing: August (2)".
 

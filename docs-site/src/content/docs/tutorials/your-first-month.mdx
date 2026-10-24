@@ -37,9 +37,9 @@ These are the values printed on the two receipts. We check the app's reading aga
 
 ## Upload the receipts
 
-Sign in to your copy. On **Home**, follow the **Add several** link. The **Add receipts or invoices** page opens.
+Sign in to your copy. **Home** opens on **Welcome**, with a short setup checklist above an upload form. You can finish the checklist later. Under the upload form, follow the **Add several** link. The **Add receipts or invoices** page opens.
 
-![The Add receipts or invoices page, with Receipts and bills selected and an empty file drop area](../../../assets/screenshots/upload.png)
+![The Add receipts or invoices page, with Receipts and bills selected and sample.pdf and sample.png both marked Added](../../../assets/screenshots/upload.png)
 
 1. Leave **Receipts and bills** selected.
 2. Choose `sample.pdf` and `sample.png` together.
@@ -49,9 +49,9 @@ Each file shows **Added** with an **Open** link, and the page says **2 of 2 adde
 
 ## Check and approve each receipt
 
-Open **Review** in the top bar (on a phone, the tab bar at the bottom). Its title says how many receipts the app wants you to check, for example **2 to check**. Select the first one in the list.
+Open **Review** in the top bar (on a phone, the tab bar at the bottom). Its title says how many receipts the app wants you to check, for example **1 to check, 1 undated**. Each row shows the first question, such as **Seller +6**. Select the first one in the list.
 
-The receipt page shows the original beside what the app read. Anything it is unsure of comes first, as a short question with its field, under a heading such as **7 to check**.
+The receipt page shows **The original** beside what the app read. Anything it is unsure of comes first, as a short question with its field, under a heading such as **7 to check**. The bar at the bottom says where you are, for example **1 of 1 to check**, and holds **Approve receipt**.
 
 ![A receipt page for sample.png marked Needs you, with the original on the left and the seller, date, currency, total, amount before VAT, VAT amount and receipt number flagged on the right](../../../assets/screenshots/receipt-review.png)
 
@@ -59,12 +59,12 @@ In this screenshot the app could not read anything from the photo, so every fiel
 
 For each receipt in Review:
 
-1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. Set **Which currency?** from the list. The fields that were not flagged are under **All fields**.
+1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. Set **Which currency?** from the list. The fields that were not flagged are under **Other fields**.
 2. Leave **Part** and **Kind** as they are.
 3. Leave the **Note** as **Checked against the original**.
-4. Press **Approve**.
+4. Press **Approve receipt**.
 
-**Approve** opens the next receipt in Review, with the banner **Approved.** After the last one you are back on **Review**, which now says **Nothing to check.** For the USD receipt, **All fields** shows a euro amount converted at the ECB reference rate.
+**Approve receipt** opens the next receipt in Review, with the banner **Approved.** After the last one, **Review** says **All checked** and points you to the next step: **Import statement**. For the USD receipt, **Other fields** shows a euro amount converted at the ECB reference rate.
 
 :::note
 If the app read a receipt correctly, it is already **Ready** and does not appear in Review. Open it from **Receipts** later if you want to compare it with the table anyway.
@@ -72,13 +72,13 @@ If the app read a receipt correctly, it is already **Ready** and does not appear
 
 ## Import the bank statement
 
-Open **Bank** in the top bar (on a phone, the tab bar at the bottom) and press **Import statement**. The **Import a bank statement** page opens.
+Press **Import statement** on **Review**, or open **Bank** in the top bar (on a phone, the tab bar at the bottom) and press **Import statement** there. The **Import a bank statement** page opens. Its three steps are **Choose file**, **Check** and **Import**.
 
 1. Under **Bank statement (CSV file)**, choose `bank.csv`.
 2. Leave **Which account is this?** set to **Bank account**.
 3. Press **Check the file**.
 
-The **Check the file** page shows what the app read before anything is saved. It recognises the sample's layout and lists two payments: Sample Cloud Lantern Oy for -125.50 and Sample Missing Vendor for -9.99.
+The **Check the file** page shows what the app read before anything is saved. It recognises the sample's layout, says **No problems found.**, and lists two payments: Sample Cloud Lantern Oy for -125.50 and Sample Missing Vendor for -9.99.
 
 ![The Check the file page, listing two payments read from bank.csv with their dates, amounts and currency, and an Import 2 payments button](../../../assets/screenshots/import-preview.png)
 
@@ -86,21 +86,21 @@ Press **Import 2 payments**.
 
 ## See the match
 
-The app takes you to **Bank** for September 2026, with **Import done: 2 inserted** at the top.
+The app takes you to **Bank** for September 2026, with **Added 2 payments. We matched 1 for you.** at the top.
 
 ![The Bank page for September 2026, with the Sample Cloud Lantern Oy payment matched and the Sample Missing Vendor payment missing its receipt](../../../assets/screenshots/payments.png)
 
-The page opens on **Missing**, under the line "2 out, 1 matched, 1 missing". Sample Missing Vendor shows the **Missing** stamp, because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows a **Receipt** link: the app paired it with the PDF receipt by amount, date and name.
+The page opens on **Missing**, under the line "2 out, 1 matched, 1 missing". Sample Missing Vendor shows the **Missing** stamp and **No ready receipt looks like this one.**, because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows **Matched automatically** and a **Receipt** link: the app paired it with the PDF receipt by amount, date and name. When a receipt only nearly fits, the app shows it beside the payment as **Likely** and leaves the choice to you.
 
-This sample payment has no receipt on purpose. Under it, press **Not a purchase**. It now shows **No receipt**, and the page says **Every payment has a receipt.**
+This sample payment has no receipt on purpose. Under it, press **Not a purchase**. It now shows **Not a purchase**, and the page says **Every payment has a receipt.**
 
 ## Send the month
 
-On **Bank**, press **Close September**. **Home** for September 2026 opens, with three rows: **Check**, **Match** and **Send**.
+On **Bank**, press **Send September**. **Home** for September 2026 opens, with three rows: **Check**, **Match** and **Send**.
 
-![Home for September 2026, showing the three steps and the list of files that go in the month's ZIP](../../../assets/screenshots/month.png)
+![Home for September 2026, with Check and Match done, Send ready, the Spent total, Download ZIP and CSV buttons and Mark September as sent](../../../assets/screenshots/month.png)
 
-The screenshot was taken before the missing payment was marked, so **Send** still says **Not ready**. In your copy, **Check** and **Match** show **Done** and **Send** shows **Ready**. Open **In the ZIP** to see the files:
+**Check** says **All checked**, **Match** says **All matched** and **Send** shows **Ready**. Open **In the ZIP** to see the files:
 
 ```
 receipts-2026-09/
@@ -111,9 +111,9 @@ receipts-2026-09/
 
 1. Press **Download ZIP**. Your browser saves `receipts-2026-09.zip`. Open it and you find the two originals and the index spreadsheet.
 2. In real use, this is when you send the folder to your accountant.
-3. Press **Mark as sent**.
+3. Press **Mark September as sent**.
 
-The page says **Marked September as sent.** and **Send** now reads **Sent** with today's date.
+The page says **Marked September 2026 as sent.** and **Send** now reads **Sent** with today's date. If you want the CSV on its own, **CSV** sits beside the ZIP button.
 
 ## What we did
 
