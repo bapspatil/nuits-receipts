@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vitest';
 import worker from '../src/index';
 import { parseConfig, parseProducts, parseSenders } from '../src/config';
 import { receiveEmail } from '../src/receipts';
-import { APP_NOTICE, EXPORT_NOTICE } from '../src/ui';
+import { FOOTER_NOTICE, EXPORT_LINE } from '../src/ui';
 import type { Env } from '../src/env';
 import { uploadPdf } from './helpers';
 
@@ -89,16 +89,16 @@ test('an empty sender allowlist reads no mail: authenticated mail waits as Unkno
 test('pages show the notices, configured labels and no private links', async () => {
   const labelled = { ACCOUNTANT_LABEL: 'Example Books' };
   const html = await (await as('owner', 'local-dummy-password', labelled)).text();
-  expect(html).toContain(APP_NOTICE);
+  expect(html).toContain(FOOTER_NOTICE);
   expect(html).toContain('receipts@example.com');
   expect(html).not.toMatch(/github\.com/);
   // The export and its notice live on Home once anything is in; products are listed in Settings.
   await uploadPdf();
-  const monthHtml = await (await as('owner', 'local-dummy-password', labelled, '/')).text();
-  expect(monthHtml).toContain(APP_NOTICE);
-  expect(monthHtml).toContain(EXPORT_NOTICE);
-  expect(monthHtml).toContain('<h2>Send to Example Books</h2>');
-  expect(monthHtml).toContain('Spreadsheet only (CSV)</a>');
+  const monthHtml = await (await as('owner', 'local-dummy-password', labelled, '/?month=2026-09')).text();
+  expect(monthHtml).toContain(FOOTER_NOTICE);
+  expect(monthHtml).toContain(EXPORT_LINE);
+  expect(monthHtml).toContain('<b>Send</b>');
+  expect(monthHtml).toContain('>CSV</a>');
   const settings = await (await as('owner', 'local-dummy-password', labelled, '/settings')).text();
   for (const label of ['General', 'App', 'Website', 'Hosting'])
     expect(settings).toContain(`name="product_label" value="${label}"`);
@@ -111,10 +111,10 @@ test('pages show the notices, configured labels and no private links', async () 
 });
 
 test('notices match the legal review word for word', () => {
-  expect(APP_NOTICE).toBe(
-    'Figures are read automatically and can be wrong. Check every row before you use it. Not tax, VAT or accounting advice. Provided as is, without warranty. You run this in your own Cloudflare account; Nuits has no access to your data.',
+  expect(FOOTER_NOTICE).toBe(
+    'Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank.',
   );
-  expect(EXPORT_NOTICE).toBe('Review flagged rows first. Your accountant decides how these are booked.');
+  expect(EXPORT_LINE).toBe('Check every row before sending this to your accountant.');
 });
 
 test('new receipts take the configured default product and exports use the prefix', async () => {

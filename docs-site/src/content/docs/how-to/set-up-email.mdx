@@ -35,12 +35,9 @@ Select **Save**. Only one rule should use this pattern: if two do, only the firs
   </Step>
   <Step title="Tell the app the address and the allowed senders">
 
-In the app, open **Settings > Email** and fill in:
+In the app, open **Settings > Email** and fill in **Receipt address**: the address you just routed. It is shown next to the upload form. Routing, not this field, decides what reaches the Worker. Once you change it, tick "I’ve added the Email Routing rule for this address" and press **Save**.
 
-- **Receipt address**: the address you just routed. It is shown next to the upload form. Routing, not this field, decides what reaches the Worker.
-- **Allowed senders**: one address per line. Mail from these addresses is read. Mail from anyone else waits in **Review** as **Unknown sender** if Cloudflare's checks prove who sent it. You can also manage this list in **Settings** > **Senders**.
-
-Changing either field needs its confirmation tick in the same save: "I’ve added the Email Routing rule for this address" and "I’ve checked this list; mail from anyone else is ignored". Then press **Save email**.
+Then open **Settings > Senders**, type each address you forward from in the address box and press **Add**. Mail from these addresses is read. Mail from anyone else waits in **Review** under **Unknown senders** if Cloudflare's checks prove who sent it.
 
 You can set the same values at deploy time with the `RECEIPT_ADDRESS` and `ALLOWED_SENDER_EMAILS` variables instead. A value saved in the app wins over the variable. See [Change settings in the app](/how-to/change-settings-in-the-app/).
 
@@ -62,7 +59,7 @@ Within a minute or so the receipt appears on **Receipts** and, if anything needs
 
 If nothing appears:
 
-- **The sender is not approved yet.** Mail from anyone not on your approved senders waits in **Review** under **Unknown senders**. Press **Approve sender** to read it, and their later mail is read as it arrives. **Receipts** > **Recent mail** shows every email that arrived and what happened to it.
+- **The sender is not approved yet.** Mail from anyone not on your allowed senders waits in **Review** under **Unknown senders**. Press **Allow** to read it, and their later mail is read as it arrives.
 - **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
 - **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept in **Review** with "We couldn't verify who sent this email." It is not read by AI. Download the original, check it, and upload it if it is genuine.
 - **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).
@@ -70,7 +67,7 @@ If nothing appears:
 ## Change the address later
 
 1. In Cloudflare, add a **Send to a Worker** rule for the new address.
-2. In **Settings > Email**, change **Receipt address**, tick the confirmation and press **Save email**. The app reminds you of the next steps.
+2. In **Settings > Email**, change **Receipt address**, tick the confirmation and press **Save**. The app shows the next steps under "Now update Cloudflare Email Routing".
 3. Send a test from an allowed address and check that it arrives.
 4. Remove the rule for the old address.
 

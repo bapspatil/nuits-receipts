@@ -176,13 +176,17 @@ async function afterSave(base: Env, changes: readonly Change[]): Promise<void> {
 }
 
 // ---------- View ----------
-// Each field is one row: label and source tag, then the control, a one-line
-// hint and, when set here, who changed it and Reset. One Save per group.
-const SOURCE_LABEL = { app: 'App', deploy: 'Deploy', default: 'Default' } as const;
+// Each field is one row: the label, then the control (its help is a tooltip)
+// and, when set here, Reset. One Save per group.
+// A pattern of the current value: with the form's novalidate, the field turns
+// :invalid as soon as it differs, which is when its confirm box shows (CSS).
+function unchanged(value: string): string {
+  return value.replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&');
+}
 function control(env: Env, field: Field): string {
   const value = effective(env, field),
     name = escape(field.key),
-    attrs = `id="f-${name}" aria-describedby="${name}-src ${name}-help"`;
+    attrs = `id="f-${name}" title="${escape(field.help)}"${field.confirm ? ` pattern="${escape(unchanged(value))}"${value ? ' required' : ''}` : ''}`;
   const settings = config(env);
   switch (field.kind) {
     case 'textarea':
@@ -198,7 +202,7 @@ function control(env: Env, field: Field): string {
     case 'number':
       return `<input name="${name}" value="${escape(value)}" type="number" inputmode="decimal" min="${field.min}" max="${field.max}" step="${field.step}" ${attrs}>`;
     case 'products':
-      return `<ul class="plain parts" role="group" aria-labelledby="${name}-label" aria-describedby="${name}-src ${name}-help">${settings.products
+      return `<ul class="plain parts" role="group" aria-labelledby="${name}-label">${settings.products
         .map(
           (p) =>
             `<li><input type="hidden" name="product_id" value="${escape(p.id)}"><label class="vh" for="part-${escape(p.id)}">Name for ${escape(p.label)}</label><input id="part-${escape(p.id)}" name="product_label" value="${escape(p.label)}" maxlength="100"><label class="check"><input type="checkbox" name="product_remove" value="${escape(p.id)}"> Remove<span class="vh"> ${escape(p.label)}</span></label></li>`,
@@ -218,7 +222,6 @@ function resetButton(field: Field, text: string): string {
 function fieldRow(env: Env, field: Field): string {
   const state = applied(env),
     source = sourceOf(env, field.key),
-    row = state.app.get(field.key),
     invalid = state.invalid.get(field.key),
     deploy = deployValue(env, field.key).trim(),
     key = field.key,
@@ -231,13 +234,10 @@ function fieldRow(env: Env, field: Field): string {
     ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'deploy value' : 'default'} is used. ${resetButton(field, 'Clear it')}</p>`
     : '';
   const confirm = field.confirm
-    ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes"> ${escape(field.confirm)}</label>${field.warning ? `<details class="why"><summary>Why<span class="vh">, ${label}</span></summary><p>${escape(field.warning)}</p></details>` : ''}</div>`
+    ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes"> ${escape(field.confirm)}</label></div>`
     : '';
-  const meta =
-    source === 'app'
-      ? `<p class="meta">Changed ${escape(day(row!.updated_at))} by ${escape(row!.updated_by)}${deploy ? ` · deploy value <code>${escape(deploy.length > 40 ? deploy.slice(0, 37) + '…' : deploy)}</code>` : ''} · ${resetButton(field, 'Reset')}</p>`
-      : '';
-  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}<span class="src ${source}" id="${key}-src"><span class="vh">Source: </span>${SOURCE_LABEL[source]}</span></div><div class="sc">${control(env, field)}<p class="hint" id="${key}-help">${escape(field.help)}</p>${bad}${confirm}${meta}</div></div>`;
+  const meta = source === 'app' ? `<p class="meta">${resetButton(field, 'Reset')}</p>` : '';
+  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${bad}${confirm}${meta}</div></div>`;
 }
 function resetForms(env: Env, fields: readonly Field[]): string {
   const state = applied(env);
@@ -249,9 +249,10 @@ function resetForms(env: Env, fields: readonly Field[]): string {
     )
     .join('');
 }
+// Allowed senders are edited row by row in Senders, so Email leaves the list out.
 function groupForm(env: Env, group: (typeof GROUPS)[number], card: boolean): string {
-  const fields = FIELDS.filter((f) => f.group === group.id);
-  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"><input type="hidden" name="group" value="${group.id}"><input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save ${escape(group.title.toLowerCase())}</button></div></form>${resetForms(env, fields)}`;
+  const fields = FIELDS.filter((f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS');
+  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}"><input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
 }
 const AUDIT_LABEL = new Map(FIELDS.map((f) => [f.key as string, f.label]));
 function auditValue(json: string | null, key: string): string {
@@ -297,10 +298,10 @@ export async function setupParts(
         ? `<p class="banner" role="status">${reset ? `${escape(FIELD.get(reset as SettingKey)?.label ?? 'Setting')} is back to the ${sourceOf(env, reset as SettingKey) === 'deploy' ? 'deploy value' : 'default'}.` : 'Saved.'}</p>`
         : '';
   const group = (id: Group) => GROUPS.find((g) => g.id === id)!;
-  const top = (id: Group) => `${notice(id)}${groupForm(env, group(id), true)}`;
-  const fold = (id: Group, hint = '') => {
+  const top = (id: Group) => `${notice(id)}${groupForm(env, group(id), false)}`;
+  const fold = (id: Group) => {
     const changed = FIELDS.some((f) => f.group === id && (state.app.has(f.key) || state.invalid.has(f.key)));
-    return `<details class="group" id="setup-${id}"${changed || saved === id ? ' open' : ''}><summary>${escape(group(id).title)}${changed ? ' <span class="src app">Changed</span>' : ''}</summary><div class="body">${hint ? `<p class="hint">${hint}</p>` : ''}${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
+    return `<details class="group" id="setup-${id}"${changed || saved === id ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
   };
   const base = deployEnv(env) as unknown as Record<string, unknown>;
   const shown = (key: string, secret?: boolean): string => {
@@ -313,7 +314,7 @@ export async function setupParts(
     return raw ? `<code>${escape(raw)}</code>` : 'Not set';
   };
   const hasOneDrive = !!settings.oneDrive || settings.oneDriveIncomplete;
-  const deployOnly = `<details class="group" id="setup-deploy"><summary>Set at deploy</summary><div class="body"><p class="hint">Read-only here, so a mistake can’t lock you out or leak a secret. Change them in Cloudflare or your wrangler config.</p><div class="scroll"><table><caption class="vh">Set at deploy</caption><thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead><tbody>${DEPLOY_ONLY.filter(
+  const deployOnly = `<details class="group" id="setup-deploy"><summary>Set at deploy</summary><div class="body"><div class="scroll"><table><caption class="vh">Set at deploy</caption><thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead><tbody>${DEPLOY_ONLY.filter(
     (d) =>
       (!(d.key === 'AUTH_USERNAME' || d.key === 'NUITS_PASSWORD') || !settings.access) &&
       (hasOneDrive || !/^(MS_|ONEDRIVE_)/.test(d.key)),
@@ -330,12 +331,12 @@ export async function setupParts(
               `<tr><td>${escape(day(r.changed_at))} ${escape(r.changed_at.slice(11, 16))} UTC</td><td>${escape(AUDIT_LABEL.get(r.key) ?? r.key)}</td><td>${auditValue(r.old_json, r.key)}</td><td>${auditValue(r.new_json, r.key)}</td><td>${escape(r.changed_by)}</td></tr>`,
           )
           .join('')}</tbody></table></div>`
-      : '<p class="hint">Nothing changed here yet.</p>'
+      : '<p>Nothing yet.</p>'
   }</div></details>`;
   return {
     business: top('business'),
     email: top('email'),
     accountant: top('accountant'),
-    advanced: `<section class="sect" id="advanced" aria-labelledby="advanced-h"><div class="sh"><h2 id="advanced-h">Advanced</h2></div><div class="folds">${fold('review', 'The defaults suit most books.')}${fold('integrations')}${deployOnly}${audit}</div></section>`,
+    advanced: `<div class="folds">${fold('review')}${fold('integrations')}${deployOnly}${audit}</div>`,
   };
 }

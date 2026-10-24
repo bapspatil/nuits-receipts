@@ -6,6 +6,7 @@ import { config, ConfigError, parseConfig, parseTuning } from '../src/config';
 import { DEFAULT_TUNING, withinWindow } from '../src/domain';
 import { kindFor } from '../src/receipts';
 import { applied, layer, SETTING_VALUE_LIMIT, sourceOf, withSettings, type Row } from '../src/settings';
+import { DATA_LINE } from '../src/ui';
 import type { Env } from '../src/env';
 import { request } from './helpers';
 
@@ -48,8 +49,6 @@ async function save(fields: Record<string, string | string[]>, group: string, or
   }
   return request('/settings/setup', { method: 'POST', body: form, headers: { Origin: origin } });
 }
-const tag = (key: string, source: 'app' | 'deploy' | 'default') =>
-  `<span class="src ${source}" id="${key}-src"><span class="vh">Source: </span>${{ app: 'App', deploy: 'Deploy', default: 'Default' }[source]}</span>`;
 const rows = async () =>
   (await env.DB.prepare('SELECT key,value_json,updated_by FROM settings ORDER BY key').all()).results;
 const audit = async () =>
@@ -71,15 +70,17 @@ test('with nothing saved, every value comes from the deploy or the default', asy
   expect(sourceOf(layered, 'SEND_HINT')).toBe('default');
   expect(sourceOf(layered, 'INVOICES_ADDRESS')).toBe('deploy');
   const html = await page();
-  expect(html).toContain('<h2 id="setup-business-h">Business</h2>');
-  expect(html).toContain('<h2 id="setup-email-h">Email</h2>');
-  expect(html).toContain('<h2 id="setup-accountant-h">Export</h2>');
+  expect(html).toContain('<summary><h2>Business</h2>');
+  expect(html).toContain('<summary><h2>Email</h2><span class="sum">receipts@example.com</span></summary>');
+  expect(html).toContain('<summary><h2>Export</h2>');
   expect(html).toContain('<summary>Review &amp; matching</summary>');
-  expect(html).toContain(`<label for="f-INVOICES_ADDRESS">Invoice address</label>${tag('INVOICES_ADDRESS', 'deploy')}`);
-  expect(html).toContain(
-    `<label for="f-SEND_HINT">Note under the month download</label>${tag('SEND_HINT', 'default')}`,
+  // A field is its label and control; the help is a tooltip, with no source badge.
+  expect(html).toContain('<div class="sl"><label for="f-INVOICES_ADDRESS">Invoice address</label></div>');
+  expect(html).toMatch(
+    /<label for="f-SEND_HINT">Note under the month download<\/label><\/div><div class="sc"><input name="SEND_HINT" [^>]*title="[^"]+"/,
   );
-  expect(html).toContain('Nothing changed here yet');
+  expect(html).not.toMatch(/class="src (app|deploy|default)"/);
+  expect(html).toContain('Nothing yet.');
   // Deploy-only values are listed read-only, secrets only as set or not.
   expect(html).toContain('<code>APP_BASE_PATH</code>');
   expect(html).not.toContain('local-dummy-password');
@@ -93,7 +94,7 @@ test('a saved value wins over the deploy value, is audited, and Reset goes back'
   expect(await rows()).toEqual([{ key: 'APP_NAME', value_json: '"Example Books"', updated_by: 'password' }]);
   const html = await page();
   expect(html).toContain('Example Books</a>'); // the header brand
-  expect(html).toContain(tag('APP_NAME', 'app'));
+  expect(html).toContain('<button class="linkbtn" form="reset-APP_NAME" name="reset" value="APP_NAME">Reset');
   expect(await audit()).toEqual([
     { key: 'APP_NAME', old_json: null, new_json: '"Example Books"', changed_by: 'password' },
   ]);
@@ -114,7 +115,7 @@ test('a saved value wins over the deploy value, is audited, and Reset goes back'
     new_json: null,
     changed_by: 'password',
   });
-  expect(await page()).toContain(tag('APP_NAME', 'deploy'));
+  expect(await page()).not.toContain('form="reset-APP_NAME"');
 });
 
 test('Reset posts its own small form, so Enter in a field still means Save', async () => {
@@ -139,11 +140,14 @@ test('Reset posts its own small form, so Enter in a field still means Save', asy
   expect(await (await request('/settings?reset=APP_NAME')).text()).toContain('App name is back to the deploy value.');
 });
 
-test('the page has a section nav, one Save per group and history tucked away', async () => {
+test('the page is one fold per section, one Save per group and history tucked away', async () => {
   await save({ APP_NAME: 'Example Books' }, 'business');
   const html = await page();
-  const nav = html.match(/<nav class="snav" aria-label="Settings sections"><ul>(.*?)<\/ul>/)![1]!;
-  const targets = [...nav.matchAll(/<a href="#([a-z-]+)">/g)].map((m) => m[1]);
+  const targets = [
+    ...html.matchAll(
+      /<details class="sect"[^>]*><summary><h2>[^<]+<\/h2>(?:<span class="sum">[^<]*<\/span>)?<\/summary><div class="body" id="([a-z-]+)">/g,
+    ),
+  ].map((m) => m[1]);
   expect(targets).toEqual([
     'setup-business',
     'setup-email',
@@ -153,8 +157,12 @@ test('the page has a section nav, one Save per group and history tucked away', a
     'setup-accountant',
     ...(config(env).oneDrive ? ['onedrive'] : []),
     'advanced',
+    'about',
   ]);
-  for (const id of targets) expect(html).toContain(`<section class="sect" id="${id}"`);
+  // Everything starts folded; no side nav, no source legend.
+  expect(html).not.toContain('<details class="sect" open>');
+  expect(html).not.toContain('class="snav"');
+  expect(html).not.toContain('Where values come from');
   // Imports and transfers are bookkeeping, so they moved to Bank; the old anchors say so.
   expect(html).toContain(
     '<p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p>',
@@ -162,21 +170,50 @@ test('the page has a section nav, one Save per group and history tucked away', a
   expect(html).toContain(
     '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>',
   );
-  expect(html).not.toContain('<section class="sect" id="imports"');
-  expect(html).not.toContain('<section class="sect" id="transfers"');
   // Every group form has exactly one button of its own: Save.
   const forms = [...html.matchAll(/<form action="\/settings\/setup" method="post"[^>]*>([\s\S]*?)<\/form>/g)];
   expect(forms).toHaveLength(5);
   for (const [, body] of forms) {
     const own = [...body!.matchAll(/<button\b([^>]*)>([^<]*)/g)].filter(([, attrs]) => !/\bform="/.test(attrs!));
-    expect(own.map(([, , text]) => text!.split(' ')[0])).toEqual(['Save']);
+    expect(own.map(([, , text]) => text)).toEqual(['Save']);
   }
-  // Source tags: one per field; deploy-only values and history start collapsed.
-  expect(html.match(/<span class="src (app|deploy|default)" id="[A-Z_]+-src">/g)).toHaveLength(22);
+  // Deploy-only values and history start collapsed.
   expect(html).toContain('<details class="group" id="setup-deploy"><summary>Set at deploy</summary>');
   expect(html).toContain('<details class="group" id="setup-history"><summary>Change history (1)</summary>');
-  // Risky fields keep a confirm box right in their row.
+  // Allowed senders are edited in Senders only, not as a second list in Email.
+  expect(html).not.toContain('name="ALLOWED_SENDER_EMAILS"');
+  // Address fields keep their confirm box, shown by CSS only once the value differs.
+  expect(html).toMatch(
+    /<form action="\/settings\/setup" method="post" class="setup-form" novalidate><input type="hidden" name="group" value="email">/,
+  );
+  expect(html).toMatch(/id="f-RECEIPT_ADDRESS" title="[^"]+" pattern="receipts@example\\\.com" required/);
   expect(html).toMatch(/id="f-FORWARD_COPY_TO"[^>]*>.*?name="confirm_FORWARD_COPY_TO" value="yes"/);
+  expect(html).toContain('.setup-form .srow:has(:invalid) .confirm{display:flex}');
+  expect(html).not.toContain('<details class="why"><summary>Why');
+});
+
+test('About carries the full notice, the licence and the trademark lines', async () => {
+  const about = (await page()).match(/<div class="body" id="about">([\s\S]*?)<\/div><\/details>/)![1]!;
+  expect(about).toContain(DATA_LINE.replace("'", '&#39;'));
+  expect(DATA_LINE).toBe("Runs in your own Cloudflare account. Nuits doesn't receive or store your data.");
+  expect(about).toContain('<strong>No warranty. Not financial, tax or accounting advice.</strong>');
+  expect(about).toContain('without warranties or conditions of any kind, as set out in the Apache License 2.0');
+  expect(about).toContain('Nothing in this notice limits liability that cannot be limited by law.');
+  expect(about).toContain('Nuits Receipts is not affiliated with or endorsed by any of them.');
+  expect(about).toContain(
+    'Nuits Receipts is an independent project and is not affiliated with or endorsed by Cloudflare.',
+  );
+  expect(about).toContain('Licence: Apache-2.0.');
+  expect(about).not.toMatch(/no access|have access/i);
+  const linked = await (
+    await worker.fetch(
+      new Request('http://localhost/settings', {
+        headers: { Authorization: 'Basic ' + btoa('owner:local-dummy-password') },
+      }),
+      { ...env, SOURCE_REPOSITORY: 'https://example.com/books' } as Env,
+    )
+  ).text();
+  expect(linked).toContain('Licence: <a href="https://example.com/books/blob/main/LICENSE">Apache-2.0</a>.');
 });
 
 test('saving the deploy value again removes the app value', async () => {

@@ -13,7 +13,7 @@ Use this guide to stop correcting the same seller's filing every month. A vendor
 - A receipt from the seller, read and with the seller's name right.
 - The parts of the business you want to file under, set in **Settings** > **Business**. See [Change settings in the app](/how-to/change-settings-in-the-app/).
 
-## Add a rule
+## Make a rule
 
 <Steps>
   <Step title="Open a receipt from the seller">
@@ -23,15 +23,15 @@ Open any receipt from the seller, for example from **Review** or from **Receipts
   </Step>
   <Step title="Open the rule form">
 
-Near the bottom of the receipt page, open **Always file *seller* as...**, for example **Always file Hetzner Online as...**.
+On the receipt page, open **More** and then **Always file as**.
 
   </Step>
   <Step title="Fill in the rule">
 
-- **When the seller's name contains**: starts as the full seller name. Shorten it to the part that stays the same, for example `Hetzner`. Case, accents and endings such as "Ltd" or "Inc" are ignored.
-- **Part of the business** and **Kind of cost**: where these receipts belong.
-- **Only if the receipt also mentions** (optional): extra text that must appear in the receipt or its email, for example a project name, when one seller serves several parts of the business.
-- **Name on your bank statement** (optional): the payee name exactly as your bank shows it, when it differs from the seller name on the receipt. This lets payments match automatically.
+- **Seller contains**: starts as the full seller name. Shorten it to the part that stays the same, for example `Hetzner`. Case, accents and endings such as "Ltd" or "Inc" are ignored.
+- **Part** and **Kind**: where these receipts belong.
+- **Also mentions** (optional): extra text that must appear in the receipt or its email, for example a project name, when one seller serves several parts of the business.
+- **Bank name** (optional): the payee name exactly as your bank shows it, when it differs from the seller name on the receipt. This lets payments match automatically.
 - **Priority**: when several rules match, the highest number wins.
 
   </Step>
@@ -44,24 +44,24 @@ Select **Save rule**. You return to the receipt.
 
 ## Apply it to receipts you already have
 
-Rules are used when a receipt is read. New receipts follow the rule straight away. A receipt already in the app keeps its filing until you either change **Which part of the business** and **Kind of cost** on it yourself, or open **Read it again** and select **Read it again**.
+Rules are used when a receipt is read. New receipts follow the rule straight away. A receipt already in the app keeps its filing until you either change **Part** and **Kind** under **All fields** yourself, or select **More** > **Read again**.
 
 ## Check that it worked
 
-- **Settings** > **Vendor rules** lists the rule with its seller text, filing and priority.
-- The next receipt from the seller shows the rule's filing on its receipt page, under "Files it under", with no **Which part of the business?** or **What kind of cost is this?** flag.
+- **Settings** > **Vendor rules** lists the rule as one row, such as "Hetzner → Hosting, infra", with its priority when it is not 0.
+- The next receipt from the seller shows the rule's filing under **All fields**, with no **Which part of the business?** or **What kind of cost is this?** flag.
 
 ## Fix "Two of your rules disagree."
 
 This flag means two or more rules match the receipt with the same, highest priority but file it differently. The receipt waits in **Review** until you pick the filing on it.
 
-To stop it happening again, open **Settings** > **Vendor rules**, select **Edit** on one of the rules, and either give it a higher **Priority** or select **Delete rule**.
+To stop it happening again, open **Settings** > **Vendor rules**, select one of the rules, and either give it a higher **Priority** and select **Save**, or select **Delete**.
 
 ## Change or delete a rule
 
-Open **Settings** > **Vendor rules** and select **Edit** next to the rule. Change any field and select **Save rule**, or select **Delete rule**. **Add a rule** at the bottom of the section adds one without opening a receipt. Two rules cannot have the same seller text and the same "Only if the receipt also mentions" text.
+Open **Settings** > **Vendor rules** and select the rule. Change any field and select **Save**, or select **Delete**. **Add rule** at the bottom of the section adds one without opening a receipt. Two rules cannot have the same **Seller contains** and **Also mentions** text.
 
 ## Related
 
 - How rules, Clef and conflicts fit together: [How costs are sorted](/explanation/how-costs-are-sorted/).
-- How **Name on your bank statement** affects matching: [How matching works](/explanation/how-matching-works/).
+- How **Bank name** affects matching: [How matching works](/explanation/how-matching-works/).

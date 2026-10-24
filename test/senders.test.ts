@@ -105,11 +105,15 @@ test('an unknown sender is held with its facts, never read, and only the domain 
   expect(logged).toContain('"reason":"sender_not_allowed"');
   expect(logged).toContain('"domain":"link.com"');
   expect(logged).not.toContain('notifications@');
-  // Review shows it with the three actions; the nav badge counts it.
+  // Review shows it with Allow, Ignore and (under More) Delete, named for screen readers; the nav badge counts it.
   const html = await (await request('/review')).text();
   expect(html).toContain('notifications@link.com');
   expect(html).toContain('Your receipt from Example');
-  for (const label of ['Approve sender', 'Ignore sender', 'Delete']) expect(html).toContain(label);
+  expect(html).toContain('<button class="btn primary" aria-label="Allow notifications@link.com">Allow</button>');
+  expect(html).toContain('<button class="linkbtn" aria-label="Ignore notifications@link.com">Ignore</button>');
+  expect(html).toMatch(
+    /<details class="more"><summary aria-label="More for notifications@link.com">More<\/summary><div class="body">[\s\S]*?Delete email<\/button>/,
+  );
   expect(html).toMatch(/Review <span class="count">1/);
 });
 
@@ -175,11 +179,12 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a3@amazonses.com>' }, 'vendor: Third Shop'));
   expect(await receipts()).toBe(3);
   expect(await held()).toHaveLength(0);
-  expect(await (await request('/review?approved=2')).text()).toContain('2 emails are being read now.');
-  // Settings lists it as added, the defaults as Default.
+  expect(await (await request('/review?approved=2')).text()).toContain('Allowed. Reading 2 emails.');
+  // Settings lists it next to the defaults, with no source badges.
   const settings = await (await request('/settings')).text();
   expect(settings).toMatch(/notifications@link\.com<\/span><\/div>/);
-  expect(settings).toMatch(/owner@example\.com<\/span><span class="meta">Default/);
+  expect(settings).toMatch(/owner@example\.com<\/span><\/div>/);
+  expect(settings).toContain('<span class="sum">4 allowed</span>');
 });
 
 test('the approved list stops at the cap with a clear message', async () => {
@@ -252,7 +257,7 @@ async function receipt(n: number, at: string, fields: Record<string, unknown> = 
   return row.id;
 }
 
-test('All receipts lists receipts and held mail newest first, with filters and paging', async () => {
+test('Receipts lists receipts and held mail newest first, with filters and paging', async () => {
   const ready = await receipt(1, '2026-09-03T10:00:00Z', { status: 'ready', vendor: 'Coffee Shop', total_minor: 450 });
   const needs = await receipt(2, '2026-10-02T10:00:00Z', { status: 'needs_review', vendor: 'Hosting Co' });
   const sales = await receipt(3, '2026-10-05T10:00:00Z', { status: 'ready', kind: 'sales', client: 'Acme' });
@@ -269,18 +274,27 @@ test('All receipts lists receipts and held mail newest first, with filters and p
   expect(await ids({ show: 'sales' })).toEqual([sales]);
   expect(await ids({ show: 'reading' })).toEqual([]);
   expect(await ids({ show: 'unknown' })).toHaveLength(1);
+  // The month is the document's month; undated ones count where they arrived.
   expect(await ids({ month: '2026-09' })).toEqual([ready]);
+  await env.DB.prepare("UPDATE receipts SET issue_date='2026-08-30' WHERE id=?").bind(needs).run();
+  expect(await ids({ month: '2026-08' })).toEqual([needs]);
+  expect(await ids({ month: '2026-10' })).not.toContain(needs);
   expect(await ids({ q: 'coffee' })).toEqual([ready]);
   expect(await ids({ q: 'acme' })).toEqual([sales]);
   expect(await ids({ q: 'link.com' })).toHaveLength(1);
   expect(await ids({ q: '%' })).toEqual([]);
 
   const html = await (await request('/receipts')).text();
-  expect(html).toContain('<h1>All receipts</h1>');
+  expect(html).toContain('<h1>Receipts</h1>');
   expect(html).toContain(`href="/receipts/${needs}"`);
-  expect(html).toContain('Needs you');
-  expect(html).toContain('Recent mail');
-  expect(html).toContain('Unknown sender, waiting in Review');
+  expect(html).toContain('<span class="stamp needs">Needs you</span> 30 Aug');
+  // Rows show the document date only; held mail is Review's, with no mail log here.
+  expect(html).not.toContain('Received ');
+  expect(html).not.toContain('Recent mail');
+  const september = await (await request('/receipts?month=2026-09')).text();
+  expect(september).toContain('<h1>September 2026</h1>');
+  expect(september).toContain(`href="/receipts/${ready}"`);
+  expect(september).not.toContain(`href="/receipts/${needs}"`);
   expect(html.indexOf(`/receipts/${dup}`)).toBeLessThan(html.indexOf(`/receipts/${ready}`));
   expect((await request('/receipts?month=2026-13')).status).toBe(422);
 
@@ -290,12 +304,15 @@ test('All receipts lists receipts and held mail newest first, with filters and p
   expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
   const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
   expect(second).toContain('Newer');
-  expect(second).not.toContain('Recent mail');
   expect([...second.matchAll(/<li><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(5);
 });
 
-test('All receipts shows the forwarding address when empty', async () => {
+test('Receipts empty states: one line and one action', async () => {
   const html = await (await request('/receipts')).text();
-  expect(html).toContain('No receipts yet.');
-  expect(html).toContain('<code>receipts@example.com</code>');
+  expect(html).toContain('<h2>No receipts yet. Forward to <code>receipts@example.com</code>.</h2>');
+  expect(await (await request('/receipts?month=2026-09')).text()).toContain('<h2>Nothing dated September.</h2>');
+  const search = await (await request('/receipts?q=xyz')).text();
+  expect(search).toContain(
+    '<h2>Nothing matches &#8220;xyz&#8221;.</h2><a class="btn primary" href="/receipts">Clear search</a>',
+  );
 });

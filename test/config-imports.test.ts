@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import Papa from 'papaparse';
 import worker from '../src/index';
 import type { Env } from '../src/env';
-import { APP_NOTICE, EXPORT_NOTICE } from '../src/ui';
+import { FOOTER_NOTICE, EXPORT_LINE } from '../src/ui';
 import { confirmationForm, pdfBytes } from './helpers';
 
 const configured: Env = {
@@ -51,7 +51,7 @@ async function preview(amount = '-125.50') {
 function expectBranding(html: string) {
   expect(html).toContain('Synthetic Studio Books');
   expect(html).toContain('https://example.com/studio-books/releases/tag/v');
-  expect(html).toContain(APP_NOTICE);
+  expect(html).toContain(FOOTER_NOTICE);
   expect(html).not.toMatch(/Check Holvi|github\.com/);
 }
 
@@ -74,11 +74,10 @@ test('configured owner imports into a new account and retains products, notices 
     const rendered = await page.text();
     expectBranding(rendered);
     if (path.startsWith('/?')) {
-      expect(rendered).toContain('invoices@example.org');
       expect(rendered).toContain('<th scope="row">Studio work</th>');
-      expect(rendered).toContain('<h2>Send to Synthetic Accounts</h2>');
-      expect(rendered).toMatch(/I've sent September to Synthetic Accounts<\/button>|Download anyway/);
-      expect(rendered).toContain(EXPORT_NOTICE);
+      expect(rendered).toContain('<b>Send</b>');
+      expect(rendered).toMatch(/Mark as sent<\/button>/);
+      expect(rendered).toContain(EXPORT_LINE);
     } else {
       expect(rendered).toContain('Synthetic operating account');
     }

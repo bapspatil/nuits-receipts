@@ -24,8 +24,7 @@ const rules = async () =>
 
 test('Settings lists vendor rules with an open Add form when there are none', async () => {
   const html = await (await request('/settings')).text();
-  expect(html).toContain('No rules yet. Add one here or from any receipt with “Always file … as”.');
-  expect(html).toContain('<details class="add" open><summary>Add a rule</summary>');
+  expect(html).toContain('<p>No rules yet.</p><details class="add" open><summary>Add rule</summary>');
   const created = await post('/rules', htmlForm(html, '/rules') as unknown as URLSearchParams);
   // The rendered form alone is not enough: the seller text is required.
   expect(created.status).toBe(422);
@@ -34,9 +33,10 @@ test('Settings lists vendor rules with an open Add form when there are none', as
   expect(saved.headers.get('Location')).toBe('/settings?rules=saved#rules');
   const after = await (await request('/settings?rules=saved')).text();
   expect(after).toContain('<p class="banner" role="status">Rule saved.</p>');
-  expect(after).toContain('<code>Sample Cloud</code>');
-  expect(after).toContain('Hosting · infra · Priority 5');
-  expect(after).toContain('<details class="add"><summary>Add a rule</summary>');
+  // One plain row per rule; it opens its own edit form. The saved section is open.
+  expect(after).toContain('<details class="sect" open><summary><h2>Vendor rules</h2><span class="sum">1</span>');
+  expect(after).toContain('<li><details><summary>Sample Cloud → Hosting, infra · 5</summary>');
+  expect(after).toContain('<details class="add"><summary>Add rule</summary>');
 });
 
 test('a rule made from a receipt goes back to that receipt', async () => {
@@ -63,7 +63,9 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   const edit = htmlForm(html, `/rules/${id}`);
   expect(edit.get('vendor_contains')).toBe('Sample Cloud');
   expect(edit.get('product')).toBe('hosting');
-  expect(html).toContain(`<button class="linkbtn" formaction="/rules/${id}/delete">Delete rule</button>`);
+  expect(html).toContain(`<button class="linkbtn" formaction="/rules/${id}/delete">Delete</button>`);
+  // Priority 0 is not shown.
+  expect(html).toMatch(/<summary>Fake Shop → [^<·]+<\/summary>/);
 
   edit.set('vendor_contains', 'Sample Cloud Lantern');
   edit.set('priority', '9');

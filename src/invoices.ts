@@ -9,15 +9,19 @@ import {
   amount,
   day,
   emptyState,
+  EXPORT_LINE,
   escape,
   input,
+  chipRow,
+  monthHead,
   monthName,
-  monthSwitcher,
   navCounts,
   page,
   pageHead,
   plural,
   receiptsSegment,
+  shortDay,
+  tag,
 } from './ui';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
@@ -52,15 +56,15 @@ export function salesStatus(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays
 export function salesStamp(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays): string {
   switch (salesStatus(r, terms)) {
     case 'reading':
-      return '<span class="stamp muted">Reading</span>';
+      return tag('Reading');
     case 'review':
       return '<span class="stamp needs">Needs a look</span>';
     case 'paid':
-      return '<span class="stamp matched">Paid</span>';
+      return tag('Paid', true);
     case 'overdue':
       return '<span class="stamp missing">Overdue</span>';
     default:
-      return '<span class="stamp ready">Unpaid</span>';
+      return tag('Unpaid');
   }
 }
 export function invoiceName(r: Pick<Receipt, 'client' | 'invoice_number'>): string {
@@ -85,7 +89,7 @@ export async function overdueInvoices(env: Env): Promise<SalesRow[]> {
 type Show = 'all' | 'review' | 'unpaid' | 'overdue' | 'paid';
 const SHOWS: Record<Show, string> = {
   all: 'All',
-  review: 'Needs a look',
+  review: 'Check',
   unpaid: 'Unpaid',
   overdue: 'Overdue',
   paid: 'Paid',
@@ -119,48 +123,70 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
       : (k === 'unpaid' || k === 'overdue' ? open : month).filter(
           (r) => salesStatus(r, config(env).tuning.paymentTermsDays) === k,
         ).length;
-  const chips = `<ul class="chips" aria-label="Show">${(Object.keys(SHOWS) as Show[])
-    .map(
-      (k) =>
-        `<li><a href="/invoices?month=${selected}${k === 'all' ? '' : `&show=${k}`}"${k === show ? ' aria-current="page"' : ''}>${SHOWS[k]}${k === 'unpaid' || k === 'overdue' ? '' : ` (${count(k)})`}</a></li>`,
-    )
-    .join('')}</ul>`;
+  const chips = chipRow(
+    'Show',
+    (Object.keys(SHOWS) as Show[]).map((k) => ({
+      href: `/invoices?month=${selected}${k === 'all' ? '' : `&show=${k}`}`,
+      label: SHOWS[k],
+      count: count(k),
+      current: k === show,
+    })),
+  );
+  // One row per invoice: client (or number), total, then status and the date that matters.
+  const status = (r: SalesRow) => {
+    const due = dueOn(r);
+    const paid = paidOn(r);
+    switch (salesStatus(r, config(env).tuning.paymentTermsDays)) {
+      case 'reading':
+        return tag('Reading');
+      case 'review':
+        return `<span class="stamp needs" title="${escape(firstFlag(r))}">Check</span>`;
+      case 'paid':
+        return tag(`Paid ${escape(shortDay(paid!))}`, true);
+      case 'overdue':
+        return `<span class="stamp missing">Overdue</span> ${escape(shortDay(due!))}`;
+      default:
+        return due ? `Due ${escape(shortDay(due))}` : 'No date';
+    }
+  };
   const rows = shown.length
-    ? `<div class="scroll"><table class="stack"><caption class="vh">Sales invoices</caption><thead><tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Client</th><th scope="col" class="n">Total</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead><tbody>${shown
-        .map((r) => {
-          const paid = paidOn(r);
-          return `<tr><td class="lead"><a href="/receipts/${r.id}">${escape(r.invoice_number ?? 'No number')}</a></td><td data-label="Date">${escape(day(r.issue_date)) || 'No date'}</td><td data-label="Client">${escape(r.client ?? 'Client unknown')}</td><td class="n" data-label="Total">${amount(r.total_minor, r.currency)}</td><td data-label="Due">${escape(day(dueOn(r)))}${paid ? `<span class="hint"> · paid ${escape(day(paid, false))}</span>` : ''}</td><td data-label="Status">${salesStamp(r, config(env).tuning.paymentTermsDays)}${r.status === 'needs_review' ? `<span class="hint"> ${escape(firstFlag(r))}</span>` : ''}</td></tr>`;
-        })
-        .join('')}</tbody></table></div>`
+    ? `<ul class="list all">${shown
+        .map(
+          (r) =>
+            `<li><a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
+        )
+        .join('')}</ul>`
     : emptyState(
-        month.length || across ? 'Nothing in this filter.' : `No invoices dated ${escape(monthName(selected, false))}.`,
-        settings.invoicesAddress
-          ? `Copy <code>${escape(settings.invoicesAddress)}</code> when you send one, or add it here.`
-          : 'Add the invoices you sent, or set an invoice address in <a href="/settings#setup-email">Settings › Email</a>.',
-        '<a class="btn primary" href="/add?kind=sales">Add invoices</a>',
+        month.length || across
+          ? 'Nothing here.'
+          : `No invoices dated ${escape(monthName(selected, false))}. ${
+              settings.invoicesAddress
+                ? `Copy <code>${escape(settings.invoicesAddress)}</code> when you send one.`
+                : 'Set an invoice address in <a href="/settings#setup-email">Settings</a>.'
+            }`,
+        '<a class="btn primary" href="/add?kind=sales">Add invoice</a>',
       );
   const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const body = `${receiptsSegment(await navCounts(env), 'invoices')}<p class="summary"><span>Invoiced in ${escape(monthName(selected, false))}: EUR ${money(invoiced)}</span><span>Received: EUR ${money(received)}</span>${noEur ? `<span class="red">${plural(noEur, 'invoice has', 'invoices have')} no euro amount yet</span>` : ''}</p>${
+  const body = `${receiptsSegment(await navCounts(env), 'invoices', selected)}${
+    month.length
+      ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`
+      : ''
+  }${
     overdue.length
-      ? `<div class="alert" role="note"><p><strong>${plural(overdue.length, 'older invoice is', 'older invoices are')} overdue.</strong> <a href="/invoices?month=${selected}&show=overdue">See ${overdue.length === 1 ? 'it' : 'them'}</a></p></div>`
+      ? `<p class="alert" role="note"><a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'older invoice')} overdue ›</a></p>`
       : ''
   }${chips}${rows}${
     undated.length && !across
-      ? `<p class="small">Plus ${plural(undated.length, 'invoice')} with no date: ${undated
+      ? `<p class="small">Undated: ${undated
           .slice(0, 5)
           .map((r) => `<a href="/receipts/${r.id}">${escape(invoiceName(r))}</a>`)
-          .join(', ')}.</p>`
+          .join(', ')}</p>`
       : ''
-  }<div class="btns">${shown.length ? '<a class="btn primary" href="/add?kind=sales">Add invoices</a>' : ''}<a class="btn secondary" href="/export-sales.csv?month=${selected}">Spreadsheet (CSV)</a></div><details class="why"><summary>What counts as paid?</summary><p>Money in matched on your bank statement, or marked paid by you. Unpaid invoices don't stop the month from being ready. Your accountant decides how these are booked.</p></details>`;
+  }${month.length ? `<div class="csv"><a class="btn secondary" href="/export-sales.csv?month=${selected}">CSV</a><p class="small">${EXPORT_LINE}</p></div>` : ''}`;
+  const add = shown.length ? '<a class="btn primary" href="/add?kind=sales">Add invoice</a>' : '';
   return page(`Invoices ${selected}`, body, 200, env, {
     nav: 'receipts',
-    head: pageHead(across ? SHOWS[show] : escape(monthName(selected)), {
-      kicker: 'Invoices you sent',
-      sub: settings.invoicesAddress
-        ? `Copy <code>${escape(settings.invoicesAddress)}</code> on invoices you send.`
-        : '',
-      aside: monthSwitcher('/invoices', selected),
-    }),
+    head: across ? pageHead(SHOWS[show], add) : monthHead('/invoices', selected, add),
   });
 }
 function firstFlag(r: Receipt): string {
@@ -172,6 +198,8 @@ function firstFlag(r: Receipt): string {
 type Credit = Transaction & { account_name: string; bank_name: string };
 // The money-in box: the matched payment, or credits that may be this invoice.
 export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
+  const box = (title: string, body: string) =>
+    `<section aria-labelledby="pay-h" class="matchs"><h2 id="pay-h">${title}</h2>${body}</section>`;
   if (r.paid_bank_on) {
     const t = await env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE t.receipt_id=? AND i.status='complete' LIMIT 1",
@@ -179,13 +207,19 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
       .bind(r.id)
       .first<Credit>();
     if (t)
-      return `<section aria-labelledby="pay-h" style="margin-top:24px"><h2 id="pay-h">Paid</h2><div class="match"><p><strong>${escape(t.merchant)} paid ${amount(t.amount_minor, t.currency)} into ${escape(t.account_name)} on ${day(t.booking_date)}.</strong></p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="linkbtn" name="action" value="unlink">Not this payment, remove the match</button></form></div></section>`;
+      return box(
+        'Paid',
+        `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form></div>`,
+      );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post"><div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout, or another bank' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark as paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post" style="margin-top:8px"><button class="linkbtn">Not paid after all</button></form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post"><div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { attrs: ' placeholder="Stripe payout"' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post"><button class="linkbtn">Not paid</button></form>` : ''}`;
   if (r.paid_outside_on)
-    return `<section aria-labelledby="pay-h" style="margin-top:24px"><h2 id="pay-h">Paid</h2><div class="match"><p><strong>You marked it paid on ${escape(day(r.paid_outside_on))}.</strong> <span class="hint">${escape(r.paid_outside_note)}</span></p>${paidForm}</div></section>`;
+    return box(
+      'Paid',
+      `<div class="match"><p><strong>${escape(day(r.paid_outside_on))}</strong> ${escape(r.paid_outside_note)}</p>${paidForm}</div>`,
+    );
   if (r.status !== 'ready' && r.review_reasons_json !== '["missing_eur"]')
-    return `<section aria-labelledby="pay-h" style="margin-top:24px"><h2 id="pay-h">Payment</h2><p class="hint">Approve the invoice first; then the money coming in can be matched to it.</p></section>`;
+    return box('Payment', '<p class="small">Approve it first.</p>');
   const credits = (
     await env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IS NULL AND t.receipt_required=1 AND t.amount_minor>0 AND NOT EXISTS (SELECT 1 FROM internal_transfers p WHERE p.credit_id=t.id OR p.debit_id=t.id) ORDER BY t.booking_date,t.id LIMIT 500",
@@ -193,17 +227,22 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
   ).results;
   const likely = credits.filter((t) => creditFit(r, t, config(env).tuning) !== null);
   const due = dueOn(r, config(env).tuning.paymentTermsDays);
-  return `<section aria-labelledby="pay-h" style="margin-top:24px"><h2 id="pay-h">${likely.length ? 'Is this the payment?' : 'Not paid yet'}</h2>${
-    likely.length
-      ? likely
-          .slice(0, 5)
-          .map(
-            (t) =>
-              `<form action="/matches" method="post" class="match"><p><strong>${escape(t.merchant)} paid ${amount(t.amount_minor, t.currency)} into ${escape(t.account_name)} on ${day(t.booking_date)}.</strong>${t.reference ? ` <span class="hint">Reference ${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">The amount doesn't line up exactly, and that's fine</label><p style="margin:10px 0 0"><button class="btn secondary" name="action" value="link">Yes, match</button></p></form>`,
-          )
-          .join('')
-      : `<p class="hint">${due ? `Due ${escape(day(due))}. ` : ''}No matching payment in yet. It's matched automatically when the amount and reference or payer fit.</p>`
-  }<details><summary>Paid some other way?</summary><div class="body"><p class="hint">For example a Stripe payout or a bank you don't import.</p>${paidForm}</div></details></section>`;
+  return box(
+    likely.length ? 'Payment?' : 'Unpaid',
+    `${
+      likely.length
+        ? likely
+            .slice(0, 5)
+            .map(
+              (t) =>
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label><button class="btn secondary" name="action" value="link">Match</button></form>`,
+            )
+            .join('')
+        : due
+          ? `<p class="small">Due ${escape(day(due))}</p>`
+          : ''
+    }<details><summary>Paid another way?</summary><div class="body">${paidForm}</div></details>`,
+  );
 }
 
 // ---------- Add page ----------
@@ -230,10 +269,7 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
   }<script src="/assets/add.js" defer></script>`;
   return page('Add documents', body, 200, env, {
     nav: 'receipts',
-    head: pageHead('Add receipts or invoices', {
-      kicker: 'Add',
-      sub: 'Each file is read on its own. Unsure ones wait in Review.',
-    }),
+    head: pageHead('Add receipts or invoices'),
   });
 }
 // Progressive enhancement for /add: drag and drop, one request per file and

@@ -22,8 +22,8 @@ The month package is one ZIP that holds one folder with the month's original doc
 | Parameter | Button or control on Home | Effect |
 | --- | --- | --- |
 | `anyway=1` | **Download anyway** | Also includes documents that are not checked (needs review, still being read) and emails held for review, in `check-these/`. |
-| `undated=1` | **Also include … with no date** | Also includes documents with no issue date, from any month, in `check-these/`. |
-| `changes=1` | **Download only what changed** | Only documents added or corrected since the month was last marked as sent. |
+| `undated=1` | **Add N undated receipts** | Also includes documents with no issue date, from any month, in `check-these/`. |
+| `changes=1` | **Download changes** | Only documents added or corrected since the month was last marked as sent. |
 
 ## Layout
 
@@ -123,7 +123,7 @@ Rows are payments out (negative amounts) from completed imports, booked in the m
 
 | Item | Value |
 | --- | --- |
-| Button | **I've sent `<month>` to `<ACCOUNTANT_LABEL>`** |
+| Button | **Mark as sent** |
 | Request | `POST /month/sent` |
 | Recorded | One row in `month_sends`: time, method (`download` or `onedrive`), number of documents, EUR total of expense receipts, and the sorted list of `id:revision` for every non-duplicate document dated in the month, with its SHA-256. |
 | Refused when | No documents are dated in the month, or the month changed since the page was opened (HTTP 409). |
@@ -145,7 +145,7 @@ After a send, Home compares the current list with the last one and counts docume
 | --- | --- |
 | Request | `POST /month/onedrive-upload` |
 | Destination | Subfolder `<EXPORT_PREFIX>-YYYY-MM` inside the chosen OneDrive folder, created if missing. |
-| Files per request | 10. The page then shows how many are uploaded and a **Continue uploading** button. |
+| Files per request | 10. The page then shows how many are uploaded and a **Continue upload** button. |
 | Single upload | Files up to 4 MiB. |
 | Upload session | Larger files, in chunks of 3,276,800 bytes. |
 | Repeat uploads | Files already uploaded at the same revision are skipped. A corrected document replaces its old copy. Index files are always replaced, and always list the whole month, also when only the changes are uploaded. |

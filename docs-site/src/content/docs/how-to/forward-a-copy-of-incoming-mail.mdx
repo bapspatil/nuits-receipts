@@ -23,7 +23,7 @@ Cloudflare only forwards to verified destination addresses. In the Cloudflare da
   </Step>
   <Step title="Set the address in the app">
 
-Open **Settings > Email**, fill in **Forward a copy to**, tick "This address is a verified destination in Email Routing", and press **Save email**.
+Open **Settings > Email** and fill in **Forward a copy to**. Tick "This address is a verified destination in Email Routing", which shows once you change the address, and press **Save**.
 
 The app cannot check that the address is verified. If it is not, the copies are lost and each failure is logged as `forward_copy_failed`.
 
@@ -45,7 +45,7 @@ The message arrives in the destination inbox, forwarded by Cloudflare. If it cam
 
 - Only one address is supported, because Cloudflare forwards each message once.
 - Forwarding runs alongside receipt reading. A failed forward never stops a receipt being read, and a failed read still forwards.
-- The copy itself is not stored, and it is not read by AI unless its sender is on **Allowed senders**.
+- The copy itself is not stored, and it is not read by AI unless its sender is allowed in **Settings** > **Senders**.
 - A destination equal to the address the message was sent to, the receipt address or the invoice address is skipped to avoid a loop, and logged as `forward_copy_loop`.
 - `FORWARD_COPY_TO` must differ from the invoice address if you use one.
 

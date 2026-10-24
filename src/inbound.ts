@@ -218,17 +218,6 @@ export async function heldCount(env: Env): Promise<number> {
     return 0;
   }
 }
-export async function recentMail(env: Env, limit = 20): Promise<MailRow[]> {
-  try {
-    return (
-      await env.DB.prepare('SELECT * FROM inbound_mail ORDER BY received_at DESC,id DESC LIMIT ?')
-        .bind(limit)
-        .all<MailRow>()
-    ).results;
-  } catch {
-    return [];
-  }
-}
 export async function ignoredSenders(env: Env): Promise<{ address: string; added_at: string }[]> {
   try {
     return (

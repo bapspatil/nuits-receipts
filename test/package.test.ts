@@ -248,7 +248,7 @@ test('ZIP refuses empty months, too many files and bad input with plain messages
   expect(big.status).toBe(413);
   expect(await big.text()).toContain('901 files, more than the 900');
   const page = await (await request('/?month=2026-11')).text();
-  expect(page).toContain('This month is too big for one package.');
+  expect(page).toContain('This month is too big for one package');
   expect(page).not.toContain('/month/package.zip');
 });
 
@@ -257,10 +257,11 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   const second = await seed({ bytes: 'ready two', vendor: 'Beta', issue_date: '2026-10-03' });
   // No bank statement: the month is not ready, so the ZIP is "anyway".
   let html = await (await request('/?month=2026-10')).text();
-  expect(html).toContain('No bank statement is imported.');
+  expect(html).toContain('<b>Match</b><span class="red">No statement</span>');
+  expect(html).toContain('<details class="send"><summary>Download anyway</summary>');
   expect(html).toContain('<form action="/month/package.zip" method="get">');
   expect(html).toContain('Download anyway</button>');
-  expect(html).toContain('Spreadsheet only (CSV)');
+  expect(html).toContain('>CSV</a>');
   await env.DB.batch([
     env.DB.prepare(
       "INSERT INTO imports (id,account_key,original_key,status,row_count,imported_at,snapshot_json) VALUES ('i','holvi','imports/i','complete',1,'2026-10-21','{}')",
@@ -270,10 +271,11 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
     ).bind(pdf.id),
   ]);
   html = await (await request('/?month=2026-10')).text();
-  expect(html).toContain('<span class="stamp ready">Ready</span>');
+  expect(html).toContain('<b>Send</b><span>Ready</span>');
   expect(html).toMatch(
-    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10">Download October ZIP \(\d+ KB\)<\/a>/,
+    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10">Download ZIP \(\d+ KB\)<\/a>/,
   );
+  expect(html).toContain('<button class="btn secondary">Mark as sent</button>');
   expect(html).toContain('<ul class="manifest" aria-label="Files in the package"><li>receipts-2026-10/</li>');
   expect(html.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
   const shownHash = html.match(/name="receipts_hash" value="([a-f0-9]{64})"/)![1]!;
@@ -301,14 +303,14 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   html = await (await request('/?month=2026-10&sent=1')).text();
   const today = new Date();
   const short = `${today.getUTCDate()} ${today.toUTCString().slice(8, 11)}`;
-  expect(html).toContain(`<span class="stamp matched">Sent ${short}</span>`);
+  expect(html).toContain(`<b>Send</b><span>Sent ${short}</span>`);
   expect(html).toContain('Marked October as sent.');
   expect(html).toContain('<a href="/?month=2026-11">On to November ›</a>');
-  expect(html).toContain('<li id="send" class="step done">');
+  expect(html).toContain('<li class="step done" id="send">');
   expect(html).not.toContain('action="/month/sent"');
   const home = await (await request('/?month=2026-10')).text();
-  expect(home).toContain(`<span class="stamp matched">Sent ${short}</span>`);
-  expect(home).toContain('<li id="send" class="step done">');
+  expect(home).toContain(`<b>Send</b><span>Sent ${short}</span>`);
+  expect(home).toContain('<li class="step done" id="send">');
 
   // Nothing changed yet, so there is no "changes" ZIP.
   const unchanged = await request('/month/package.zip?month=2026-10&changes=1');
@@ -320,7 +322,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   const added = await seed({ bytes: 'late arrival', vendor: 'Gamma', issue_date: '2026-10-20' });
   html = await (await request('/?month=2026-10')).text();
   expect(html).toContain(`Changed since you sent it on ${short}: 1 added and 1 corrected.`);
-  expect(html).toContain('Download only what changed (2 files)');
+  expect(html).toContain('Download changes (2 files)');
   const { response, entries } = await zipOf('/month/package.zip?month=2026-10&changes=1&anyway=1');
   expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="receipts-2026-10-changes.zip"');
   expect(entries.map((e) => e.name.split('_').at(-1))).toEqual([

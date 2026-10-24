@@ -89,12 +89,13 @@ test('exactly 2 MiB survives multipart preview and bounded base64 confirmation',
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(5000);
   expect(fetch).not.toHaveBeenCalled();
 }, 30000);
-test('preset picker labels presets as CSV layouts and shows the no-affiliation hint', async () => {
+test('preset picker labels presets as CSV layouts, with no disclaimer of its own', async () => {
   const csv = 'Kirjauspäivä;Saaja;Summa;Valuutta;Viite\n01.09.2026;Synthetic Shop;-12,50;EUR;SYN-1\n';
   const html = await (await preview(csv)).text();
   expect(html).toContain('<option value="builtin-nordea">Nordea (CSV layout)</option>');
   expect(html).toContain('<option value="builtin-op">OP (CSV layout)</option>');
-  expect(html).toContain('<p class="muted">Presets match common CSV export layouts. Not affiliated with any bank.</p>');
+  // The footer carries the not-affiliated line; the picker repeats nothing.
+  expect(html.match(/Not affiliated/g)).toHaveLength(1);
   expect(html).not.toContain('Built-in synthetic-tested layout');
 });
 test('saved presets are labelled as layouts too', async () => {
@@ -105,5 +106,5 @@ test('saved presets are labelled as layouts too', async () => {
   expect((await request('/imports/csv/confirm', { method: 'POST', body })).status).toBe(303);
   const html = await (await preview(csv.replace('-12.50', '-13.50'))).text();
   expect(html).toContain('>Monthly · Synthetic (CSV layout)</option>');
-  expect(html).toContain('Not affiliated with any bank.');
+  expect(html.match(/Not affiliated/g)).toHaveLength(1);
 });

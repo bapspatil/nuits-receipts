@@ -12,7 +12,7 @@ import {
 } from './receipts';
 import { FAVICON_SVG, errorPage, exportCsv, exportSalesCsv, month } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
-import { home, importPage, payments, previewable, receiptPage, reviewPage, settingsPage } from './views';
+import { home, importPage, payments, previewable, queueAround, receiptPage, reviewPage, settingsPage } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
 import { clearBankReview, creditFit, eligible, matchable, reconcile, type Transaction } from './banking';
@@ -123,12 +123,12 @@ function redirect(location: string): Response {
 export function moved(location: string, search = ''): Response {
   return new Response(null, { status: 302, headers: { Location: location + search } });
 }
-// Bank's Transfers section for the month the money left in.
+// The first transfer row on Bank, in the month the money left.
 async function transfersPage(env: Env, debitId: string): Promise<string> {
   const date = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
     .bind(debitId)
     .first<string>('booking_date');
-  return `/payments${date ? `?month=${date.slice(0, 7)}` : ''}#transfers`;
+  return `/payments?${date ? `month=${date.slice(0, 7)}&` : ''}show=all#transfers`;
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
@@ -153,7 +153,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const offset = Number(url.searchParams.get('offset') ?? 0);
   requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page');
   if (request.method === 'GET' && path === '/')
-    return home(env, month(url.searchParams.get('month')), offset, url.searchParams);
+    return home(env, month(url.searchParams.get('month')), url.searchParams);
   // Old addresses: the month close is Home now, and the phone's More menu is gone.
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
@@ -289,10 +289,22 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return redirect(`/receipts/${paid[1]}`);
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
-  if (request.method === 'GET' && receipt?.[1]) return receiptPage(env, await getReceipt(env, receipt[1]));
+  if (request.method === 'GET' && receipt?.[1])
+    return receiptPage(env, await getReceipt(env, receipt[1]), url.searchParams);
   if (request.method === 'POST' && receipt?.[1]) {
-    await correctReceipt(env, receipt[1], await formData(request, 64 * 1024));
-    return redirect(`/receipts/${receipt[1]}`);
+    const id = receipt[1];
+    const form = await formData(request, 64 * 1024);
+    const action = String(form.get('action') ?? '');
+    const before = await getReceipt(env, id);
+    const { next } = await queueAround(env, id);
+    await correctReceipt(env, id, form);
+    const after = await getReceipt(env, id);
+    // Approve and Skip move on through the queue; the last one lands on Review.
+    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip'))
+      return redirect(next ? `/receipts/${next}${action === 'approve' ? '?approved=1' : ''}` : '/review');
+    // Saving a ready receipt checks it again; new flags send it back to Review.
+    if (before.status === 'ready' && after.status === 'needs_review') return redirect(`/receipts/${id}?moved=1`);
+    return redirect(`/receipts/${id}`);
   }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);
   if (request.method === 'GET' && original?.[1]) {

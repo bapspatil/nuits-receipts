@@ -12,26 +12,26 @@ Receipts (`kind` `expense`) and sales invoices (`kind` `sales`) are stored in th
 
 | Field | Label on the receipt page | Label on a sales invoice | Stored as | Source |
 | --- | --- | --- | --- | --- |
-| `vendor` | Who you paid | Seller (you) | Text | Read |
-| `invoice_number` | Receipt or invoice number | Invoice number | Text | Read |
-| `issue_date` | Date on the receipt | Invoice date | `YYYY-MM-DD` | Read |
-| `due_date` | Due date (if any) | Due date | `YYYY-MM-DD` | Read |
+| `vendor` | Seller | Seller | Text | Read |
+| `invoice_number` | Number | Number | Text | Read |
+| `issue_date` | Date | Date | `YYYY-MM-DD` | Read |
+| `due_date` | Due date | Due date | `YYYY-MM-DD` | Read |
 | `currency` | Currency | Currency | ISO code | Read |
-| `total_minor` | Total paid | Total invoiced | Integer, minor units | Read |
+| `total_minor` | Total | Total invoiced | Integer, minor units | Read |
 | `net_minor` | Before VAT | Before VAT | Integer, minor units | Read |
-| `vat_minor` | VAT amount | VAT amount | Integer, minor units | Read |
+| `vat_minor` | VAT | VAT | Integer, minor units | Read |
 | `vat_rate_bps` | VAT % | VAT % | Integer, hundredths of a percent (2550 is 25.5 %) | Read |
 | `line_items_json` | (not shown) | (not shown) | JSON list of up to 20 descriptions | Read |
 | `client` | | Client | Text | Read (sales) |
-| `client_vat_id` | | Client's VAT number | Text, upper case, no spaces, dots or dashes | Read (sales) |
-| `client_country` | | Client's country | Two-letter code | Read (sales) |
-| `vat_treatment` | | VAT | `domestic`, `reverse_charge`, `export`, `exempt` | Read (sales) |
-| `reference_number` | | Payment reference | Text, at most 40 characters | Read (sales) |
-| `product` | Which part of the business | Which part of the business | Product id | Vendor rule, Clef or default |
-| `expense_type` | Kind of cost | | `infra`, `AI APIs`, `subscriptions`, `other` | Vendor rule, Clef or `other` |
-| `eur_override_minor` | Amount in euros | Amount in euros | Integer, euro cents | Typed in, with **Why this euro amount?** |
-| `duplicate_of` | Same receipt as | Same invoice as | Document ID | Chosen by you |
-| `paid_outside_on`, `paid_outside_note` | | Paid on, How (button **Mark as paid**) | Date and note of at most 300 characters | Typed in (sales) |
+| `client_vat_id` | | Client VAT number | Text, upper case, no spaces, dots or dashes | Read (sales) |
+| `client_country` | | Client country | Two-letter code | Read (sales) |
+| `vat_treatment` | | VAT handling | `domestic`, `reverse_charge`, `export`, `exempt` | Read (sales) |
+| `reference_number` | | Reference | Text, at most 40 characters | Read (sales) |
+| `product` | Part | Part | Product id | Vendor rule, Clef or default |
+| `expense_type` | Kind | | `infra`, `AI APIs`, `subscriptions`, `other` | Vendor rule, Clef or `other` |
+| `eur_override_minor` | In euros | In euros | Integer, euro cents | Typed in, with **Why** |
+| `duplicate_of` | Duplicate of | Duplicate of | Document ID | Chosen by you |
+| `paid_outside_on`, `paid_outside_note` | | Paid on, How, under **Paid another way?** (button **Mark paid**) | Date and note of at most 300 characters | Typed in (sales) |
 
 "Read" fields come from Clairic, cross-checked against labelled lines in the document text. Any value you type in is kept when the document is read again.
 
@@ -39,8 +39,8 @@ Receipts (`kind` `expense`) and sales invoices (`kind` `sales`) are stored in th
 
 | Item | Value |
 | --- | --- |
-| Button | **Approve receipt** or **Approve invoice** |
-| Reason field | **Note for your accountant**, prefilled with "Checked against the original". Required. |
+| Button | **Approve** |
+| Reason field | **For your accountant**, under **Note**, prefilled with "Checked against the original". Required. |
 | Required facts | Seller, issue date, a supported currency, total, amount before VAT and VAT amount. Sales invoices also need the client. |
 | Result | Status `ready`, review reasons cleared, `reviewed_at` set. The flags present at approval are remembered and not raised again for the same values. |
 
@@ -137,9 +137,9 @@ A read value is **settled** when the document text states it on a labelled line,
 | `unsupported_document` | We can't read this file type. | Source | The stored file is not a PDF, image, HTML or plain text. | Upload |
 | `original_missing` | The original file is missing. | Source | The original is not in R2. | Upload |
 | `input_truncated` | This was long, so we only read the start. | Source | Document text plus email context is over 40,000 characters. Only the first 40,000 are read. | |
-| `model_truncated` | The reader stopped early. | Source | Clairic reported a truncated answer. | **Read it again** |
-| `invalid_model_output` | The reader got confused. | Source | Clairic's answer did not have the expected shape. | **Read it again** |
-| `extraction_failed` | Reading failed. | Source | Any other error while reading. | **Read it again** |
+| `model_truncated` | The reader stopped early. | Source | Clairic reported a truncated answer. | **Read again** |
+| `invalid_model_output` | The reader got confused. | Source | Clairic's answer did not have the expected shape. | **Read again** |
+| `extraction_failed` | Reading failed. | Source | Any other error while reading. | **Read again** |
 
 ### Sales invoices only
 

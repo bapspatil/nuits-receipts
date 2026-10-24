@@ -83,7 +83,7 @@ Checked in this order; the first that applies is used.
 
 | Value | Applies when | `eur_total` |
 | --- | --- | --- |
-| `manual` | An euro amount was entered on the receipt page (**Amount in euros**, with a reason). | The entered amount. |
+| `manual` | An euro amount was entered on the receipt page (**In euros**, with a reason). | The entered amount. |
 | `bank` | The document is matched to a bank transaction in EUR from a completed import. | The bank amount, as a positive number for a payment out. |
 | `native` | The document's currency is EUR. | The document total. |
 | `ecb` | A reference rate was found for the currency and issue date. | Total converted at the ECB rate on `fx_rate_date`. |

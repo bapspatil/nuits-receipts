@@ -195,18 +195,19 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
   expect((await at('/app/settings/onedrive/connect', {}, {}, plain)).status).toBe(404);
   const half = { ...plain, MS_CLIENT_ID: CLIENT_ID } as Env;
   const note = await (await at('/app/settings', {}, {}, half)).text();
-  expect(note).toContain('Not set up. <code>MS_CLIENT_ID</code> is set, but <code>MS_CLIENT_SECRET</code>');
-  expect(note).not.toContain('Connect Microsoft account');
+  expect(note).toContain('<h2>OneDrive</h2><span class="sum">Not set up</span>');
+  expect(note).toContain('<code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing.');
+  expect(note).not.toContain('onedrive/connect');
   expect(ms.calls).toHaveLength(0);
 });
 
 test('connect sends PKCE S256 and a sealed state cookie; the callback stores the token encrypted', async () => {
   const settings = await (await at('/app/settings')).text();
-  expect(settings).toContain(
-    '<a class="btn secondary" href="/app/settings/onedrive/connect">Connect Microsoft account</a>',
-  );
+  expect(settings).toContain('<a class="btn secondary" href="/app/settings/onedrive/connect">Connect</a>');
   expect(settings).toContain(`${ORIGIN}/app/settings/onedrive/callback`);
-  expect(settings).toContain('<li><a href="#onedrive">OneDrive</a></li>');
+  expect(settings).toContain(
+    '<h2>OneDrive</h2><span class="sum">Not connected</span></summary><div class="body" id="onedrive">',
+  );
   expect(settings.match(/class="[^"]*\bbtn primary\b/g)).toBeNull();
 
   const start = await at('/app/settings/onedrive/connect');
@@ -282,7 +283,11 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
   expect(await unseal(odEnv, 'oauth-state', row!.refresh_token_enc!)).toBeNull();
   const after = await (await at('/app/settings?onedrive=connected')).text();
   expect(after).toContain('Microsoft account connected.');
-  expect(after).toContain('Connected as <strong>Synthetic Owner</strong> (owner@example.com)');
+  expect(after).toContain('<dd>Synthetic Owner (owner@example.com)</dd>');
+  // The section the callback returns to is open, its summary names the account.
+  expect(after).toContain(
+    '<details class="sect" open><summary><h2>OneDrive</h2><span class="sum">owner@example.com</span>',
+  );
   expect(after).toContain('action="/app/settings/onedrive/folder"');
 });
 
@@ -370,7 +375,7 @@ test('upload puts small files, chunked large files and the index in the month fo
   const [small, large] = await readyMonth(1, true);
   const page = await (await at('/app/?month=2026-10')).text();
   expect(page).toContain('action="/app/month/onedrive-upload"');
-  expect(page).toContain('Upload anyway to Accountant Inbox');
+  expect(page).toContain('>Upload anyway</button>');
   expect(page).toContain('href="/app/settings#onedrive">Change</a>');
 
   const first = await post('/app/month/onedrive-upload', { month: '2026-10' });
@@ -397,8 +402,8 @@ test('upload puts small files, chunked large files and the index in the month fo
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(2);
   expect(ms.refreshes).toEqual(['refresh-original']);
   const done = await (await at('/app/?month=2026-10&upload=done')).text();
-  expect(done).toContain('Everything is in Accountant Inbox. October is marked as sent.');
-  expect(done).toContain('by uploading it to OneDrive');
+  expect(done).toContain('Uploaded to Accountant Inbox. Marked as sent.');
+  expect(done).toContain('Via OneDrive');
 
   // Again: nothing new to upload, only the index is refreshed.
   ms.calls = [];
@@ -438,7 +443,7 @@ test('uploads run in batches of ten and continue without JavaScript', async () =
   expect(ms.files.has('receipts-2026-10-id/00-index-2026-10.csv')).toBe(false);
   expect(await env.DB.prepare('SELECT count(*) n FROM month_sends').first('n')).toBe(0);
   const page = await (await at('/app/?month=2026-10&anyway=1&upload=more')).text();
-  expect(page).toContain('10 of 12 files uploaded to Accountant Inbox. Continue to upload the rest.');
+  expect(page).toContain('10 of 12 uploaded.');
   expect(page).toContain('<input type="hidden" name="anyway" value="1">');
   expect(page).not.toMatch(/http-equiv|<script/);
   const second = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
@@ -482,9 +487,7 @@ test('429 and 503 stop the batch with the wait Microsoft asks for', async () => 
   expect(result.headers.get('Location')).toBe('/app/?month=2026-10&upload=more&wait=7#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(1);
   const page = await (await at('/app/?month=2026-10&upload=more&wait=7')).text();
-  expect(page).toContain(
-    '1 of 3 files uploaded to Accountant Inbox. Microsoft asked us to wait; continue in 7 seconds.',
-  );
+  expect(page).toContain('1 of 3 uploaded. Continue in 7 s.');
   ms.hook = (call) => (call.method === 'PUT' ? new Response(null, { status: 503 }) : undefined);
   expect((await post('/app/month/onedrive-upload', { month: '2026-10' })).headers.get('Location')).toContain('wait=30');
   ms.hook = () => undefined;

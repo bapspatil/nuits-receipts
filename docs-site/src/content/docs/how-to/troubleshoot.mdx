@@ -58,29 +58,28 @@ The file's contents do not match its type, for example a renamed file. Export or
 
 PDFs can be up to 10 MiB and 25 pages, photos up to 4 MiB, and an email up to 20 MiB. Shrink or split the file, or take a photo of the page that matters.
 
-### A receipt says "Still reading" for a long time
+### A receipt says "Reading" for a long time
 
-Refresh the page. If it is still reading after two minutes, open **Read it again** and select **Read it again**.
+Select **Refresh**. If it is still reading after two minutes, select **More** > **Read again**.
 
 ### "Reading failed." on several receipts at once
 
-Workers AI may be unavailable, or the Workers Free daily AI allowance may be used up, in which case calls fail until 00:00 UTC. Wait, then select **Read it again** on each receipt.
+Workers AI may be unavailable, or the Workers Free daily AI allowance may be used up, in which case calls fail until 00:00 UTC. Wait, then select **Read again** on each receipt.
 
 ### "This PDF has no readable text."
 
-The PDF is probably a scan; the app reads text PDFs only. Type the numbers in, or upload a photo of it with **Upload a better copy** and mark the PDF as its duplicate. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+The PDF is probably a scan; the app reads text PDFs only. Type the numbers in, or upload a photo of it with **More** > **Upload a copy** and mark the PDF as its duplicate. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
 
 ### A forwarded email never appears
 
-- Open **Receipts** and look at **Recent mail**: it lists the last 20 emails that reached the app and what happened to each. If nothing is listed, the mail never reached the Worker; check the Email Routing rule.
-- Look under **Review** > **Unknown senders**: mail from a sender who is not approved waits there. Press **Approve sender**. You can also add senders in **Settings** > **Senders**.
+- Look under **Review** > **Unknown senders**: mail from a sender who is not allowed waits there. Press **Allow**. You can also add senders in **Settings** > **Senders**.
 - Mail that fails the sender check is dropped. Forwarding services can change the sending address; check what actually arrives.
 - Look under **Review** > **Email not verified**: mail the app could not prove came from you waits there unread.
 - Check the Email Routing rule for the receipt address is **Send to a Worker** and points at this Worker. See [Set up email](/how-to/set-up-email/).
 
-### After "It's genuine, read it", the email says "We can't read this file type."
+### After **Read it**, the email says "We can't read this file type."
 
-The email is kept as a whole message, which the reader cannot read directly. Download it with **Download the original**, save the receipt from it, and add it with **Upload a better copy**. Then, on the email, fill in **Who you paid** to match the new receipt, select **Save, decide later**, and pick the new receipt under **This is a duplicate** > **Same receipt as**. This is how the app works today: an email it could not verify is kept whole and never read, and when you ask for it to be read it is treated as a single file the reader does not support, so it fails with `unsupported_document`. Its attachments are not read separately.
+The email is kept as a whole message, which the reader cannot read directly. Download it with **More** > **Download original**, save the receipt from it, and add it with **More** > **Upload a copy**. Then, on the email, set **Seller** to match the new receipt, pick the new receipt under **All fields** > **Duplicate of**, and select **Skip ›** to save it. This is how the app works today: an email it could not verify is kept whole and never read, and when you ask for it to be read it is treated as a single file the reader does not support, so it fails with `unsupported_document`. Its attachments are not read separately.
 
 ### "Stale receipt. Reload before saving."
 
@@ -98,7 +97,7 @@ The same file was imported into a different account. A file belongs to one accou
 
 ### "Preview expired or missing. Preview again."
 
-A preview is valid for 30 minutes. Start again from **Import bank statement**.
+A preview is valid for 30 minutes. Start again from **Import statement** on **Bank**.
 
 ### "Mapping fields changed. Update preview before confirming."
 
@@ -124,11 +123,11 @@ Only approved receipts can be matched. Approve it first. See [Review and approve
 
 ### "Confirm match exceptions"
 
-The receipt and payment do not fit the usual date and amount rules. If the match is right, tick **The amount or date doesn't line up exactly, and that's fine** and select **Match** again.
+The receipt and payment do not fit the usual date and amount rules. If the match is right, tick **Not exact, still this** and select **Match** again.
 
 ### "Receipt is already matched"
 
-A receipt can be matched to one payment only. Open the other payment and select **Remove match** first.
+A receipt can be matched to one payment only. On the other payment, open **More** and select **Remove match** first.
 
 ### A match I made disappeared
 
@@ -136,7 +135,7 @@ Saving a change to a receipt removes its bank match, and automatic matching runs
 
 ### "Payment changed or belongs to an own-account transfer. Undo the pair first."
 
-The payment is one side of a transfer pair. Select **Undo transfer** first. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
+The payment is one side of a transfer pair. Open its **More** and select **Undo transfer** first. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
 
 ### "Transfer changed or unavailable; review both payments"
 
@@ -144,21 +143,21 @@ The two sides must be in different accounts, have the same amount and currency, 
 
 ## Sending the month
 
-### "This month is too big for one package."
+### "This month is too big for one package"
 
-One package holds up to 900 files. Download **Spreadsheet only (CSV)** and fetch the originals from the app.
+One package holds up to 900 files. Download the **CSV** and fetch the originals from the app.
 
 ### "This month changed since you opened the page."
 
-Something was added or corrected while the page was open. Reload it, check what you send, then select the **I've sent** button again.
+Something was added or corrected while the page was open. Reload it, check what you send, then select **Mark as sent** again.
 
 ### "Nothing has changed since you sent this month."
 
-There is nothing new to send. Use **Download everything again** if you need the full package.
+There is nothing new to send. Use **Download again** or **Download all** if you need the full package.
 
 ### A very large month fails to download on Workers Free
 
-Building the ZIP checksums every byte, which can exceed the Free plan's CPU limit. Move to Workers Paid, or send **Spreadsheet only (CSV)**.
+Building the ZIP checksums every byte, which can exceed the Free plan's CPU limit. Move to Workers Paid, or send the **CSV**.
 
 ### My accountant cannot open the ZIP in OneDrive
 

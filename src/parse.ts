@@ -127,7 +127,7 @@ function iso(y: number, m: number, d: number): string | null {
 // The first unambiguous date at the start of `text`. Slash dates count only when
 // the day is above 12; dotted dates are day.month.year as printed in Europe.
 export function leadingDate(text: string): string | null {
-  const t = text.trim().replace(/^[:\-–\s]+/, '');
+  const t = text.trim().replace(/^[:\-\u2013\s]+/, '');
   let m = t.match(/^(\d{4})-(\d{2})-(\d{2})\b/);
   if (m) return iso(+m[1]!, +m[2]!, +m[3]!);
   m = t.match(/^([A-Za-zäö]{3,12})\.? (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})\b/);

@@ -68,7 +68,7 @@ The three `ACCESS_*` vars are set together or not at all. A partial set fails wi
 
 | Var | Default | Rules | What it does | Where it can be changed |
 | --- | --- | --- | --- | --- |
-| `ALLOWED_SENDER_EMAILS` | empty | Up to 75 addresses of at most 254 characters, separated by commas, semicolons or whitespace. | Senders whose mail is read: the envelope sender, or the From address when DMARC passed for its domain. Mail from anyone else waits in Review as Unknown sender when its sender is proven, and is dropped otherwise. Empty means nothing is read. | Settings > Email (**Allowed senders**), with a confirmation tick, or Settings > Senders and **Approve sender** in Review |
+| `ALLOWED_SENDER_EMAILS` | empty | Up to 75 addresses of at most 254 characters, separated by commas, semicolons or whitespace. | Senders whose mail is read: the envelope sender, or the From address when DMARC passed for its domain. Mail from anyone else waits in Review as Unknown sender when its sender is proven, and is dropped otherwise. Empty means nothing is read. | Settings > Senders (**Add**), or **Allow** in Review |
 | `RECEIPT_ADDRESS` | empty | One email address, at most 254 characters. | The address routed to the Worker. Shown in the app. Not used to filter mail. | Settings > Email (**Receipt address**), with a confirmation tick |
 | `INVOICES_ADDRESS` | empty | One email address, different from `RECEIPT_ADDRESS` and `FORWARD_COPY_TO`. | Mail whose envelope recipient is this address is filed as a sales invoice. Empty turns it off. After a change in Settings, the previous address is still read as an invoice address for 30 days. | Settings > Email (**Invoice address**), with a confirmation tick |
 | `FORWARD_COPY_TO` | empty | One email address, or empty. | Every message the Worker receives, from any sender, is also forwarded here. It must be a verified destination address in Email Routing. A copy to the receiving address itself is skipped. | Settings > Email (**Forward a copy to**), with a confirmation tick |
@@ -77,7 +77,7 @@ The three `ACCESS_*` vars are set together or not at all. A partial set fails wi
 
 | Var | Default | Rules | What it does | Where it can be changed |
 | --- | --- | --- | --- | --- |
-| `ACCOUNTANT_LABEL` | `your accountant` | At most 100 characters. | Shown on Home's send step, as in "Send to your accountant". | Settings > Export (**Accountant**) |
+| `ACCOUNTANT_LABEL` | `your accountant` | At most 100 characters. | Shown as the summary of Settings > Export, and counts **Accountant** as done on the first-run checklist once changed. | Settings > Export (**Accountant**) |
 | `EXPORT_PREFIX` | `receipts` | 1 to 40 characters: letters, digits, `.`, `_`, `-`. | Start of export file names and of the month package folder, as in `receipts-2026-09.csv`. | Settings > Export (**Export file name**) |
 | `SEND_HINT` | empty | One line, at most 300 characters. | Text shown under the month download button. Empty shows nothing. | Settings > Export (**Note under the month download**) |
 | `SOURCE_REPOSITORY` | empty | An `https://` URL, at most 300 characters. | The footer links the version to `<url>/releases/tag/vX.Y.Z`. Empty hides the link. | Settings > Advanced (**Source code link**) |

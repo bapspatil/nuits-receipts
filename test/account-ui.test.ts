@@ -69,7 +69,7 @@ test('matches and payments show accounts and export appends two formula-safe acc
   expect((await eurValue(env, r)).source).toBe('bank');
   const payments = await (await request('/payments?month=2026-09')).text();
   expect(payments).toContain('=Fake Main');
-  expect(payments).toContain('Matched');
+  expect(payments).toContain(`<a class="tag ok" href="/receipts/${r.id}">Receipt</a>`);
   expect(await (await request('/receipts/' + r.id)).text()).toContain('=Fake Main');
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,
@@ -98,26 +98,32 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   });
   expect(paired.status).toBe(303);
   // Transfers live on Bank now, in the month the money left.
-  expect(paired.headers.get('Location')).toBe('/payments?month=2026-09#transfers');
-  const page = await (await request('/payments?month=2026-09')).text();
-  expect(page).toContain('<section class="sect" id="transfers" aria-labelledby="transfers-h">');
-  expect(page).toContain('<section class="sect" id="imports" aria-labelledby="imports-h">');
-  expect(page).toContain('<h2 id="imports-h">Statements imported</h2>');
-  expect(page).toContain('Fake Main → Fake Savings');
-  expect(page).toContain('Own-account transfer');
-  expect(page).toContain('Undo transfer');
-  expect(page).not.toContain('class="warning">Missing receipt');
+  expect(paired.headers.get('Location')).toBe('/payments?month=2026-09&show=all#transfers');
+  const page = await (await request('/payments?month=2026-09&show=all')).text();
+  // Both legs say where the money went; Undo is in each row's More.
+  expect(page).toContain(`<li class="pay" id="transfers">`);
+  expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
+  expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');
+  expect(page.match(/<button class="linkbtn">Undo transfer<\/button>/g)).toHaveLength(2);
+  expect(page).toContain('<div class="stmts" id="imports"><details><summary>Statements (2)</summary>');
+  expect(page).not.toContain('stamp missing');
   expect(
     (await request('/payments/' + debit, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) }))
       .status,
   ).toBe(409);
   const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
   expect(undone.status).toBe(303);
-  expect(undone.headers.get('Location')).toBe('/payments?month=2026-09#transfers');
-  expect(await (await request('/payments?month=2026-09')).text()).toContain('No transfers paired yet.');
+  expect(undone.headers.get('Location')).toBe('/payments?month=2026-09&show=all#transfers');
+  // Unpaired again: the debit is missing, and its More offers the pair once more.
+  const again = await (await request('/payments?month=2026-09')).text();
+  expect(again).toContain(
+    `<input type="hidden" name="debit_id" value="${debit}"><select name="credit_id" aria-label="Arrived in"><option value="${credit}">Fake Savings · 7 Sep</option>`,
+  );
   expect(await env.DB.prepare('SELECT sum(receipt_required) n FROM bank_transactions').first('n')).toBe(2);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
-  expect(await (await request('/payments?month=2026-09')).text()).toContain('Missing receipt');
+  expect(await (await request('/payments?month=2026-09')).text()).toContain(
+    '<span class="stamp missing">Missing</span>',
+  );
 });
 
 test('legacy account IDs with spaces keep their identity when renamed through the rendered form', async () => {

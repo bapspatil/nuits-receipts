@@ -4,8 +4,23 @@ import type { Env } from './env';
 import { config } from './config';
 import { requireInput } from './domain';
 import { invoiceName } from './invoices';
-import { recentMail, type MailRow } from './inbound';
-import { amount, day, emptyState, escape, navCounts, page, pageHead, plural, receiptsSegment, uploadForm } from './ui';
+import type { MailRow } from './inbound';
+import {
+  amount,
+  chipRow,
+  emptyState,
+  escape,
+  monthHead,
+  monthName,
+  more,
+  navCounts,
+  page,
+  pageHead,
+  shortDay,
+  plural,
+  receiptsSegment,
+  tag,
+} from './ui';
 
 export const PAGE_SIZE = 50;
 export const SHOW = {
@@ -17,9 +32,10 @@ export const SHOW = {
   unknown: 'Unknown sender',
 } as const;
 export type Show = keyof typeof SHOW;
-// Needs you and Unknown sender are Review's job: still accepted in the URL,
-// but not offered as chips here.
-const CHIPS: readonly Show[] = ['ready', 'reading', 'duplicate', 'sales'];
+// Only the exceptions are chips. Ready is the default, Sales has its own
+// segment, and Needs you and Unknown sender are Review's: all still filter
+// from the URL.
+const CHIPS = ['reading', 'duplicate'] as const;
 export type AllRow = {
   type: 'receipt' | 'mail';
   id: string;
@@ -56,7 +72,8 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
     binds: unknown[] = [];
   if (query.show) where.push(WHERE[query.show]);
   if (query.month) {
-    where.push('substr(received_at,1,7)=?');
+    // The document's month, like Home; undated ones by when they arrived.
+    where.push('substr(coalesce(issue_date,received_at),1,7)=?');
     binds.push(query.month);
   }
   if (query.q) {
@@ -96,44 +113,6 @@ function rowName(row: AllRow): string {
   return row.kind === 'sales' ? invoiceName(row) : (row.vendor ?? row.filename ?? 'Receipt');
 }
 
-const REASONS: Record<string, string> = {
-  allowed: 'Read',
-  sender_approved: 'Read after you approved the sender',
-  sender_not_allowed: 'Unknown sender, waiting in Review',
-  sender_ignored: 'Ignored sender, not kept',
-  sender_auth_failed: 'Failed sender checks, not kept',
-  sender_unverified: 'Sender not verified',
-  email_too_large: 'Too large, not kept',
-  held_limit: 'Too many waiting, not kept',
-  duplicate: 'Already received',
-  deleted: 'Deleted',
-  original_missing: 'Original missing',
-};
-export function reasonLabel(row: Pick<MailRow, 'reason' | 'state'>): string {
-  if (row.reason === 'sender_unverified')
-    return row.state === 'imported' ? 'Kept for review, sender not verified' : 'Sender not verified, not kept';
-  return REASONS[row.reason] ?? row.reason;
-}
-// "24 Oct, 08:23" in the app's time zone (the same one the reader uses).
-export function when(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return escape(iso);
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Helsinki',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  return `${part('day')} ${part('month')}, ${part('hour')}:${part('minute')}`;
-}
-function age(iso: string): string {
-  const days = Math.floor((Date.now() - Date.parse(iso)) / 86400000);
-  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
-}
-
 // What an approve, ignore or delete did. Shown on the page it returns to.
 export function senderBanner(params: URLSearchParams): string {
   const n = (key: string) => {
@@ -143,49 +122,38 @@ export function senderBanner(params: URLSearchParams): string {
   let text = '';
   if (params.has('approved')) {
     const count = n('approved');
-    text = `Sender approved. ${count ? `${plural(count, 'email is', 'emails are')} being read now.` : 'Their next email goes straight in.'}`;
+    text = count ? `Allowed. Reading ${plural(count, 'email')}.` : 'Allowed.';
   } else if (params.has('ignored')) {
     const count = n('ignored');
-    text = `Sender ignored. ${count ? `${plural(count, 'waiting email')} deleted. ` : ''}Their mail won't be kept.`;
+    text = count ? `Ignored. ${plural(count, 'email')} deleted.` : 'Ignored.';
   } else if (params.get('deleted') === '1') text = 'Email deleted.';
-  else if (params.get('senders') === 'removed') text = 'Sender removed. Their next email waits in Review.';
-  else if (params.get('senders') === 'unignored') text = 'Sender no longer ignored. Their next email waits in Review.';
+  else if (params.get('senders') === 'removed') text = 'Sender removed.';
+  else if (params.get('senders') === 'unignored') text = 'No longer ignored.';
   return text ? `<p class="banner" role="status">${escape(text)}</p>` : '';
 }
 
-// The Unknown senders block. back: where the forms return to.
-export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review'): string {
+// The Unknown senders block. back: where the forms return to. primary: the
+// first Allow is the screen's one primary (when nothing else is).
+export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
   if (!rows.length) return '';
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
       .join('')}<input type="hidden" name="back" value="${back}">${button}</form>`;
   const items = rows
-    .map((r) => {
-      const to = r.to_address ? `To ${escape(r.to_address)}` : '';
-      const files = r.attachments ? plural(r.attachments, 'attachment') : 'No attachments';
-      return `<li class="card" id="mail-${escape(r.id)}"><p class="who"><b>${escape(r.sender)}</b><span class="stamp needs">Unknown sender</span></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><p class="ok">${[to, files, `arrived ${age(r.received_at)}`].filter(Boolean).join(' · ')}</p><div class="btns">${form(
+    .map((r, i) => {
+      const who = escape(r.sender);
+      return `<li id="mail-${escape(r.id)}"><p class="who"><b>${who}</b></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns">${form(
         '/senders/approve',
         { address: r.sender },
-        '<button class="btn primary">Approve sender</button>',
-      )}${form('/senders/ignore', { address: r.sender }, '<button class="btn secondary">Ignore sender</button>')}${form(
-        '/senders/delete',
-        { id: r.id },
-        '<button class="linkbtn">Delete</button>',
+        `<button class="btn ${primary && !i ? 'primary' : 'secondary'}" aria-label="Allow ${who}">Allow</button>`,
+      )}${form('/senders/ignore', { address: r.sender }, `<button class="linkbtn" aria-label="Ignore ${who}">Ignore</button>`)}${more(
+        form('/senders/delete', { id: r.id }, `<button class="linkbtn">Delete email</button>`),
+        who,
       )}</div></li>`;
     })
     .join('');
-  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders <span class="muted">(${rows.length})</span></h2><p class="hint">Mail from addresses not on your list. Nothing is read until you approve the sender. Approving reads this email and any others waiting from them.</p><ul>${items}</ul></section>`;
-}
-
-export function recentSection(rows: readonly MailRow[]): string {
-  if (!rows.length) return '';
-  return `<section class="recent" aria-labelledby="recent-h"><h2 id="recent-h">Recent mail</h2><p class="hint">The last ${rows.length === 1 ? 'email' : `${rows.length} emails`} sent to your address, and what happened to each.</p><ul class="list">${rows
-    .map(
-      (r) =>
-        `<li><span class="who">${escape(r.sender)}</span><span class="amt">${when(r.received_at)}</span><span class="ok">${escape(reasonLabel(r))}${r.subject ? ` · ${escape(r.subject)}` : ''}</span></li>`,
-    )
-    .join('')}</ul></section>`;
+  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><ul class="list">${items}</ul></section>`;
 }
 
 function parseQuery(params: URLSearchParams, offset: number): AllQuery {
@@ -215,61 +183,70 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const rows = await allRows(env, query);
   const more = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
-  const filtered = !!(query.show || query.month || query.q);
-  const chip = (key: Show | null, label: string) =>
-    `<li><a href="${link(query, { show: key })}"${key === query.show ? ' aria-current="page"' : ''}>${escape(label)}</a></li>`;
-  const chips = `<ul class="chips" aria-label="Show">${chip(null, 'All')}${CHIPS.map((k) => chip(k, SHOW[k])).join('')}</ul>`;
-  const find = `<form class="find" method="get" action="/receipts" role="search">${query.show ? `<input type="hidden" name="show" value="${query.show}">` : ''}<label class="q">Search<input name="q" type="search" value="${escape(query.q)}" placeholder="Vendor, client or sender" maxlength="100"></label><label class="m">Month received<input name="month" type="month" value="${escape(query.month ?? '')}"></label><button class="btn secondary">Show</button>${filtered ? `<a class="linkbtn" href="/receipts">Clear</a>` : ''}</form>`;
+  const filtered = !!(query.show || query.q);
+  const tally = await env.DB.prepare(
+    "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL),0) AS duplicate FROM receipts",
+  ).first<Record<'reading' | 'duplicate', number>>();
+  const chips = chipRow('Show', [
+    { href: link(query, { show: null }), label: 'All', current: !query.show },
+    ...CHIPS.map((k) => ({
+      href: link(query, { show: k }),
+      label: SHOW[k],
+      count: tally?.[k] ?? 0,
+      current: k === query.show,
+    })),
+  ]);
+  const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
   const list = shown.length
     ? `<ul class="list all">${shown
         .map((r) => {
           const chip = chipOf(r);
           const href = r.type === 'mail' ? `/review#mail-${escape(r.id)}` : `/receipts/${escape(r.id)}`;
-          const extra =
-            r.type === 'mail'
-              ? r.subject
-                ? escape(r.subject)
-                : '(no subject)'
-              : r.issue_date
-                ? `dated ${escape(day(r.issue_date))}`
-                : 'No date';
-          return `<li><a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' ? '' : amount(r.total_minor, r.currency)}</span><span class="ok"><span class="stamp ${chip.css}">${chip.label}</span>${r.kind === 'sales' ? ' <span class="stamp muted">Sales invoice</span>' : ''} Received ${day(r.received_at)} · ${extra}</span></li>`;
+          const status =
+            chip.css === 'needs'
+              ? `<span class="stamp needs">${chip.label}</span> `
+              : chip.css === 'muted'
+                ? `${tag(chip.label)} `
+                : '';
+          const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
+          return `<li><a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span></li>`;
         })
         .join('')}</ul>${
         query.offset || more
           ? `<nav class="btns" aria-label="Pages">${query.offset ? `<a class="btn secondary" href="${link(query, { offset: Math.max(0, query.offset - PAGE_SIZE) })}">Newer</a>` : ''}${more ? `<a class="btn secondary" href="${link(query, { offset: query.offset + PAGE_SIZE })}">Older</a>` : ''}</nav>`
           : ''
       }`
-    : filtered || query.offset
+    : query.q
       ? emptyState(
-          'Nothing matches.',
-          'Try another month or search.',
-          '<a class="btn primary" href="/receipts">Show everything</a>',
+          `Nothing matches &#8220;${escape(query.q)}&#8221;.`,
+          `<a class="btn primary" href="${link(query, { q: '' })}">Clear search</a>`,
         )
-      : emptyState(
-          'No receipts yet.',
-          config(env).receiptAddress
-            ? `Forward receipts to <code>${escape(config(env).receiptAddress)}</code> or upload one.`
-            : 'Upload a receipt to start.',
-          uploadForm(config(env).receiptAddress, true),
-        );
-  const recent = query.offset ? '' : recentSection(await recentMail(env));
+      : filtered || query.offset
+        ? emptyState('Nothing here.', '<a class="btn primary" href="/receipts">Show all</a>')
+        : query.month
+          ? emptyState(
+              `Nothing dated ${escape(monthName(query.month, false))}.`,
+              '<a class="btn primary" href="/add">Add receipts</a>',
+            )
+          : emptyState(
+              config(env).receiptAddress
+                ? `No receipts yet. Forward to <code>${escape(config(env).receiptAddress)}</code>.`
+                : 'No receipts yet.',
+              '<a class="btn primary" href="/add">Add receipts</a>',
+            );
   const counts = await navCounts(env);
   const waiting = counts.review
-    ? `<p class="small waiting"><a href="/review">${counts.review} waiting in Review ›</a></p>`
+    ? `<p class="small waiting"><a href="/review">${counts.review} in Review ›</a></p>`
     : '';
+  const add = shown.length ? '<a class="btn secondary" href="/add">Add receipts</a>' : '';
   return page(
-    'All receipts',
-    `${receiptsSegment(counts, 'all')}${senderBanner(params)}${waiting}${chips}${find}${list}${recent}`,
+    query.month ? `Receipts ${query.month}` : 'Receipts',
+    `${receiptsSegment(counts, 'all', query.month)}${senderBanner(params)}${waiting}${chips}${find}${list}`,
     200,
     env,
     {
       nav: 'receipts',
-      head: pageHead('All receipts', {
-        kicker: 'Receipts',
-        sub: 'Every receipt and invoice, newest first.',
-        aside: '<a class="btn secondary" href="/add">Add receipts</a>',
-      }),
+      head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),
     },
   );
 }

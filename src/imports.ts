@@ -55,7 +55,6 @@ const label = (name: string) => LABELS[name] ?? name.replaceAll('_', ' ');
 function options(name: string, values: readonly { value: string; label: string }[], current: unknown): string {
   return `<label>${escape(label(name))}<select name="${name}">${values.map((v) => `<option value="${escape(v.value)}"${v.value === String(current) ? ' selected' : ''}>${escape(v.label)}</option>`).join('')}</select></label>`;
 }
-export const PRESET_HINT = 'Presets match common CSV export layouts. Not affiliated with any bank.';
 // Presets are named after the CSV layout they read, never as a bank product.
 export function presetLabel(p: { id: string; bank_name: string; name: string }): string {
   if (p.id.startsWith('builtin-')) return `${p.bank_name} (CSV layout)`;
@@ -406,7 +405,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
         `<tr><td class="lead">${escape(r.merchant)}</td><td data-label="Row">${record}</td><td data-label="Date">${day(r.booking_date)}</td><td class="n" data-label="Amount">${money(r.amount_minor, r.currency)}</td><td data-label="Currency">${escape(r.currency)}</td></tr>`,
     )
     .join('')}</tbody></table></div>`;
-  const editor = `<details${errors ? ' open' : ''}><summary>The columns look wrong? Adjust how we read the file</summary><div class="body">${hidden('editor', '1')}${hidden('current_preset', shownPresetId)}<div class="fields">${options('preset_id', [{ value: '', label: 'Choose layout' }, { value: 'custom', label: 'Custom mapping' }, ...suggestions.map((p) => ({ value: p.id, label: presetLabel(p) }))], shownPresetId)}</div><p class="muted">${PRESET_HINT}</p>${mappingEditor(mapping, layout.headers, currency, slash === 'yes')}<fieldset><legend>Already imported?</legend><div class="fields">${options(
+  const editor = `<details${errors ? ' open' : ''}><summary>The columns look wrong? Adjust how we read the file</summary><div class="body">${hidden('editor', '1')}${hidden('current_preset', shownPresetId)}<div class="fields">${options('preset_id', [{ value: '', label: 'Choose layout' }, { value: 'custom', label: 'Custom mapping' }, ...suggestions.map((p) => ({ value: p.id, label: presetLabel(p) }))], shownPresetId)}</div>${mappingEditor(mapping, layout.headers, currency, slash === 'yes')}<fieldset><legend>Already imported?</legend><div class="fields">${options(
     'collision',
     [
       { value: '', label: 'Ask me' },
@@ -443,7 +442,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${table}${exclusions}${confirm}${editor}</form>`;
   return page('Check the file', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
     nav: 'bank',
-    head: pageHead('Check the file', { kicker: 'Import a bank statement' }),
+    head: pageHead('Check the file'),
   });
 }
 function fallbackMapping(currency: string): CsvMapping {

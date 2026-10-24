@@ -289,7 +289,7 @@ test('money in is matched to a sales invoice by amount and reference, never to a
     'suggested',
   );
   const page = await (await request(`/receipts/${other.id}`)).text();
-  expect(page).toContain('Is this the payment?');
+  expect(page).toContain('<h2 id="pay-h">Payment?</h2>');
   // Linking money in to an expense receipt is refused.
   const receipt = await env.DB.prepare("SELECT id FROM receipts WHERE kind='expense'").first<string>('id');
   const wrong = new FormData();
@@ -306,16 +306,18 @@ test('money in is matched to a sales invoice by amount and reference, never to a
   expect((await t(loose))!.receipt_id).toBe(other.id);
   const list = await (await request('/invoices?month=2026-09')).text();
   expect(list).toContain('Sample Client GmbH');
-  expect(list.match(/stamp matched">Paid/g)).toHaveLength(2);
+  expect(list.match(/tag ok">Paid/g)).toHaveLength(2);
   // Money in on Payments links to the invoice.
-  expect(await (await request('/payments?month=2026-09')).text()).toContain('View invoice');
+  expect(await (await request('/payments?month=2026-09&show=all')).text()).toContain(
+    `<a class="tag ok" href="/receipts/${other.id}">Invoice</a>`,
+  );
 });
 
 test('overdue and paid outside the bank', async () => {
   const r = await sales(DOMESTIC, 'lasku.txt');
   const home = await (await request('/?month=2026-09')).text();
   expect(home).toContain(
-    '<strong>1 invoice is overdue.</strong> <a href="/invoices?month=2026-09&show=overdue">See it</a>',
+    '<p class="alert" role="note"><a href="/invoices?month=2026-09&show=overdue">1 invoice overdue ›</a></p>',
   );
   expect(await (await request('/invoices?month=2026-10&show=overdue')).text()).toContain('Esimerkki Asiakas Oy');
   const form = new FormData();
@@ -361,8 +363,8 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   });
   // Unpaid doesn't hold the month back...
   let month = await (await request('/?month=2026-09')).text();
-  expect(month).toContain('Money in: invoices dated September');
-  expect(month).not.toContain('need you</span>');
+  expect(month).toContain('1 invoice dated September ›');
+  expect(month).not.toContain('to check</span>');
   // ...an invoice that needs a look does.
   const flagged = await sales(
     REVERSE.replace('Sample Client GmbH', 'Other Client AG')
@@ -374,8 +376,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   );
   expect(flagged.status).toBe('needs_review');
   month = await (await request('/?month=2026-09')).text();
-  expect(month).toContain('1 need you</span>');
-  expect(month).toContain(`/receipts/${flagged.id}`);
+  expect(month).toContain('<a href="/review"><b>Check</b><span class="red">1 to check</span></a>');
   const csv = await request('/export-sales.csv?month=2026-09');
   expect(csv.headers.get('Content-Disposition')).toContain('receipts-sales-2026-09.csv');
   expect((await csv.text()).split('\n').length).toBeGreaterThan(2);
