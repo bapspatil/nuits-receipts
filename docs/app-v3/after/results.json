@@ -15,9 +15,9 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Welcome screen says: Welcome Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare The",
+        "Welcome screen says: Welcome Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare The",
         "Landed on /receipts/:id with title \"Sample Cloud Lantern Oy\"",
-        "Home after the first receipt: Finish setting up 1 of 5 done Done: Business name added So invoices you send are told apart from receipts. Next: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c",
+        "Home after the first receipt: Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare Then forward one receipt to check it. A receipt that arrives by email c",
         "Saved: Saved your accountant."
       ]
     },
@@ -36,7 +36,7 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done Done: Business name added So invoices you send are told apart from receipts. Done: Email Routing confirmed A receipt arrived by email, so it wo",
+        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › Finish setting up 3 of 5 done DONE: Business name added So invoices you send are told apart from receipts. DONE: Email Routing confirmed A receipt arrived by email, so it wo",
         "Review lists 3 receipts.",
         "Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review."
       ]
@@ -87,13 +87,13 @@
       "edits": 0,
       "screens": [
         "/",
-        "/?month=2026-09&done=sent&at=2026-10-24T15%3A57%3A58.207Z"
+        "/?month=2026-09&done=sent&at=2026-10-24T16%3A20%3A41.029Z"
       ],
       "silentPosts": [],
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October Done: Check Done Done: Match Done Next: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be",
+        "Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October DONE: Check Done DONE: Match Done NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be",
         "Downloaded receipts-2026-09.zip"
       ]
     }
@@ -103,7 +103,7 @@
       "name": "receipt-flagged",
       "path": "/receipts/c42a8d8a99bf00264da9a8f8f18927f3ec020414b6995f9b0e9b9208aa7a3df3",
       "viewport": "1440",
-      "viewports": 1.52,
+      "viewports": 1.45,
       "file": "screens/receipt-flagged-1440.png",
       "axe": []
     },
@@ -111,7 +111,7 @@
       "name": "receipt-flagged",
       "path": "/receipts/c42a8d8a99bf00264da9a8f8f18927f3ec020414b6995f9b0e9b9208aa7a3df3",
       "viewport": "390",
-      "viewports": 2.09,
+      "viewports": 2.15,
       "file": "screens/receipt-flagged-390.png",
       "axe": []
     },
@@ -119,7 +119,7 @@
       "name": "home-sep",
       "path": "/?month=2026-09",
       "viewport": "1440",
-      "viewports": 1.26,
+      "viewports": 1.16,
       "file": "screens/home-sep-1440.png",
       "axe": []
     },
@@ -127,7 +127,7 @@
       "name": "home-sep",
       "path": "/?month=2026-09",
       "viewport": "390",
-      "viewports": 1.41,
+      "viewports": 1.49,
       "file": "screens/home-sep-390.png",
       "axe": []
     },
@@ -135,7 +135,7 @@
       "name": "home-arrival",
       "path": "/",
       "viewport": "1440",
-      "viewports": 1.31,
+      "viewports": 1.2,
       "file": "screens/home-arrival-1440.png",
       "axe": []
     },
@@ -143,7 +143,7 @@
       "name": "home-arrival",
       "path": "/",
       "viewport": "390",
-      "viewports": 1.49,
+      "viewports": 1.57,
       "file": "screens/home-arrival-390.png",
       "axe": []
     },
@@ -183,7 +183,7 @@
       "name": "receipts",
       "path": "/receipts?month=2026-09",
       "viewport": "1440",
-      "viewports": 1.38,
+      "viewports": 1.33,
       "file": "screens/receipts-1440.png",
       "axe": []
     },
@@ -191,7 +191,7 @@
       "name": "receipts",
       "path": "/receipts?month=2026-09",
       "viewport": "390",
-      "viewports": 1.52,
+      "viewports": 1.51,
       "file": "screens/receipts-390.png",
       "axe": []
     },
@@ -207,23 +207,23 @@
       "name": "receipt-ready",
       "path": "/receipts/b1b1fd2e7724f34564168696d79536c6a691f678569bd60f03d1d83968e17753",
       "viewport": "390",
-      "viewports": 1.16,
+      "viewports": 1.27,
       "file": "screens/receipt-ready-390.png",
       "axe": []
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/896ce018bb532e17f156740ba4ce692ffc4d5056f971e248dc64db0a91fc1f5d",
+      "path": "/receipts/24fe26cf07d6f50eac4dc9b3cb2691ed1327f57980fabbfd9d60ffac57badd0b",
       "viewport": "1440",
-      "viewports": 1.06,
+      "viewports": 1.02,
       "file": "screens/invoice-paid-1440.png",
       "axe": []
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/896ce018bb532e17f156740ba4ce692ffc4d5056f971e248dc64db0a91fc1f5d",
+      "path": "/receipts/24fe26cf07d6f50eac4dc9b3cb2691ed1327f57980fabbfd9d60ffac57badd0b",
       "viewport": "390",
-      "viewports": 1.59,
+      "viewports": 1.68,
       "file": "screens/invoice-paid-390.png",
       "axe": []
     },
@@ -231,7 +231,7 @@
       "name": "bank",
       "path": "/payments?month=2026-09&show=all",
       "viewport": "1440",
-      "viewports": 1.39,
+      "viewports": 1.27,
       "file": "screens/bank-1440.png",
       "axe": []
     },
@@ -239,7 +239,7 @@
       "name": "bank",
       "path": "/payments?month=2026-09&show=all",
       "viewport": "390",
-      "viewports": 1.47,
+      "viewports": 1.52,
       "file": "screens/bank-390.png",
       "axe": []
     },
@@ -247,7 +247,7 @@
       "name": "import",
       "path": "/import",
       "viewport": "1440",
-      "viewports": 1.06,
+      "viewports": 1.03,
       "file": "screens/import-1440.png",
       "axe": []
     },
@@ -255,7 +255,7 @@
       "name": "import",
       "path": "/import",
       "viewport": "390",
-      "viewports": 1.42,
+      "viewports": 1.43,
       "file": "screens/import-390.png",
       "axe": []
     },
@@ -271,7 +271,7 @@
       "name": "add",
       "path": "/add",
       "viewport": "390",
-      "viewports": 1.06,
+      "viewports": 1.07,
       "file": "screens/add-390.png",
       "axe": []
     },
@@ -311,7 +311,7 @@
       "name": "bank-likely",
       "path": "/payments?month=2026-09&show=missing",
       "viewport": "1440",
-      "viewports": 2.77,
+      "viewports": 2.5,
       "file": "screens/bank-likely-1440.png",
       "axe": []
     },
@@ -319,7 +319,7 @@
       "name": "bank-likely",
       "path": "/payments?month=2026-09&show=missing",
       "viewport": "390",
-      "viewports": 2.98,
+      "viewports": 2.67,
       "file": "screens/bank-likely-390.png",
       "axe": []
     },
@@ -327,7 +327,7 @@
       "name": "help",
       "path": "/help",
       "viewport": "1440",
-      "viewports": 1.66,
+      "viewports": 1.58,
       "file": "screens/help-1440.png",
       "axe": []
     },
@@ -335,7 +335,7 @@
       "name": "help",
       "path": "/help",
       "viewport": "390",
-      "viewports": 2.2,
+      "viewports": 2.24,
       "file": "screens/help-390.png",
       "axe": []
     },
@@ -343,7 +343,7 @@
       "name": "help-flags",
       "path": "/help#flag-missing_vendor",
       "viewport": "1440",
-      "viewports": 1.86,
+      "viewports": 1.78,
       "file": "screens/help-flags-1440.png",
       "axe": []
     },
@@ -351,7 +351,7 @@
       "name": "help-flags",
       "path": "/help#flag-missing_vendor",
       "viewport": "390",
-      "viewports": 2.5,
+      "viewports": 2.55,
       "file": "screens/help-flags-390.png",
       "axe": []
     },
@@ -359,7 +359,7 @@
       "name": "home-setup",
       "path": "/?month=2026-09",
       "viewport": "1440",
-      "viewports": 1.72,
+      "viewports": 1.6,
       "file": "screens/home-setup-1440.png",
       "axe": []
     },
@@ -367,7 +367,7 @@
       "name": "home-setup",
       "path": "/?month=2026-09",
       "viewport": "390",
-      "viewports": 1.93,
+      "viewports": 2.01,
       "file": "screens/home-setup-390.png",
       "axe": []
     }

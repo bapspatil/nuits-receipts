@@ -186,7 +186,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(--text-base)/1.2 var(--font-ui)}
 .plain{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-3)}
 .list{list-style:none;margin:0 0 var(--space-3);padding:0;background:var(--surface-raised);border:1px solid var(--border)}
-.list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 var(--space-4);padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);line-height:1.4}
+.list li{display:grid;align-items:baseline;grid-template-columns:minmax(0,1fr) auto;gap:0 var(--space-4);padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);line-height:1.4}
 .list li:last-child{border-bottom:0}
 .list a{font-weight:600;display:inline-flex;align-items:center;min-height:44px}
 .list .why{color:var(--danger);font-size:var(--text-sm);font-weight:600;grid-column:1}
@@ -196,7 +196,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .chips{display:flex;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-4);padding:0;list-style:none}
 .chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 var(--space-4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);text-decoration:none;font-weight:600;font-size:var(--text-sm);color:var(--text);background:var(--surface-raised)}
 .chips a[aria-current=page]{border-color:var(--accent);background:var(--accent);color:var(--text-on-accent)}
-.held{margin:0 0 var(--space-5)}.held h2,.recent h2{margin:0 0 var(--space-1)}.held>.hint,.recent>.hint{margin:0 0 var(--space-3)}
+.held{margin:0 0 var(--space-5)}.held h2{margin:0 0 var(--space-1)}.held>.hint{margin:0 0 var(--space-3)}
 .held .list li{display:block}.held .who,.held .subj{margin:0;overflow-wrap:anywhere}.held .btns{margin:var(--space-1) 0 0}.held details.more{margin:0}
 .steps{list-style:none;margin:0 0 var(--space-4);padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface-raised);border:1px solid var(--border)}
 .steps li{border-left:1px solid var(--border);border-top:3px solid transparent}
@@ -215,11 +215,12 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .setup .steps{display:block;margin-bottom:var(--space-2)}
 .setup .steps li,.setup .steps li:first-child{border-left:0;border-top:0;border-bottom:1px solid var(--border)}
 .setup .steps li:last-child{border-bottom:0}
+.setup .steps .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .setup .steps a{display:grid;grid-template-columns:16px minmax(0,1fr) auto;column-gap:var(--space-3);row-gap:2px;align-items:center;height:auto;padding:var(--space-2) var(--space-4);min-height:var(--row-height)}
 .setup .steps a::before{content:"";grid-row:1/3;width:12px;height:12px;border:2px solid var(--text-muted);border-radius:50%}
 .setup .steps .now a::before{border-color:var(--accent)}
 .setup .steps .done a::before{border-color:var(--success);background:var(--success)}
-.setup .steps a::after{position:static;grid-row:1/3;grid-column:3}
+.setup .steps a::after{position:static;grid-row:1/3;grid-column:3;align-self:center}
 .setup .steps b{grid-column:2;font:600 var(--text-base)/1.3 var(--font-ui)}
 .setup .steps span:not(.vh){grid-column:2;font-weight:400}
 .setup .steps .done b{font-weight:500;color:var(--text-muted)}
@@ -260,7 +261,7 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .sbar>.btn:last-child{margin-left:auto}
 .sbar>.linkbtn{padding:0 var(--space-2)}
 .sbar>details{border:0;background:none;margin:0;border-radius:0}
-.sbar>details>summary{display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);list-style:none;color:var(--text-muted)}
+.sbar>details>summary{font-size:var(--text-sm);font-weight:600;display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);list-style:none;color:var(--text-muted)}
 .sbar>details>summary::-webkit-details-marker{display:none}
 .sbar>details>.body{position:absolute;left:0;right:0;bottom:100%;max-height:60vh;overflow:auto;background:var(--surface-raised);border:1px solid var(--border-strong);padding:var(--space-3) var(--space-4)}
 .fix{padding-bottom:var(--space-4)}
