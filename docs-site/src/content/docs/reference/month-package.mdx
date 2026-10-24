@@ -123,7 +123,7 @@ Rows are payments out (negative amounts) from completed imports, booked in the m
 
 | Item | Value |
 | --- | --- |
-| Button | **Mark as sent** |
+| Button | **Mark September as sent** (with the month's name), under "Did you send it?" |
 | Request | `POST /month/sent` |
 | Recorded | One row in `month_sends`: time, method (`download` or `onedrive`), number of documents, EUR total of expense receipts, and the sorted list of `id:revision` for every non-duplicate document dated in the month, with its SHA-256. |
 | Refused when | No documents are dated in the month, or the month changed since the page was opened (HTTP 409). |
