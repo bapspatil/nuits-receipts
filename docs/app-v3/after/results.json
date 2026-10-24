@@ -12,7 +12,7 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Welcome screen says: Welcome Business Done Email Done Accountant Set up Receipt (PDF or photo) Upload Add several Or forward to receipts@example.com",
+        "Welcome screen says: Welcome Done: Business Done Done: Email Done To do: Accountant Set up Receipt (PDF or photo) Upload Add several Or forward to receipts@example.com",
         "Landed on /receipts/:id with title \"Sample Cloud Lantern Oy\"",
         "No accountant step on Home after the first receipt."
       ]
@@ -32,7 +32,7 @@
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home on arrival (current month): ‹ Sep October 2026 Nov › Check Nothing yet Match No statement Send Nothing yet Add receipts",
+        "Home on arrival (oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. 2 receipts need you. · Go to October Next: Check 2 to check, 1 undated To do: Match No statement To do: Send Not ready Check receipts Download anyw",
         "Review lists 3 receipts.",
         "Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review."
       ]
@@ -61,14 +61,13 @@
     },
     {
       "journey": "e. Sales invoice added, money in matched",
-      "clicks": 6,
+      "clicks": 5,
       "edits": 1,
       "screens": [
         "/receipts",
         "/invoices",
         "/add?kind=sales",
-        "/payments",
-        "/payments?month=2026-09"
+        "/payments"
       ],
       "silentPosts": [],
       "deadEnds": [],
@@ -80,18 +79,17 @@
     },
     {
       "journey": "c. September closed and marked sent",
-      "clicks": 4,
+      "clicks": 3,
       "edits": 0,
       "screens": [
         "/",
-        "/?month=2026-09",
-        "/?month=2026-09&done=sent"
+        "/?month=2026-09&done=sent&at=2026-10-24T15%3A35%3A34.531Z"
       ],
       "silentPosts": [],
       "deadEnds": [],
       "inlineErrors": [],
       "notes": [
-        "Home for September: ‹ Aug September 2026 Oct › Check Done Match Done Send Ready Spent EUR 250.22 Download ZIP (4 KB) Mark as sent CSV Check every row before sending this to your accountant. In the ZIP By part 6 receipts,",
+        "Home on arrival (September, the oldest month not sent): ‹ Aug September 2026 Oct › September isn't sent yet. It is ready to send. · Go to October Done: Check Done Done: Match Done Next: Send Ready Spent EUR 250.22 Download ZIP (4 KB) CSV Check every row be",
         "Downloaded receipts-2026-09.zip"
       ]
     }
@@ -117,7 +115,7 @@
       "name": "home-sep",
       "path": "/?month=2026-09",
       "viewport": "1440",
-      "viewports": 1.16,
+      "viewports": 1.26,
       "file": "screens/home-sep-1440.png",
       "axe": []
     },
@@ -125,13 +123,29 @@
       "name": "home-sep",
       "path": "/?month=2026-09",
       "viewport": "390",
-      "viewports": 1.37,
+      "viewports": 1.41,
       "file": "screens/home-sep-390.png",
       "axe": []
     },
     {
-      "name": "home-oct",
+      "name": "home-arrival",
       "path": "/",
+      "viewport": "1440",
+      "viewports": 1.31,
+      "file": "screens/home-arrival-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-arrival",
+      "path": "/",
+      "viewport": "390",
+      "viewports": 1.49,
+      "file": "screens/home-arrival-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-oct",
+      "path": "/?month=2026-10",
       "viewport": "1440",
       "viewports": 1,
       "file": "screens/home-oct-1440.png",
@@ -139,7 +153,7 @@
     },
     {
       "name": "home-oct",
-      "path": "/",
+      "path": "/?month=2026-10",
       "viewport": "390",
       "viewports": 1,
       "file": "screens/home-oct-390.png",
@@ -165,7 +179,7 @@
       "name": "receipts",
       "path": "/receipts?month=2026-09",
       "viewport": "1440",
-      "viewports": 1.47,
+      "viewports": 1.38,
       "file": "screens/receipts-1440.png",
       "axe": []
     },
@@ -173,7 +187,7 @@
       "name": "receipts",
       "path": "/receipts?month=2026-09",
       "viewport": "390",
-      "viewports": 1.61,
+      "viewports": 1.52,
       "file": "screens/receipts-390.png",
       "axe": []
     },
@@ -195,7 +209,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/12214629f9034bfdfb0afd3018273a87838e72f421a74a5a14bd071f81e0f930",
+      "path": "/receipts/624c99d268e8781e86368c4a4f0b9c752a5801816200617e75565a1b4c448a6b",
       "viewport": "1440",
       "viewports": 1.06,
       "file": "screens/invoice-paid-1440.png",
@@ -203,7 +217,7 @@
     },
     {
       "name": "invoice-paid",
-      "path": "/receipts/12214629f9034bfdfb0afd3018273a87838e72f421a74a5a14bd071f81e0f930",
+      "path": "/receipts/624c99d268e8781e86368c4a4f0b9c752a5801816200617e75565a1b4c448a6b",
       "viewport": "390",
       "viewports": 1.59,
       "file": "screens/invoice-paid-390.png",
