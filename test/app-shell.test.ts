@@ -665,8 +665,10 @@ test('rarely used things sit behind one More per object, named for screen reader
   const bank = await (await request('/payments?month=2026-09&show=all')).text();
   expect(bank).not.toContain('Technical details');
   const more = [...bank.matchAll(/<details class="more"><summary aria-label="More for ([^"]+)">More<\/summary>/g)];
-  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop', 'Fake Customer']);
-  // Remove match and the payment ID wait in More; the row shows only the receipt link.
+  // A row has a More only when it has an action to hide; the payment ID is not shown at all.
+  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy']);
+  expect(bank).not.toMatch(/ID <code>/);
+  // Remove match waits in More; the row shows only the receipt link.
   const matchedRow = bank.match(/<li class="pay">[\s\S]*?<\/li>/)![0];
   expect(matchedRow).toMatch(/<details class="more">[\s\S]*value="unlink">Remove match<\/button>/);
   // Bank opens on Missing; the footer trio and the Transfers section are gone.

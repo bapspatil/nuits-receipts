@@ -651,12 +651,12 @@ export async function payments(
   const shown = show === 'missing' ? missing : rows;
   const exact =
     '<label class="check"><input type="checkbox" name="confirm_exception" value="yes">Not exact, still this</label>';
+  // Which account a payment came from matters only when there is more than one.
+  const accounts = new Set(rows.map((t) => t.account_key));
   const items = shown
     .map((t) => {
       const pair = paired.get(t.id);
-      const extra: string[] = [
-        `<p class="hint">${escape(t.account_name)}${t.bank_name ? ` · ${escape(t.bank_name)}` : ''} · ID <code>${t.id}</code></p>`,
-      ];
+      const extra: string[] = [];
       let status: string,
         controls = '';
       if (pair) {
@@ -705,7 +705,7 @@ export async function payments(
             `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span> ${status}</span>${more(extra.join(''), escape(t.merchant))}</div>${controls}</li>`;
+      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}</span>${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''} ${status}</span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
     })
     .join('');
   const others = elsewhere.length
