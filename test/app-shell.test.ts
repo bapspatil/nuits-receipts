@@ -244,7 +244,7 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(phone).toMatch(/nav\.tabs\{display:block;position:fixed;[^}]*bottom:0/);
   expect(phone).toMatch(/nav\.tabs a\{[^}]*min-height:3\.5rem/);
   expect(phone).toContain('env(safe-area-inset-bottom)');
-  expect(phone).toContain('body{padding-bottom:var(--tabs)}');
+  expect(phone).toContain('body{padding-bottom:var(--tabbar-height)}');
   expect(phone).toContain('html{scroll-padding-bottom:');
   expect(phone).toContain('textarea:focus) :is(nav.tabs,.fix .actions){display:none}');
   expect(phone).not.toContain(':hover');
@@ -382,8 +382,8 @@ test('flagged fields are one compact row: the question labels the input, its sen
   // Phones keep Approve above the tab bar, never over the focused field: it hides while typing,
   // and scrolling into view leaves room for it.
   const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
-  expect(phone).toContain('.fix .actions{position:sticky;bottom:var(--tabs);');
-  expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabs) + 88px)}');
+  expect(phone).toContain('.fix .actions{position:sticky;bottom:var(--tabbar-height);');
+  expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
   expect(html).not.toMatch(/\n\.actions\{[^}]*position:sticky/);
 });
 
@@ -678,21 +678,24 @@ test('rarely used things sit behind one More per object, named for screen reader
 test('one type and spacing scale, 44px targets, and a footer clear of the tab bar', async () => {
   const html = await (await request('/')).text();
   const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
-  expect(css).toContain('h1{font-size:1.75rem;');
-  expect(css).toMatch(/@media \(max-width:640px\)\{[\s\S]*h1\{font-size:1\.5rem\}/);
-  expect(css).toContain('h2{font-size:1.125rem;');
-  expect(css).toContain('font:400 1rem/1.5 var(--ui)');
-  // No text under 12px.
+  expect(css).toContain('h1{font-size:var(--text-2xl);');
+  expect(css).toMatch(/@media \(max-width:640px\)\{[\s\S]*h1\{font-size:var\(--text-xl\)\}/);
+  expect(css).toContain('h2{font-size:var(--text-lg);');
+  expect(css).toContain('font:400 var(--text-base)/1.5 var(--font-ui)');
+  // No text under 12px, in the type tokens or in a raw length.
+  for (const [, size] of css.matchAll(/--text-\w+:([\d.]+)rem/g)) expect(Number(size)).toBeGreaterThanOrEqual(0.75);
   for (const [, size] of css.matchAll(/font(?:-size)?:(?:\d+ )?\.(\d+)rem/g))
     expect(Number(`0.${size}`)).toBeGreaterThanOrEqual(0.75);
+  // Spacing comes from --space-1..8; the only raw lengths left are a hairline and one negative nudge.
+  expect([...css.matchAll(/--space-\d:(\d+)px/g)].map((m) => Number(m[1]))).toEqual([4, 8, 12, 16, 24, 32, 48, 64]);
   const spacing = new Set<number>();
   for (const [, value] of css.matchAll(/(?<![\w-])(?:padding|margin|gap)(?:-(?:top|right|bottom|left))?:([^;}]+)/g))
     for (const [, px] of value!.matchAll(/(?:^|[\s(,-])(\d+)px/g)) spacing.add(Number(px));
-  expect([...spacing].sort((a, b) => a - b)).toEqual([1, 4, 8, 12, 16, 24, 32, 48]);
+  expect([...spacing].sort((a, b) => a - b)).toEqual([1, 12]);
   for (const rule of ['label.check{', '.list a{', '.why>summary{', '.chips a{'])
     expect(css.slice(css.indexOf(rule)).split('}')[0], rule).toContain('min-height:44px');
   // Chip borders reach 3:1 against the page.
-  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--ink-soft)');
+  expect(css.slice(css.indexOf('.chips a{')).split('}')[0]).toContain('border:1px solid var(--text-muted)');
   expect(css).not.toContain('.kicker');
 });
 
