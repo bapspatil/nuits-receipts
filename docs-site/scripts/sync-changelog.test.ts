@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { docsChangelog, topVersion } from "./sync-changelog.mjs";
 
 const SOURCE = `# Changelog
@@ -34,4 +36,16 @@ test("the newest entry version is read from the heading, with or without a link"
   expect(topVersion(SOURCE)).toBe("1.0.1");
   expect(topVersion("## 2.3.4 (2026-01-01)\n")).toBe("2.3.4");
   expect(topVersion("# Changelog\n")).toBeNull();
+});
+
+// Byte snapshots taken from the script before it moved its link rules into
+// scripts/changelog-parse.mjs. The docs page must not change by a byte.
+const fixture = (name: string) => readFileSync(join(import.meta.dir, "__fixtures__", name), "utf8");
+
+test("the docs page for CHANGELOG.md at 1.12.2 is byte for byte the pre-refactor output", () => {
+  expect(docsChangelog(fixture("CHANGELOG-1.12.2.md"))).toBe(fixture("docs-changelog.expected.mdx"));
+});
+
+test("the docs page for the inline fixture is byte for byte the pre-refactor output", () => {
+  expect(docsChangelog(SOURCE)).toBe(fixture("docs-changelog-inline.expected.mdx"));
 });
