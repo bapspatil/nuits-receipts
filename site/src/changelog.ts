@@ -24,6 +24,7 @@ const peek = scrub.querySelector<HTMLElement>(".scrub-peek")!;
 const older = document.querySelector<HTMLAnchorElement>(".turn-older")!;
 const newer = document.querySelector<HTMLAnchorElement>(".turn-newer")!;
 const live = document.querySelector<HTMLElement>("[data-live]")!;
+const wideQuery = matchMedia("(min-width: 64rem) and (min-height: 37.5rem)");
 const untilFound = "onbeforematch" in document.body;
 
 let current = 0;
@@ -155,8 +156,11 @@ function format(): "avif" | "webp" {
   return ext ?? "avif";
 }
 
+// The art a spread shows here: phones get the small strip, as in the
+// <picture> (scripts/changelog-book.mjs).
 export function artUrl(i: number) {
-  return `${spreads[i].dataset.art}.${format()}`;
+  const { art, small } = spreads[i].dataset;
+  return `${art}${small && !wideQuery.matches ? `-${small}` : ""}.${format()}`;
 }
 
 function prefetchAround(i: number) {
@@ -254,7 +258,6 @@ book.addEventListener("beforematch", (e) => {
 // pointer; letting go opens it. Only thumbnails load while dragging.
 const peekImg = peek.querySelector("img")!;
 const peekV = peek.querySelector<HTMLElement>(".scrub-peek-v")!;
-const wideQuery = matchMedia("(min-width: 64rem) and (min-height: 37.5rem)");
 function showPeek(a: HTMLAnchorElement | null) {
   if (!a || !wideQuery.matches) return void (peek.hidden = true);
   const i = Number(a.dataset.i);

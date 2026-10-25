@@ -1,24 +1,191 @@
 {
-  "_comment": "Changelog art. Sources live in site/art/, scripts/changelog-art.mjs writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. A release with a strip gets it on the left page; every other release gets a one-panel SLIP card picked by the kind of change. Titles are optional; without one the first entry is the title. Overlay items (sfx, stamp) are drawn over the art as HTML, x and y in percent of the art.",
+  "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. A release with a strip gets it on the left page; every other release gets a one-panel SLIP card picked by the kind of change. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
   "strips": {
+    "1.12.4": {
+      "src": "strip-1.12.4.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt taps its foot by the database among hourglasses, presses one big button, then leans on the database, relaxed.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "TAP TAP",
+          "x": 45,
+          "y": 23,
+          "r": -8,
+          "s": 0.7
+        },
+        {
+          "type": "sfx",
+          "text": "KLIK!",
+          "x": 70,
+          "y": 37,
+          "r": -10
+        },
+        {
+          "type": "bubble",
+          "text": "About one wait per page.",
+          "x": 19,
+          "y": 71,
+          "w": 24
+        }
+      ]
+    },
     "1.12.3": {
       "src": "strip-1.12.3.png",
-      "alt": "Manga strip: SLIP the receipt runs back and forth to the database, then makes one trip and finds the next tabs already waiting.",
-      "overlay": []
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt runs back and forth between a page and the database, then makes one trip, and the next tabs are already waiting.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HUFF HUFF",
+          "x": 21,
+          "y": 24,
+          "r": -8,
+          "s": 0.65
+        },
+        {
+          "type": "sfx",
+          "text": "ZIP!",
+          "x": 13,
+          "y": 51,
+          "r": -12
+        },
+        {
+          "type": "sfx",
+          "text": "FETCHED!",
+          "x": 74,
+          "y": 60,
+          "r": 6,
+          "s": 0.75
+        },
+        {
+          "type": "bubble",
+          "text": "Pages load faster now.",
+          "x": 28,
+          "y": 74,
+          "w": 30
+        }
+      ]
+    },
+    "1.12.2": {
+      "src": "strip-1.12.2.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt squints at a crowded phone screen, spaces the buttons out with a ruler, then taps one big button happily.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SQUINT",
+          "x": 11,
+          "y": 16,
+          "r": -10,
+          "s": 0.5
+        },
+        {
+          "type": "sfx",
+          "text": "SHFF!",
+          "x": 20,
+          "y": 38,
+          "r": -10
+        },
+        {
+          "type": "sfx",
+          "text": "TAP!",
+          "x": 77,
+          "y": 73,
+          "r": 8,
+          "s": 0.8
+        },
+        {
+          "type": "bubble",
+          "text": "Easy to tap.",
+          "x": 13,
+          "y": 69.5,
+          "w": 15,
+          "s": 0.8
+        }
+      ]
     }
   },
   "cards": {
-    "src": "mascot-sheet.png",
+    "src": "slip-sheet.png",
     "panels": {
-      "neutral": { "crop": [26, 151, 472, 403], "label": [0, 0, 172, 56], "alt": "SLIP the receipt, standing calm." },
-      "proud": { "crop": [524, 151, 473, 403], "label": [0, 0, 140, 56], "alt": "SLIP the receipt, fist up, proud." },
-      "shocked": { "crop": [26, 580, 472, 417], "label": [0, 0, 152, 56], "alt": "SLIP the receipt, shocked." },
-      "sweating": { "crop": [524, 580, 473, 417], "label": [0, 0, 180, 56], "alt": "SLIP the receipt, running and sweating." },
-      "smug": { "crop": [26, 1024, 472, 488], "label": [0, 0, 112, 56], "alt": "SLIP the receipt, arms crossed, smug." },
-      "sleepy": { "crop": [524, 1024, 473, 488], "label": [0, 0, 152, 56], "alt": "SLIP the receipt, sleepy." }
+      "neutral": {
+        "crop": [
+          22,
+          21,
+          482,
+          445
+        ],
+        "alt": "SLIP the receipt, standing calm."
+      },
+      "proud": {
+        "crop": [
+          520,
+          21,
+          482,
+          445
+        ],
+        "alt": "SLIP the receipt, fist up, proud."
+      },
+      "shocked": {
+        "crop": [
+          22,
+          487,
+          482,
+          475
+        ],
+        "alt": "SLIP the receipt, shocked."
+      },
+      "sweating": {
+        "crop": [
+          520,
+          487,
+          482,
+          475
+        ],
+        "alt": "SLIP the receipt, running and sweating."
+      },
+      "smug": {
+        "crop": [
+          22,
+          982,
+          482,
+          513
+        ],
+        "alt": "SLIP the receipt, arms crossed, smug."
+      },
+      "sleepy": {
+        "crop": [
+          520,
+          982,
+          482,
+          513
+        ],
+        "alt": "SLIP the receipt, sleepy."
+      }
     },
-    "byKind": { "features": "proud", "breaking": "shocked", "hotfixes": "sweating", "fixes": "smug", "ui": "neutral", "docs": "sleepy", "other": "neutral" },
-    "sfx": { "features": "KA-CHUNK!", "breaking": "KRAK!", "hotfixes": "TAK!", "fixes": "TAK!", "ui": "SHFF!", "docs": "FLIP!", "other": "TA-DA!" }
+    "byKind": {
+      "features": "proud",
+      "breaking": "shocked",
+      "hotfixes": "sweating",
+      "fixes": "smug",
+      "ui": "neutral",
+      "docs": "sleepy",
+      "other": "neutral"
+    },
+    "sfx": {
+      "features": "KA-CHUNK!",
+      "breaking": "KRAK!",
+      "hotfixes": "TAK!",
+      "fixes": "TAK!",
+      "ui": "SHFF!",
+      "docs": "FLIP!",
+      "other": "TA-DA!"
+    },
+    "palette": true
   },
   "titles": {
     "1.12.4": "Fewer waits",
