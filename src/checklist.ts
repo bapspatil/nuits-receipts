@@ -20,20 +20,20 @@ export type SetupStep = {
 
 export async function setupSteps(env: Env): Promise<SetupStep[]> {
   const settings = config(env);
-  const [accounts, state] = await Promise.all([
+  const [accounts, state, logged] = await Promise.all([
     listAccounts(env.DB),
     env.DB.prepare(
       "SELECT EXISTS(SELECT 1 FROM receipts WHERE source='email') mail, EXISTS(SELECT 1 FROM imports WHERE status='complete') statement",
     ).first<{ mail: number; statement: number }>(),
+    // Email Routing can't be asked of Cloudflare, so an email that reached the app is the proof, even one that was not kept.
+    // The log has a row for every email that arrived, kept or not. Missing before its migration.
+    env.DB.prepare('SELECT EXISTS(SELECT 1 FROM inbound_mail) n')
+      .first<number>('n')
+      .catch(() => 0),
   ]);
   const address = !!settings.receiptAddress;
   // The migration seeds one account, "Bank account"; until it is renamed or another is added, the person has none of their own.
   const own = accounts.some((a) => !(a.id === 'default-account' && a.label === 'Bank account' && !a.bank_name));
-  // Email Routing can't be asked of Cloudflare, so an email that reached the app is the proof, even one that was not kept.
-  // The log has a row for every email that arrived, kept or not. Missing before its migration.
-  const logged = await env.DB.prepare('SELECT EXISTS(SELECT 1 FROM inbound_mail) n')
-    .first<number>('n')
-    .catch(() => 0);
   const routed = address && (!!state?.mail || !!logged);
   return [
     {

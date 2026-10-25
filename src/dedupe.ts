@@ -60,7 +60,7 @@ export function planGroup(rows: readonly Receipt[], matched: ReadonlySet<string>
   return merges;
 }
 
-async function matchedIds(env: Env): Promise<Set<string>> {
+export async function matchedIds(env: Env): Promise<Set<string>> {
   const rows = await env.DB.prepare(
     'SELECT DISTINCT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL',
   ).all<{
@@ -152,13 +152,16 @@ export async function settleEmailRows(env: Env, emailKey: string, ids: readonly 
 
 // Rows made before one-row-per-email: per source email first, then the same
 // charge across emails. Dry run for the Review page's count.
-export async function mergePlan(env: Env): Promise<Merge[]> {
-  const rows = (
-    await env.DB.prepare(
+// known: the matched ids when the caller is already loading them.
+export async function mergePlan(env: Env, known?: Promise<Set<string>>): Promise<Merge[]> {
+  const [rows, matched] = await Promise.all([
+    env.DB.prepare(
       `SELECT * FROM receipts WHERE duplicate_of IS NULL AND discarded_at IS NULL AND ${SETTLED} ORDER BY received_at,id`,
-    ).all<Receipt>()
-  ).results;
-  const matched = await matchedIds(env);
+    )
+      .all<Receipt>()
+      .then((r) => r.results),
+    known ?? matchedIds(env),
+  ]);
   const merges: Merge[] = [],
     hidden = new Set<string>();
   const byEmail = new Map<string, Receipt[]>();

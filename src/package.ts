@@ -165,14 +165,17 @@ export function query(month: string, o: Partial<PackageOptions>): string {
 // "Sent" is tracked over every non-duplicate document dated in the month
 // (receipts and sales invoices), by id and revision. A correction bumps the
 // revision, so it shows as changed.
-export async function sendStatus(env: Env, month: string, rows?: Receipt[]): Promise<SendStatus> {
-  rows ??= await documentRows(env, month);
-  const list = rows.map((r) => `${r.id}:${r.revision}`).sort();
-  const row = await env.DB.prepare(
-    'SELECT sent_at,method,file_count,receipts_hash,receipts_json FROM month_sends WHERE month=? ORDER BY sent_at DESC LIMIT 1',
-  )
-    .bind(month)
-    .first<{ sent_at: string; method: string; file_count: number; receipts_hash: string; receipts_json: string }>();
+// rows may still be loading: the last send is looked up alongside.
+export async function sendStatus(env: Env, month: string, rows?: Receipt[] | Promise<Receipt[]>): Promise<SendStatus> {
+  const [docs, row] = await Promise.all([
+    rows ?? documentRows(env, month),
+    env.DB.prepare(
+      'SELECT sent_at,method,file_count,receipts_hash,receipts_json FROM month_sends WHERE month=? ORDER BY sent_at DESC LIMIT 1',
+    )
+      .bind(month)
+      .first<{ sent_at: string; method: string; file_count: number; receipts_hash: string; receipts_json: string }>(),
+  ]);
+  const list = docs.map((r) => `${r.id}:${r.revision}`).sort();
   const digest = await hash(list.join('\n'));
   if (!row) return { hash: digest, list, last: null, changed: false, added: 0, corrected: 0, removed: 0 };
   const last = {
@@ -194,19 +197,29 @@ export async function sendStatus(env: Env, month: string, rows?: Receipt[]): Pro
   };
 }
 
-export async function planPackage(
-  env: Env,
-  month: string,
-  o: PackageOptions,
-  { sizes = false, rows }: { sizes?: boolean; rows?: Receipt[] } = {},
-): Promise<Plan> {
-  rows ??= await documentRows(env, month);
-  const undatedRows = (
+// Documents with no date yet, which belong to no month.
+export async function undatedDocuments(env: Env): Promise<Receipt[]> {
+  return (
     await env.DB.prepare(
       'SELECT * FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY received_at,id',
     ).all<Receipt>()
   ).results;
-  const send = await sendStatus(env, month, rows);
+}
+export async function planPackage(
+  env: Env,
+  month: string,
+  o: PackageOptions,
+  // rows and send: the month's documents and send status, when the caller has them already.
+  {
+    sizes = false,
+    rows,
+    send: known,
+    undated,
+  }: { sizes?: boolean; rows?: Receipt[]; send?: SendStatus; undated?: Promise<Receipt[]> } = {},
+): Promise<Plan> {
+  const undatedQuery = undated ?? undatedDocuments(env);
+  rows ??= await documentRows(env, month);
+  const [undatedRows, send] = await Promise.all([undatedQuery, known ?? sendStatus(env, month, rows)]);
   const sent = new Set(send.last?.list ?? []);
   const isChanged = (r: Receipt) => !sent.has(`${r.id}:${r.revision}`);
   const candidates = [...rows, ...(o.undated ? undatedRows : [])];

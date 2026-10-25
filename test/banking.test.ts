@@ -7,6 +7,7 @@ import {
   eurValue,
   eurValues,
   importBankCsv,
+  monthEurValues,
   importIdentity,
   parsePreset,
   reconcile,
@@ -279,6 +280,7 @@ test('eurValues answers a whole list in one call, the same as eurValue row by ro
   const matched = await receipt();
   await importCsv();
   const usd = await seed({
+    issue_date: '2026-09-05',
     currency: 'USD',
     total_minor: 2000,
     fx_requested_date: '2026-09-05',
@@ -287,7 +289,12 @@ test('eurValues answers a whole list in one call, the same as eurValue row by ro
   await env.DB.prepare(
     "INSERT INTO fx_rates VALUES ('USD','2026-09-05','2026-09-04','0.9','synthetic','2026-09-06')",
   ).run();
-  const unrated = await seed({ currency: 'USD', total_minor: 500, fx_requested_date: '2026-09-09' });
+  const unrated = await seed({
+    issue_date: '2026-09-09',
+    currency: 'USD',
+    total_minor: 500,
+    fx_requested_date: '2026-09-09',
+  });
   const native = await seed({});
   // The matched row twice: duplicates in the list each get their own answer.
   const fresh = await Promise.all([matched, usd, unrated, native, matched].map((r) => getReceipt(env, r.id)));
@@ -298,4 +305,8 @@ test('eurValues answers a whole list in one call, the same as eurValue row by ro
   expect(all[1]).toMatchObject({ minor: 1800, rateDate: '2026-09-04', transaction: null });
   expect(all[2]!.rateDate).toBeNull();
   expect(await eurValues(env, [])).toEqual([]);
+  // Looked up by month, for the rows dated in it, the answer is the same.
+  const september = fresh.filter((r) => r.issue_date?.startsWith('2026-09'));
+  expect(september.map((r) => r.id)).toEqual([matched.id, usd.id, unrated.id, matched.id]);
+  expect((await monthEurValues(env, '2026-09'))(september)).toEqual(await eurValues(env, september));
 });

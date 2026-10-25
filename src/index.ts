@@ -36,7 +36,7 @@ import { importPreview, confirmImport } from './imports';
 import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
-import { FIELD, withSettings, type SettingKey } from './settings';
+import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
 import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
@@ -174,6 +174,16 @@ async function transferRow(env: Env, debitId: string): Promise<{ to: string; nam
   };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
+// Where this browser's last request left the database (see fetch).
+const BOOKMARK = '__Host-d1';
+const BOOKMARK_SHAPE = /^[0-9a-f-]{1,200}$/i;
+function cookie(request: Request, name: string): string | null {
+  for (const part of (request.headers.get('Cookie') ?? '').split(';')) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === name) return value.join('=');
+  }
+  return null;
+}
 // Pages that always render the tab bar, so their counts can start early.
 const TAB_PAGES = new Set([
   '/',
@@ -328,7 +338,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'GET' && path === '/payments')
     return payments(
       env,
-      url.searchParams.has('month') ? month(url.searchParams.get('month')) : (await arrivalMonth(env)).month,
+      url.searchParams.has('month') ? month(url.searchParams.get('month')) : arrivalMonth(env).then((a) => a.month),
       offset,
       url.searchParams,
     );
@@ -827,6 +837,41 @@ function rebase(response: Response, base: string): Response {
     .on('[src]', attribute('src'))
     .transform(response);
 }
+// One request with its settings in place, before the shared headers.
+async function serve(request: Request, env: Env, ctx?: Waiter): Promise<Response> {
+  let response: Response,
+    inner: Request | null = null,
+    state: RequestState | undefined;
+  const pending: Promise<unknown>[] = [];
+  const signs = signer(env);
+  const waiter: Waiter = ctx ?? { waitUntil: (promise) => void pending.push(promise) };
+  try {
+    const base = config(env).basePath;
+    const stripped = base ? stripBase(request, base) : request;
+    // A ?done= link that isn't genuine and fresh is dropped before any page sees it.
+    const checked = stripped ? await signs.verify(new URL(stripped.url)) : null;
+    inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
+    // The query reaches the page shell (the feedback banner) through the request's own store.
+    const own = inner;
+    if (own) state = { params: new URL(own.url).searchParams };
+    response =
+      own && state
+        ? await requestState.run(state, () => route(own, env, base, waiter))
+        : new Response('Not found', { status: 404 });
+    const location = response.headers.get('Location');
+    if (location?.includes('done=')) {
+      const headers = new Headers(response.headers);
+      headers.set('Location', await signedLocation(signs, location));
+      response = new Response(null, { status: response.status, headers });
+    }
+    await Promise.allSettled(pending);
+    if (base) response = rebase(new Response(response.body, response), base);
+  } catch (error) {
+    response = (inner && state && (await redisplay(inner, env, state, error))) || (await failure(request, env, error));
+  }
+  return response;
+}
+
 export default {
   // In-app settings are layered over env once per message and per request.
   async email(message: Parameters<typeof receiveEmail>[0], env: Env, ctx: ExecutionContext): Promise<void> {
@@ -835,38 +880,29 @@ export default {
   // ctx is optional so tests can call fetch(request, env); work handed to
   // waitUntil then finishes before the response is returned.
   async fetch(request: Request, deploy: Env, ctx?: Waiter): Promise<Response> {
-    let response: Response,
-      inner: Request | null = null,
-      state: RequestState | undefined;
-    const env = await withSettings(deploy);
-    const pending: Promise<unknown>[] = [];
-    const signs = signer(env);
-    const waiter: Waiter = ctx ?? { waitUntil: (promise) => void pending.push(promise) };
-    try {
-      const base = config(env).basePath;
-      const stripped = base ? stripBase(request, base) : request;
-      // A ?done= link that isn't genuine and fresh is dropped before any page sees it.
-      const checked = stripped ? await signs.verify(new URL(stripped.url)) : null;
-      inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
-      // The query reaches the page shell (the feedback banner) through the request's own store.
-      const own = inner;
-      if (own) state = { params: new URL(own.url).searchParams };
-      response =
-        own && state
-          ? await requestState.run(state, () => route(own, env, base, waiter))
-          : new Response('Not found', { status: 404 });
-      const location = response.headers.get('Location');
-      if (location?.includes('done=')) {
-        const headers = new Headers(response.headers);
-        headers.set('Location', await signedLocation(signs, location));
-        response = new Response(null, { status: response.status, headers });
-      }
-      await Promise.allSettled(pending);
-      if (base) response = rebase(new Response(response.body, response), base);
-    } catch (error) {
-      response =
-        (inner && state && (await redisplay(inner, env, state, error))) || (await failure(request, env, error));
-    }
+    // A read starts on the settings this isolate read last while they are read
+    // again alongside; if they changed, the read is served again with the new
+    // ones. Writes, and the OneDrive steps (which are not plain reads), always
+    // wait for the fresh read.
+    const read = request.method === 'GET' || request.method === 'HEAD';
+    // D1 read replication: a read may start on the nearest replica, a write
+    // starts on the primary, and the bookmark cookie carries on from the last
+    // response so a page always shows what the request before it saved. With
+    // replication off, every query goes to the primary as before.
+    const bookmark = cookie(request, BOOKMARK);
+    const session = deploy.DB.withSession(
+      bookmark && BOOKMARK_SHAPE.test(bookmark) ? bookmark : read ? 'first-unconstrained' : 'first-primary',
+    );
+    const own = withDatabase(deploy, session as unknown as D1Database);
+    const quick = read && !new URL(request.url).pathname.includes('/onedrive/') ? cachedSettings(own) : null;
+    const fresh = quick ? freshSettings(own) : null;
+    let response = await serve(request, quick?.env ?? (await withSettings(own)), ctx);
+    const current = await fresh;
+    // The first response is dropped unread; a stream that is never read never runs.
+    if (quick && current && current.signature !== quick.signature) response = await serve(request, current.env, ctx);
+    const mark = session.getBookmark();
+    if (mark && mark !== bookmark)
+      response.headers.append('Set-Cookie', `${BOOKMARK}=${mark}; Path=/; Secure; HttpOnly; SameSite=Lax`);
     if (!response.headers.has('Cache-Control')) response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('X-Content-Type-Options', 'nosniff');
     if (!response.headers.has('Content-Security-Policy'))

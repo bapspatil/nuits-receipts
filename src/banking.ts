@@ -781,34 +781,46 @@ export type EurValue = {
 export async function eurValue(env: Env, row: Receipt): Promise<EurValue> {
   return (await eurValues(env, [row]))[0]!;
 }
+type Matched = Transaction & { account_name: string };
+type RateDate = { currency: string; requested_date: string; rate_date: string };
+const MATCHED =
+  "SELECT t.*,a.label AS account_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IN ";
+// From the matched payments and ECB rate dates some rows need, to those rows' EUR values.
+function valuer(banks: readonly Matched[], rates: readonly RateDate[]): (rows: readonly Receipt[]) => EurValue[] {
+  const bankOf = new Map<string, Matched>();
+  for (const t of banks) if (t.receipt_id && !bankOf.has(t.receipt_id)) bankOf.set(t.receipt_id, t);
+  const rateOf = new Map<string, string>();
+  for (const f of rates) rateOf.set(`${f.currency}\u0000${f.requested_date}`, f.rate_date);
+  return (rows) =>
+    rows.map((row) => eurFrom(row, bankOf.get(row.id), rateOf.get(`${row.currency}\u0000${row.fx_requested_date}`)));
+}
 // The EUR value of many rows in one round trip: the matched payments and the
 // ECB rate dates are each one query over a JSON list, however many rows.
 export async function eurValues(env: Env, rows: readonly Receipt[]): Promise<EurValue[]> {
   if (!rows.length) return [];
   const rated = rows.filter((r) => r.currency !== 'EUR' && r.currency !== null);
   const [banks, rates] = await env.DB.batch([
-    env.DB.prepare(
-      "SELECT t.*,a.label AS account_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE t.receipt_id IN (SELECT value FROM json_each(?)) AND i.status='complete'",
-    ).bind(JSON.stringify([...new Set(rows.map((r) => r.id))])),
+    env.DB.prepare(MATCHED + '(SELECT value FROM json_each(?))').bind(
+      JSON.stringify([...new Set(rows.map((r) => r.id))]),
+    ),
     env.DB.prepare(
       "SELECT f.currency,f.requested_date,f.rate_date FROM fx_rates f JOIN json_each(?) j ON f.currency=json_extract(j.value,'$[0]') AND f.requested_date=json_extract(j.value,'$[1]')",
     ).bind(JSON.stringify(rated.map((r) => [r.currency, r.fx_requested_date]))),
   ]);
-  const bankOf = new Map<string, Transaction & { account_name: string }>();
-  for (const t of (banks?.results ?? []) as (Transaction & { account_name: string })[])
-    if (t.receipt_id && !bankOf.has(t.receipt_id)) bankOf.set(t.receipt_id, t);
-  const rateOf = new Map<string, string>();
-  for (const f of (rates?.results ?? []) as { currency: string; requested_date: string; rate_date: string }[])
-    rateOf.set(`${f.currency}\u0000${f.requested_date}`, f.rate_date);
-  return rows.map((row) =>
-    eurFrom(row, bankOf.get(row.id), rateOf.get(`${row.currency}\u0000${row.fx_requested_date}`)),
-  );
+  return valuer((banks?.results ?? []) as Matched[], (rates?.results ?? []) as RateDate[])(rows);
 }
-function eurFrom(
-  row: Receipt,
-  bank: (Transaction & { account_name: string }) | undefined,
-  rateDate: string | undefined,
-): EurValue {
+// The same for the documents dated in a month, looked up by the month so it
+// loads alongside the rows instead of after them.
+export async function monthEurValues(env: Env, month: string): Promise<(rows: readonly Receipt[]) => EurValue[]> {
+  const [banks, rates] = await env.DB.batch([
+    env.DB.prepare(MATCHED + '(SELECT id FROM receipts WHERE substr(issue_date,1,7)=?)').bind(month),
+    env.DB.prepare(
+      'SELECT DISTINCT f.currency,f.requested_date,f.rate_date FROM fx_rates f JOIN receipts r ON f.currency=r.currency AND f.requested_date=r.fx_requested_date WHERE substr(r.issue_date,1,7)=?',
+    ).bind(month),
+  ]);
+  return valuer((banks?.results ?? []) as Matched[], (rates?.results ?? []) as RateDate[]);
+}
+function eurFrom(row: Receipt, bank: Matched | undefined, rateDate: string | undefined): EurValue {
   const account = {
     accountId: bank?.account_key ?? null,
     accountName: bank?.account_name ?? null,

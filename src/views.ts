@@ -5,8 +5,8 @@ import {
   creditFit,
   eligible,
   eurValue,
-  eurValues,
   lookalike,
+  monthEurValues,
   openSales,
   type EurValue,
   type Transaction,
@@ -20,14 +20,22 @@ import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
 import { heldSection } from './all';
-import { mergePlan } from './dedupe';
+import { matchedIds, mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import { feedback } from './events';
 import { arrivalMonth } from './arrival';
 import { DISCARD_REASONS } from './domain';
 import { aboutBody } from './about';
-import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
+import {
+  MAX_PACKAGE_FILES,
+  options,
+  planPackage,
+  query,
+  sendStatus,
+  undatedDocuments,
+  type PackageOptions,
+} from './package';
 import { overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
 import { TREATMENT_LABELS } from './sales';
 import { VAT_TREATMENTS } from './domain';
@@ -145,9 +153,18 @@ function receiptOption(r: Receipt, selected = false): string {
 
 type MonthState = Awaited<ReturnType<typeof monthState>>;
 async function monthState(env: Env, selected: string) {
-  // Everything below depends only on the month, so it loads at once.
-  const [rows, payments, imported, sales, undated] = await Promise.all([
-    monthRows(env, selected),
+  // Everything below depends only on the month, so it loads at once. The EUR
+  // values and the send status follow the documents as soon as they arrive.
+  const rowsQuery = monthRows(env, selected);
+  // Sales invoices issued in the month. One that needs a look blocks the
+  // month like a receipt does; an unpaid one does not.
+  const salesQuery = salesRows(env, 'substr(r.issue_date,1,7)=?', selected);
+  const documents = Promise.all([rowsQuery, salesQuery]).then(([r, s]) => [...r, ...s]);
+  const [rows, sales, all, send, payments, imported, undated] = await Promise.all([
+    rowsQuery,
+    salesQuery,
+    Promise.all([documents, monthEurValues(env, selected)]).then(([d, value]) => value(d)),
+    sendStatus(env, selected, documents),
     env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id",
     )
@@ -159,9 +176,6 @@ async function monthState(env: Env, selected: string) {
     )
       .bind(selected)
       .first<string | null>('d'),
-    // Sales invoices issued in the month. One that needs a look blocks the
-    // month like a receipt does; an unpaid one does not.
-    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
     // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
     // while any is left (a month already sent stays closed).
     env.DB.prepare(
@@ -169,10 +183,6 @@ async function monthState(env: Env, selected: string) {
     )
       .first<number>('n')
       .then((n) => n ?? 0),
-  ]);
-  const [all, send] = await Promise.all([
-    eurValues(env, [...rows, ...sales]),
-    sendStatus(env, selected, [...rows, ...sales]),
   ]);
   const eurs: EurValue[] = all.slice(0, rows.length);
   const matrix = new Map<string, bigint>();
@@ -242,14 +252,20 @@ export async function reviewPage(
   filter: ReviewFilter | null,
   params = new URLSearchParams(),
 ): Promise<Response> {
-  const all = await reviewQueue(env);
-  const held = await heldMail(env);
+  // Rows a bank line points at: Discard asks to remove the match too.
+  const known = matchedIds(env);
+  const [all, held, reading, merges, matched] = await Promise.all([
+    reviewQueue(env),
+    heldMail(env),
+    env.DB.prepare(
+      "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
+    ).first<number>('n'),
+    mergePlan(env, known),
+    known,
+  ]);
   const rows = filter ? all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter)) : all;
-  const reading = await env.DB.prepare(
-    "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
-  ).first<number>('n');
   const undated = all.filter((r) => r.issue_date === null).length;
-  const mergeable = (await mergePlan(env)).length;
+  const mergeable = merges.length;
   const merge = mergeable
     ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
     : '';
@@ -262,14 +278,6 @@ export async function reviewPage(
       current: k === filter,
     })),
   ]);
-  // Rows a bank line points at: Discard asks to remove the match too.
-  const matched = new Set(
-    (
-      await env.DB.prepare('SELECT DISTINCT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL').all<{
-        receipt_id: string;
-      }>()
-    ).results.map((t) => t.receipt_id),
-  );
   const selecting = params.get('select') === '1' && rows.length > 0;
   const here = filter ? `/review?reason=${filter}` : '/review';
   const select =
@@ -729,23 +737,70 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
 }
 
 // ---------- Payments ----------
+// month: the month to show, or the lookup that picks it, so the queries that
+// don't need it start right away.
 export async function payments(
   env: Env,
-  selected: string,
+  month: string | Promise<string>,
   offset: number,
   params = new URLSearchParams(),
 ): Promise<Response> {
-  const rows = (
-    await env.DB.prepare(
-      "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
+  const chosen = Promise.resolve(month);
+  // One round for everything. The open invoices, the transfer credits and the
+  // receipts still in Review are needed only for some months, but loading them
+  // every time is cheaper than waiting a second round for them.
+  const [
+    selected,
+    rows,
+    receipts,
+    allInvoices,
+    rules,
+    transfers,
+    allCredits,
+    waiting,
+    elsewhere,
+    droppedRecently,
+    history,
+  ] = await Promise.all([
+    chosen,
+    chosen.then((m) =>
+      env.DB.prepare(
+        "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
+      )
+        .bind(m, offset)
+        .all<Payment>()
+        .then((r) => r.results),
+    ),
+    matchableReceipts(env),
+    openSales(env),
+    env.DB.prepare('SELECT * FROM vendor_rules')
+      .all<Rule>()
+      .then((r) => r.results),
+    listTransfers(env.DB),
+    // Unmatched money in that could be the other side of an own-account transfer.
+    env.DB.prepare(
+      "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IS NULL AND t.receipt_required=1 AND t.amount_minor>0 ORDER BY t.booking_date DESC,t.id LIMIT 300",
     )
-      .bind(selected, offset)
       .all<Payment>()
-  ).results;
-  const receipts = await matchableReceipts(env);
-  const invoices = rows.some((t) => t.amount_minor > 0 && !t.receipt_id) ? await openSales(env) : [];
-  const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
-  const transfers = await listTransfers(env.DB);
+      .then((r) => r.results),
+    // Receipts that would fit a payment but still need review: the person is sent there first.
+    env.DB.prepare(
+      `SELECT * FROM receipts WHERE kind='expense' AND status='needs_review' AND review_reasons_json<>'["missing_eur"]' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY issue_date DESC,id LIMIT 200`,
+    )
+      .all<Receipt>()
+      .then((r) => r.results),
+    chosen.then((m) =>
+      env.DB.prepare(
+        `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
+      )
+        .bind(m)
+        .all<{ m: string; n: number }>()
+        .then((r) => r.results),
+    ),
+    hasRecentDropped(env),
+    statements(env),
+  ]);
+  const invoices = rows.some((t) => t.amount_minor > 0 && !t.receipt_id) ? allInvoices : [];
   const paired = new Map(
     transfers.flatMap(
       (p) =>
@@ -755,21 +810,9 @@ export async function payments(
         ] as const,
     ),
   );
-  // Unmatched money in that could be the other side of an own-account transfer.
   const credits = rows.some((t) => t.amount_minor < 0 && !t.receipt_id && !paired.has(t.id))
-    ? (
-        await env.DB.prepare(
-          "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IS NULL AND t.receipt_required=1 AND t.amount_minor>0 ORDER BY t.booking_date DESC,t.id LIMIT 300",
-        ).all<Payment>()
-      ).results.filter((t) => !paired.has(t.id))
+    ? allCredits.filter((t) => !paired.has(t.id))
     : [];
-  const elsewhere = (
-    await env.DB.prepare(
-      `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
-    )
-      .bind(selected)
-      .all<{ m: string; n: number }>()
-  ).results;
   const unmatched = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
   const open = rows.filter(unmatched);
   const out = rows.filter((t) => t.amount_minor < 0 && !paired.has(t.id));
@@ -798,14 +841,6 @@ export async function payments(
     const facts = pairFacts(r, t, rules, tuning);
     if (facts.exact) bulk.push({ t, r, facts });
   }
-  // Receipts that would fit a payment but still need review: the person is sent there first.
-  const waiting = open.some((t) => !likelyOf.has(t.id))
-    ? (
-        await env.DB.prepare(
-          `SELECT * FROM receipts WHERE kind='expense' AND status='needs_review' AND review_reasons_json<>'["missing_eur"]' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY issue_date DESC,id LIMIT 200`,
-        ).all<Receipt>()
-      ).results
-    : [];
   const waitOf = new Map<string, Receipt>();
   for (const t of open) {
     const w = likelyOf.has(t.id)
@@ -827,7 +862,6 @@ export async function payments(
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
   const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
-  const droppedRecently = missing.length ? await hasRecentDropped(env) : false;
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
@@ -971,7 +1005,7 @@ export async function payments(
         `No statement for ${escape(monthName(selected))} yet.`,
         '<a class="btn primary" href="/import">Import statement</a>',
       );
-  return page('bank', `${others}${body}${await statements(env)}`, 200, env, {
+  return page('bank', `${others}${body}${history}`, 200, env, {
     detail: monthName(selected),
     head: monthHead('/payments', selected),
   });
@@ -1019,13 +1053,21 @@ function nextStep(s: MonthState, selected: string): { label: string; href: strin
 // One status row per step (Check, Match, Send), and one panel for the current step.
 export async function home(env: Env, requested: string | null, params = new URLSearchParams()): Promise<Response> {
   const settings = config(env);
-  // The month Home opens on is worked out alongside, though a new install doesn't need it.
-  const [ever, steps, arrival] = await Promise.all([
+  // Everything loads at once, the month's own queries as soon as the month is
+  // known. A new install doesn't need most of it, but its tables are empty.
+  // No month in the address: open on the oldest one that is not sent.
+  const opening = requested ? null : arrivalMonth(env);
+  const undatedDocs = undatedDocuments(env);
+  const [ever, steps, arrival, s, queue, overdue] = await Promise.all([
     env.DB.prepare(
       "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
     ).first<{ r: number; i: number }>(),
     setupSteps(env),
-    requested ? null : arrivalMonth(env),
+    opening,
+    opening ? opening.then((a) => monthState(env, a.month)) : monthState(env, requested!),
+    reviewQueue(env),
+    overdueInvoices(env),
+    undatedDocs,
   ]);
   const checklist = setupChecklist(steps);
   if (!ever?.r && !ever?.i)
@@ -1036,13 +1078,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
       env,
       { head: pageHead('Welcome') },
     );
-  // No month in the address: open on the oldest one that is not sent.
   const selected = requested ?? arrival!.month;
-  const [s, queue, overdue]: [MonthState, Receipt[], Awaited<ReturnType<typeof overdueInvoices>>] = await Promise.all([
-    monthState(env, selected),
-    reviewQueue(env),
-    overdueInvoices(env),
-  ]);
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
   const alert = overdue.length
     ? `<a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'invoice')} overdue ›</a>`
@@ -1072,7 +1108,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
     : s.missing.length
       ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
       : row(2, 'Match', 'All matched', `/payments?month=${selected}`, false, true);
-  const send = await sendStep(env, s, selected, current, params);
+  const send = await sendStep(env, s, selected, current, params, undatedDocs);
   const step = nextStep(s, selected);
   const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';
   const dated = [
@@ -1116,6 +1152,7 @@ async function sendStep(
   selected: string,
   current: number,
   params: URLSearchParams,
+  undatedDocs: Promise<Receipt[]>,
 ): Promise<{ status: string; body: string }> {
   const settings = config(env);
   const empty = s.docs === 0,
@@ -1127,13 +1164,15 @@ async function sendStep(
   // While an upload runs, the URL carries its options so "Continue" repeats them.
   const uploading = ['driveDone', 'driveMore'].includes(params.get('done') ?? '');
   const chosen = uploading ? options(params) : defaults;
-  const plan = await planPackage(
-    env,
-    selected,
-    { ...chosen, changes: false },
-    { sizes: s.docs <= 100, rows: [...s.rows, ...s.sales] },
-  );
-  const conn: Connection | null = settings.oneDrive ? await connection(env) : null;
+  const [plan, conn]: [Awaited<ReturnType<typeof planPackage>>, Connection | null] = await Promise.all([
+    planPackage(
+      env,
+      selected,
+      { ...chosen, changes: false },
+      { sizes: s.docs <= 100, rows: [...s.rows, ...s.sales], send: s.send, undated: undatedDocs },
+    ),
+    settings.oneDrive ? connection(env) : null,
+  ]);
   const drive = conn?.folder_item_id ? conn : null;
   const upload = drive && !empty ? await progress(env, drive, selected, chosen) : null;
   const folder = escape(drive?.folder_name ?? '');
@@ -1346,11 +1385,14 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
   const opened = feedback(params)?.section ?? (params.get('open') === 'mail' ? 'mail' : '');
-  const oneDrive = await oneDrivePart(env, opened === 'onedrive', origin);
-  const setup = await setupParts(env, params, opened);
-  const [accounts, rules] = await Promise.all([
+  // The sections don't depend on each other, so they all load at once.
+  const [oneDrive, setup, accounts, rules, senders, mailLog] = await Promise.all([
+    oneDrivePart(env, opened === 'onedrive', origin),
+    setupParts(env, params, opened),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
+    sendersPart(env, opened === 'senders'),
+    mailLogPart(env, opened === 'mail'),
   ]);
   const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
   const accountsPart = sect(
@@ -1395,8 +1437,8 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
       opens('business'),
     ),
     sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    await sendersPart(env, opened === 'senders'),
-    await mailLogPart(env, opened === 'mail'),
+    senders,
+    mailLog,
     accountsPart,
     rulesPart,
     sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
