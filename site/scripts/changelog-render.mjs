@@ -142,17 +142,24 @@ export function seed(text) {
   );
 }
 
-function panel(item, span, withSfx) {
+// Props are line art by scope or label (src/assets/svg/props/); a ui entry
+// gets the generic ledger.
+const PROP_ALIAS = { ui: "ledger" };
+
+function panel(item, span, withSfx, props = {}) {
   const { entry, kind } = item;
   const scope = entry.scope ? `<span class="scope">${escapeHtml(entry.scope)}</span>` : "";
   const pr = entry.pr ? ` <span class="pr">(#${entry.pr})</span>` : "";
   // The sound word sits in an impact frame: the tone corner of a panel, or,
   // on a splash slip, a panel of its own under the caption.
+  const prop = entry.scope ?? entry.label?.toLowerCase().split(" ")[0] ?? "";
+  const art = props[PROP_ALIAS[prop] ?? prop];
   const sfx =
     withSfx && KINDS[kind]
-      ? `<span class="impact" aria-hidden="true" style="${seed(entry.text)}"><span class="sfx">${KINDS[kind].sfx}</span></span>`
+      ? `<span class="impact" aria-hidden="true" style="${seed(entry.text)}">` +
+        (art ? `<span class="prop">${art}</span>` : "") +
+        `<span class="sfx">${KINDS[kind].sfx}</span></span>`
       : "";
-  const prop = entry.scope ?? entry.label?.toLowerCase().split(" ")[0] ?? "";
   return (
     `<li class="panel" data-kind="${kind}" data-size="${item.size}" data-span="${span}"${prop ? ` data-prop="${escapeHtml(prop)}"` : ""}>` +
     `<div class="caption">${scope}<p class="panel-text">${inline(entry.text)}${pr}</p></div>${sfx}</li>`
@@ -163,7 +170,7 @@ function panel(item, span, withSfx) {
 // short line does not get the same panel as a long one.
 const weight = (items) => items.reduce((n, it) => n + Math.max(1, it.entry.text.length / 90), 0).toFixed(2);
 
-function pageHtml(release, pages, index, position) {
+function pageHtml(release, pages, index, position, props) {
   const page = pages[index];
   const count = pages.length;
   const id = `${release.slug}-p${index + 1}`;
@@ -176,7 +183,7 @@ function pageHtml(release, pages, index, position) {
   const body = groups
     .map((g, gi) => {
       const span = spans(g.items);
-      const panels = g.items.map((it, i) => panel(it, span[i], i === 0)).join("");
+      const panels = g.items.map((it, i) => panel(it, span[i], i === 0, props)).join("");
       if (g.kind === "intro") return `<ul class="panels" data-kind="intro">${panels}</ul>`;
       const section = release.sections[g.section];
       const kind = KINDS[g.kind] ?? { stamp: section.title.split(" ")[0] };
@@ -211,7 +218,7 @@ function tally(release) {
   });
 }
 
-export function renderRelease(release, position = 0) {
+export function renderRelease(release, position = 0, props = {}) {
   const pages = paginate(release);
   const date = release.date
     ? `<p class="rel-date"><time datetime="${release.date}">${formatDate(release.date)}</time></p>`
@@ -223,7 +230,7 @@ export function renderRelease(release, position = 0) {
     `<header class="rel-head"><h2 class="rel-version" id="${release.slug}-h" tabindex="-1" style="--fit:${fit(release.version)}">${escapeHtml(release.version)}</h2>${date}` +
     (marks.length ? `<ul class="rel-tally">${marks.join("")}</ul>` : "") +
     `</header>` +
-    `<div class="rel-pages">${pages.map((_, i) => pageHtml(release, pages, i, position + i)).join("")}</div>` +
+    `<div class="rel-pages">${pages.map((_, i) => pageHtml(release, pages, i, position + i, props)).join("")}</div>` +
     `<p class="rel-foot"><a class="rel-link" href="${escapeHtml(release.releaseUrl)}">Release</a>` +
     `<button class="rel-next" type="button" hidden>Next</button></p>` +
     `</article>`
@@ -262,12 +269,13 @@ export function renderIndex(releases) {
   );
 }
 
-export function renderBook(releases) {
+// props: prop name to inline SVG markup, for the props that exist.
+export function renderBook(releases, props = {}) {
   if (!releases.length) return `<p class="empty">No releases yet.</p>`;
   let position = 0;
   return releases
     .map((release) => {
-      const html = renderRelease(release, position);
+      const html = renderRelease(release, position, props);
       position += paginate(release).length;
       return html;
     })

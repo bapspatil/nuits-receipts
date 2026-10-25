@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseChangelog } from "../../scripts/changelog-parse.mjs";
-import { checkVersion, fillSlots } from "./changelog-plugin.mjs";
+import { checkVersion, fillSlots, readProps } from "./changelog-plugin.mjs";
 import { inline, paginate, renderBook, renderIndex, renderJsonLd, renderRelease, spans } from "./changelog-render.mjs";
 
 const frozen = readFileSync(
@@ -128,4 +128,24 @@ test("the slots fill and the version check fails a stale changelog", () => {
   expect(() => fillSlots("<!-- changelog:nope -->", FIXTURE, "#355650")).toThrow('unknown changelog slot "nope"');
   expect(() => checkVersion(FIXTURE, "2.0.0")).not.toThrow();
   expect(() => checkVersion(FIXTURE, "2.0.1")).toThrow("CHANGELOG.md starts at 2.0.0 but package.json is 2.0.1.");
+});
+
+test("a prop by scope sits in the panel's impact frame, and a missing one is left out", () => {
+  const releases = parseChangelog(FIXTURE);
+  const html = renderBook(releases, { bank: '<svg class="ill ill-prop"></svg>' });
+  expect(html).toContain('<span class="impact" aria-hidden="true" style="');
+  expect(html.match(/<span class="prop"><svg class="ill ill-prop"><\/svg><\/span><span class="sfx">/g)).toHaveLength(1);
+  expect(renderBook(releases)).not.toContain('class="prop"');
+  expect(renderBook(releases, { ledger: "<svg></svg>" })).not.toContain('class="prop"');
+});
+
+test("every committed prop is cleaned: classes only, no inline colour or metadata", () => {
+  const props = readProps();
+  expect(Object.keys(props).sort()).toEqual(
+    ["app", "bank", "docs", "ledger", "mail", "nav", "receipts", "review", "settings", "setup"],
+  );
+  for (const svg of Object.values(props)) {
+    expect(svg).toStartWith('<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="ill ill-prop"');
+    expect(svg).not.toMatch(/fill=|style=|<metadata|c2pa|width=/);
+  }
 });
