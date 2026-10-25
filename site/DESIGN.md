@@ -153,7 +153,7 @@ The footer is the receipt's stub: a torn top edge, the wordmark at display size 
 ```
 Idea:        every release is printed on a receipt slip and read like a comic page
 Metaphor:    a thermal receipt roll bound as a manga volume
-Signature:   turning the page tears the slip off the roll and curls it away
+Signature:   turning the page tears the slip off the roll and curls it away (src/curl.ts)
 Emotion:     the small satisfaction of tearing off a receipt
 Motion verb: tear and curl
 Screenshot:  a slip mid-curl, dithered back showing, the next release's stamp landing beneath
@@ -195,12 +195,23 @@ Optional line art in `src/assets/svg/props/`, chosen by an entry's scope or labe
 
 | Motion | Duration | Curve |
 | --- | --- | --- |
-| Tear: the slip is tugged, then pulled off the roll as one sheet, up and away under the bar | 450 ms | the tear curve, cubic-bezier(0.7, 0, 0.2, 1) |
-| Arriving version wipes in, once the slip has cleared | 360 ms from 200 ms | the hero wipe curve |
-| Stamp lands after a turn, once the slip has cleared | 520 ms from 400 ms | the hero full-stop curve |
+| Curl: the slip lifts from its foot corner, rolls round a cylinder leaning 12 degrees and lies face down off the top, its back dithered with the print showing through | 750 ms | the tear curve, cubic-bezier(0.7, 0, 0.2, 1) |
+| Tear (no WebGL, a software GPU, Save-Data, or the cover): the slip is tugged, then pulled off the roll as one sheet, up and away under the bar | 450 ms | the tear curve |
+| A turn asked for mid-curl finishes the curl first | 120 ms | linear |
+| Arriving version wipes in, once the slip has cleared | 360 ms from 200 ms into the tear, or 190 ms into the curl (410 ms going back) | the hero wipe curve |
+| Stamp lands after a turn, once the slip has cleared | 520 ms, 200 ms after the version starts | the hero full-stop curve |
 | Strip stamps land as their slip scrolls in | scroll position | linear, native view timeline |
 
-Reduced motion, the switch set to off and no JavaScript get an instant swap: no tear and no view timelines.
+Reduced motion, the switch set to off and no JavaScript get an instant swap: no tear, no curl and no view timelines. three.js and GSAP are never loaded for them.
+
+### The curl
+
+`src/curl.ts` with `src/shaders/curl.*.glsl`, three.js in its own lazy chunk (budget 160 KB gzipped, held by `scripts/check-weight.mjs`). It loads on idle after the page, or on the first hover or focus of Next, and only with motion on, WebGL2, no Save-Data and a hardware GPU (`?fx-force` lets SwiftShader through for the frame checks).
+
+- The slip is captured by drawing a clone of it, with the page's own styles and fonts inlined, into an SVG `foreignObject` the size of the window, laid out at the same fraction of a pixel as on the page, at one texel per drawn pixel. Frame 0 matches the DOM slip; `check-frames` fails if the first frame is more than 5% off, or if a frame mid-curl has not moved.
+- A plane at the slip's exact rect, under a 30 degree camera set so z = 0 is one CSS pixel per unit, wraps round a cylinder that shrinks as it lifts. The curve and the back are a 4x4 Bayer dither between inkSoft and slip, never a blend, the ink field's rule.
+- One renderer, drawn on GSAP's ticker only during a turn. The last three captures are kept. The renderer is disposed and its context released on `pagehide`, the switch going off or leaving the book; a lost context falls back to the tear for the session.
+- Phones: the strip's Next at a release's foot curls that slip away, at 1.5 pixels per CSS pixel and 24 segments. Scrolling never drives WebGL.
 
 ## Don'ts
 
