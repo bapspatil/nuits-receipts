@@ -58,12 +58,15 @@ test("ids are the versions, unique, and every heading is an h2 with the version"
   expect(html.match(/<h2/g)).toHaveLength(releases.length);
 });
 
-test("a release with a strip gets it, the others a SLIP card for their kind", () => {
-  const withStrip = { ...fixture[1], version: "1.12.3" };
-  expect(artOf(withStrip, art, { ...manifest, strips: { "1.12.3": { width: 1, height: 1, blur: "" } } }).type).toBe("strip");
-  const card = artOf(fixture[1], art, manifest);
-  expect(card).toMatchObject({ type: "card", mood: art.cards.byKind.hotfixes, sfx: art.cards.sfx.hotfixes });
-  expect(artOf(fixture[0], art, manifest).mood).toBe(art.cards.byKind.breaking);
+test("every release has its own strip; one without gets a plain page and loads nothing", () => {
+  for (const r of releases) expect(artOf(r, art, manifest).type).toBe("strip");
+  expect(new Set(releases.map((r) => artOf(r, art, manifest).name)).size).toBe(releases.length);
+  const unseen = { ...fixture[1], version: "9.9.9" };
+  expect(artOf(unseen, art, manifest)).toEqual({ type: "none" });
+  const html = renderSpread(unseen, 1, art, manifest);
+  expect(html).toContain('data-art="none"');
+  expect(html).not.toContain("<img");
+  expect(html).not.toContain("data-thumb");
 });
 
 test("text is escaped, inline markdown becomes markup, and no commit link survives", () => {
@@ -125,9 +128,10 @@ test("the slots fill and the version check fails a stale changelog", () => {
 });
 
 test("every built art file is within budget", () => {
-  for (const entry of [...Object.values(manifest.strips), ...Object.values(manifest.cards)]) {
+  for (const entry of Object.values(manifest.strips)) {
     expect(entry.avif).toBeLessThanOrEqual(200 * 1024);
     expect(entry.webp).toBeLessThanOrEqual(320 * 1024);
     expect(entry.blur.length).toBeLessThan(2048);
+    expect(entry.small).toBe(640);
   }
 });

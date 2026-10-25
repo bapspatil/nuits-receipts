@@ -166,7 +166,7 @@ Screenshot:  a leaf mid-turn, screentone shade on it, the next release beneath
 
 ### Art
 
-- The latest three releases get a full strip (`art/strip-<version>.png`), older ones a one-panel card cut from the mascot sheet (`art/mascot-sheet.png`), by kind. Crops, label paint-outs, titles and sound words live in `changelog/art.json`.
+- Every release gets its own three-panel strip (`art/strip-<version>.png`: before, shipped, reaction), drawn with Codex from the locked SLIP sheet (`art/slip-sheet.png`), text-free. Titles, sound words and bubbles live in `changelog/art.json` as HTML overlays. A release cut before its strip exists shows its version big and loads no image.
 - `bun run art` writes AVIF, WebP, a 256 px thumbnail and a blurred placeholder for each into `public/changelog-art/`, and fails over 200 KB AVIF or 320 KB WebP.
 - The newest release's art is the only image in the first view (`fetchpriority="high"`). First view budget 550 KB, held by `scripts/check-weight.mjs`.
 

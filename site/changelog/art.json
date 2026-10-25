@@ -1,5 +1,5 @@
 {
-  "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. A release with a strip gets it on the left page; every other release gets a one-panel SLIP card picked by the kind of change. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
+  "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. Every release has its own three-panel strip (before, shipped, reaction) on the left page; a release with no strip yet shows its version big and loads no image. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
   "strips": {
     "1.12.4": {
       "src": "strip-1.12.4.png",
@@ -107,89 +107,573 @@
           "s": 0.8
         }
       ]
+    },
+    "1.12.1": {
+      "src": "strip-1.12.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt panics as undated receipts slip past a turnstile, holds them back in a queue, then wipes its brow by a tidy column map.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "WHOOSH",
+          "x": 55,
+          "y": 7,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "HALT!",
+          "x": 12,
+          "y": 38,
+          "r": -10,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "Undated ones wait.",
+          "x": 17,
+          "y": 70.5,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.12.0": {
+      "src": "strip-1.12.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt watches mail drop into the bin, pulls one envelope back out by a tick button, then holds it up by an open gate.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "PLOP",
+          "x": 10,
+          "y": 5,
+          "r": -8,
+          "s": 0.7
+        },
+        {
+          "type": "sfx",
+          "text": "GOT IT!",
+          "x": 11,
+          "y": 38,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Allow this sender.",
+          "x": 17,
+          "y": 70.5,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.11.0": {
+      "src": "strip-1.11.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt frets over a messy desk, lines cards up on a grid with a T-square, then stands smug by the tidy grid.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "UGH",
+          "x": 55,
+          "y": 4,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "SNAP!",
+          "x": 10,
+          "y": 38,
+          "r": -10,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "Calm grid.",
+          "x": 17,
+          "y": 70.5,
+          "w": 20
+        }
+      ]
+    },
+    "1.10.0": {
+      "src": "strip-1.10.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is lost among pipes and switches, ticks a setup checklist, then reads a small book by the finished list.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HUH?",
+          "x": 9,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "TICK!",
+          "x": 10,
+          "y": 39,
+          "r": -10,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "Every step done.",
+          "x": 18,
+          "y": 70.5,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.9.0": {
+      "src": "strip-1.9.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt faces a tall stack of calendar pages, flips back to the oldest month and presses one button, then holds an undo arrow.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "UHH",
+          "x": 9,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "FLIP!",
+          "x": 86,
+          "y": 39,
+          "r": 8,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "Oldest month first.",
+          "x": 18,
+          "y": 71,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.8.0": {
+      "src": "strip-1.8.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is tangled in strings between receipts and coins, pulls a lever that pairs them up, then cheers by neat rows of pairs.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "ARGH!",
+          "x": 86,
+          "y": 8,
+          "r": 8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "KA-CHUNK!",
+          "x": 56,
+          "y": 37,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Match all.",
+          "x": 15,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.7.0": {
+      "src": "strip-1.7.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt runs between two desks, works at one split screen with two sizes of flag, then drops the finished stack in the out tray.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HUFF HUFF",
+          "x": 14,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "SPLIT!",
+          "x": 10,
+          "y": 38,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "PLOP",
+          "x": 88,
+          "y": 72,
+          "r": 8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Approve, next.",
+          "x": 16,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.6.0": {
+      "src": "strip-1.6.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt gasps at a toppling tower of odd blocks, lays a row of identical blocks, then stands proud on the solid row with an undo arrow.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "WOBBLE",
+          "x": 12,
+          "y": 6,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "TAP TAP",
+          "x": 72,
+          "y": 36,
+          "r": 8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Solid ground.",
+          "x": 17,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.5.1": {
+      "src": "strip-1.5.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt presses save and the chain to its coin snaps, clips the chain back together, then stands smug as the match holds.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SNAP!",
+          "x": 30,
+          "y": 30,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "KLIP!",
+          "x": 85,
+          "y": 38,
+          "r": 8,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "The match stays.",
+          "x": 17,
+          "y": 71,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.5.0": {
+      "src": "strip-1.5.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is buried in unwanted receipts, sweeps the ticked ones into a bin, then pulls one back out with an undo arrow.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "BURIED",
+          "x": 80,
+          "y": 8,
+          "r": 8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "SWOOSH!",
+          "x": 55,
+          "y": 37,
+          "r": -8,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "Undo brings it back.",
+          "x": 17,
+          "y": 71,
+          "w": 26,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.4.1": {
+      "src": "strip-1.4.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt frowns at a name tag with an extra strip of tape, snips it off with scissors, then stands smug by the neat tag and the docs.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HMM",
+          "x": 60,
+          "y": 6,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "SNIP!",
+          "x": 68,
+          "y": 37,
+          "r": 8,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "Just the name.",
+          "x": 17,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.4.0": {
+      "src": "strip-1.4.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt gasps as one envelope sprays copies of a receipt, studies a letter with a magnifier, then cheers by one envelope and one receipt.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "FWOOSH!",
+          "x": 14,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "SCAN",
+          "x": 12,
+          "y": 38,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "One each.",
+          "x": 17,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.3.0": {
+      "src": "strip-1.3.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt gasps at a cluttered screen, rubs the clutter away with a giant eraser, then walks calmly across three stepping stones.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "BLEEP",
+          "x": 9,
+          "y": 5,
+          "r": -6,
+          "s": 0.5
+        },
+        {
+          "type": "sfx",
+          "text": "SCRUB!",
+          "x": 8,
+          "y": 40,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Three steps.",
+          "x": 16,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.2.0": {
+      "src": "strip-1.2.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is lost at a crooked signpost, hammers in a straight one with five arrows, then strolls past a bar of five icons.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HUH?",
+          "x": 10,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "BANG!",
+          "x": 12,
+          "y": 38,
+          "r": -8,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "Five places.",
+          "x": 16,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.1.0": {
+      "src": "strip-1.1.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt spots a masked envelope sneaking to the mailbox, stops it at the gate to wait on a bench, then cheers by a shelf of filed receipts.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SNEAK",
+          "x": 60,
+          "y": 7,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "STOP!",
+          "x": 10,
+          "y": 38,
+          "r": -10,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "You decide.",
+          "x": 16,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.0.2": {
+      "src": "strip-1.0.2.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt struggles to fit a long chain of envelopes in a box, tightens a bolt with a wrench, then stands smug by a browser tab with its own icon.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "STUFF",
+          "x": 50,
+          "y": 6,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "KLANK!",
+          "x": 80,
+          "y": 37,
+          "r": 8,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "All fixed.",
+          "x": 16,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
+    "1.0.1": {
+      "src": "strip-1.0.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt prints out of a receipt printer, opens a box of receipts, mail, a coin and a folder, then waves on a stage under confetti.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "BZZZT",
+          "x": 15,
+          "y": 10,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "TA-DA!",
+          "x": 12,
+          "y": 38,
+          "r": -10,
+          "s": 0.7
+        },
+        {
+          "type": "bubble",
+          "text": "Hello, world.",
+          "x": 18,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
     }
-  },
-  "cards": {
-    "src": "slip-sheet.png",
-    "panels": {
-      "neutral": {
-        "crop": [
-          22,
-          21,
-          482,
-          445
-        ],
-        "alt": "SLIP the receipt, standing calm."
-      },
-      "proud": {
-        "crop": [
-          520,
-          21,
-          482,
-          445
-        ],
-        "alt": "SLIP the receipt, fist up, proud."
-      },
-      "shocked": {
-        "crop": [
-          22,
-          487,
-          482,
-          475
-        ],
-        "alt": "SLIP the receipt, shocked."
-      },
-      "sweating": {
-        "crop": [
-          520,
-          487,
-          482,
-          475
-        ],
-        "alt": "SLIP the receipt, running and sweating."
-      },
-      "smug": {
-        "crop": [
-          22,
-          982,
-          482,
-          513
-        ],
-        "alt": "SLIP the receipt, arms crossed, smug."
-      },
-      "sleepy": {
-        "crop": [
-          520,
-          982,
-          482,
-          513
-        ],
-        "alt": "SLIP the receipt, sleepy."
-      }
-    },
-    "byKind": {
-      "features": "proud",
-      "breaking": "shocked",
-      "hotfixes": "sweating",
-      "fixes": "smug",
-      "ui": "neutral",
-      "docs": "sleepy",
-      "other": "neutral"
-    },
-    "sfx": {
-      "features": "KA-CHUNK!",
-      "breaking": "KRAK!",
-      "hotfixes": "TAK!",
-      "fixes": "TAK!",
-      "ui": "SHFF!",
-      "docs": "FLIP!",
-      "other": "TA-DA!"
-    },
-    "palette": true
   },
   "titles": {
     "1.12.4": "Fewer waits",
     "1.12.3": "Fewer round trips",
-    "1.12.2": "Spacing and tap targets"
+    "1.12.2": "Spacing and tap targets",
+    "1.12.1": "Undated receipts wait",
+    "1.12.0": "Mail we didn't keep",
+    "1.11.0": "Swiss workbench look",
+    "1.10.0": "Setup checklist",
+    "1.9.0": "Oldest month first",
+    "1.8.0": "Match all",
+    "1.7.0": "Split review",
+    "1.6.0": "App foundations",
+    "1.5.1": "Matches stay put",
+    "1.5.0": "Discard with undo",
+    "1.4.1": "Clean vendor names",
+    "1.4.0": "One receipt per email",
+    "1.3.0": "Less on every page",
+    "1.2.0": "Five-item navigation",
+    "1.1.0": "Unknown senders held",
+    "1.0.2": "Small fixes",
+    "1.0.1": "First public release"
   }
 }
