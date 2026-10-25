@@ -8,7 +8,10 @@ import "./nav";
 
 type Motion = "on" | "off";
 type Dir = 1 | -1;
-export type TurnEffect = (from: HTMLElement, to: HTMLElement, dir: Dir) => Promise<void>;
+// begin(head) is called when the slip visibly starts to move; head is how
+// long after that it has cleared enough for the arriving head to wipe in and
+// the folio to change.
+export type TurnEffect = (from: HTMLElement, to: HTMLElement, dir: Dir, begin: (head: number) => void) => Promise<void>;
 
 const root = document.documentElement;
 const wide = matchMedia("(min-width: 64rem) and (min-height: 37.5rem)");
@@ -66,9 +69,11 @@ const wait = (el: HTMLElement) =>
 // The fallback turn: the slip leaving is torn off and pulled away up the page
 // as one sheet (src/styles/changelog.css). Going back, the earlier slip comes
 // down onto the roll.
-const tear: TurnEffect = async (from, to, dir) => {
+export const tear: TurnEffect = async (from, to, dir, begin) => {
   const moving = slipOf(dir === 1 ? from : to);
   moving.classList.add(dir === 1 ? "is-tearing" : "is-tearing-back");
+  // The torn sheet has cleared the head at 200 ms.
+  begin(200);
   await wait(moving);
   moving.classList.remove("is-tearing", "is-tearing-back");
 };
@@ -156,15 +161,22 @@ async function turn(to: number, focus = false) {
       // the one arriving when going back.
       const top = dir === 1 ? from : target;
       top.classList.add("is-top");
-      if (!sameUnit) {
-        unitOf(from).classList.add("is-leaving");
-        unitOf(top).classList.add("is-top");
-        unitOf(target).classList.add("is-entering");
-      }
+      if (!sameUnit) unitOf(top).classList.add("is-top");
       paintKeeping(to, from);
-      // The folio changes with the head, as the arriving one wipes in.
-      const folioAt = setTimeout(() => setFolio(to), 200);
-      await run(from, target, dir).catch(() => {});
+      // The heads swap and the folio changes once the slip is on its way,
+      // whenever the effect gets it moving.
+      let folioAt = 0;
+      const begin = (head: number) => {
+        if (folioAt) return;
+        root.style.setProperty("--head-at", `${head}ms`);
+        if (!sameUnit) {
+          unitOf(from).classList.add("is-leaving");
+          unitOf(target).classList.add("is-entering");
+        }
+        folioAt = setTimeout(() => setFolio(to), head);
+      };
+      await run(from, target, dir, begin).catch(() => {});
+      begin(0);
       clearTimeout(folioAt);
       for (const el of [from, target, unitOf(from), unitOf(target)]) el.classList.remove("is-top", "is-leaving");
       const entering = unitOf(target);
@@ -176,6 +188,7 @@ async function turn(to: number, focus = false) {
     if (focus) headingOf(target).focus({ preventScroll: true });
     else live.textContent = describe(target);
     markIndex();
+    dispatchEvent(new CustomEvent("changelog:turned"));
   })();
   await busy;
   busy = null;
@@ -231,6 +244,7 @@ function enterBook() {
 
 function leaveBook() {
   inBook = false;
+  dispatchEvent(new CustomEvent("changelog:mode"));
   folio.hidden = true;
   delete root.dataset.book;
   controls.hidden = true;
@@ -342,5 +356,26 @@ export function useStripEffect(next: ((slip: HTMLElement) => Promise<void>) | nu
 
 wide.addEventListener("change", syncMode);
 syncMode();
+
+// --- the curl -------------------------------------------------------------------
+//
+// src/curl.ts and three.js load only with motion on, WebGL2 present and
+// Save-Data off: on idle after load, or sooner on the first hover or focus of
+// a Next. Until it arrives, and if it never does, turns tear.
+let curl: Promise<void> | null = null;
+function loadCurl() {
+  const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  if (curl || still() || saveData || !("WebGL2RenderingContext" in window)) return;
+  curl = import("./curl").then((m) => m.attach()).catch(() => {});
+}
+const soon = (fn: () => void) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 1500));
+addEventListener("load", () => soon(loadCurl), { once: true });
+for (const button of [next, ...document.querySelectorAll<HTMLButtonElement>(".rel-next")]) {
+  button.addEventListener("pointerenter", loadCurl, { once: true });
+  button.addEventListener("focus", loadCurl, { once: true });
+}
+addEventListener("changelog:motion", (e) => {
+  if ((e as CustomEvent).detail === "on") loadCurl();
+});
 
 export const reader = { leaves, get current() { return current; }, turn, slipOf, still };

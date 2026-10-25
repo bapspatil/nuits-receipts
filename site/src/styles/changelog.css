@@ -1052,6 +1052,25 @@ html[data-book] .leaf[hidden] {
 
 /* --- Turning -------------------------------------------------------------- */
 
+/* The curl (src/curl.ts): one canvas over the viewport, under the bar, shown
+   only while a slip curls. The slip it draws hides for the turn. */
+.curl {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.curl[hidden] {
+  display: none;
+}
+
+.is-curling {
+  visibility: hidden;
+}
+
 /* The leaf leaving stays on top until its turn ends; the arriving head wipes
    in (a clip, never an opacity) and its stamp lands. */
 html[data-book] .is-leaving {
@@ -1102,7 +1121,7 @@ html[data-book] .release.is-top.is-entering .rel-pages::after {
 
 /* Going on, the leaving head gives way as the arriving one starts to wipe. */
 html[data-book] .release.is-leaving :is(.rel-head, .rel-foot) {
-  animation: give-way 1ms 200ms forwards;
+  animation: give-way 1ms var(--head-at, 200ms) forwards;
 }
 
 @keyframes give-way {
@@ -1120,11 +1139,11 @@ html[data-book] .rel-head {
 .is-entering .rel-head,
 .is-entering .rel-foot,
 .is-entering.cover .cover-head {
-  animation: wipe-in 360ms var(--ease) 200ms both;
+  animation: wipe-in 360ms var(--ease) var(--head-at, 200ms) both;
 }
 
 .is-entering .cl-stamp {
-  animation: stamp-land 520ms var(--land-ease) 400ms both;
+  animation: stamp-land 520ms var(--land-ease) calc(var(--head-at, 200ms) + 200ms) both;
 }
 
 @keyframes wipe-in {

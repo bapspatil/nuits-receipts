@@ -10,7 +10,10 @@
 // Pages: the home page, and /changelog/. At 1440 the changelog is the book,
 // so instead of scrolling it turns with Next through every slip and shoots
 // each settled page, then scrolls the last one to the footer. At 390 it is
-// the strip and scrolls like the home page.
+// the strip and scrolls like the home page. In mode on, the first turn is
+// the WebGL curl: its first frame must match the DOM slip it replaces (a
+// texture that does not match makes the text jump), and a frame mid-curl
+// must have moved on from it and not be a flat sheet.
 //
 // A frame fails when:
 //   - the whole viewport is near-uniform, or has no visible text;
@@ -46,6 +49,13 @@ const INK_SOFT = [0x35, 0x56, 0x50];
 // while pinned scenes are still moving.
 const SETTLE_MS = 180;
 const STEP = 0.3;
+// Share of the slip's pixels allowed to differ (by more than 32 in any
+// channel) between the DOM and the curl's first frame: sub-pixel text
+// offsets measure under 2%; a texture a pixel off or in the wrong colour is
+// 10% or more.
+const MAX_FIRST_DIFF = 0.05;
+// Mid-curl, at least this share of the slip must have changed.
+const MIN_MID_DIFF = 0.1;
 
 const WATCHED = [
   ".hero-title",
@@ -193,6 +203,57 @@ async function shoot(page, run, tag, index, y, total) {
   return live;
 }
 
+// Share of pixels in box that differ by more than 32 in any channel.
+function differ(a, b, box) {
+  let n = 0;
+  let changed = 0;
+  for (let y = Math.max(0, box.y); y < Math.min(a.height, box.y + box.h); y++)
+    for (let x = Math.max(0, box.x); x < Math.min(a.width, box.x + box.w); x++, n++) {
+      const i = (y * a.width + x) * 4;
+      if (Math.max(...[0, 1, 2].map((c) => Math.abs(a.data[i + c] - b.data[i + c]))) > 32) changed++;
+    }
+  return n ? changed / n : 0;
+}
+
+// The first turn through the curl: DOM, first frame, mid-curl.
+async function curlTurn(page, run, tag) {
+  // Hovering Next loads the curl; its canvas is made on the first turn.
+  await page.hover(".ctl-next");
+  await page.waitForTimeout(2500);
+  const box = await page.evaluate(() => {
+    const r = document.querySelector(".leaf:not([hidden])")?.getBoundingClientRect();
+    return r && { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  const dom = PNG.sync.read(await page.screenshot());
+  // Stop the page's clock (rAF, timers, GSAP's ticker) so the curl holds at
+  // its first frame, then step it to the middle of the 750 ms turn.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 20);
+  await page.click(".ctl-next");
+  const shown = await page
+    .waitForFunction(() => document.querySelector("canvas.curl:not([hidden])"), null, { polling: 50, timeout: 5000 })
+    .then(() => true, () => false);
+  if (!shown) {
+    await page.clock.resume();
+    return failures.push(`${tag}: the curl never ran`);
+  }
+  const firstBuffer = await page.screenshot();
+  await page.clock.runFor(375);
+  const midBuffer = await page.screenshot();
+  await page.clock.resume();
+  writeFileSync(`${OUT}${tag}-curl-first.png`, firstBuffer);
+  writeFileSync(`${OUT}${tag}-curl-mid.png`, midBuffer);
+  const first = PNG.sync.read(firstBuffer);
+  const mid = PNG.sync.read(midBuffer);
+  const firstDiff = differ(dom, first, box);
+  const midDiff = differ(first, mid, box);
+  const midStats = stats(mid, box);
+  console.log(`${tag}: curl first frame ${(firstDiff * 100).toFixed(1)}% off the DOM, mid-curl ${(midDiff * 100).toFixed(1)}% moved`);
+  if (firstDiff > MAX_FIRST_DIFF) failures.push(`${tag}: curl first frame ${(firstDiff * 100).toFixed(1)}% off the DOM slip`);
+  if (midDiff < MIN_MID_DIFF) failures.push(`${tag}: mid-curl frame only ${(midDiff * 100).toFixed(1)}% changed`);
+  if (midStats.stddev < MIN_ELEMENT_STDDEV) failures.push(`${tag}: mid-curl frame is flat`);
+  await page.waitForTimeout(800);
+}
+
 async function scrollThrough(page, run, tag, from = 0, first = 0) {
   const total = await page.evaluate(() => document.documentElement.scrollHeight);
   const step = Math.round(run.height * STEP);
@@ -213,6 +274,8 @@ for (const run of runs) {
     reducedMotion: run.motion === "reduce" ? "reduce" : "no-preference",
   });
   const page = await context.newPage();
+  // A clock the curl check can pause; it runs at real speed until then.
+  if (run.motion === "on" && run.width === 1440) await page.clock.install();
   const slug = run.path === "/" ? "home" : run.path.replace(/\W+/g, "");
   const tag = `${slug}-${run.width}-${run.motion}`;
   page.on("pageerror", (e) => failures.push(`${tag}: page error ${e.message}`));
@@ -226,8 +289,11 @@ for (const run of runs) {
       await shoot(page, run, tag, i++, 0, 0);
       const last = await page.evaluate(() => document.querySelector(".ctl-next")?.getAttribute("aria-disabled") === "true");
       if (last) break;
-      await page.click(".ctl-next");
-      await page.waitForTimeout(run.motion === "reduce" ? 150 : 800);
+      if (i === 2 && run.motion === "on") await curlTurn(page, run, tag);
+      else {
+        await page.click(".ctl-next");
+        await page.waitForTimeout(run.motion === "reduce" ? 150 : 800);
+      }
     }
     const rest = await scrollThrough(page, run, tag, Math.round(run.height * STEP), i);
     console.log(`${tag}: ${i} slips turned, then ${rest.frames} scroll frames to the footer`);
