@@ -104,10 +104,14 @@ function fullNotes(release) {
     .join("");
   const intro = release.intro.map((t) => `<p>${inline(t)}</p>`).join("");
   return (
-    `<details class="full"><summary class="btn">Read full notes</summary><div class="full-body">${intro}${sections}` +
+    `<details class="full"><summary class="btn btn-primary">Read full notes</summary><div class="full-body">${intro}${sections}` +
     `<p><a href="${escapeHtml(release.releaseUrl)}">Release ${escapeHtml(release.version)} on GitHub</a></p></div></details>`
   );
 }
+
+// The copy-link action is an icon; "Copied" shows beside it after a click.
+const LINK_ICON =
+  `<svg class="icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 
 export function renderSpread(release, index, art, manifest) {
   const a = artOf(release, art, manifest);
@@ -129,7 +133,9 @@ export function renderSpread(release, index, art, manifest) {
     `<p class="rel-title">${escapeHtml(titleOf(release, art.titles))}</p>` +
     `<p class="rel-meta">${date}<span class="rel-kind" data-kind="${kind}">${escapeHtml(stamp)}</span></p></header>` +
     `<div class="rel-body"><ul class="rel-bullets">${bullets}</ul>${more}` +
-    `<div class="rel-actions">${fullNotes(release)}<button class="btn btn-copy" type="button" data-copy hidden>Copy link</button></div>` +
+    `<div class="rel-actions">${fullNotes(release)}` +
+    `<button class="btn-quiet btn-copy" type="button" data-copy aria-label="Copy link" hidden>${LINK_ICON}<span class="copy-state" aria-live="polite"></span></button>` +
+    `<a class="rel-all" href="#all" data-all>All releases</a></div>` +
     `<span class="shipped" aria-hidden="true"><span>Shipped</span><span class="shipped-v">${v}</span></span>` +
     `</div></div>` +
     `</article>`

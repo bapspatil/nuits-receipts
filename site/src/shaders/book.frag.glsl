@@ -8,6 +8,8 @@ uniform sampler2D uFrom;
 uniform sampler2D uTo;
 uniform float uFromLeft; // 1 when the leaf starts on the left page
 uniform float uSpine; // the spine's place across the texture, 0 to 1
+uniform float uPlain; // 1 on a phone: the leaf's back is plain paper
+uniform vec3 PAPER;
 
 varying vec2 vUv;
 varying float vShade;
@@ -35,7 +37,7 @@ void main() {
   // sits at uSpine across it. u runs from the spine to the page's outer edge.
   float x = left ? uSpine * (1.0 - vUv.x) : uSpine + vUv.x * (1.0 - uSpine);
   vec2 st = vec2(x, vUv.y);
-  vec3 color = starting ? texture2D(uFrom, st).rgb : texture2D(uTo, st).rgb;
+  vec3 color = starting ? texture2D(uFrom, st).rgb : (uPlain > 0.5 ? PAPER : texture2D(uTo, st).rgb);
   // Standing up from the page, the leaf takes a dither of shade.
   if (bayer(gl_FragCoord.xy) < vShade * 0.22) color = INK_SOFT;
   gl_FragColor = vec4(color, 1.0);
