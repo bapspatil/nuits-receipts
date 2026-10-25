@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds the changelog art from site/art/ (see changelog/art.json): for each
-// strip and each SLIP card an AVIF (q55), a WebP (q75), a 256 px WebP
+// release strip an AVIF (q55), a WebP (q75), a 640 px phone AVIF and WebP, a 256 px WebP
 // thumbnail for the scrubber, and a blurred 24 px placeholder written into
 // public/changelog-art/manifest.json as a data URL. Fails when an AVIF is over
 // its budget, so heavy art cannot slip in unnoticed.
@@ -76,29 +76,13 @@ async function emit(name, pipeline, { median = 0, palette = false, small = false
   return { ok: !over.length, entry: { width, height, ...(small ? { small: SMALL } : {}), avif: avif.length, webp: webp.length, blur: `data:image/webp;base64,${blur.toString("base64")}` } };
 }
 
-const manifest = { strips: {}, cards: {} };
+const manifest = { strips: {} };
 let ok = true;
 
 for (const [version, strip] of Object.entries(config.strips)) {
   const r = await emit(`strip-${version}`, sharp(resolve(ART, strip.src)), { median: strip.median ?? 3, palette: !!strip.palette, small: true });
   ok &&= r.ok;
   manifest.strips[version] = r.entry;
-}
-
-const sheet = resolve(ART, config.cards.src);
-for (const [mood, panel] of Object.entries(config.cards.panels)) {
-  const [left, top, width, height] = panel.crop;
-  // A sheet with labels in its panels (NEUTRAL, PROUD, ...) can paint them
-  // out in the panel's paper colour: the mood is the drawing's job.
-  const covers = (panel.label ? [panel.label] : []).map(([lx, ly, lw, lh]) => ({
-    input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect x="${lx}" y="${ly}" width="${lw}" height="${lh}" fill="#ffffff"/></svg>`),
-    top: 0,
-    left: 0,
-  }));
-  const cropped = await sharp(sheet).extract({ left, top, width, height }).png().toBuffer();
-  const r = await emit(`card-${mood}`, sharp(cropped).composite(covers), { median: config.cards.median ?? 0, palette: !!config.cards.palette });
-  ok &&= r.ok;
-  manifest.cards[mood] = r.entry;
 }
 
 writeFileSync(resolve(OUT, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

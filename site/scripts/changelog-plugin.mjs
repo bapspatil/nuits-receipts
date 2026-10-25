@@ -20,7 +20,7 @@ const MANIFEST = resolve(import.meta.dirname, "..", "public", "changelog-art", "
 // builds without a manifest: every release then prints text only.
 export function readArt() {
   const art = JSON.parse(readFileSync(ART, "utf8"));
-  const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : { strips: {}, cards: {} };
+  const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : { strips: {} };
   return { art, manifest };
 }
 

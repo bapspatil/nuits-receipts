@@ -166,7 +166,7 @@ export function artUrl(i: number) {
 function prefetchAround(i: number) {
   idle(() => {
     for (const j of [i + 1, i - 1]) {
-      if (j < 0 || j >= spreads.length) continue;
+      if (j < 0 || j >= spreads.length || !spreads[j].dataset.art) continue;
       const url = artUrl(j);
       if (fetched.has(url)) continue;
       fetched.add(url);
@@ -338,7 +338,9 @@ const peekV = peek.querySelector<HTMLElement>(".scrub-peek-v")!;
 function showPeek(a: HTMLAnchorElement | null) {
   if (!a || !wideQuery.matches) return void (peek.hidden = true);
   const i = Number(a.dataset.i);
-  peekImg.src = spreads[i].dataset.thumb!;
+  const thumb = spreads[i].dataset.thumb;
+  peekImg.hidden = !thumb;
+  if (thumb) peekImg.src = thumb;
   peekV.textContent = versionOf(i);
   const box = scrub.getBoundingClientRect();
   const r = a.getBoundingClientRect();

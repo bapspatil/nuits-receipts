@@ -359,31 +359,19 @@ html:not([data-ready]) .spread:target {
   text-transform: uppercase;
 }
 
-/* A one-panel card: the SLIP mood for the kind of change, the version set
-   big behind it, and the sound word breaking over the frame. */
-.page-art[data-art="card"] {
+/* A release whose strip is not drawn yet: the version set big, no image. */
+.page-art[data-art="none"] {
   display: grid;
   place-items: center;
-  padding: 2.5rem 0 1rem;
+  min-height: 12rem;
   overflow: hidden;
 }
-.card-v {
-  position: absolute;
-  inset: 0 auto auto 0;
+.art-v {
   font: 800 clamp(5rem, 30vw, 13rem) / 0.8 var(--font-display);
   letter-spacing: -0.04em;
   color: transparent;
   -webkit-text-stroke: 2px var(--color-guilloche);
   user-select: none;
-}
-.card-frame {
-  position: relative;
-  display: block;
-  width: min(100%, 26rem);
-  border: 3px solid var(--color-ink);
-  background: var(--color-slip);
-  box-shadow: 6px 6px 0 var(--color-ink);
-  transform: rotate(-1.2deg);
 }
 
 .ov-layer {
@@ -617,15 +605,8 @@ html[data-motion="off"] .spread.is-leaving {
     height: calc(var(--book-h) - 2 * var(--page-pad) - 4px);
     object-fit: contain;
   }
-  .page-art[data-art="card"] {
-    padding: 2.5rem 2rem;
-  }
-  .card-v {
-    inset: 1.5rem auto auto 1.75rem;
+  .art-v {
     font-size: clamp(6rem, 11vw, 12rem);
-  }
-  .card-frame {
-    width: min(100%, 30rem);
   }
   .page-notes {
     position: relative;

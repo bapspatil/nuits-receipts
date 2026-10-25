@@ -25,17 +25,15 @@ export function titleOf(release, titles = {}) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-// The art a release gets: its strip when there is one, else the SLIP card for
-// its kind of change.
+// The art a release gets: its own strip. A release cut before its strip is
+// drawn gets a plain page with the version set big and no image, so nothing
+// is fetched for it.
 export function artOf(release, art, manifest) {
   const strip = art.strips?.[release.version];
   if (strip && manifest.strips?.[release.version]) {
     return { type: "strip", name: `strip-${release.version}`, alt: strip.alt, overlay: strip.overlay ?? [], ...manifest.strips[release.version] };
   }
-  const kind = kindOf(release);
-  const mood = art.cards.byKind[kind] ?? art.cards.byKind.other;
-  const sfx = art.cards.sfx[kind] ?? art.cards.sfx.other;
-  return { type: "card", name: `card-${mood}`, mood, alt: art.cards.panels[mood].alt, sfx, ...manifest.cards[mood] };
+  return { type: "none" };
 }
 
 // Phones get the 640 px strip; the book on a wide screen the full one. The
@@ -76,15 +74,7 @@ function artPage(release, a, eager) {
       `</span></figure>`
     );
   }
-  // A one-panel card: the SLIP mood for the kind of change, the version set
-  // big behind it and the sound word over the panel corner.
-  return (
-    `<figure class="page page-art" data-art="card" data-mood="${a.mood}">` +
-    `<span class="card-v" aria-hidden="true">${escapeHtml(release.version)}</span>` +
-    `<span class="card-frame">${picture(a, eager)}` +
-    `<span class="ov-layer" aria-hidden="true"><span class="ov ov-sfx" style="--x:78%;--y:12%;--r:-8deg">${escapeHtml(a.sfx)}</span></span></span>` +
-    `</figure>`
-  );
+  return `<figure class="page page-art" data-art="none"><span class="art-v" aria-hidden="true">${escapeHtml(release.version)}</span></figure>`;
 }
 
 function fullNotes(release) {
@@ -126,7 +116,7 @@ export function renderSpread(release, index, art, manifest) {
   const kind = kindOf(release);
   const stamp = KINDS[kind]?.stamp ?? "Shipped";
   return (
-    `<article class="spread" id="${v}" data-i="${index}" data-v="${v}" data-art="${ART_BASE}${a.name}"${a.small ? ` data-small="${a.small}"` : ""} data-thumb="${ART_BASE}${a.name}-thumb.webp" aria-labelledby="h-${v}"${index ? " hidden" : ""}>` +
+    `<article class="spread" id="${v}" data-i="${index}" data-v="${v}" ${a.name ? ` data-art="${ART_BASE}${a.name}"${a.small ? ` data-small="${a.small}"` : ""} data-thumb="${ART_BASE}${a.name}-thumb.webp"` : ""} aria-labelledby="h-${v}"${index ? " hidden" : ""}>` +
     artPage(release, a, index === 0) +
     `<div class="page page-notes">` +
     `<header class="rel-head"><h2 class="rel-v" id="h-${v}" tabindex="-1"><span class="vh">Release </span>v${v}</h2>` +
