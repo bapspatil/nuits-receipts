@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Holds the site's script chunks to their gzipped budgets after `vite build`.
-// Budgets are per chunk, by the name Vite gives it, plus the changelog's
+// The changelog's 3D book pulls in three.js, which is easy to let grow. Budgets
+// are per chunk, by the name Vite gives it, plus the changelog's
 // first view as a whole (docs: the redesign plan's performance budget).
 //
 //   node scripts/check-weight.mjs [dist]
@@ -14,7 +15,9 @@ const KB = 1024;
 // [chunk name, budget, warn at]; sizes gzipped.
 const BUDGETS = [
   ["changelog", 10 * KB, 8 * KB],
+  ["book3d", 6 * KB, 5 * KB],
   ["gsap", 35 * KB, 30 * KB],
+  ["three", 160 * KB, 140 * KB],
 ];
 
 const assets = join(dist, "assets");
@@ -48,6 +51,7 @@ const text = [
 ];
 const binary = [
   ...refs(/<link rel="preload" href="([^"]+)" as="font"/g),
+  // The full-size AVIF (a wide screen), the heavier of the two.
   ...refs(/<source type="image\/avif" srcset="([^"]+)"><img[^>]*fetchpriority="high"/g),
 ];
 const gz = (f) => gzipSync(readFileSync(join(dist, f)), { level: 9 }).length;

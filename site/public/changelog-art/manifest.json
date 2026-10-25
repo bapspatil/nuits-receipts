@@ -1,55 +1,72 @@
 {
   "strips": {
+    "1.12.4": {
+      "width": 1024,
+      "height": 1536,
+      "small": 640,
+      "avif": 81497,
+      "webp": 194326,
+      "blur": "data:image/webp;base64,UklGRowAAABXRUJQVlA4IIAAAABwBQCdASoYACQAPu1qrlCppiQiqrgKATAdiWlXn1seBwPGG+K+Xvv3eSorypYmvqlpoRlwAP7vQ89evgYeV7xidnHNuyB9VzHQuVQSVBV0wchO76zH+uXfgivwqJINWUH0+XxUm3U3W5vdo40Cs44eyo0SG+V0o/rdVJm4A4AAAA=="
+    },
     "1.12.3": {
       "width": 1024,
       "height": 1536,
-      "avif": 195126,
-      "webp": 230772,
-      "blur": "data:image/webp;base64,UklGRqQAAABXRUJQVlA4IJgAAABwBQCdASoYACQAPu1srk8ppiSiKqoBMB2JYwDPoBQeIOK9F9bFuiWwsIFAIMTPiOCGOCfgAP4vcIbuJzYKd53EKrPBNL3cqUNybF4GB74Sx+2vMEOXJVIWKeS+mrgEdl4ceMcFy+GlDVx4Zs7RhtpVnFDragqmJ3NLDCEBPJydBFK+4IqRcta4IyKvCC+OkP6CATPauoAAAA=="
+      "small": 640,
+      "avif": 46127,
+      "webp": 113954,
+      "blur": "data:image/webp;base64,UklGRnwAAABXRUJQVlA4IHAAAACQBQCdASoYACQAPtlUpU2oJKOiNVv8AQAbCWcA0bwhYEvjB9u04mOmrTopdFATbjTjHVeVoAD+7YhyC5f0ywOLAUfxKwtU1O5/qlK76jO+dciTk6J7luzJCjiDo9l0rxxbw6yZ/NnHl/GunDkAAAAA"
+    },
+    "1.12.2": {
+      "width": 1024,
+      "height": 1536,
+      "small": 640,
+      "avif": 77217,
+      "webp": 198324,
+      "blur": "data:image/webp;base64,UklGRogAAABXRUJQVlA4IHwAAAAwBQCdASoYACQAPu1wrlIppiQiqrgIATAdiWddgFzghm8Xz1yzFvwE+wDQVBKwKlbAAAD+7yI8wbzYc1zpXZUbRZ8XjIC1f9o9v7MLzK6tA8EO1TdrofQkX8jWUnrb+m7BPhaVCvEFtQPDiNyAHGLrrqJBKMVgcTlAAAAA"
     }
   },
   "cards": {
     "neutral": {
-      "width": 472,
-      "height": 403,
-      "avif": 9521,
-      "webp": 12458,
-      "blur": "data:image/webp;base64,UklGRlgAAABXRUJQVlA4IEwAAAAwBACdASoYABQAPuFap02opSOiN/qoARAcCWcAAIGP8wLGnVYjK3C0OYAA/vCB9xV3v4OSQrpdSgf65Kv9/Gv1HmhGnNDBe2pnGlAA"
+      "width": 482,
+      "height": 445,
+      "avif": 6687,
+      "webp": 15232,
+      "blur": "data:image/webp;base64,UklGRmQAAABXRUJQVlA4IFgAAAAQBQCdASoYABYAPtVapE2oJaOiN+gBABqJZwDPZDJROyGskmDOp7aNc9arOKCsF2wAAP72Ccv8/JAWeewDf5IF4mqFOKPN4cjNvkwt+oD3h3peOwY0AAAA"
     },
     "proud": {
-      "width": 473,
-      "height": 403,
-      "avif": 11873,
-      "webp": 15920,
-      "blur": "data:image/webp;base64,UklGRl4AAABXRUJQVlA4IFIAAADwBACdASoYABQAPtFapE2oJaOiN+gBABoJZwAAiO4A5B8I7w9Th2uHQXngwFtrlAAA/vYQQwGaaIrDfyOJJFKxSiMI4UyIfsxP91UJ3aaqOAAA"
+      "width": 482,
+      "height": 445,
+      "avif": 8614,
+      "webp": 19872,
+      "blur": "data:image/webp;base64,UklGRl4AAABXRUJQVlA4IFIAAADQBACdASoYABYAPtVUoU2oJKMiN+gBABqJZwAAiE922Z0k2lJuOIb94R96jtBvgAD+9NOjOtZ+bSyqKMwbgcWG895WQEKCJtkXzZNnicxoHkgA"
     },
     "shocked": {
-      "width": 472,
-      "height": 417,
-      "avif": 26329,
-      "webp": 35624,
-      "blur": "data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAABQBQCdASoYABUAPu1gqU4ppSOiMBgMATAdiWUAADF/11l771eJgfgm42e13X5o7Up5AwAA/vBuxYsNnrp0qWdTzMzmMS/c61Tow+Uit3mdIM2ec6KtznKb6uvsvHZTjm0XNuzbJ57Rm1alAAA="
+      "width": 482,
+      "height": 475,
+      "avif": 19460,
+      "webp": 46008,
+      "blur": "data:image/webp;base64,UklGRnYAAABXRUJQVlA4IGoAAAAQBQCdASoYABgAPu1ur1CppqQiqAqpMB2JZwDGuBEd+F9hQBKYhmxlp8TuLbOGupAAAP7IwtYZMG0oP941IaLRQfExTQLMIZX04uzLLDVoU/XWL+Bd2bVWNOTkCs8qbiI8Cy6mXTmhuAAA"
     },
     "sweating": {
-      "width": 473,
-      "height": 417,
-      "avif": 16759,
-      "webp": 22456,
-      "blur": "data:image/webp;base64,UklGRmoAAABXRUJQVlA4IF4AAADwBACdASoYABUAPu1yrVGppyQiqAqpMB2JZwDM0BEJokLdFkEvcunO65TmRg8IL/AA/vHMzn1BidyPbRYupRbWW7zobpKctYUaZeMmFBACn29cUxdM4z5qGN8CTIAA"
+      "width": 482,
+      "height": 475,
+      "avif": 11974,
+      "webp": 29274,
+      "blur": "data:image/webp;base64,UklGRnAAAABXRUJQVlA4IGQAAAAQBQCdASoYABgAPu1cqU2ppKQiN/VYATAdiWcAAC3BkPsdMLcMycPz3oCPL2DhkkgAAP7xzKANUY4jDRznyou65KYPqSFQnuXyvNmjEVIuDr2KtG5V+wLmrL18NyHTzIaB+AAA"
     },
     "smug": {
-      "width": 472,
-      "height": 488,
-      "avif": 12251,
-      "webp": 16218,
-      "blur": "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAACQBACdASoYABkAPu1grU+ppSQiMBgIATAdiWcAAC52KEEvV8KLlkHC/dKeagAA/vN97wpesSJ4+Cbvr4tP5RLx5q0sVygzcymO/pqpp/odMqUrluGwAA=="
+      "width": 482,
+      "height": 513,
+      "avif": 8086,
+      "webp": 18656,
+      "blur": "data:image/webp;base64,UklGRmQAAABXRUJQVlA4IFgAAABwBACdASoYABoAPtlcpE2oJaOiN/qoAQAbCWcAAFuzfaitpYAMwB9L+IVYAAD+9NuEWCZeq3UGjaa+DgK6z9ZNkIT49/1B/3nIM9Ub1R3wyFfODa7VY4AA"
     },
     "sleepy": {
-      "width": 473,
-      "height": 488,
-      "avif": 12622,
-      "webp": 17010,
-      "blur": "data:image/webp;base64,UklGRmoAAABXRUJQVlA4IF4AAAAwBQCdASoYABkAPu1krVAppSQisBgIATAdiWcAznQ0b6jM2hHrL3p57Y+lYLaPBAJwAAD+9gnPn8zLVaIHa3pe3wmCLUlRgixYhUiK90u4qn5bYBtyLySmG7regAAA"
+      "width": 482,
+      "height": 513,
+      "avif": 7790,
+      "webp": 18434,
+      "blur": "data:image/webp;base64,UklGRmAAAABXRUJQVlA4IFQAAABwBACdASoYABoAPtFWo02oJKMiN+gBABoJZwAAiOLZfGfSVE3dRv8L9vrrgAD+9NOs5Aav92WeauJH++5LolXHlEdJ5c6oWgnZ9i9/rCULGsBgAAA="
     }
   }
 }

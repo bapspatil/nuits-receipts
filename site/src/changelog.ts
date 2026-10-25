@@ -24,6 +24,7 @@ const peek = scrub.querySelector<HTMLElement>(".scrub-peek")!;
 const older = document.querySelector<HTMLAnchorElement>(".turn-older")!;
 const newer = document.querySelector<HTMLAnchorElement>(".turn-newer")!;
 const live = document.querySelector<HTMLElement>("[data-live]")!;
+const wideQuery = matchMedia("(min-width: 64rem) and (min-height: 37.5rem)");
 const untilFound = "onbeforematch" in document.body;
 
 let current = 0;
@@ -93,7 +94,7 @@ function paint(i: number) {
   }
 }
 
-const css: Turn = (from, to, dir) =>
+export const slide: Turn = (from, to, dir) =>
   new Promise((done) => {
     if (still()) return done();
     book.style.setProperty("--dir", String(dir));
@@ -124,7 +125,7 @@ export async function go(to: number, focus = false): Promise<void> {
   busy = (async () => {
     paint(to);
     history.replaceState(null, "", `#${versionOf(to)}`);
-    await (still() ? Promise.resolve() : (turnEffect ?? css)(spreads[from], spreads[to], dir).catch(() => {}));
+    await (still() ? Promise.resolve() : (turnEffect ?? slide)(spreads[from], spreads[to], dir).catch(() => {}));
     setHidden(spreads[from], true);
     if (focus) heading(to).focus({ preventScroll: true });
     live.textContent = `Release ${versionOf(to)}`;
@@ -155,8 +156,11 @@ function format(): "avif" | "webp" {
   return ext ?? "avif";
 }
 
+// The art a spread shows here: phones get the small strip, as in the
+// <picture> (scripts/changelog-book.mjs).
 export function artUrl(i: number) {
-  return `${spreads[i].dataset.art}.${format()}`;
+  const { art, small } = spreads[i].dataset;
+  return `${art}${small && !wideQuery.matches ? `-${small}` : ""}.${format()}`;
 }
 
 function prefetchAround(i: number) {
@@ -254,7 +258,6 @@ book.addEventListener("beforematch", (e) => {
 // pointer; letting go opens it. Only thumbnails load while dragging.
 const peekImg = peek.querySelector("img")!;
 const peekV = peek.querySelector<HTMLElement>(".scrub-peek-v")!;
-const wideQuery = matchMedia("(min-width: 64rem) and (min-height: 37.5rem)");
 function showPeek(a: HTMLAnchorElement | null) {
   if (!a || !wideQuery.matches) return void (peek.hidden = true);
   const i = Number(a.dataset.i);
@@ -333,6 +336,23 @@ for (const button of book.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
   }
   addEventListener("load", () => prefetchAround(current), { once: true });
 }
+
+// --- the 3D book --------------------------------------------------------------
+//
+// src/book3d.ts and three.js load after first paint, only where the turn is
+// worth its weight: two pages on screen, motion on, WebGL2, no Save-Data and
+// a device that is not short of memory. Until then, and if it fails, the
+// slide above turns the page.
+let book3d: Promise<void> | null = null;
+function load3d() {
+  const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
+  if (book3d || still() || !wideQuery.matches || nav.connection?.saveData || (nav.deviceMemory ?? 8) < 4) return;
+  if (!("WebGL2RenderingContext" in window)) return;
+  book3d = import("./book3d").then((m) => m.attach()).catch(() => {});
+}
+addEventListener("load", () => idle(load3d), { once: true });
+wideQuery.addEventListener("change", load3d);
+addEventListener("changelog:motion", load3d);
 
 export const reader = {
   book,

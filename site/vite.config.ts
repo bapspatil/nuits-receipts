@@ -44,7 +44,7 @@ export default defineConfig({
     rollupOptions: {
       input: { main: resolve(import.meta.dirname, "index.html"), privacy: resolve(import.meta.dirname, "privacy/index.html"), notFound: resolve(import.meta.dirname, "404.html"), changelog: resolve(import.meta.dirname, "changelog/index.html") },
       // three.js in a chunk of its own, so scripts/check-weight.mjs can hold
-      // it to its budget apart from the curl that uses it.
+      // it to its budget apart from the book that uses it.
       output: { manualChunks: (id) => (id.includes("/node_modules/three/") ? "three" : undefined) },
     },
   },

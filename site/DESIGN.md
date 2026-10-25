@@ -148,70 +148,57 @@ The footer is the receipt's stub: a torn top edge, the wordmark at display size 
 
 ## The changelog
 
-`/changelog/` reads the releases like a comic. It is built from `CHANGELOG.md` at site build time by `scripts/changelog-plugin.mjs` (parser in `scripts/changelog-parse.mjs` at the repository root, markup in `scripts/changelog-render.mjs`), so every word is real HTML and a new release needs no hand work. The build fails if the newest release is not the version in `package.json`.
+`/changelog/` reads the releases like a manga volume, one spread per release. It is built from `CHANGELOG.md` at site build time by `scripts/changelog-plugin.mjs` (parser in `scripts/changelog-parse.mjs` at the repository root, spreads in `scripts/changelog-book.mjs`), so every word is real HTML and a new release needs no hand work. The build fails if the newest release is not the version in `package.json`.
 
 ```
-Idea:        every release is printed on a receipt slip and read like a comic page
-Metaphor:    a thermal receipt roll bound as a manga volume
-Signature:   turning the page tears the slip off the roll and curls it away (src/curl.ts)
-Emotion:     the small satisfaction of tearing off a receipt
-Motion verb: tear and curl
-Screenshot:  a slip mid-curl, dithered back showing, the next release's stamp landing beneath
+Idea:        every release is a spread in a manga volume about the app
+Metaphor:    an open book: the art on the left page, the notes on the right
+Signature:   the page turns in 3D and lands on the next release (src/book3d.ts)
+Motion verb: turn
+Screenshot:  a leaf mid-turn, screentone shade on it, the next release beneath
 ```
 
-Two layouts. The strip is the default: cover, index, then every release stacked down the roll with a perforation between them. Phones, readers without JavaScript and crawlers get it. The book is the reading mode `src/changelog.ts` turns on at 64rem wide and 37.5rem tall: one slip at a time beside its version, turned with Back and Next, arrow keys, Page Up and Down, Home and End, or a swipe, with an anchor per slip (`#v1-12-2`, `#v1-0-1-p2`). Slips waiting their turn are `hidden="until-found"`, so find in page still opens them.
+- The page opens on the newest release, or the one in the URL (`#1.12.3`; the old `#v1-12-3` anchors still resolve). Nothing to click first.
+- Wide screens (64rem by 37.5rem and up): the book, older and newer arrows either side, a version scrubber along the foot (hover shows the art, drag flips through thumbnails only). Phones: one page, version, art, then notes, with a sticky row of version chips.
+- Direction is manga: older is to the left. Left arrow and Page Down go older, right arrow and Page Up newer, Home the oldest, End the newest. Swipe right goes older.
+- Notes page: the version huge, a short title, the date and the kind stamp, at most five bullets, "Read full notes" (every section) and the GitHub release link, Copy link, and the SHIPPED stamp.
+- Hidden spreads are `hidden="until-found"` with lazy art, so find in page still opens them and only the open release's art loads. The next and previous art is prefetched while idle. "All releases" lists every release as text. Without JavaScript every release opens through `:target`.
 
-### Panel grammar
+### Art
 
-- A page is one release, or part of one: a slip with the torn foot, on a roll of two more slips. Its version sets as wide as its column (the build writes the figures' width into `--fit`, capped at 17rem and a third of the screen) beside it (book) or above it (strip), with the date in small type, the tally and one Release link to the GitHub release page. In the book a folio ("03 / 23", `aria-hidden`) closes the column.
-- A slip holds at most four panel units and 560 characters. A panel is S (80 characters or fewer), M (up to 160) or L (longer, two units). Sections run on in order; a section that continues repeats its stamp with "cont.".
-- A panel is one entry: a caption on slip inside a 2.5px ink rule. Entries are set as sentences (first letter upper case by CSS); the text stays as written. Two shorter panels share a row, the longer taking two thirds when it is at least twice as long; a long panel takes the row. Phones set every panel full width.
-- In the book the panels share the slip's height. A slip with one entry is a splash page in two beats (`data-splash`): the caption in its own panel at lede size and an impact panel filling the rest of the slip with the sound word set huge over lines drawn for its kind. Splash slips cycle three compositions down the book: stack (caption over impact), flip (impact over caption) and inset (the impact is the whole slip, the caption sits in its corner). The impact art is seeded from the entry text (focus point, tone cut, the sound word's tilt), so two slips of a kind never print alike.
-- Screentone (3px squares on the 6px dot-matrix cell, inkSoft, generated from `tokens.json` at build time) fills the corner the text never reaches, shaped by kind: a rising wedge for new things, a falling wedge for fixes, speed lines for a restyle, an even band for docs. 25% under short and medium panels, 50% under long ones. Never under text.
-- Impact panels: focus lines (a hard-stop conic gradient, rays converging behind the sound word) for features and breaking changes, a 50% tone wedge for fixes, speed lines for a restyle.
-- The cover is a volume cover: the title on a clean plate, focus lines, and the newest version as the volume number on its own tilted plate where the lines meet. No text sits on the lines.
-- Each release head carries its tally: the stamps of its kinds as small chips with a count. The index groups releases under the day they shipped, each row a version and its chips.
-- Narration (a release's intro) and breaking changes print in reverse: slip on an ink panel.
-- No speech bubbles, no characters, no faces. The stamps and sound words carry the voice.
+- The latest three releases get a full strip (`art/strip-<version>.png`), older ones a one-panel card cut from the mascot sheet (`art/mascot-sheet.png`), by kind. Crops, label paint-outs, titles and sound words live in `changelog/art.json`.
+- `bun run art` writes AVIF, WebP, a 256 px thumbnail and a blurred placeholder for each into `public/changelog-art/`, and fails over 200 KB AVIF or 320 KB WebP.
+- The newest release's art is the only image in the first view (`fetchpriority="high"`). First view budget 550 KB, held by `scripts/check-weight.mjs`.
 
-### Stamps and sound words
-
-| Kind | Stamp | Sound word | Treatment |
+| Kind | Stamp | Sound word | Card |
 | --- | --- | --- | --- |
-| Breaking changes | Breaking (white on stamp) | KRAK | Ink panel, slip text |
-| Features | New (ink on mint) | KA-CHUNK | |
-| UI enhancements | Restyled (inkSoft, dashed) | SHFF | Guilloche inner rule |
-| Hotfixes, Fixes | Fixed (stamp on slip) | TAK | |
-| Documentation and project site | Docs (ink on slip) | FLIP | |
-| Anything else | First word of the heading | none | |
+| Breaking changes | Breaking | KRAK! | shocked |
+| Features | New | KA-CHUNK! | proud |
+| UI enhancements | Restyled | SHFF! | neutral |
+| Hotfixes | Fixed | TAK! | sweating |
+| Fixes | Fixed | TAK! | smug |
+| Documentation and project site | Docs | FLIP! | sleepy |
 
-The stamp sits on the panel border at -7 degrees, the way a rubber stamp overlaps what it marks. It repeats the section heading, which is the real `h3` (visually hidden), so the stamp is `aria-hidden` and read once. The sound word is in the first panel of each section only: Bricolage 800 in ink with a slip outline cut out of the tone, `aria-hidden`, never inside a heading or a link.
-
-### Props
-
-Line art in `src/assets/svg/props/` (ten Recraft props, cleaned by `scripts/clean-recraft.mjs`, log in `props/README.md`), chosen by an entry's scope or label (bank, settings, setup, nav, review, receipts, app, mail, docs; ui takes the ledger). Unknown scopes get none. A prop sits in the tone corner of a panel, on the side away from the sound word, coloured by class like the other illustrations, `aria-hidden`. Splash slips in the book and ink panels keep their composition without one. Never people, faces, bank logos or bank colours. With no prop file the corner keeps its sound word and tone.
+Stamps and sound words are `aria-hidden`; the section headings are the real text.
 
 ### Motion
 
 | Motion | Duration | Curve |
 | --- | --- | --- |
-| Curl: the slip lifts from its foot corner, rolls round a cylinder leaning 12 degrees and lies face down off the top, its back dithered with the print showing through | 750 ms | the tear curve, cubic-bezier(0.7, 0, 0.2, 1) |
-| Tear (no WebGL, a software GPU, Save-Data, or the cover): the slip is tugged, then pulled off the roll as one sheet, up and away under the bar | 450 ms | the tear curve |
-| A turn asked for mid-curl finishes the curl first | 120 ms | linear |
-| Arriving version wipes in, once the slip has cleared | 360 ms from 200 ms into the tear, or 190 ms into the curl (410 ms going back) | the hero wipe curve |
-| Stamp lands after a turn, once the slip has cleared | 520 ms, 200 ms after the version starts | the hero full-stop curve |
-| Strip stamps land as their slip scrolls in | scroll position | linear, native view timeline |
+| 3D turn: the leaf lifts off the page on the side you are going, bends with its free edge lagging, and lands on the other side showing the arriving page | 900 ms | power2.inOut |
+| Slide (phones, no WebGL, a software or slow GPU, Save-Data, low memory): the old spread slides out, the new one in | 260 ms out, 360 ms in | the turn ease |
+| A turn asked for mid-turn finishes the turn first | 150 ms | linear |
+| Stamp and sound word pop in on the arriving spread | 420 ms and 380 ms | an overshoot, cubic-bezier(0.3, 1.6, 0.5, 1) |
 
-Reduced motion, the switch set to off and no JavaScript get an instant swap: no tear, no curl and no view timelines. three.js and GSAP are never loaded for them.
+Reduced motion, the switch set to off and no JavaScript get an instant swap. three.js and GSAP are never loaded for them.
 
-### The curl
+### The 3D book
 
-`src/curl.ts` with `src/shaders/curl.*.glsl`, three.js in its own lazy chunk (budget 160 KB gzipped, held by `scripts/check-weight.mjs`). It loads on idle after the page, or on the first hover or focus of Next, and only with motion on, WebGL2, no Save-Data and a hardware GPU (`?fx-force` lets SwiftShader through for the frame checks).
+`src/book3d.ts` with `src/shaders/book.*.glsl`, three.js in its own lazy chunk (budget 160 KB gzipped, held by `scripts/check-weight.mjs`). It loads on idle after the page, only on a wide screen with motion on, WebGL2, no Save-Data, at least 4 GB of device memory and a hardware GPU (`?fx-force` lets SwiftShader through for testing).
 
-- The slip is captured by drawing a clone of it, with the page's own styles and fonts inlined, into an SVG `foreignObject` the size of the window, laid out at the same fraction of a pixel as on the page, at one texel per drawn pixel. Frame 0 matches the DOM slip; `check-frames` fails if the first frame is more than 5% off, or if a frame mid-curl has not moved.
-- A plane at the slip's exact rect, under a 30 degree camera set so z = 0 is one CSS pixel per unit, wraps round a cylinder that shrinks as it lifts. The curve and the back are a 4x4 Bayer dither between inkSoft and slip, never a blend, the ink field's rule.
-- One renderer, drawn on GSAP's ticker only during a turn. The last three captures are kept. The renderer is disposed and its context released on `pagehide`, the switch going off or leaving the book; a lost context falls back to the tear for the session.
-- Phones: the strip's Next at a release's foot curls that slip away, at 1.5 pixels per CSS pixel and 24 segments. Scrolling never drives WebGL.
+- Each spread is captured by drawing a clone of it, with the page's styles, fonts and art inlined, into an SVG `foreignObject`. The open spread and its two neighbours are captured while idle, so a turn starts at once.
+- One fixed canvas, a 30 degree camera set so z = 0 is one CSS pixel per unit. A flat plane holds the page that stays; the leaf is a 48 segment strip bent in the vertex shader (closed form arc). Shade is a 4x4 Bayer dither to inkSoft, never a blend.
+- Drawn on GSAP's ticker only during a turn. Under 40 frames a second, a lost context or any error hands the turn to the slide for the session. Disposed on `pagehide` and when the motion switch goes off.
 
 ## Don'ts
 
