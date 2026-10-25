@@ -811,3 +811,11 @@ html[data-motion="off"] .spread.is-leaving {
 html[data-ready] .all:not([open]) > .all-toggle {
   display: none;
 }
+
+/* The release title takes focus only from the script, after a turn, so a
+   screen reader starts reading there. It is not a control and cannot be
+   tabbed to, so it shows no ring; buttons and links keep theirs. */
+.rel-v[tabindex="-1"]:focus,
+.rel-v[tabindex="-1"]:focus-visible {
+  outline: none;
+}
