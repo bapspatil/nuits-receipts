@@ -13,6 +13,8 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Run the Worker near its D1 database, so each page's queries stay short.
+  "placement": { "mode": "smart" },
   "vars": {
     "AI_MODE": "live",
     "AUTH_USERNAME": "owner",

@@ -137,4 +137,4 @@ Settings > Advanced > **Set at deploy** shows these read-only. Secrets show only
 | `wrangler.resolved.jsonc` | No (gitignored) | Written by `bun run deploy` when the chosen config has no `database_id`. |
 | `.dev.vars` | No (gitignored) | Local secrets for `bun run dev`. Copy of `.dev.vars.example`. |
 
-Both committed configs set `compatibility_date` `2026-08-01`, the `nodejs_compat` flag and `send_metrics: false`. `wrangler.jsonc` also sets `workers_dev: true`, `preview_urls: false` and `observability` with `head_sampling_rate: 1`. There are no cron triggers.
+Both committed configs set `compatibility_date` `2026-08-01`, the `nodejs_compat` flag and `send_metrics: false`. `wrangler.jsonc` also sets `workers_dev: true`, `preview_urls: false` and `observability` with `head_sampling_rate: 1`, and `placement` `smart`, so the Worker runs near its D1 database. There are no cron triggers.

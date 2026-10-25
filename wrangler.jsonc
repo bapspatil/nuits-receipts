@@ -16,6 +16,9 @@
   "preview_urls": false,
   // Logs stay in your own Cloudflare account. Lower the rate if you prefer.
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Run the Worker near its D1 database, not near the visitor: a page makes
+  // several queries, and each one would otherwise cross that distance again.
+  "placement": { "mode": "smart" },
   "vars": {
     "AI_MODE": "live",
     "AUTH_USERNAME": "owner",
