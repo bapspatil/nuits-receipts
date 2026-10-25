@@ -4,7 +4,7 @@
 // the same files under the same names.
 import { makeZip, predictLength } from 'client-zip';
 import { hash, money, requireInput, type Receipt } from './domain';
-import { eurValue } from './banking';
+import { eurValues } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { csvCell, csvText, documentRows, EXPORT_COLUMNS, exportRow, SALES_COLUMNS, salesRow } from './ui';
@@ -254,16 +254,16 @@ export async function planPackage(
   };
 }
 
+const receiptOf = (f: { receipt: Receipt }) => f.receipt;
+
 // Today's export columns unchanged, plus where the file is in the package.
 // Receipts only; sales invoices have their own index.
 // A changes package lists only its own files, so its index gets its own name
 // and never replaces the full one when unzipped over it.
 export async function indexCsv(env: Env, plan: Plan, origin: string, partial = false): Promise<TextFile> {
-  const data = await Promise.all(
-    (partial ? plan.files : plan.all)
-      .filter((f) => f.receipt.kind !== 'sales')
-      .map(async (f) => [...(await exportRow(env, f.receipt, origin)), f.path, f.folder]),
-  );
+  const files = (partial ? plan.files : plan.all).filter((f) => f.receipt.kind !== 'sales');
+  const eurs = await eurValues(env, files.map(receiptOf));
+  const data = files.map((f, i) => [...exportRow(f.receipt, eurs[i]!, origin), f.path, f.folder]);
   return {
     name: `00-index-${plan.month}${partial ? '-changes' : ''}.csv`,
     bytes: new TextEncoder().encode(csvText([...EXPORT_COLUMNS, 'file_name', 'folder'], data)),
@@ -274,9 +274,8 @@ export async function indexCsv(env: Env, plan: Plan, origin: string, partial = f
 export async function salesIndexCsv(env: Env, plan: Plan, origin: string, partial = false): Promise<TextFile | null> {
   const files = (partial ? plan.files : plan.all).filter((f) => f.receipt.kind === 'sales');
   if (!files.length) return null;
-  const data = await Promise.all(
-    files.map(async (f) => [...(await salesRow(env, f.receipt, origin)), f.path, f.folder]),
-  );
+  const eurs = await eurValues(env, files.map(receiptOf));
+  const data = files.map((f, i) => [...salesRow(f.receipt, eurs[i]!, origin), f.path, f.folder]);
   return {
     name: `00-sales-index-${plan.month}${partial ? '-changes' : ''}.csv`,
     bytes: new TextEncoder().encode(csvText([...SALES_COLUMNS, 'file_name', 'folder'], data)),
@@ -409,7 +408,8 @@ export async function markSent(
     409,
   );
   let total = 0;
-  for (const r of rows) if (r.kind !== 'sales') total += (await eurValue(env, r)).minor ?? 0;
+  const expenses = rows.filter((r) => r.kind !== 'sales');
+  for (const eur of await eurValues(env, expenses)) total += eur.minor ?? 0;
   const at = new Date().toISOString();
   await env.DB.prepare(
     'INSERT INTO month_sends (month,sent_at,method,file_count,total_minor,receipts_hash,receipts_json) VALUES (?,?,?,?,?,?,?)',

@@ -583,6 +583,29 @@ test('the app has a tab icon, served by the Worker behind sign-in', async () => 
   expect((await at('/app/favicon.svg')).status).toBe(200);
 });
 
+test('pages ask Chrome to fetch the other tabs ahead, from a rules file behind sign-in', async () => {
+  const page = await request('/');
+  expect(page.headers.get('Speculation-Rules')).toBe('"/assets/speculation-rules.json"');
+  const rules = await request('/assets/speculation-rules.json');
+  expect(rules.status).toBe(200);
+  expect(rules.headers.get('Content-Type')).toBe('application/speculationrules+json');
+  const { prefetch } = (await rules.json()) as { prefetch: { where: unknown; eagerness: string }[] };
+  expect(prefetch).toEqual([
+    {
+      where: {
+        and: [{ selector_matches: 'nav.main a, nav.tabs a' }, { not: { selector_matches: '[aria-current=page]' } }],
+      },
+      eagerness: 'moderate',
+    },
+  ]);
+  expect((await worker.fetch(new Request('http://localhost/assets/speculation-rules.json'), env)).status).toBe(401);
+  const based = { ...env, APP_BASE_PATH: '/app' } as Env;
+  const at = (path: string) =>
+    worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), based);
+  expect((await at('/app/review')).headers.get('Speculation-Rules')).toBe('"/app/assets/speculation-rules.json"');
+  expect((await at('/app/assets/speculation-rules.json')).status).toBe(200);
+});
+
 test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
   const based = { ...env, APP_BASE_PATH: '/app' } as Env;
   const at = (path: string) =>
