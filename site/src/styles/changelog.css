@@ -270,6 +270,38 @@ html:not([data-ready]) .spread:target {
 .page-art[data-art="strip"] .art-img {
   border: var(--book-ink);
 }
+/* A strip's overlay is placed in percent of the art itself, so the box wraps
+   the image exactly, and its type scales with the art (cqi). */
+.art-box {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-inline: auto;
+}
+.art-box > .ov-layer {
+  container-type: inline-size;
+}
+.art-box .ov-sfx {
+  font-size: calc(var(--s, 1) * 9cqi);
+  -webkit-text-stroke-width: max(1px, 0.35cqi);
+  text-shadow: 0.6cqi 0.6cqi 0 var(--color-ink);
+}
+.art-box .ov-bubble {
+  width: var(--w, 30%);
+  white-space: normal;
+  text-align: center;
+  font: 700 calc(var(--s, 1) * 4.2cqi) / 1.1 var(--font-display);
+  color: var(--color-ink);
+  text-wrap: balance;
+}
+.art-box .ov-tag {
+  padding: 0.5cqi 1.4cqi;
+  background: var(--color-ink);
+  color: var(--color-slip);
+  font: 700 calc(var(--s, 1) * 3.2cqi) / 1.1 var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 
 /* A one-panel card: the SLIP mood for the kind of change, the version set
    big behind it, and the sound word breaking over the frame. */
@@ -498,6 +530,10 @@ html[data-motion="off"] .spread.is-leaving {
   .page-art {
     display: grid;
     place-items: center;
+  }
+  .page-art[data-art="strip"] .art-box {
+    width: fit-content;
+    max-width: 100%;
   }
   .page-art[data-art="strip"] .art-img {
     width: auto;

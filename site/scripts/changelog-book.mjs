@@ -38,32 +38,42 @@ export function artOf(release, art, manifest) {
   return { type: "card", name: `card-${mood}`, mood, alt: art.cards.panels[mood].alt, sfx, ...manifest.cards[mood] };
 }
 
+// Phones get the 640 px strip; the book on a wide screen the full one. The
+// same rule is in src/changelog.ts (artUrl), which prefetches neighbours.
+export const SMALL_MEDIA = "(max-width: 63.99rem), (max-height: 37.49rem)";
 function picture(a, eager) {
   const src = `${ART_BASE}${a.name}`;
   const loading = eager ? ` fetchpriority="high"` : ` loading="lazy"`;
+  const small = a.small ? `<source type="image/avif" media="${SMALL_MEDIA}" srcset="${src}-${a.small}.avif"><source type="image/webp" media="${SMALL_MEDIA}" srcset="${src}-${a.small}.webp">` : "";
   return (
-    `<picture class="art-pic">` +
+    `<picture class="art-pic">${small}` +
     `<source type="image/avif" srcset="${src}.avif">` +
     `<img class="art-img" src="${src}.webp" width="${a.width}" height="${a.height}" alt="${escapeHtml(a.alt)}" decoding="async"${loading} style="background-image:url(${a.blur})">` +
     `</picture>`
   );
 }
 
+// Overlay items over a strip, x and y in percent of the art (the item's
+// centre), r in degrees, s a size factor, w a width in percent (bubbles).
+// sfx: a crimson sound word. bubble: words for an empty speech bubble.
+// tag: a small ink label on the art, like a panel caption.
+const OVERLAY = new Set(["sfx", "bubble", "tag"]);
 function overlay(items) {
   return items
-    .map(
-      (o) =>
-        `<span class="ov ov-${o.type === "stamp" ? "stamp" : "sfx"}" style="--x:${o.x}%;--y:${o.y}%;--r:${o.r ?? 0}deg">${escapeHtml(o.text)}</span>`,
-    )
+    .filter((o) => OVERLAY.has(o.type) && o.text)
+    .map((o) => {
+      const style = [`--x:${o.x}%`, `--y:${o.y}%`, `--r:${o.r ?? 0}deg`, o.s ? `--s:${o.s}` : "", o.w ? `--w:${o.w}%` : ""].filter(Boolean).join(";");
+      return `<span class="ov ov-${o.type}" style="${style}">${escapeHtml(o.text)}</span>`;
+    })
     .join("");
 }
 
 function artPage(release, a, eager) {
   if (a.type === "strip") {
     return (
-      `<figure class="page page-art" data-art="strip">${picture(a, eager)}` +
-      (a.overlay.length ? `<div class="ov-layer" aria-hidden="true">${overlay(a.overlay)}</div>` : "") +
-      `</figure>`
+      `<figure class="page page-art" data-art="strip"><span class="art-box">${picture(a, eager)}` +
+      (a.overlay.length ? `<span class="ov-layer" aria-hidden="true">${overlay(a.overlay)}</span>` : "") +
+      `</span></figure>`
     );
   }
   // A one-panel card: the SLIP mood for the kind of change, the version set
@@ -112,7 +122,7 @@ export function renderSpread(release, index, art, manifest) {
   const kind = kindOf(release);
   const stamp = KINDS[kind]?.stamp ?? "Shipped";
   return (
-    `<article class="spread" id="${v}" data-i="${index}" data-v="${v}" data-art="${ART_BASE}${a.name}" data-thumb="${ART_BASE}${a.name}-thumb.webp" aria-labelledby="h-${v}"${index ? " hidden" : ""}>` +
+    `<article class="spread" id="${v}" data-i="${index}" data-v="${v}" data-art="${ART_BASE}${a.name}"${a.small ? ` data-small="${a.small}"` : ""} data-thumb="${ART_BASE}${a.name}-thumb.webp" aria-labelledby="h-${v}"${index ? " hidden" : ""}>` +
     artPage(release, a, index === 0) +
     `<div class="page page-notes">` +
     `<header class="rel-head"><h2 class="rel-v" id="h-${v}" tabindex="-1"><span class="vh">Release </span>v${v}</h2>` +

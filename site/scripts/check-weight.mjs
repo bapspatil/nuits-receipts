@@ -51,6 +51,7 @@ const text = [
 ];
 const binary = [
   ...refs(/<link rel="preload" href="([^"]+)" as="font"/g),
+  // The full-size AVIF (a wide screen), the heavier of the two.
   ...refs(/<source type="image\/avif" srcset="([^"]+)"><img[^>]*fetchpriority="high"/g),
 ];
 const gz = (f) => gzipSync(readFileSync(join(dist, f)), { level: 9 }).length;
