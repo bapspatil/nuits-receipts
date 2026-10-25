@@ -13,6 +13,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripLinks, topVersion } from "../../scripts/changelog-parse.mjs";
+
+export { topVersion };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SOURCE = join(root, "CHANGELOG.md");
@@ -30,19 +33,12 @@ This page is built from \`CHANGELOG.md\` in the repository by \`docs-site/script
 
 `;
 
-const COMMIT_OR_COMPARE = /^https:\/\/github\.com\/[^/\s)]+\/[^/\s)]+\/(?:commit|compare)\//;
-
 // Pure: CHANGELOG.md text in, docs page text out.
 export function docsChangelog(markdown) {
   const start = markdown.search(/^## /m);
   if (start < 0) throw new Error("CHANGELOG.md has no release entries.");
   let body = markdown.slice(start).replace(/\r\n?/g, "\n");
-  // A line that is only a compare link ("[Compare v1 to v2](...)"), with its blank line.
-  body = body.replace(/^\[[^\]\n]*\]\(https:\/\/github\.com\/[^)\s]*\/compare\/[^)\s]*\)\n(?:\n)?/gm, "");
-  // "([abc1234](https://github.com/o/r/commit/<sha>))" at the end of an entry.
-  body = body.replace(/ \(\[[0-9a-f]{7,40}\]\(https:\/\/github\.com\/[^)\s]*\/commit\/[0-9a-f]{7,40}\)\)/g, "");
-  // Any other link to a commit or compare page keeps its text only.
-  body = body.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (all, text, url) => (COMMIT_OR_COMPARE.test(url) ? text : all));
+  body = stripLinks(body);
   // MDX reads "{" and "<" outside code as markup.
   body = body
     .split("\n")
@@ -54,13 +50,6 @@ export function docsChangelog(markdown) {
     )
     .join("\n");
   return `${FRONTMATTER}${body.trimEnd()}\n`;
-}
-
-// The newest entry must be the version in package.json, so a release cannot
-// ship with a stale changelog page.
-export function topVersion(markdown) {
-  const match = /^## \[?(\d+\.\d+\.\d+)\b/m.exec(markdown);
-  return match ? match[1] : null;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
