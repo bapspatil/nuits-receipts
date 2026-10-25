@@ -467,6 +467,37 @@
   left: 0.75rem;
 }
 
+/* A prop (src/assets/svg/props/, by scope) stands in the tone corner on the
+   side away from the sound word, coloured by class like the other
+   illustrations. Splash slips keep their composition without one. */
+.prop {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.5rem;
+  width: clamp(2.75rem, 18%, 5rem);
+  color: var(--color-ink);
+}
+
+.prop svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.prop .ik { fill: currentColor; }
+.prop .pp { fill: var(--color-slip); }
+.prop .mt { fill: var(--color-mint); }
+
+.panel:is([data-kind="hotfixes"], [data-kind="fixes"]) .prop {
+  left: auto;
+  right: 0.75rem;
+}
+
+html[data-book] .page[data-splash] .prop,
+.panel[data-kind="breaking"] .prop {
+  display: none;
+}
+
 /* Narration and breaking changes print in reverse: slip on an ink panel. */
 .panels[data-kind="intro"] .panel,
 .panel[data-kind="breaking"] {

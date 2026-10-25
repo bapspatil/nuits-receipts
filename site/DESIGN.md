@@ -189,7 +189,7 @@ The stamp sits on the panel border at -7 degrees, the way a rubber stamp overlap
 
 ### Props
 
-Optional line art in `src/assets/svg/props/`, chosen by an entry's scope or label (bank, settings, setup, nav, review, receipts, app, ui, mail, docs). Unknown scopes get none. A prop sits in the tone corner, coloured by class like the other illustrations, `aria-hidden`. Never people, faces, bank logos or bank colours. With no prop file the corner keeps its sound word and tone.
+Line art in `src/assets/svg/props/` (ten Recraft props, cleaned by `scripts/clean-recraft.mjs`, log in `props/README.md`), chosen by an entry's scope or label (bank, settings, setup, nav, review, receipts, app, mail, docs; ui takes the ledger). Unknown scopes get none. A prop sits in the tone corner of a panel, on the side away from the sound word, coloured by class like the other illustrations, `aria-hidden`. Splash slips in the book and ink panels keep their composition without one. Never people, faces, bank logos or bank colours. With no prop file the corner keeps its sound word and tone.
 
 ### Motion
 
