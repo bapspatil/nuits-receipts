@@ -7,13 +7,13 @@
 //   nowebgl  motion on in a browser with WebGL and WebGPU disabled, so every
 //            canvas falls back to its pre-rendered image
 //
-// Pages: the home page, and /changelog/. At 1440 the changelog is the book,
-// so instead of scrolling it turns with Next through every slip and shoots
-// each settled page, then scrolls the last one to the footer. At 390 it is
-// the strip and scrolls like the home page. In mode on, the first turn is
-// the WebGL curl: its first frame must match the DOM slip it replaces (a
-// texture that does not match makes the text jump), and a frame mid-curl
-// must have moved on from it and not be a flat sheet.
+// Pages: the home page, and /changelog/. At 1440 the changelog is the open
+// book, so instead of scrolling it turns older through every spread and
+// shoots each settled one, then scrolls to the footer. At 390 it scrolls
+// like the home page. In mode on, the second turn is the 3D book: its first
+// frame must match the DOM spread it replaces (a texture that does not match
+// makes the text jump), and a frame mid-turn must have moved on from it and
+// not be a flat sheet.
 //
 // A frame fails when:
 //   - the whole viewport is near-uniform, or has no visible text;
@@ -49,12 +49,12 @@ const INK_SOFT = [0x35, 0x56, 0x50];
 // while pinned scenes are still moving.
 const SETTLE_MS = 180;
 const STEP = 0.3;
-// Share of the slip's pixels allowed to differ (by more than 32 in any
-// channel) between the DOM and the curl's first frame: sub-pixel text
+// Share of the spread's pixels allowed to differ (by more than 32 in any
+// channel) between the DOM and the 3D turn's first frame: sub-pixel text
 // offsets measure under 2%; a texture a pixel off or in the wrong colour is
 // 10% or more.
 const MAX_FIRST_DIFF = 0.05;
-// Mid-curl, at least this share of the slip must have changed.
+// Mid-turn, at least this share of the spread must have changed.
 const MIN_MID_DIFF = 0.1;
 
 const WATCHED = [
@@ -67,11 +67,10 @@ const WATCHED = [
   ".fact",
   ".statement",
   ".disclaimer",
-  ".cl-title",
-  ".rel-version",
-  ".panel",
-  ".cl-stamp",
-  ".rel-foot",
+  ".rel-v",
+  ".rel-bullets",
+  ".page-art",
+  ".scrub-list",
 ];
 
 const modes = (process.env.MODES ?? "on,reduce,nowebgl").split(",");
@@ -144,8 +143,8 @@ function inspect(watched) {
   const boxes = [];
   for (const el of document.querySelectorAll(watched.join(","))) {
     const r = el.getBoundingClientRect();
-    const isText = el.matches(".hero-title, .title, .close-title, .cl-title, .rel-version");
-    // A slip waiting its turn in the book is not on show.
+    const isText = el.matches(".hero-title, .title, .close-title, .rel-v");
+    // A spread waiting its turn in the book is not on show.
     if (el.closest("[hidden]")) continue;
     // A hidden heading is exactly the failure, so headings are never skipped.
     if (!onScreen(r) || (!isText && hidden(el))) continue;
@@ -215,43 +214,44 @@ function differ(a, b, box) {
   return n ? changed / n : 0;
 }
 
-// The first turn through the curl: DOM, first frame, mid-curl.
-async function curlTurn(page, run, tag) {
-  // Hovering Next loads the curl; its canvas is made on the first turn.
-  await page.hover(".ctl-next");
+// A turn through the 3D book: DOM, first frame, mid-turn.
+async function bookTurn(page, run, tag) {
+  // The book loads on idle after the page and captures ahead while idle.
   await page.waitForTimeout(2500);
   const box = await page.evaluate(() => {
-    const r = document.querySelector(".leaf:not([hidden])")?.getBoundingClientRect();
+    const r = document.querySelector(".spread:not([hidden])")?.getBoundingClientRect();
     return r && { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
   });
-  const dom = PNG.sync.read(await page.screenshot());
-  // Stop the page's clock (rAF, timers, GSAP's ticker) so the curl holds at
-  // its first frame, then step it to the middle of the 750 ms turn.
+  const domBuffer = await page.screenshot();
+  writeFileSync(`${OUT}${tag}-turn-dom.png`, domBuffer);
+  const dom = PNG.sync.read(domBuffer);
+  // Stop the page's clock (rAF, timers, GSAP's ticker) so the turn holds at
+  // its first frame, then step it to the middle of the 900 ms turn.
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 20);
-  await page.click(".ctl-next");
+  await page.click(".turn-older");
   const shown = await page
-    .waitForFunction(() => document.querySelector("canvas.curl:not([hidden])"), null, { polling: 50, timeout: 5000 })
+    .waitForFunction(() => document.querySelector("canvas.book3d:not([hidden])"), null, { polling: 50, timeout: 5000 })
     .then(() => true, () => false);
   if (!shown) {
     await page.clock.resume();
-    return failures.push(`${tag}: the curl never ran`);
+    return failures.push(`${tag}: the 3D turn never ran`);
   }
   const firstBuffer = await page.screenshot();
-  await page.clock.runFor(375);
+  await page.clock.runFor(450);
   const midBuffer = await page.screenshot();
   await page.clock.resume();
-  writeFileSync(`${OUT}${tag}-curl-first.png`, firstBuffer);
-  writeFileSync(`${OUT}${tag}-curl-mid.png`, midBuffer);
+  writeFileSync(`${OUT}${tag}-turn-first.png`, firstBuffer);
+  writeFileSync(`${OUT}${tag}-turn-mid.png`, midBuffer);
   const first = PNG.sync.read(firstBuffer);
   const mid = PNG.sync.read(midBuffer);
   const firstDiff = differ(dom, first, box);
   const midDiff = differ(first, mid, box);
   const midStats = stats(mid, box);
-  console.log(`${tag}: curl first frame ${(firstDiff * 100).toFixed(1)}% off the DOM, mid-curl ${(midDiff * 100).toFixed(1)}% moved`);
-  if (firstDiff > MAX_FIRST_DIFF) failures.push(`${tag}: curl first frame ${(firstDiff * 100).toFixed(1)}% off the DOM slip`);
-  if (midDiff < MIN_MID_DIFF) failures.push(`${tag}: mid-curl frame only ${(midDiff * 100).toFixed(1)}% changed`);
-  if (midStats.stddev < MIN_ELEMENT_STDDEV) failures.push(`${tag}: mid-curl frame is flat`);
-  await page.waitForTimeout(800);
+  console.log(`${tag}: turn first frame ${(firstDiff * 100).toFixed(1)}% off the DOM, mid-turn ${(midDiff * 100).toFixed(1)}% moved`);
+  if (firstDiff > MAX_FIRST_DIFF) failures.push(`${tag}: turn first frame ${(firstDiff * 100).toFixed(1)}% off the DOM spread`);
+  if (midDiff < MIN_MID_DIFF) failures.push(`${tag}: mid-turn frame only ${(midDiff * 100).toFixed(1)}% changed`);
+  if (midStats.stddev < MIN_ELEMENT_STDDEV) failures.push(`${tag}: mid-turn frame is flat`);
+  await page.waitForTimeout(1200);
 }
 
 async function scrollThrough(page, run, tag, from = 0, first = 0) {
@@ -274,29 +274,29 @@ for (const run of runs) {
     reducedMotion: run.motion === "reduce" ? "reduce" : "no-preference",
   });
   const page = await context.newPage();
-  // A clock the curl check can pause; it runs at real speed until then.
+  // A clock the 3D turn check can pause; it runs at real speed until then.
   if (run.motion === "on" && run.width === 1440) await page.clock.install();
   const slug = run.path === "/" ? "home" : run.path.replace(/\W+/g, "");
   const tag = `${slug}-${run.width}-${run.motion}`;
   page.on("pageerror", (e) => failures.push(`${tag}: page error ${e.message}`));
   await page.goto(`${BASE.replace(/\/$/, "")}${run.path}?fx-force`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
-  const isBook = await page.evaluate(() => document.documentElement.dataset.book !== undefined);
+  const isBook = await page.evaluate(() => !!document.querySelector(".book") && matchMedia("(min-width: 64rem) and (min-height: 37.5rem)").matches);
   if (isBook) {
-    // Turn through every slip, shooting each settled page.
+    // Turn older through every spread, shooting each settled one.
     let i = 0;
     for (;;) {
       await shoot(page, run, tag, i++, 0, 0);
-      const last = await page.evaluate(() => document.querySelector(".ctl-next")?.getAttribute("aria-disabled") === "true");
+      const last = await page.evaluate(() => document.querySelector(".turn-older")?.getAttribute("aria-disabled") === "true");
       if (last) break;
-      if (i === 2 && run.motion === "on") await curlTurn(page, run, tag);
+      if (i === 2 && run.motion === "on") await bookTurn(page, run, tag);
       else {
-        await page.click(".ctl-next");
-        await page.waitForTimeout(run.motion === "reduce" ? 150 : 800);
+        await page.click(".turn-older");
+        await page.waitForTimeout(run.motion === "reduce" ? 150 : 1200);
       }
     }
     const rest = await scrollThrough(page, run, tag, Math.round(run.height * STEP), i);
-    console.log(`${tag}: ${i} slips turned, then ${rest.frames} scroll frames to the footer`);
+    console.log(`${tag}: ${i} spreads turned, then ${rest.frames} scroll frames to the footer`);
   } else {
     const { frames, live, total } = await scrollThrough(page, run, tag);
     if (run.path === "/") {

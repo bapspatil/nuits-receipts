@@ -672,3 +672,17 @@ html[data-motion="off"] .spread.is-leaving {
     margin-top: 2rem;
   }
 }
+
+/* The 3D book's canvas (src/book3d.ts): over the page, under the bar, only
+   while a leaf is turning. */
+.book3d {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  pointer-events: none;
+}
+.book3d[hidden] {
+  display: none;
+}
