@@ -24,6 +24,8 @@ export type RequestState = {
   // The form a POST handler read, kept so a refusal can show it again.
   form?: FormData;
   failure?: FormFailure;
+  // The tab counts, started once per page request (see navCounts in ui.ts).
+  counts?: Promise<{ review: number; missing: number }>;
 };
 
 export const requestState = new AsyncLocalStorage<RequestState>();

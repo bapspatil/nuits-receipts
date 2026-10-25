@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 import { money, requireInput, type Receipt } from './domain';
-import { eurValue } from './banking';
+import { eurValues, type EurValue } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { version } from '../package.json';
@@ -65,17 +65,28 @@ async function heldTotal(env: Env): Promise<number> {
     return 0;
   }
 }
-export async function navCounts(env: Env): Promise<Counts> {
+// The tab counts for this request. The router starts them as soon as a page
+// request is signed in, so they load alongside the page's own queries.
+export function navCounts(env: Env): Promise<Counts> {
+  const state = requestState.getStore();
+  if (!state) return countNav(env);
+  return (state.counts ??= countNav(env));
+}
+async function countNav(env: Env): Promise<Counts> {
   try {
-    const [review, missing] = await env.DB.batch<{ n: number }>([
-      env.DB.prepare(
-        "SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
-      ),
-      env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
+    // Held mail is its own query, so it runs alongside the batch instead of after it.
+    const [[review, missing], held] = await Promise.all([
+      env.DB.batch<{ n: number }>([
+        env.DB.prepare(
+          "SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+        ),
+        env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
+      ]),
+      heldTotal(env),
     ]);
     return {
       // Unknown-sender emails wait in Review too.
-      review: (review?.results[0]?.n ?? 0) + (await heldTotal(env)),
+      review: (review?.results[0]?.n ?? 0) + held,
       missing: missing?.results[0]?.n ?? 0,
     };
   } catch {
@@ -609,10 +620,27 @@ export async function page(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
     {
       status: requestState.getStore()?.failure?.status ?? status,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        // The rules live in a file, not an inline script, so the page needs no script-src.
+        'Speculation-Rules': `"${basePath}/assets/speculation-rules.json"`,
+      },
     },
   );
 }
+// Chrome and Edge fetch a tab as the pointer rests on it (or on press, on a
+// phone), so the page is often loaded by the time the click lands. Only the
+// tab bars, which are plain reads; other browsers ignore the header.
+export const SPECULATION_RULES = JSON.stringify({
+  prefetch: [
+    {
+      where: {
+        and: [{ selector_matches: 'nav.main a, nav.tabs a' }, { not: { selector_matches: '[aria-current=page]' } }],
+      },
+      eagerness: 'moderate',
+    },
+  ],
+});
 
 // The page header: the title and at most one action. No kicker, no subtitle. HTML in.
 export function pageHead(title: string, aside = ''): string {
@@ -835,8 +863,7 @@ export const EXPORT_COLUMNS = [
   'matched_account_name',
 ] as const;
 // One export row, in EXPORT_COLUMNS order. The month package index reuses it.
-export async function exportRow(env: Env, r: Receipt, origin: string): Promise<unknown[]> {
-  const eur = await eurValue(env, r);
+export function exportRow(r: Receipt, eur: EurValue, origin: string): unknown[] {
   return [
     r.issue_date,
     csvCell(r.vendor),
@@ -885,13 +912,8 @@ export const SALES_COLUMNS = [
   'eur_source',
 ] as const;
 // One sales invoice row, in SALES_COLUMNS order.
-export async function salesRow(env: Env, r: Receipt, origin: string): Promise<unknown[]> {
-  const eur = await eurValue(env, r);
-  const paid = eur.transaction
-    ? await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
-        .bind(eur.transaction)
-        .first<string>('booking_date')
-    : null;
+export function salesRow(r: Receipt, eur: EurValue, origin: string): unknown[] {
+  const paid = eur.bookingDate;
   return [
     r.issue_date,
     csvCell(r.invoice_number),
@@ -919,7 +941,8 @@ export async function salesRow(env: Env, r: Receipt, origin: string): Promise<un
 }
 export async function exportSalesCsv(env: Env, selected: string, origin: string): Promise<Response> {
   const rows = await salesMonthRows(env, selected);
-  const data = await Promise.all(rows.map((r) => salesRow(env, r, origin)));
+  const eurs = await eurValues(env, rows);
+  const data = rows.map((r, i) => salesRow(r, eurs[i]!, origin));
   return new Response(csvText(SALES_COLUMNS, data), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -933,7 +956,8 @@ export function csvText(fields: readonly string[], data: unknown[][]): string {
 }
 export async function exportCsv(env: Env, selected: string, origin: string): Promise<Response> {
   const rows = await monthRows(env, selected);
-  const data = await Promise.all(rows.map((r) => exportRow(env, r, origin)));
+  const eurs = await eurValues(env, rows);
+  const data = rows.map((r, i) => exportRow(r, eurs[i]!, origin));
   return new Response(csvText(EXPORT_COLUMNS, data), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
