@@ -129,3 +129,7 @@ const spy = new IntersectionObserver(
   { rootMargin: "-45% 0px -45% 0px" },
 );
 for (const s of sections) spy.observe(s);
+
+// Page links (Changelog, Privacy) mark the page they point at.
+for (const a of document.querySelectorAll<HTMLAnchorElement>(".nav-page .nav-link"))
+  if (a.origin === location.origin && a.pathname === location.pathname && !a.hash) a.setAttribute("aria-current", "page");

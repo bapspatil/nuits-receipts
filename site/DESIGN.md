@@ -146,6 +146,62 @@ The bar is an opaque plate of paper with a torn foot, sticky at the top in CSS a
 
 The footer is the receipt's stub: a torn top edge, the wordmark at display size with the footer nav and the Deploy badge, the small print in two columns, the trader identification and licence and trademark lines, and a centred tail ending on "No receipt needed for this page."
 
+## The changelog
+
+`/changelog/` reads the releases like a comic. It is built from `CHANGELOG.md` at site build time by `scripts/changelog-plugin.mjs` (parser in `scripts/changelog-parse.mjs` at the repository root, markup in `scripts/changelog-render.mjs`), so every word is real HTML and a new release needs no hand work. The build fails if the newest release is not the version in `package.json`.
+
+```
+Idea:        every release is printed on a receipt slip and read like a comic page
+Metaphor:    a thermal receipt roll bound as a manga volume
+Signature:   turning the page tears the slip off the roll and curls it away
+Emotion:     the small satisfaction of tearing off a receipt
+Motion verb: tear and curl
+Screenshot:  a slip mid-curl, dithered back showing, the next release's stamp landing beneath
+```
+
+Two layouts. The strip is the default: cover, index, then every release stacked down the roll with a perforation between them. Phones, readers without JavaScript and crawlers get it. The book is the reading mode `src/changelog.ts` turns on at 64rem wide and 37.5rem tall: one slip at a time beside its version, turned with Back and Next, arrow keys, Page Up and Down, Home and End, or a swipe, with an anchor per slip (`#v1-12-2`, `#v1-0-1-p2`). Slips waiting their turn are `hidden="until-found"`, so find in page still opens them.
+
+### Panel grammar
+
+- A page is one release, or part of one: a slip with the torn foot, on a roll of two more slips. Its version sets as wide as its column (the build writes the figures' width into `--fit`, capped at 17rem and a third of the screen) beside it (book) or above it (strip), with the date in small type, the tally and one Release link to the GitHub release page. In the book a folio ("03 / 23", `aria-hidden`) closes the column.
+- A slip holds at most four panel units and 560 characters. A panel is S (80 characters or fewer), M (up to 160) or L (longer, two units). Sections run on in order; a section that continues repeats its stamp with "cont.".
+- A panel is one entry: a caption on slip inside a 2.5px ink rule. Entries are set as sentences (first letter upper case by CSS); the text stays as written. Two shorter panels share a row, the longer taking two thirds when it is at least twice as long; a long panel takes the row. Phones set every panel full width.
+- In the book the panels share the slip's height. A slip with one entry is a splash page in two beats (`data-splash`): the caption in its own panel at lede size and an impact panel filling the rest of the slip with the sound word set huge over lines drawn for its kind. Splash slips cycle three compositions down the book: stack (caption over impact), flip (impact over caption) and inset (the impact is the whole slip, the caption sits in its corner). The impact art is seeded from the entry text (focus point, tone cut, the sound word's tilt), so two slips of a kind never print alike.
+- Screentone (3px squares on the 6px dot-matrix cell, inkSoft, generated from `tokens.json` at build time) fills the corner the text never reaches, shaped by kind: a rising wedge for new things, a falling wedge for fixes, speed lines for a restyle, an even band for docs. 25% under short and medium panels, 50% under long ones. Never under text.
+- Impact panels: focus lines (a hard-stop conic gradient, rays converging behind the sound word) for features and breaking changes, a 50% tone wedge for fixes, speed lines for a restyle.
+- The cover is a volume cover: the title on a clean plate, focus lines, and the newest version as the volume number on its own tilted plate where the lines meet. No text sits on the lines.
+- Each release head carries its tally: the stamps of its kinds as small chips with a count. The index groups releases under the day they shipped, each row a version and its chips.
+- Narration (a release's intro) and breaking changes print in reverse: slip on an ink panel.
+- No speech bubbles, no characters, no faces. The stamps and sound words carry the voice.
+
+### Stamps and sound words
+
+| Kind | Stamp | Sound word | Treatment |
+| --- | --- | --- | --- |
+| Breaking changes | Breaking (white on stamp) | KRAK | Ink panel, slip text |
+| Features | New (ink on mint) | KA-CHUNK | |
+| UI enhancements | Restyled (inkSoft, dashed) | SHFF | Guilloche inner rule |
+| Hotfixes, Fixes | Fixed (stamp on slip) | TAK | |
+| Documentation and project site | Docs (ink on slip) | FLIP | |
+| Anything else | First word of the heading | none | |
+
+The stamp sits on the panel border at -7 degrees, the way a rubber stamp overlaps what it marks. It repeats the section heading, which is the real `h3` (visually hidden), so the stamp is `aria-hidden` and read once. The sound word is in the first panel of each section only: Bricolage 800 in ink with a slip outline cut out of the tone, `aria-hidden`, never inside a heading or a link.
+
+### Props
+
+Optional line art in `src/assets/svg/props/`, chosen by an entry's scope or label (bank, settings, setup, nav, review, receipts, app, ui, mail, docs). Unknown scopes get none. A prop sits in the tone corner, coloured by class like the other illustrations, `aria-hidden`. Never people, faces, bank logos or bank colours. With no prop file the corner keeps its sound word and tone.
+
+### Motion
+
+| Motion | Duration | Curve |
+| --- | --- | --- |
+| Tear: the slip is tugged, then pulled off the roll as one sheet, up and away under the bar | 450 ms | the tear curve, cubic-bezier(0.7, 0, 0.2, 1) |
+| Arriving version wipes in, once the slip has cleared | 360 ms from 200 ms | the hero wipe curve |
+| Stamp lands after a turn, once the slip has cleared | 520 ms from 400 ms | the hero full-stop curve |
+| Strip stamps land as their slip scrolls in | scroll position | linear, native view timeline |
+
+Reduced motion, the switch set to off and no JavaScript get an instant swap: no tear and no view timelines.
+
 ## Don'ts
 
 - No elves, mascots or characters.

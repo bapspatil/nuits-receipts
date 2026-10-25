@@ -7,6 +7,11 @@
 //   nowebgl  motion on in a browser with WebGL and WebGPU disabled, so every
 //            canvas falls back to its pre-rendered image
 //
+// Pages: the home page, and /changelog/. At 1440 the changelog is the book,
+// so instead of scrolling it turns with Next through every slip and shoots
+// each settled page, then scrolls the last one to the footer. At 390 it is
+// the strip and scrolls like the home page.
+//
 // A frame fails when:
 //   - the whole viewport is near-uniform, or has no visible text;
 //   - a watched element (headings, illustrations, slips, steps, facts) that
@@ -18,6 +23,7 @@
 //     dot-matrix print, live or fallback: no exact inkSoft dots in its box.
 //
 // Needs the built site served at SITE_URL (default http://localhost:4321/).
+// PAGES=/,/changelog/ limits or extends the pages.
 // Frames go to OUT (default ../../nuits-receipts-site-shots/frames).
 // MODES=on,reduce limits the run.
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -51,11 +57,17 @@ const WATCHED = [
   ".fact",
   ".statement",
   ".disclaimer",
+  ".cl-title",
+  ".rel-version",
+  ".panel",
+  ".cl-stamp",
+  ".rel-foot",
 ];
 
 const modes = (process.env.MODES ?? "on,reduce,nowebgl").split(",");
-const runs = [390, 1440].flatMap((width) =>
-  modes.map((motion) => ({ width, height: width === 390 ? 844 : 900, motion })),
+const pages = (process.env.PAGES ?? "/,/changelog/").split(",");
+const runs = pages.flatMap((path) =>
+  [390, 1440].flatMap((width) => modes.map((motion) => ({ path, width, height: width === 390 ? 844 : 900, motion }))),
 );
 
 function stats(png, box) {
@@ -98,6 +110,7 @@ function inspect(watched) {
       const cs = getComputedStyle(e);
       if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) < 0.05) return true;
       if (/inset\((100%|calc\(100%)/.test(cs.clipPath)) return true;
+      if (e.hidden || cs.contentVisibility === "hidden") return true;
       if (e.closest("[aria-hidden='true']") === e && e.tagName !== "svg") return true;
     }
     return false;
@@ -121,7 +134,9 @@ function inspect(watched) {
   const boxes = [];
   for (const el of document.querySelectorAll(watched.join(","))) {
     const r = el.getBoundingClientRect();
-    const isText = el.matches(".hero-title, .title, .close-title");
+    const isText = el.matches(".hero-title, .title, .close-title, .cl-title, .rel-version");
+    // A slip waiting its turn in the book is not on show.
+    if (el.closest("[hidden]")) continue;
     // A hidden heading is exactly the failure, so headings are never skipped.
     if (!onScreen(r) || (!isText && hidden(el))) continue;
     const x = Math.max(0, r.left);
@@ -151,6 +166,46 @@ const browserFor = async (motion) =>
 const failures = [];
 const summary = [];
 
+async function shoot(page, run, tag, index, y, total) {
+  const name = `${tag}-${String(index).padStart(3, "0")}.png`;
+  const buffer = await page.screenshot();
+  writeFileSync(OUT + name, buffer);
+  const png = PNG.sync.read(buffer);
+  const whole = stats(png);
+  const seen = await page.evaluate(inspect, WATCHED);
+  const problems = [];
+  if (whole.stddev < MIN_STDDEV || whole.dominant > MAX_DOMINANT || seen.text === 0)
+    problems.push(`frame stddev ${whole.stddev.toFixed(1)}, dominant ${(whole.dominant * 100).toFixed(1)}%, ${seen.text} text`);
+  for (const b of seen.boxes) {
+    const s = stats(png, b);
+    if (s.stddev < MIN_ELEMENT_STDDEV) problems.push(`"${b.name}" is a flat box (stddev ${s.stddev.toFixed(1)})`);
+    if (b.text === 0) problems.push(`"${b.name}" heading has no visible words`);
+  }
+  let live = 0;
+  if (run.path === "/")
+    for (const b of seen.ink) {
+      if (b.live) live++;
+      const s = stats(png, b);
+      if (s.ink < MIN_INK_DOTS) problems.push(`"${b.name}" has no dot print (${(s.ink * 100).toFixed(2)}% dots)`);
+    }
+  summary.push({ frame: name, y, stddev: +whole.stddev.toFixed(1), text: seen.text, watched: seen.boxes.length, problems });
+  for (const p of problems) failures.push(`${name}: ${p}`);
+  return live;
+}
+
+async function scrollThrough(page, run, tag, from = 0, first = 0) {
+  const total = await page.evaluate(() => document.documentElement.scrollHeight);
+  const step = Math.round(run.height * STEP);
+  let i = first;
+  let live = 0;
+  for (let y = from; y <= total - run.height + step - 1; y += step, i++) {
+    await page.evaluate((top) => window.scrollTo(0, top), Math.min(y, total - run.height));
+    await page.waitForTimeout(SETTLE_MS);
+    live += await shoot(page, run, tag, i, y, total);
+  }
+  return { frames: i - first, live, total };
+}
+
 for (const run of runs) {
   const browser = await browserFor(run.motion);
   const context = await browser.newContext({
@@ -158,43 +213,33 @@ for (const run of runs) {
     reducedMotion: run.motion === "reduce" ? "reduce" : "no-preference",
   });
   const page = await context.newPage();
-  const tag = `${run.width}-${run.motion}`;
+  const slug = run.path === "/" ? "home" : run.path.replace(/\W+/g, "");
+  const tag = `${slug}-${run.width}-${run.motion}`;
   page.on("pageerror", (e) => failures.push(`${tag}: page error ${e.message}`));
-  await page.goto(`${BASE}?fx-force`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE.replace(/\/$/, "")}${run.path}?fx-force`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
-  const total = await page.evaluate(() => document.documentElement.scrollHeight);
-  const step = Math.round(run.height * STEP);
-  let i = 0;
-  let live = 0;
-  for (let y = 0; y <= total - run.height + step - 1; y += step, i++) {
-    await page.evaluate((top) => window.scrollTo(0, top), Math.min(y, total - run.height));
-    await page.waitForTimeout(SETTLE_MS);
-    const name = `${tag}-${String(i).padStart(3, "0")}.png`;
-    const buffer = await page.screenshot();
-    writeFileSync(OUT + name, buffer);
-    const png = PNG.sync.read(buffer);
-    const whole = stats(png);
-    const seen = await page.evaluate(inspect, WATCHED);
-    const problems = [];
-    if (whole.stddev < MIN_STDDEV || whole.dominant > MAX_DOMINANT || seen.text === 0)
-      problems.push(`frame stddev ${whole.stddev.toFixed(1)}, dominant ${(whole.dominant * 100).toFixed(1)}%, ${seen.text} text`);
-    for (const b of seen.boxes) {
-      const s = stats(png, b);
-      if (s.stddev < MIN_ELEMENT_STDDEV) problems.push(`"${b.name}" is a flat box (stddev ${s.stddev.toFixed(1)})`);
-      if (b.text === 0) problems.push(`"${b.name}" heading has no visible words`);
+  const isBook = await page.evaluate(() => document.documentElement.dataset.book !== undefined);
+  if (isBook) {
+    // Turn through every slip, shooting each settled page.
+    let i = 0;
+    for (;;) {
+      await shoot(page, run, tag, i++, 0, 0);
+      const last = await page.evaluate(() => document.querySelector(".ctl-next")?.getAttribute("aria-disabled") === "true");
+      if (last) break;
+      await page.click(".ctl-next");
+      await page.waitForTimeout(run.motion === "reduce" ? 150 : 800);
     }
-    for (const b of seen.ink) {
-      if (b.live) live++;
-      const s = stats(png, b);
-      if (s.ink < MIN_INK_DOTS) problems.push(`"${b.name}" has no dot print (${(s.ink * 100).toFixed(2)}% dots)`);
+    const rest = await scrollThrough(page, run, tag, Math.round(run.height * STEP), i);
+    console.log(`${tag}: ${i} slips turned, then ${rest.frames} scroll frames to the footer`);
+  } else {
+    const { frames, live, total } = await scrollThrough(page, run, tag);
+    if (run.path === "/") {
+      // The modes must actually differ: live print with motion on, never without.
+      if (run.motion === "on" && live === 0) failures.push(`${tag}: the WebGL ink scene never went live`);
+      if (run.motion !== "on" && live > 0) failures.push(`${tag}: the WebGL ink scene ran in ${run.motion} mode`);
     }
-    summary.push({ frame: name, y, stddev: +whole.stddev.toFixed(1), text: seen.text, watched: seen.boxes.length, problems });
-    for (const p of problems) failures.push(`${name}: ${p}`);
+    console.log(`${tag}: ${frames} frames, page ${total}px, ${live} frames with live ink`);
   }
-  // The modes must actually differ: live print with motion on, never without.
-  if (run.motion === "on" && live === 0) failures.push(`${tag}: the WebGL ink scene never went live`);
-  if (run.motion !== "on" && live > 0) failures.push(`${tag}: the WebGL ink scene ran in ${run.motion} mode`);
-  console.log(`${tag}: ${i} frames, page ${total}px, ${live} frames with live ink`);
   await context.close();
 }
 for (const b of Object.values(browsers)) await b.close();

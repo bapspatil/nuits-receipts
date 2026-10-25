@@ -14,7 +14,7 @@ const htmlUnder = (dir) =>
         .map((f) => join(dir, f))
     : [];
 
-const sources = ["index.html", "404.html", "privacy/index.html", "src/og.html", ...htmlUnder("src/partials")];
+const sources = ["index.html", "404.html", "privacy/index.html", "changelog/index.html", "src/og.html", "src/og-changelog.html", ...htmlUnder("src/partials")].filter((f) => existsSync(f));
 const files = [...sources, ...htmlUnder("dist")];
 
 const phrases = [
@@ -47,6 +47,9 @@ const banned = [
   [/never leaves your account|stays in your (own )?account/i, "data-locality claim (say: Nuits never sees your data)"],
   [/github\.com\/[\w.-]+\/[\w.-]+-private\b/i, "mention of the private repository (its pages are not public)"],
   [/github\.com\/[\w.-]+\/[\w.-]+\/(?:commit|compare)\//i, "link to a commit or compare page (404 for visitors)"],
+  // The repository root and a release tag page are the only GitHub pages the
+  // site links to; the changelog's Release links are the tag pages.
+  [/github\.com\/bapspatil\/nuits-receipts\/(?!releases\/tag\/v\d+\.\d+\.\d+(?![\w.]))[\w.-]/i, "GitHub link other than the repository root or a release tag page"],
   [/Cloudflare Receipts|Receipts for Cloudflare|CF-Receipts/i, "Cloudflare in the product name"],
   [/your own receipt inbox on Cloudflare/i, "old descriptor with Cloudflare in it"],
   [/type="email"|<form\b|waitlist|email me updates/i, "email capture"],

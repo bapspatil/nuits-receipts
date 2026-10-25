@@ -17,7 +17,8 @@
     "lighthouse": "bash scripts/lighthouse.sh",
     "screenshots": "node scripts/screenshots.mjs",
     "record": "node scripts/record.mjs",
-    "preflight:launch": "node scripts/check-copy.mjs --production"
+    "preflight:launch": "node scripts/check-copy.mjs --production",
+    "test": "bun test scripts/"
   },
   "devDependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
