@@ -1,6 +1,6 @@
 {
   "name": "nuits-receipts",
-  "version": "1.12.2",
+  "version": "1.12.3",
   "description": "Self-hosted receipt and invoice reader that runs on Cloudflare Workers: reads receipts with Workers AI, matches them to bank CSV exports and prepares a monthly CSV for your accountant.",
   "license": "Apache-2.0",
   "author": "Bapusaheb Shankaragouda Patil / Nuits",
