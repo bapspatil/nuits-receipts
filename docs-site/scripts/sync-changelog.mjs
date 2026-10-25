@@ -31,6 +31,8 @@ sidebar:
 
 This page is built from \`CHANGELOG.md\` in the repository by \`docs-site/scripts/sync-changelog.mjs\`, with commit and compare links removed. \`scripts/version.mjs\` generates the entries from Conventional Commits on every release. The first release run planted the \`v0.1.0\` baseline from \`package.json\`; entries start after it.
 
+To read the releases as a comic, one receipt slip per release, see the [changelog on the project site](https://receipts.nuits.net/changelog/).
+
 `;
 
 // Pure: CHANGELOG.md text in, docs page text out.

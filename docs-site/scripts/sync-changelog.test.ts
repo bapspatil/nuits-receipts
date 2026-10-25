@@ -38,14 +38,15 @@ test("the newest entry version is read from the heading, with or without a link"
   expect(topVersion("# Changelog\n")).toBeNull();
 });
 
-// Byte snapshots taken from the script before it moved its link rules into
-// scripts/changelog-parse.mjs. The docs page must not change by a byte.
+// Byte snapshots of the docs page, first taken before the link rules moved
+// into scripts/changelog-parse.mjs. A change to the page updates them on
+// purpose, as the link to the changelog comic did.
 const fixture = (name: string) => readFileSync(join(import.meta.dir, "__fixtures__", name), "utf8");
 
-test("the docs page for CHANGELOG.md at 1.12.2 is byte for byte the pre-refactor output", () => {
+test("the docs page for CHANGELOG.md at 1.12.2 matches its snapshot byte for byte", () => {
   expect(docsChangelog(fixture("CHANGELOG-1.12.2.md"))).toBe(fixture("docs-changelog.expected.mdx"));
 });
 
-test("the docs page for the inline fixture is byte for byte the pre-refactor output", () => {
+test("the docs page for the inline fixture matches its snapshot byte for byte", () => {
   expect(docsChangelog(SOURCE)).toBe(fixture("docs-changelog-inline.expected.mdx"));
 });
