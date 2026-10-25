@@ -4,22 +4,24 @@
 //
 // The build fails if the newest release in CHANGELOG.md is not the version in
 // package.json, so the page can never ship a release behind.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseChangelog, topVersion } from "../../scripts/changelog-parse.mjs";
-import { renderBook, renderIndex, renderJsonLd, renderLatest, renderTones } from "./changelog-render.mjs";
+import { renderAll, renderScrubber, renderSpreads } from "./changelog-book.mjs";
+import { renderJsonLd, renderLatest } from "./changelog-render.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
 const SOURCE = resolve(ROOT, "CHANGELOG.md");
 const PACKAGE = resolve(ROOT, "package.json");
-const TOKENS = resolve(import.meta.dirname, "..", "tokens.json");
-const PROPS = resolve(import.meta.dirname, "..", "src", "assets", "svg", "props");
+const ART = resolve(import.meta.dirname, "..", "changelog", "art.json");
+const MANIFEST = resolve(import.meta.dirname, "..", "public", "changelog-art", "manifest.json");
 
-// The props that exist, by name. The page builds without any.
-export function readProps(dir = PROPS) {
-  if (!existsSync(dir)) return {};
-  const files = readdirSync(dir).filter((f) => f.endsWith(".svg"));
-  return Object.fromEntries(files.map((f) => [basename(f, ".svg"), readFileSync(resolve(dir, f), "utf8").trim()]));
+// The art config and what scripts/changelog-art.mjs built from it. The page
+// builds without a manifest: every release then prints text only.
+export function readArt() {
+  const art = JSON.parse(readFileSync(ART, "utf8"));
+  const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : { strips: {}, cards: {} };
+  return { art, manifest };
 }
 
 export function checkVersion(markdown, version) {
@@ -27,14 +29,14 @@ export function checkVersion(markdown, version) {
   if (top !== version) throw new Error(`CHANGELOG.md starts at ${top} but package.json is ${version}.`);
 }
 
-export function fillSlots(html, markdown, inkSoft, props = {}) {
+export function fillSlots(html, markdown, { art, manifest }) {
   const releases = parseChangelog(markdown);
   const slots = {
     version: () => renderLatest(releases),
-    index: () => renderIndex(releases),
-    book: () => renderBook(releases, props),
+    spreads: () => renderSpreads(releases, art, manifest),
+    scrubber: () => renderScrubber(releases),
+    all: () => renderAll(releases),
     jsonld: () => renderJsonLd(releases),
-    tones: () => renderTones(inkSoft),
   };
   return html.replace(/<!-- changelog:(\w+) -->/g, (all, name) => {
     if (!slots[name]) throw new Error(`unknown changelog slot "${name}"`);
@@ -57,8 +59,7 @@ export default function changelog() {
     },
     transformIndexHtml(html) {
       if (!html.includes("<!-- changelog:")) return html;
-      const inkSoft = JSON.parse(readFileSync(TOKENS, "utf8")).color.inkSoft.hex;
-      return fillSlots(html, read(), inkSoft, readProps());
+      return fillSlots(html, read(), readArt());
     },
   };
 }

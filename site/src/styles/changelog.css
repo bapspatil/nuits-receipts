@@ -1,33 +1,17 @@
-/* The changelog comic. Every release is printed on a receipt slip and read
-   like a comic page: entries are panels, the kind of change is a stamp, and a
-   sound word sits in the first panel of each section. One file, after the
-   shared site styles.
+/* The changelog as an open manga book. One spread per release: the art on the
+   left page, the notes on the right, newest first. It opens on the newest
+   release (or the one in the URL) with nothing to click first.
 
-   Two layouts. The strip is the default: every release stacked down the roll,
-   which is what phones, readers without JavaScript and every crawler get. The
-   book is the wide-screen reading mode src/changelog.ts switches on with
-   html[data-book]: one slip at a time, turned with Back and Next. */
+   Phones get one page: the version, the art, then the notes, under a sticky
+   row of version chips. Wide screens get the spread with older and newer
+   either side and the version scrubber along the foot. Without JavaScript
+   every release is still reachable by its #x.y.z anchor through :target. */
 @import "./site.css";
 
 :root {
-  --tear-ease: cubic-bezier(0.7, 0, 0.2, 1);
-  --land-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
-  --panel-rule: 2.5px solid var(--color-ink);
-  --gap-panel: 0.625rem;
-}
-
-/* Manga focus lines: thin rays from one point, drawn with hard stops so they
-   are lines, not a blend. --at is where they converge. Declared on the
-   drawings themselves, so each resolves its own --at and --gap. */
-.cover-head::before,
-.impact::before {
-  --rays: repeating-conic-gradient(from 3deg at var(--at, 70% 62%), var(--ray, var(--color-ink-soft)) 0deg var(--w, 0.7deg), transparent var(--w, 0.7deg) var(--gap, 4deg));
-}
-
-/* Speed lines: horizontal strokes, for things that slid into place. */
-.impact::before,
-.panel::after {
-  --speed: repeating-linear-gradient(180deg, var(--color-ink-soft) 0 2px, transparent 2px 9px);
+  --book-ink: 2px solid var(--color-ink);
+  --scrub-h: 0px;
+  --turn-ease: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .vh {
@@ -42,1245 +26,649 @@
 
 .cl {
   display: grid;
-  padding: clamp(1.5rem, 5vh, 3.5rem) var(--gutter) clamp(4rem, 10vh, 6rem);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  padding: 0 var(--gutter) 3rem;
 }
 
-/* --- Cover: a manga volume cover and the index slip ------------------------ */
-
-.cover {
-  display: grid;
-  gap: 2rem;
-  align-content: start;
-}
-
-/* The volume cover. Title on a clean plate at the top, focus lines below,
-   and the newest version as the volume number on its own plate. No text sits
-   on the lines. */
-.cover-head {
-  container-type: inline-size;
-  position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(9rem, 1fr);
-  min-height: min(68svh, 34rem);
-  padding: 1.25rem 1.25rem 1.5rem;
-  border: var(--panel-rule);
-  border-radius: var(--radius-slip);
-  background: var(--color-slip);
-  box-shadow: var(--shadow-system);
-  overflow: hidden;
-}
-
-.cover-head::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  --at: 64% 58%;
-  background: var(--rays);
-  mask-image: radial-gradient(ellipse 60% 55% at 64% 58%, transparent 0 32%, #000 62%);
-  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 64% 58%, transparent 0 32%, #000 62%);
-}
-
-.cl-title {
-  position: relative;
-  z-index: 1;
-  justify-self: start;
-  padding: 0.25rem 0.75rem 0.5rem 0.5rem;
-  background: var(--color-slip);
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: min(clamp(3.25rem, 1.5rem + 7.5vw, 7.5rem), calc((100cqi - 3rem) / 3.6));
-  line-height: 0.86;
-  letter-spacing: -0.045em;
-}
-
-.cl-title:focus,
-.rel-version:focus,
-.index-title:focus {
-  outline: none;
-}
-
-/* The volume number sits where the focus lines meet. */
-.cover-latest {
-  position: relative;
-  z-index: 1;
-  grid-row: 2;
-  align-self: center;
-  justify-self: center;
-  translate: 14% 0;
-  padding: 0.5rem 0.875rem 0.625rem;
-  border: var(--panel-rule);
-  background: var(--color-slip);
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(3rem, 1.5rem + 5vw, 6.5rem);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  rotate: -3deg;
-}
-
-.index {
-  padding-bottom: 2.75rem;
-}
-
-.index-title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-heading);
-  letter-spacing: var(--text-heading--letter-spacing);
-  padding-bottom: 0.75rem;
-  border-bottom: 1px dashed var(--color-ink);
-}
-
-/* Releases grouped under the day they shipped, each row a version and the
-   stamps of what it changed. */
-.index-day > ol {
-  columns: 15rem 2;
-  column-gap: 2rem;
-}
-
-.index-day > ol > li {
-  break-inside: avoid;
-}
-
-.index-date {
-  padding: 1rem 0.25rem 0.25rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-small);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--color-ink-soft);
-}
-
-.index-day li {
-  border-bottom: 1px dashed var(--color-guilloche);
-}
-
-.index-day a {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.375rem 0.5rem;
-  min-height: 44px;
-  padding: 0.5rem 0.25rem;
-  text-decoration: none;
-}
-
-/* Instrument Sans, not the display face: at this size Bricolage closes the
-   gap round the dots and 1.12.1 reads as 1121. */
-.index-day .cl-chip {
-  font-size: 0.875rem;
-}
-
-.index-v {
-  min-width: 4em;
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 1.125rem;
-  letter-spacing: 0.01em;
-}
-
-.index-day a:hover .index-v,
-.index-day a[aria-current] .index-v {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.2em;
-}
-
-.empty {
-  font-size: var(--text-lede);
-  color: var(--color-ink-soft);
-}
-
-/* --- A release: head (version, date, tally), slips, foot ------------------ */
-
-.release {
-  display: grid;
-  gap: 1.5rem;
-  padding-top: 3rem;
-  margin-top: 3rem;
-  background: var(--perforation) top / 100% 1px no-repeat;
-  color: var(--color-ink);
-}
-
-/* Proportional figures: the tabular one has a foot that joins its
-   neighbours into a bar at display tracking. */
-.rel-version,
-.cover-latest,
-.index-v {
-  font-variant-numeric: proportional-nums;
-}
-
-/* The version sets as wide as its column, from the figure widths the build
-   writes into --fit, up to a cap that keeps the head on the screen. */
-.rel-head {
-  container-type: inline-size;
-}
-
-.rel-version {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: min(calc(100cqi / var(--fit, 1.6)), 17rem, 34svh, 38vw);
-  line-height: 0.86;
-  letter-spacing: -0.035em;
-  /* The figure 1's side bearing, so the ink sits on the gutter at any size. */
-  margin-left: -0.012em;
-}
-
-.rel-date {
-  margin-top: 0.75rem;
-  font-size: var(--text-small);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--color-ink-soft);
-}
-
-/* The tally, like the stamp tally under the statement on the home page. */
-.rel-tally {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin-top: 1.25rem;
-}
-
-.rel-tally li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tally-n {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.25rem;
-}
-
-.rel-pages {
-  display: grid;
-  gap: 1.75rem;
-}
-
-.rel-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.25rem;
-}
-
-.rel-link {
+.btn {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  font-weight: 600;
-  text-decoration-thickness: 2px;
-}
-
-/* --- Stamps --------------------------------------------------------------- */
-
-.cl-stamp,
-.cl-chip {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border: var(--book-ink);
   background: var(--color-slip);
-}
-
-/* The section stamp lands on the panel border, the way a rubber stamp
-   overlaps the edge of what it marks. */
-.cl-stamp {
-  position: relative;
-  z-index: 2;
-  justify-self: start;
-  margin: 0 0 -0.85rem 0.5rem;
-  font-size: 1.125rem;
-}
-
-/* Chips: the same stamps, small and straight, for the index and the tally. */
-.cl-chip {
-  font-size: 0.8125rem;
-  padding: 0.2em 0.5em 0.25em;
-  border-width: 1.5px;
-  rotate: 0deg;
-}
-
-:is(.cl-stamp, .cl-chip)[data-kind="features"] {
   color: var(--color-ink);
-  background: var(--color-mint);
+  font: 600 var(--text-small) / 1 var(--font-ui);
+  cursor: pointer;
+  list-style: none;
+}
+.btn::-webkit-details-marker {
+  display: none;
+}
+.btn:hover {
+  background: var(--color-paper);
 }
 
-:is(.cl-stamp, .cl-chip):is([data-kind="hotfixes"], [data-kind="fixes"]) {
+/* --- the scrubber ---------------------------------------------------------- */
+
+/* Phones: a sticky row of chips under the bar, newest first. */
+.scrub {
+  position: sticky;
+  top: var(--bar-h);
+  z-index: 5;
+  margin-inline: calc(var(--gutter) * -1);
+  padding: 0.75rem var(--gutter);
+  background: var(--color-paper);
+}
+.scrub-list {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.scrub-v {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: var(--book-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-slip);
+  color: var(--color-ink);
+  font: 700 var(--text-small) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+.scrub-v[aria-current="true"] {
+  border-color: var(--color-stamp);
+  background: var(--color-stamp);
+  color: var(--color-on-stamp);
+}
+.scrub-peek {
+  display: none;
+}
+
+/* --- the book -------------------------------------------------------------- */
+
+.stage {
+  display: grid;
+  min-width: 0;
+}
+.book {
+  display: grid;
+  min-width: 0;
+}
+.spread {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-areas: "head" "art" "body";
+  gap: 1.25rem;
+  min-width: 0;
+}
+.spread[hidden] {
+  display: none;
+}
+.spread {
+  scroll-margin-top: calc(var(--bar-h) + 4.5rem);
+}
+/* No script, or before it runs: the release in the URL is the open one. */
+html:not([data-ready]) .book:has(> .spread:target) > .spread:not(:target) {
+  display: none;
+}
+html:not([data-ready]) .spread:target {
+  display: grid;
+}
+
+.page-notes {
+  display: contents;
+}
+.rel-head {
+  grid-area: head;
+}
+.page-art {
+  grid-area: art;
+  position: relative;
+  margin: 0;
+}
+.rel-body {
+  grid-area: body;
+  position: relative;
+}
+
+.rel-v {
+  margin: 0;
+  font: 800 clamp(2.75rem, 11vw, 5.5rem) / 0.95 var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  outline-offset: 0.375rem;
+}
+.rel-title {
+  margin: 0.5rem 0 0;
+  font: 700 clamp(1.375rem, 5vw, 2.125rem) / 1.15 var(--font-display);
+  color: var(--color-ink);
+  text-wrap: balance;
+}
+.rel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.625rem 0 0;
+  color: var(--color-ink-soft);
+  font: 500 var(--text-small) / 1.4 var(--font-ui);
+}
+.rel-kind {
+  padding: 0.125rem 0.5rem;
+  border: 1.5px solid currentColor;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rel-kind[data-kind="breaking"] {
   color: var(--color-stamp);
 }
 
-:is(.cl-stamp, .cl-chip)[data-kind="breaking"] {
-  color: var(--color-on-stamp);
-  background: var(--color-stamp);
-  border-color: var(--color-stamp);
-}
-
-:is(.cl-stamp, .cl-chip)[data-kind="ui"] {
-  color: var(--color-ink-soft);
-  border-style: dashed;
-}
-
-:is(.cl-stamp, .cl-chip):is([data-kind="docs"], [data-kind="other"]) {
+.rel-bullets {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 var(--text-body) / var(--text-body--line-height) var(--font-ui);
   color: var(--color-ink);
 }
-
-.cont {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 0.7em;
-}
-
-/* --- Slips and panels ----------------------------------------------------- */
-
-.page.slip {
-  display: grid;
-  gap: 1.25rem;
-  align-content: start;
-  padding: 1.25rem 1.25rem 2.5rem;
-  border-radius: var(--radius-slip) var(--radius-slip) 0 0;
-}
-
-.sec {
-  display: grid;
-}
-
-.panels {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--gap-panel);
-}
-
-.panel {
-  position: relative;
-  grid-column: span 6;
-  display: flex;
-  flex-direction: column;
-  min-height: 7.5rem;
-  padding: 1.25rem 1rem 3.25rem;
-  border: var(--panel-rule);
-  border-radius: var(--radius-slip);
-  background: var(--color-slip);
-  overflow: hidden;
-}
-
-.caption {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  justify-items: start;
-  gap: 0.5rem;
-}
-
-.panel-text {
-  max-width: 60ch;
-  font-size: 1rem;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-
-/* Entries are written as commit subjects, some in lower case. The page sets
-   them as sentences; the text itself is left as written. */
-.panel-text::first-letter {
+.rel-bullets li::first-letter {
   text-transform: uppercase;
 }
-
-.scope {
-  padding: 0.05rem 0.45rem 0.1rem;
-  border-radius: var(--radius-slip);
-  background: var(--color-mint);
-  color: var(--color-ink);
-  font-size: var(--text-small);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+.rel-bullets li {
+  position: relative;
+  padding-left: 1.375rem;
 }
-
-.pr {
-  color: var(--color-ink-soft);
-  font-size: var(--text-small);
-  white-space: nowrap;
-}
-
-.panel-text code {
-  font-size: 0.9em;
-}
-
-/* Screentone fills the corner the text never reaches, a different shading
-   for each kind of change: a rising wedge of dots for new things, a falling
-   one for fixes, speed lines for a restyle, an even band for docs. */
-.panel::after {
+.rel-bullets li::before {
   content: "";
   position: absolute;
-  inset: auto 0 0 0;
-  height: 2.75rem;
-  background: var(--color-slip) var(--tone-25) 0 0 / 6px 6px;
-  clip-path: polygon(30% 100%, 100% 0, 100% 100%);
-  image-rendering: pixelated;
+  left: 0.125rem;
+  top: 0.6em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-ink);
 }
-
-.panel[data-size="l"]::after {
-  background-image: var(--tone-50);
+.rel-bullets code,
+.full code {
+  font-size: 0.9em;
 }
-
-.panel:is([data-kind="hotfixes"], [data-kind="fixes"])::after {
-  clip-path: polygon(0 0, 70% 100%, 0 100%);
+.rel-more {
+  margin: 0.75rem 0 0;
+  color: var(--color-ink-soft);
+  font: 500 var(--text-small) / 1.4 var(--font-ui);
 }
-
-.panel[data-kind="ui"]::after {
-  background: var(--speed);
-  clip-path: polygon(45% 0, 100% 0, 100% 100%, 20% 100%);
+.rel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
-
-.panel:is([data-kind="docs"], [data-kind="other"])::after {
-  height: 1.5rem;
-  clip-path: none;
+.full {
+  flex-basis: 100%;
+  order: 2;
 }
-
-/* The impact frame holds the sound word. In a panel it is the tone corner;
-   on a splash slip it becomes a panel of its own (below). */
-.impact {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  user-select: none;
+.full[open] summary {
+  background: var(--color-ink);
+  color: var(--color-slip);
 }
-
-/* The sound word: display type cut out of the tone with a slip outline,
-   the way manga letters sound effects over the art. */
-.sfx {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.35rem;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 2rem;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--color-ink);
-  -webkit-text-stroke: 6px var(--color-slip);
-  paint-order: stroke fill;
-  white-space: nowrap;
-  rotate: var(--tilt, -7deg);
-}
-
-.panel:is([data-kind="hotfixes"], [data-kind="fixes"]) .sfx {
-  right: auto;
-  left: 0.75rem;
-}
-
-/* A prop (src/assets/svg/props/, by scope) stands in the tone corner on the
-   side away from the sound word, coloured by class like the other
-   illustrations. Splash slips keep their composition without one. */
-.prop {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.5rem;
-  width: clamp(2.75rem, 18%, 5rem);
+.full-body {
+  margin-top: 1rem;
+  font: 400 var(--text-small) / 1.55 var(--font-ui);
   color: var(--color-ink);
 }
+.full-h {
+  margin: 1rem 0 0.375rem;
+  font: 700 var(--text-small) / 1.3 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.full-list {
+  margin: 0;
+  padding-left: 1.125rem;
+}
+.scope {
+  font-weight: 700;
+}
+.scope::after {
+  content: ":";
+}
+.pr {
+  color: var(--color-ink-soft);
+}
+.full:not([open]) {
+  flex-basis: auto;
+  order: 0;
+}
 
-.prop svg {
+/* The art. The blurred placeholder sits under the image until it decodes. */
+.art-pic {
+  display: block;
+}
+.art-img {
   display: block;
   width: 100%;
   height: auto;
+  background-size: cover;
+  background-color: var(--color-slip);
+}
+.page-art[data-art="strip"] .art-img {
+  border: var(--book-ink);
 }
 
-.prop .ik { fill: currentColor; }
-.prop .pp { fill: var(--color-slip); }
-.prop .mt { fill: var(--color-mint); }
-
-.panel:is([data-kind="hotfixes"], [data-kind="fixes"]) .prop {
-  left: auto;
-  right: 0.75rem;
-}
-
-html[data-book] .page[data-splash] .prop,
-.panel[data-kind="breaking"] .prop {
-  display: none;
-}
-
-/* Narration and breaking changes print in reverse: slip on an ink panel. */
-.panels[data-kind="intro"] .panel,
-.panel[data-kind="breaking"] {
-  background: var(--color-ink);
-  color: var(--color-slip);
-}
-
-.panels[data-kind="intro"] .panel::after,
-.panel[data-kind="breaking"]::after {
-  display: none;
-}
-
-.panels[data-kind="intro"] .panel {
-  min-height: 0;
-  padding-bottom: 1.25rem;
-}
-
-.panel[data-kind="breaking"] .sfx {
-  color: var(--color-slip);
-  -webkit-text-stroke-color: var(--color-ink);
-}
-
-.panel[data-kind="breaking"] .pr {
-  color: inherit;
-}
-
-.panel[data-kind="breaking"] .scope {
-  background: var(--color-slip);
-  color: var(--color-ink);
-}
-
-.panel[data-kind="ui"] {
-  outline: 3px solid var(--color-guilloche);
-  outline-offset: -7px;
-}
-
-/* Props (optional art, src/assets/svg/props): sit in the tone corner. */
-.prop {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.4rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  color: var(--color-ink);
-}
-
-/* --- Controls ------------------------------------------------------------- */
-
-.ctl,
-.rel-next {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 1.25rem;
-  border: 2px solid var(--color-ink);
-  border-radius: var(--radius-pill);
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font: 600 1rem/1 var(--font-ui);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.ctl-next {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
-.ctl:hover {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
-.ctl-next:hover {
-  background: var(--color-paper);
-  color: var(--color-ink);
-}
-
-.rel-next:hover {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
-.ctl:active,
-.rel-next:active {
-  translate: 0 1px;
-}
-
-.ctl[aria-disabled="true"],
-.ctl[aria-disabled="true"]:hover {
-  border-color: var(--color-guilloche);
-  background: var(--color-paper);
-  color: var(--color-ink-soft);
-  cursor: default;
-}
-
-.controls[hidden],
-.rel-next[hidden] {
-  display: none;
-}
-
-/* --- Wide screens without the book (no JavaScript) ------------------------ */
-
-@media (min-width: 64rem) {
-  html:not([data-book]) .cover {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 2rem 4rem;
-    align-items: start;
-  }
-
-  html:not([data-book]) .release {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    grid-template-rows: auto 1fr;
-    column-gap: 4rem;
-  }
-
-  html:not([data-book]) .rel-head {
-    position: sticky;
-    top: calc(var(--bar-h) + 2rem);
-    align-self: start;
-  }
-
-  html:not([data-book]) .rel-pages {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
-
-  html:not([data-book]) .rel-foot {
-    grid-column: 1;
-    grid-row: 2;
-    align-self: start;
-  }
-}
-
-/* --- The book ------------------------------------------------------------- */
-
-/* One cell, every leaf stacked in it; only the current one shows. The stage
-   is exactly the screen under the bar, less the plate, so a slip is a page
-   you see whole and its panels share its height. */
-html[data-book] .cl {
-  padding-block: 0;
-}
-
-html[data-book] .book {
-  --plate-h: 4.75rem;
+/* A one-panel card: the SLIP mood for the kind of change, the version set
+   big behind it, and the sound word breaking over the frame. */
+.page-art[data-art="card"] {
   display: grid;
-  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-  height: calc(100svh - var(--bar-h) - var(--plate-h));
-  min-height: 30rem;
-  padding-block: clamp(1.25rem, 3.5vh, 2.5rem) clamp(1rem, 2.5vh, 1.75rem);
-}
-
-html[data-book] .book > * {
-  grid-area: 1 / 1;
-}
-
-/* The whole book fits the screen, so an anchor never needs to scroll it. */
-html[data-book] :is(.leaf, .release, .index) {
-  scroll-margin-top: 100vh;
-}
-
-html[data-book] .cover,
-html[data-book] .release {
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  column-gap: clamp(2rem, 5vw, 5rem);
-  align-items: start;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  background: none;
-}
-
-html[data-book] .cover {
-  grid-template-rows: minmax(0, 1fr);
-  align-items: stretch;
-}
-
-html[data-book] .cover-head {
-  min-height: 0;
-}
-
-html[data-book] .release {
-  grid-template-rows: auto 1fr;
-}
-
-/* The left column reads as a receipt stub: the version at the top, the
-   date, tally, Release and folio printed together at the foot. */
-html[data-book] .rel-head {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  padding-top: 0.5rem;
-  padding-bottom: clamp(7.5rem, 5rem + 3vw, 9.5rem);
-}
-
-html[data-book] .rel-date {
-  margin-top: auto;
-}
-
-html[data-book] .rel-foot {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: end;
-  margin-bottom: clamp(4rem, 2rem + 3vw, 5.5rem);
-  background: var(--color-paper);
-}
-
-html[data-book] .rel-pages {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  position: relative;
-  height: 100%;
-  min-height: 0;
-}
-
-html[data-book] .rel-pages > .page {
-  grid-area: 1 / 1;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-/* The roll behind the slip: two more slips peeking out, so the one on top
-   reads as the next to tear off. */
-html[data-book] .rel-pages::before,
-html[data-book] .rel-pages::after {
-  content: "";
-  grid-area: 1 / 1;
-  align-self: stretch;
-  background: var(--color-slip);
-  border: 1px solid var(--color-guilloche);
-  rotate: 1.4deg;
-  translate: 0.6rem 0.4rem;
-}
-
-html[data-book] .rel-pages::after {
-  rotate: -1deg;
-  translate: -0.4rem 0.7rem;
-}
-
-/* The roll prints a shade under the slip, so the torn foot of the slip on
-   top reads against it. */
-html[data-book] .rel-pages::before,
-html[data-book] .rel-pages::after {
-  background: var(--color-guilloche);
-}
-
-/* In the book the slip is the whole page, so its torn foot and the roll
-   behind it print at a size that reads as a receipt. */
-html[data-book] .rel-pages > .page.slip {
-  --tooth: 16px;
-}
-
-html[data-book] .rel-pages::before,
-html[data-book] .rel-pages::after {
-  --tooth: 16px;
-  mask:
-    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
-    conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
-}
-
-html[data-book] .rel-pages > .page.slip {
-  padding-bottom: calc(1.25rem + var(--tooth));
-}
-
-/* The folio: the slip's number in the book, under the version. */
-.folio[hidden] {
-  display: none;
-}
-
-html[data-book] .folio {
-  position: relative;
-  z-index: 4;
-  align-self: end;
-  justify-self: start;
-  margin-bottom: 0.5rem;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(2.5rem, 1rem + 2.6vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: proportional-nums;
-  color: var(--color-ink-soft);
-  pointer-events: none;
-}
-
-html[data-book] .index-day > ol {
-  columns: 3;
-  column-gap: 1.25rem;
-}
-
-html[data-book] .index-v {
-  min-width: 3.1em;
-}
-
-html[data-book] .index-day a {
-  flex-wrap: nowrap;
-  gap: 0.375rem;
-}
-
-@media (max-height: 56rem) {
-  html[data-book] .index-day a {
-    min-height: 2.25rem;
-    padding-block: 0.25rem;
-  }
-
-  html[data-book] .index-date {
-    padding-top: 0.625rem;
-  }
-
-  html[data-book] .index-title {
-    padding-bottom: 0.5rem;
-  }
-}
-
-html[data-book] .cover .index {
-  align-self: stretch;
-  max-height: 100%;
-  overflow: auto;
-}
-
-html[data-book] .page > .sec,
-html[data-book] .page > .panels {
-  flex: var(--units, 1) 1 0;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-html[data-book] .page > .panels[data-kind="intro"] {
-  flex: 0 0 auto;
-}
-
-html[data-book] .sec .panels {
-  grid-auto-rows: minmax(0, 1fr);
-  min-height: 0;
-}
-
-html[data-book] .panel {
-  min-height: 0;
-}
-
-/* In the book the tone takes whatever height the caption leaves, so a short
-   entry gets a deep shaded panel rather than an empty one. */
-html[data-book] .page:not([data-splash]) .panel {
-  padding-bottom: 0;
-}
-
-/* The restyle's guilloche rule is the panel's inner frame: the lines stay
-   inside it. */
-html[data-book] .page:not([data-splash]) .panel[data-kind="ui"]::after {
-  margin: 1rem calc(-1rem + 9px) 9px;
-}
-
-html[data-book] .page .panels[data-kind="intro"] .panel {
-  padding-bottom: 1.25rem;
-}
-
-html[data-book] .page:not([data-splash]) .panel::after {
-  position: relative;
-  inset: auto;
-  flex: 1 1 0;
-  height: auto;
-  min-height: 2.75rem;
-  margin: 1rem -1rem 0;
-  clip-path: polygon(0 62%, 100% 0, 100% 100%, 0 100%);
-}
-
-html[data-book] .page:not([data-splash]) .panel:is([data-kind="hotfixes"], [data-kind="fixes"])::after {
-  clip-path: polygon(0 0, 100% 62%, 100% 100%, 0 100%);
-}
-
-html[data-book] .page:not([data-splash]) .panel[data-kind="ui"]::after {
-  clip-path: polygon(38% 0, 100% 0, 100% 100%, 0 100%);
-}
-
-html[data-book] .page:not([data-splash]) .panel:is([data-kind="docs"], [data-kind="other"])::after {
-  clip-path: none;
-}
-
-html[data-book] .page:not([data-splash]) .panel-text {
-  font-size: clamp(1.0625rem, 0.6rem + 0.6vw, 1.375rem);
-  line-height: 1.42;
-}
-
-html[data-book] .page:not([data-splash]) .sfx {
-  font-size: clamp(2.5rem, 1rem + 2.5vw, 4rem);
-  -webkit-text-stroke-width: 8px;
-}
-
-/* A slip with a single panel is a splash page in two beats: the caption on
-   its own, then an impact panel filling the rest of the slip with the sound
-   word over lines drawn for its kind. */
-html[data-book] .page[data-splash] .panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--gap-panel);
-  padding: 0;
-  border: 0;
-  background: none;
-  overflow: visible;
-}
-
-html[data-book] .page[data-splash] .panel::after {
-  display: none;
-}
-
-html[data-book] .page[data-splash] .caption {
-  padding: clamp(1.5rem, 2.5vw, 2.25rem) clamp(1.25rem, 2.5vw, 2.25rem);
-  border: var(--panel-rule);
-  border-radius: var(--radius-slip);
-  background: var(--color-slip);
-}
-
-html[data-book] .page[data-splash] .panel-text {
-  font-size: clamp(1.375rem, 0.75rem + 1.2vw, 2rem);
-  line-height: 1.3;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  max-width: 28ch;
-}
-
-html[data-book] .page[data-splash] .impact {
-  position: relative;
-  inset: auto;
-  min-height: 0;
-  border: var(--panel-rule);
-  border-radius: var(--radius-slip);
-  background: var(--color-slip);
+  place-items: center;
+  padding: 2.5rem 0 1rem;
   overflow: hidden;
 }
+.card-v {
+  position: absolute;
+  inset: 0 auto auto 0;
+  font: 800 clamp(5rem, 30vw, 13rem) / 0.8 var(--font-display);
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--color-guilloche);
+  user-select: none;
+}
+.card-frame {
+  position: relative;
+  display: block;
+  width: min(100%, 26rem);
+  border: 3px solid var(--color-ink);
+  background: var(--color-slip);
+  box-shadow: 6px 6px 0 var(--color-ink);
+  transform: rotate(-1.2deg);
+}
 
-html[data-book] .page[data-splash] .impact::before {
-  content: "";
+.ov-layer {
   position: absolute;
   inset: 0;
-  scale: var(--flip, 1) 1;
-  background: var(--color-slip) var(--tone-50) 0 0 / 6px 6px;
-  clip-path: polygon(0 100%, 100% var(--cut, 12%), 100% 100%);
+  pointer-events: none;
 }
-
-html[data-book] .page[data-splash] .panel[data-kind="features"] .impact::before {
-  --at: var(--fx, 66%) var(--fy, 58%);
-  background: var(--rays);
-  clip-path: none;
-  mask-image: radial-gradient(ellipse 58% 52% at var(--fx, 66%) var(--fy, 58%), transparent 0 30%, #000 60%);
-  -webkit-mask-image: radial-gradient(ellipse 58% 52% at var(--fx, 66%) var(--fy, 58%), transparent 0 30%, #000 60%);
-}
-
-html[data-book] .page[data-splash] .panel:is([data-kind="hotfixes"], [data-kind="fixes"]) .impact::before {
-  clip-path: polygon(0 var(--cut, 12%), 100% 100%, 0 100%);
-}
-
-html[data-book] .page[data-splash] .panel[data-kind="ui"] .impact::before {
-  background: var(--speed);
-  clip-path: polygon(calc(var(--cut, 12%) + 20%) 0, 100% 0, 100% 100%, var(--cut, 12%) 100%);
-}
-
-html[data-book] .page[data-splash] .panel[data-kind="breaking"] .impact {
-  background: var(--color-ink);
-}
-
-html[data-book] .page[data-splash] .panel[data-kind="breaking"] .impact::before {
-  --ray: var(--color-slip);
-  background: var(--rays);
-  clip-path: none;
-}
-
-html[data-book] .page[data-splash] .sfx {
-  right: clamp(1rem, 2.5vw, 2.5rem);
-  bottom: clamp(0.75rem, 3vh, 2.25rem);
-  font-size: clamp(4.5rem, 1rem + 7vw, 9.5rem);
-  -webkit-text-stroke-width: 14px;
-  letter-spacing: -0.035em;
-}
-
-html[data-book] .page[data-splash] .panel[data-kind="features"] .sfx {
-  font-size: clamp(4rem, 1rem + 5.5vw, 7.5rem);
-  right: auto;
-  bottom: auto;
-  left: var(--fx, 66%);
-  top: var(--fy, 58%);
+.ov {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
   translate: -50% -50%;
+  rotate: var(--r);
+  white-space: nowrap;
+}
+.ov-sfx {
+  font: 800 clamp(1.75rem, 7vw, 2.75rem) / 1 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--color-stamp);
+  -webkit-text-stroke: 1.5px var(--color-slip);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--color-ink);
 }
 
-html[data-book] .page[data-splash] .panel:is([data-kind="hotfixes"], [data-kind="fixes"]) .sfx,
-html[data-book] .page[data-splash] .panel[data-kind="ui"] .sfx {
-  right: auto;
-  left: var(--sx, 1.5rem);
+/* The SHIPPED stamp, inked in crimson. */
+.shipped {
+  position: absolute;
+  right: 0;
+  bottom: -0.5rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 6.5rem;
+  aspect-ratio: 1;
+  border: 3px solid var(--color-stamp);
+  border-radius: 50%;
+  outline: 1.5px solid var(--color-stamp);
+  outline-offset: -8px;
+  color: var(--color-stamp);
+  font: 800 1.0625rem / 1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  rotate: -14deg;
+  opacity: 0.92;
+  pointer-events: none;
+}
+.shipped-v {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+}
+.rel-actions {
+  padding-right: 7rem;
 }
 
-/* Flip: the impact first, the caption under it. */
-html[data-book] .page[data-splash="flip"] .panel {
-  grid-template-rows: minmax(0, 1fr) auto;
+/* Older and newer. Hidden on phones, where the chips and a swipe do it. */
+.turn {
+  display: none;
 }
 
-html[data-book] .page[data-splash="flip"] .caption {
-  order: 2;
+.all {
+  margin-top: 1rem;
 }
-
-/* Inset: the impact is the whole slip and the caption sits in its corner. */
-html[data-book] .page[data-splash="inset"] .panel {
-  grid-template-rows: minmax(0, 1fr);
+.all-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.25rem 1.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font: 500 var(--text-small) / 1.4 var(--font-ui);
 }
-
-html[data-book] .page[data-splash="inset"] .panel > * {
-  grid-area: 1 / 1;
-}
-
-html[data-book] .page[data-splash="inset"] .caption {
-  z-index: 2;
-  align-self: start;
-  justify-self: start;
-  max-width: min(36rem, 82%);
-  margin: clamp(1.75rem, 3vw, 2.5rem) 0 0 clamp(1rem, 2vw, 1.75rem);
-  box-shadow: var(--shadow-system);
-}
-
-/* The focus moves down to meet the sound word (set on the drawing itself,
-   since the entry's seed sits inline on the frame). */
-html[data-book] .page[data-splash="inset"] .impact::before {
-  --fy: 84%;
-}
-
-html[data-book] .page[data-splash="inset"] .panel[data-kind="features"] .sfx {
-  top: auto;
-  bottom: clamp(1rem, 4vh, 2.5rem);
-  translate: -50% 0;
-}
-
-html[data-book] .page[data-splash] .cl-stamp {
-  font-size: 1.5rem;
-  margin-bottom: -1.1rem;
-}
-
-html[data-book] .book {
-  grid-row: 1;
-}
-
-html[data-book] .controls {
-  grid-row: 2;
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
+.all-list a {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 0 calc(1rem + env(safe-area-inset-bottom));
-  background: var(--color-paper) var(--perforation) top / 100% 1px no-repeat;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-guilloche);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+.all-v {
+  font-weight: 700;
+}
+.all-list time {
+  color: var(--color-ink-soft);
 }
 
-html[data-book] .rel-next {
-  display: none;
-}
+/* --- turning, without 3D ---------------------------------------------------- */
 
-/* Before the reader starts, the head script has already chosen the book:
-   keep the plate's room and show only the cover, so the first frame is the
-   book and nothing moves when the script arrives. */
-html[data-book] .controls[hidden] {
-  display: flex;
-  visibility: hidden;
-}
-
-html[data-book]:not([data-reader]) .book > .release {
-  visibility: hidden;
-}
-
-/* hidden="until-found" keeps a box in the layout (so find in page can reach
-   it) and paints that box's own background. A slip waiting its turn must not
-   paint over the one on show. */
-html[data-book] .leaf[hidden] {
-  background: none;
-  box-shadow: none;
+/* The fallback turn, and the reduced-motion one when motion is on: the old
+   spread fades as the new one slides in from the side it comes from. */
+.spread.is-leaving {
+  z-index: 1;
   pointer-events: none;
+  animation: leave 260ms var(--turn-ease) both;
 }
-
-/* --- Turning -------------------------------------------------------------- */
-
-/* The curl (src/curl.ts): one canvas over the viewport, under the bar, shown
-   only while a slip curls. The slip it draws hides for the turn. */
-.curl {
-  position: fixed;
-  inset: 0;
-  z-index: 25;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+.spread.is-arriving {
+  animation: arrive 360ms var(--turn-ease) both;
 }
-
-.curl[hidden] {
-  display: none;
+.spread.is-arriving .shipped {
+  animation: stamp 420ms 180ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
-
-.is-curling {
-  visibility: hidden;
+.spread.is-arriving .ov-sfx {
+  animation: pop 380ms 120ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
-
-/* The leaf leaving stays on top until its turn ends; the arriving head wipes
-   in (a clip, never an opacity) and its stamp lands. */
-html[data-book] .is-leaving {
-  z-index: 2;
-}
-
-html[data-book] .is-top {
-  z-index: 3;
-}
-
-
-html[data-book] .release.is-leaving.is-top .rel-pages::before,
-html[data-book] .release.is-leaving.is-top .rel-pages::after {
-  visibility: hidden;
-}
-
-/* The tear: the slip is pulled off the roll as one sheet, up and away under
-   the bar, turning a little as it goes. Back runs it in reverse. */
-.is-tearing {
-  animation: tear 450ms var(--tear-ease) forwards;
-}
-
-.is-tearing-back {
-  animation: tear 450ms var(--tear-ease) reverse both;
-}
-
-@keyframes tear {
-  0% {
-    translate: 0 0;
-    rotate: 0deg;
-  }
-  18% {
-    translate: 0 0.75rem;
-    rotate: 0.6deg;
-  }
-  100% {
-    translate: 3% -112%;
-    rotate: -6deg;
-  }
-}
-
-/* Going back, the arriving release comes down over the one on show; its
-   roll joins it when the turn ends. */
-html[data-book] .release.is-top.is-entering .rel-pages::before,
-html[data-book] .release.is-top.is-entering .rel-pages::after {
-  visibility: hidden;
-}
-
-/* Going on, the leaving head gives way as the arriving one starts to wipe. */
-html[data-book] .release.is-leaving :is(.rel-head, .rel-foot) {
-  animation: give-way 1ms var(--head-at, 200ms) forwards;
-}
-
-@keyframes give-way {
+@keyframes leave {
   to {
-    visibility: hidden;
+    opacity: 0;
+    translate: calc(var(--dir, 1) * 1.5rem) 0;
   }
 }
-
-/* The arriving head waits for the slip to clear, then wipes in over the
-   one leaving (it carries the paper, so the two never show at once). */
-html[data-book] .rel-head {
-  background: var(--color-paper);
-}
-
-.is-entering .rel-head,
-.is-entering .rel-foot,
-.is-entering.cover .cover-head {
-  animation: wipe-in 360ms var(--ease) var(--head-at, 200ms) both;
-}
-
-.is-entering .cl-stamp {
-  animation: stamp-land 520ms var(--land-ease) calc(var(--head-at, 200ms) + 200ms) both;
-}
-
-@keyframes wipe-in {
+@keyframes arrive {
   from {
-    clip-path: inset(0 100% 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
+    opacity: 0;
+    translate: calc(var(--dir, 1) * -2rem) 0;
   }
 }
-
-@keyframes stamp-land {
-  0% {
-    visibility: hidden;
-    scale: 1.7;
-    rotate: -16deg;
-  }
-  1% {
-    visibility: visible;
-  }
-  to {
-    scale: 1;
-    rotate: -7deg;
+@keyframes stamp {
+  from {
+    opacity: 0;
+    scale: 1.8;
   }
 }
-
-/* The strip: stamps land as their slip scrolls in. Native scroll timelines
-   only, behind the motion switch, so nothing waits on a script. */
-@supports (animation-timeline: view()) {
-  html[data-motion="on"]:not([data-book]) .cl-stamp {
-    animation: stamp-land linear both;
-    animation-timeline: view();
-    animation-range: entry 10% entry 70%;
+@keyframes pop {
+  from {
+    opacity: 0;
+    scale: 0.4;
   }
 }
-
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
-  animation: none !important;
-  transition: none !important;
+html[data-motion="off"] .spread.is-leaving,
+html[data-motion="off"] .spread.is-arriving,
+html[data-motion="off"] .spread.is-arriving .shipped,
+html[data-motion="off"] .spread.is-arriving .ov-sfx {
+  animation: none;
+}
+html[data-motion="off"] .spread.is-leaving {
+  display: none;
 }
 
-/* --- Tablets: a shorter cover, so the index starts on the first screen - */
+/* --- wide screens: the open book --------------------------------------------- */
 
-@media (min-width: 48rem) and (max-width: 63.99rem) {
-  .cover-head {
-    min-height: 24rem;
+@media (min-width: 64rem) and (min-height: 37.5rem) {
+  :root {
+    --scrub-h: 5.5rem;
+    --book-h: clamp(30rem, calc(100svh - var(--bar-h) - var(--scrub-h) - 3rem), 54rem);
+    --page-pad: clamp(1.25rem, 3vh, 2.25rem);
   }
-}
-
-/* --- Phones --------------------------------------------------------------- */
-
-@media (max-width: 47.99rem) {
-  .cover-head {
-    min-height: 26rem;
+  .cl {
+    grid-template-areas: "stage" "scrub" "all";
+    gap: 0;
+    padding-top: 1.5rem;
   }
-
-  .index-day > ol {
-    columns: 2;
-    column-gap: 1rem;
+  .stage {
+    grid-area: stage;
+    grid-template-columns: 5rem minmax(0, 1fr) 5rem;
+    align-items: center;
+    justify-items: center;
   }
-
-  .index-day a {
-    gap: 0.25rem 0.375rem;
+  .book {
+    grid-column: 2;
+    grid-template-rows: minmax(0, 1fr);
+    width: min(100%, calc(var(--book-h) * 1.55));
+    height: var(--book-h);
+    perspective: 2400px;
   }
-
-  .index-v {
-    min-width: 3.25em;
-    font-size: 1rem;
+  .spread {
+    grid-template-areas: "art notes";
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    height: 100%;
+    border: var(--book-ink);
+    background:
+      linear-gradient(90deg, transparent 0 calc(50% - 2.5rem), rgb(13 58 54 / 0.06) calc(50% - 0.5rem), rgb(13 58 54 / 0.22) 50%, rgb(13 58 54 / 0.06) calc(50% + 0.5rem), transparent calc(50% + 2.5rem)),
+      var(--color-slip);
+    box-shadow:
+      0 1px 0 4px var(--color-slip),
+      0 1px 0 6px var(--color-ink),
+      0 30px 60px -30px rgb(13 58 54 / 0.45);
   }
-
-  .panel {
-    grid-column: span 6 !important;
+  .spread::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 50%;
+    border-left: 1.5px solid var(--color-ink);
+    pointer-events: none;
   }
-
-  .page.slip {
-    padding-inline: 0.875rem;
+  .spread {
+    position: relative;
   }
-
-  .sfx {
-    font-size: 1.625rem;
+  .page-notes {
+    grid-area: notes;
   }
-
-  .release {
-    padding-top: 2.5rem;
-    margin-top: 2.5rem;
+  .page-art,
+  .page-notes {
+    min-height: 0;
+    padding: var(--page-pad);
   }
-}
-
-@media (max-width: 47.99rem) {
-  .rel-next {
+  .page-art {
+    display: grid;
+    place-items: center;
+  }
+  .page-art[data-art="strip"] .art-img {
+    width: auto;
+    max-width: 100%;
+    height: calc(var(--book-h) - 2 * var(--page-pad) - 4px);
+    object-fit: contain;
+  }
+  .page-art[data-art="card"] {
+    padding: 2.5rem 2rem;
+  }
+  .card-v {
+    inset: 1.5rem auto auto 1.75rem;
+    font-size: clamp(6rem, 11vw, 12rem);
+  }
+  .card-frame {
+    width: min(100%, 30rem);
+  }
+  .page-notes {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding-left: clamp(2rem, 4vw, 3.5rem);
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+  .rel-v {
+    font-size: clamp(3.5rem, 6.5vw, 6rem);
+  }
+  .rel-body {
+    display: flex;
+    flex-direction: column;
     flex: 1;
+    margin-top: 1.75rem;
   }
-}
-
-@media (min-width: 48rem) {
-  .panel[data-span="2"] {
-    grid-column: span 2;
+  .rel-actions {
+    margin-top: 2rem;
+  }
+  .shipped {
+    position: sticky;
+    align-self: flex-end;
+    margin-top: auto;
+    bottom: 0;
+    width: 8rem;
+    font-size: 1.25rem;
+  }
+  .shipped-v {
+    font-size: 0.9375rem;
+  }
+  .rel-actions {
+    padding-right: 0;
   }
 
-  .panel[data-span="3"] {
-    grid-column: span 3;
+  .turn {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: 1rem 0.5rem;
+    color: var(--color-ink);
+    font: 600 var(--text-small) / 1 var(--font-ui);
+    text-decoration: none;
+  }
+  .turn[hidden] {
+    display: none;
+  }
+  .turn > span:first-child {
+    font: 800 4rem / 0.7 var(--font-display);
+    transition: translate 200ms var(--ease);
+  }
+  .turn-older:hover > span:first-child {
+    translate: -0.25rem 0;
+  }
+  .turn-newer:hover > span:first-child {
+    translate: 0.25rem 0;
+  }
+  .turn[aria-disabled="true"] {
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .turn-older {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .turn-newer {
+    grid-column: 3;
+    grid-row: 1;
   }
 
-  .panel[data-span="4"] {
-    grid-column: span 4;
+  /* The scrubber: a ruled timeline under the book, oldest on the left. */
+  .scrub {
+    grid-area: scrub;
+    position: relative;
+    top: auto;
+    margin: 0;
+    padding: 1.5rem 5rem 0.5rem;
+    background: none;
+  }
+  .scrub-list {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0;
+    overflow: visible;
+    padding-top: 0.5rem;
+    background: linear-gradient(var(--color-ink), var(--color-ink)) 0 1.125rem / 100% 2px no-repeat;
+    touch-action: none;
+    cursor: grab;
+  }
+  .scrub-list li {
+    flex: 1 1 0;
+    display: grid;
+    justify-items: center;
+  }
+  .scrub-v {
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.125rem;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 0.75rem;
+  }
+  .scrub-v::before {
+    content: "";
+    width: 0.625rem;
+    height: 1.25rem;
+    background: var(--color-ink);
+    transition: background-color 150ms, scale 150ms;
+  }
+  .scrub-v:hover::before {
+    scale: 1.3 1.15;
+  }
+  .scrub-v[aria-current="true"] {
+    background: none;
+    color: var(--color-stamp);
+  }
+  .scrub-v[aria-current="true"]::before {
+    background: var(--color-stamp);
+    scale: 1.3 1.4;
+  }
+  .scrub-peek {
+    position: absolute;
+    bottom: calc(100% - 0.5rem);
+    left: 0;
+    z-index: 6;
+    display: grid;
+    gap: 0.375rem;
+    justify-items: center;
+    padding: 0.375rem;
+    border: var(--book-ink);
+    background: var(--color-slip);
+    box-shadow: 4px 4px 0 var(--color-ink);
+    translate: -50% 0;
+    pointer-events: none;
+  }
+  .scrub-peek[hidden] {
+    display: none;
+  }
+  .scrub-peek img {
+    width: 8rem;
+    height: auto;
+    aspect-ratio: auto;
+    background: var(--color-paper);
+  }
+  .scrub-peek-v {
+    font: 700 0.8125rem / 1 var(--font-display);
+  }
+
+  .all {
+    grid-area: all;
+    justify-self: center;
+    width: min(100%, 62rem);
+    margin-top: 2rem;
   }
 }

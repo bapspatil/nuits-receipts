@@ -1,0 +1,28 @@
+{
+  "_comment": "Changelog art. Sources live in site/art/, scripts/changelog-art.mjs writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. A release with a strip gets it on the left page; every other release gets a one-panel SLIP card picked by the kind of change. Titles are optional; without one the first entry is the title. Overlay items (sfx, stamp) are drawn over the art as HTML, x and y in percent of the art.",
+  "strips": {
+    "1.12.3": {
+      "src": "strip-1.12.3.png",
+      "alt": "Manga strip: SLIP the receipt runs back and forth to the database, then makes one trip and finds the next tabs already waiting.",
+      "overlay": []
+    }
+  },
+  "cards": {
+    "src": "mascot-sheet.png",
+    "panels": {
+      "neutral": { "crop": [26, 151, 472, 403], "label": [0, 0, 172, 56], "alt": "SLIP the receipt, standing calm." },
+      "proud": { "crop": [524, 151, 473, 403], "label": [0, 0, 140, 56], "alt": "SLIP the receipt, fist up, proud." },
+      "shocked": { "crop": [26, 580, 472, 417], "label": [0, 0, 152, 56], "alt": "SLIP the receipt, shocked." },
+      "sweating": { "crop": [524, 580, 473, 417], "label": [0, 0, 180, 56], "alt": "SLIP the receipt, running and sweating." },
+      "smug": { "crop": [26, 1024, 472, 488], "label": [0, 0, 112, 56], "alt": "SLIP the receipt, arms crossed, smug." },
+      "sleepy": { "crop": [524, 1024, 473, 488], "label": [0, 0, 152, 56], "alt": "SLIP the receipt, sleepy." }
+    },
+    "byKind": { "features": "proud", "breaking": "shocked", "hotfixes": "sweating", "fixes": "smug", "ui": "neutral", "docs": "sleepy", "other": "neutral" },
+    "sfx": { "features": "KA-CHUNK!", "breaking": "KRAK!", "hotfixes": "TAK!", "fixes": "TAK!", "ui": "SHFF!", "docs": "FLIP!", "other": "TA-DA!" }
+  },
+  "titles": {
+    "1.12.4": "Fewer waits",
+    "1.12.3": "Fewer round trips",
+    "1.12.2": "Spacing and tap targets"
+  }
+}
