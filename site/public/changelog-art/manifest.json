@@ -1,0 +1,55 @@
+{
+  "strips": {
+    "1.12.3": {
+      "width": 1024,
+      "height": 1536,
+      "avif": 195126,
+      "webp": 230772,
+      "blur": "data:image/webp;base64,UklGRqQAAABXRUJQVlA4IJgAAABwBQCdASoYACQAPu1srk8ppiSiKqoBMB2JYwDPoBQeIOK9F9bFuiWwsIFAIMTPiOCGOCfgAP4vcIbuJzYKd53EKrPBNL3cqUNybF4GB74Sx+2vMEOXJVIWKeS+mrgEdl4ceMcFy+GlDVx4Zs7RhtpVnFDragqmJ3NLDCEBPJydBFK+4IqRcta4IyKvCC+OkP6CATPauoAAAA=="
+    }
+  },
+  "cards": {
+    "neutral": {
+      "width": 472,
+      "height": 403,
+      "avif": 9521,
+      "webp": 12458,
+      "blur": "data:image/webp;base64,UklGRlgAAABXRUJQVlA4IEwAAAAwBACdASoYABQAPuFap02opSOiN/qoARAcCWcAAIGP8wLGnVYjK3C0OYAA/vCB9xV3v4OSQrpdSgf65Kv9/Gv1HmhGnNDBe2pnGlAA"
+    },
+    "proud": {
+      "width": 473,
+      "height": 403,
+      "avif": 11873,
+      "webp": 15920,
+      "blur": "data:image/webp;base64,UklGRl4AAABXRUJQVlA4IFIAAADwBACdASoYABQAPtFapE2oJaOiN+gBABoJZwAAiO4A5B8I7w9Th2uHQXngwFtrlAAA/vYQQwGaaIrDfyOJJFKxSiMI4UyIfsxP91UJ3aaqOAAA"
+    },
+    "shocked": {
+      "width": 472,
+      "height": 417,
+      "avif": 26329,
+      "webp": 35624,
+      "blur": "data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAABQBQCdASoYABUAPu1gqU4ppSOiMBgMATAdiWUAADF/11l771eJgfgm42e13X5o7Up5AwAA/vBuxYsNnrp0qWdTzMzmMS/c61Tow+Uit3mdIM2ec6KtznKb6uvsvHZTjm0XNuzbJ57Rm1alAAA="
+    },
+    "sweating": {
+      "width": 473,
+      "height": 417,
+      "avif": 16759,
+      "webp": 22456,
+      "blur": "data:image/webp;base64,UklGRmoAAABXRUJQVlA4IF4AAADwBACdASoYABUAPu1yrVGppyQiqAqpMB2JZwDM0BEJokLdFkEvcunO65TmRg8IL/AA/vHMzn1BidyPbRYupRbWW7zobpKctYUaZeMmFBACn29cUxdM4z5qGN8CTIAA"
+    },
+    "smug": {
+      "width": 472,
+      "height": 488,
+      "avif": 12251,
+      "webp": 16218,
+      "blur": "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAACQBACdASoYABkAPu1grU+ppSQiMBgIATAdiWcAAC52KEEvV8KLlkHC/dKeagAA/vN97wpesSJ4+Cbvr4tP5RLx5q0sVygzcymO/pqpp/odMqUrluGwAA=="
+    },
+    "sleepy": {
+      "width": 473,
+      "height": 488,
+      "avif": 12622,
+      "webp": 17010,
+      "blur": "data:image/webp;base64,UklGRmoAAABXRUJQVlA4IF4AAAAwBQCdASoYABkAPu1krVAppSQisBgIATAdiWcAznQ0b6jM2hHrL3p57Y+lYLaPBAJwAAD+9gnPn8zLVaIHa3pe3wmCLUlRgixYhUiK90u4qn5bYBtyLySmG7regAAA"
+    }
+  }
+}

@@ -6,7 +6,7 @@
     <title>Nuits Receipts changelog</title>
     <meta
       name="description"
-      content="What changed in each release of Nuits Receipts, read like a comic: one receipt slip per release, newest first, built from the project's CHANGELOG.md."
+      content="What changed in each release of Nuits Receipts, read like a manga: one spread per release, newest first, built from the project's CHANGELOG.md."
     />
     <meta name="theme-color" content="#E6EFE9" />
     <link rel="canonical" href="https://receipts.nuits.net/changelog/" />
@@ -38,12 +38,8 @@
         try { stored = localStorage.getItem("motion"); } catch (e) {}
         var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         document.documentElement.dataset.motion = stored || (reduce ? "off" : "on");
-        // The same for the book: wide screens lay out as one slip at a time
-        // from the first frame, so nothing shifts when the reader starts.
-        if (window.matchMedia("(min-width: 64rem) and (min-height: 37.5rem)").matches) document.documentElement.dataset.book = "";
       })();
     </script>
-    <!-- changelog:tones -->
     <link rel="stylesheet" href="/src/styles/changelog.css" />
     <script type="module" src="/src/changelog.ts"></script>
     <!-- changelog:jsonld -->
@@ -54,26 +50,22 @@
     <!-- partial:bar -->
 
     <main id="main" class="cl">
-      <!-- First in the tab order, drawn under the book. -->
-      <div class="controls" hidden>
-        <button class="ctl ctl-back" type="button">Back</button>
-        <a class="ctl ctl-index" href="#index">Index</a>
-        <button class="ctl ctl-next" type="button">Next</button>
+      <h1 class="vh">Nuits Receipts changelog</h1>
+      <nav class="scrub" aria-label="Releases">
+        <!-- changelog:scrubber -->
+        <span class="scrub-peek" aria-hidden="true" hidden><img alt="" width="128" height="192" /><span class="scrub-peek-v"></span></span>
+      </nav>
+      <div class="stage">
+        <a class="turn turn-older" href="#" rel="prev" aria-label="Older release" hidden><span aria-hidden="true">&lsaquo;</span><span class="turn-label">older</span></a>
+        <div class="book" id="book">
+          <!-- changelog:spreads -->
+        </div>
+        <a class="turn turn-newer" href="#" rel="next" aria-label="Newer release" hidden><span aria-hidden="true">&rsaquo;</span><span class="turn-label">newer</span></a>
       </div>
-      <div class="book" id="book">
-        <section class="cover leaf" id="cover" aria-labelledby="cl-title">
-          <div class="cover-head">
-            <h1 class="cl-title" id="cl-title" tabindex="-1">Changelog</h1>
-            <p class="cover-latest"><!-- changelog:version --></p>
-          </div>
-          <nav class="index slip" id="index" aria-labelledby="index-title">
-            <h2 class="index-title" id="index-title" tabindex="-1">Index</h2>
-            <!-- changelog:index -->
-          </nav>
-        </section>
-        <!-- changelog:book -->
-        <p class="folio" aria-hidden="true" hidden></p>
-      </div>
+      <details class="all" id="all">
+        <summary class="btn">All releases</summary>
+        <!-- changelog:all -->
+      </details>
       <p class="vh" aria-live="polite" data-live></p>
     </main>
 

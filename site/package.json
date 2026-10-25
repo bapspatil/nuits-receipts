@@ -6,6 +6,7 @@
     "dev": "vite --port 4321",
     "tokens": "node scripts/generate-tokens.mjs tokens.json --css src/styles/theme.css --wgsl src/shaders/palette.wgsl --check-shader 'src/shaders/*.wgsl,src/shaders/*.glsl'",
     "check": "node scripts/check-contrast.mjs tokens.json --quiet && node scripts/check-copy.mjs && node scripts/check-media-range.mjs",
+    "art": "node scripts/changelog-art.mjs",
     "build": "bun run tokens && node scripts/check-contrast.mjs tokens.json --quiet && vite build && node scripts/check-copy.mjs && node scripts/check-weight.mjs",
     "preview": "vite preview --port 4321 --strictPort",
     "measure-field": "node scripts/measure-field.mjs",
@@ -27,6 +28,7 @@
     "media-chrome": "4.19.4",
     "playwright-core": "1.64.1",
     "pngjs": "7.0.0",
+    "sharp": "0.34.5",
     "three": "0.186.1",
     "vite": "8.3.4"
   }
