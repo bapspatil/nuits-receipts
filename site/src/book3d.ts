@@ -1,6 +1,6 @@
-// The 3D book: the changelog's page turn in three.js, timed by GSAP.
-// src/changelog.ts loads this after first paint, only on a wide screen with
-// motion on, WebGL2 there, Save-Data off and a device with memory to spare.
+// The 3D book: the changelog's page turn in three.js, timed by GSAP, on wide
+// screens and phones, by button or by dragging the page.
+// src/changelog.ts loads this after first paint, only with motion on, WebGL2 there, Save-Data off and a device with memory to spare.
 // Anything that goes wrong (no context, a software rasteriser, a tainted
 // canvas, a lost context, a slow GPU) hands the turn back to the CSS slide for
 // the rest of the visit; the page never waits on this file.
@@ -25,7 +25,7 @@ import {
   Vector2,
   WebGLRenderer,
 } from "three";
-import { artUrl, reader, slide, type Turn } from "./changelog";
+import { artUrl, reader, slide, type Dir, type DragTurn, type Turn } from "./changelog";
 import fragmentShader from "./shaders/book.frag.glsl?raw";
 import vertexShader from "./shaders/book.vert.glsl?raw";
 
@@ -59,6 +59,8 @@ function page(scene: Scene, z: number): Page {
     uTheta: { value: 0 },
     uBend: { value: 0 },
     uSize: { value: new Vector2(1, 1) },
+    uPlain: { value: 0 },
+    PAPER: { value: token("--color-slip") },
     INK_SOFT: { value: token("--color-ink-soft") },
   };
   const mesh = new Mesh(new PlaneGeometry(1, 1, 48, 1), new ShaderMaterial({ uniforms: u, vertexShader, fragmentShader, side: DoubleSide }));
@@ -222,7 +224,10 @@ async function capture(i: number, rect: DOMRect): Promise<Shot> {
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(w * scale);
   canvas.height = Math.round(h * scale);
-  canvas.getContext("2d")!.drawImage(image, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = getComputedStyle(document.documentElement).backgroundColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
   const shot: Shot = { key, canvas };
   cache.set(i, shot);
   // Keep the open spread and its two neighbours.
@@ -248,48 +253,55 @@ function texture(shot: Shot, renderer: WebGLRenderer) {
 }
 
 // --- the turn -----------------------------------------------------------------
+//
+// A wide screen turns half the spread about the spine. A phone shows one
+// page, so the whole page is the leaf: it peels away from the side the finger
+// pulls it, hinged on the far edge, and shows plain paper on its back.
 
-const turn: Turn = async (from, to, dir) => {
-  if (broken || !wide.matches) return slide(from, to, dir);
+type Leaf = { draw(p: number): void; cleanup(landed: boolean): void };
+
+async function prepare(from: HTMLElement, to: HTMLElement, dir: Dir): Promise<Leaf | null> {
+  if (broken) return null;
   const i = reader.spreads.indexOf(from);
   const j = reader.spreads.indexOf(to);
   // Hold the leaving spread on screen until the textures are ready.
   from.removeAttribute("hidden");
   to.setAttribute("hidden", "");
   const rect = from.getBoundingClientRect();
-  let shown = false;
   try {
     if (!rect.width || !rect.height) throw new Error("no box");
     const [a, b] = await Promise.all([capture(i, rect), capture(j, rect)]);
-    const g = create();
-    const { renderer, camera, scene, leaf, still } = g;
+    const { renderer, camera, scene, leaf, still } = create();
     const fromTex = texture(a, renderer);
     const toTex = texture(b, renderer);
-
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
     renderer.setSize(vw, vh, false);
     camera.aspect = vw / vh;
     camera.position.set(0, 0, vh / 2 / Math.tan((FOV * Math.PI) / 360));
     camera.updateProjectionMatrix();
-    // The spine, in the camera's pixels, and where it falls in the texture.
     const r = from.getBoundingClientRect();
     const f = frame(r);
-    const spine = r.left + r.width / 2;
+    const older = dir === 1;
+    const single = !wide.matches;
+    // The spine, in the camera's pixels: the middle of a spread, or on a
+    // phone the edge the page is hinged on (the right one for older).
+    const spine = single ? (older ? r.right : r.left) : r.left + r.width / 2;
     const widths = [spine - f.x, f.x + f.w - spine];
     // Older (dir 1): the art page lifts and lands on the right; newer: the
     // notes page lifts and lands on the left. The other page of the leaving
     // spread stays put until the leaf covers it.
-    const older = dir === 1;
     for (const [p, left] of [
       [leaf, older],
       [still, !older],
     ] as const) {
       p.mesh.position.x = spine - vw / 2;
       p.mesh.position.y = vh / 2 - (f.y + f.h / 2);
-      (p.u.uSize.value as Vector2).set(widths[left ? 0 : 1], f.h);
+      (p.u.uSize.value as Vector2).set(Math.max(1, widths[left ? 0 : 1]), f.h);
       p.u.uSpine.value = (spine - f.x) / f.w;
     }
+    still.mesh.visible = !single;
+    leaf.u.uPlain.value = single ? 1 : 0;
     Object.assign(leaf.u.uFrom, { value: fromTex });
     Object.assign(leaf.u.uTo, { value: toTex });
     leaf.u.uFromLeft.value = older ? 1 : 0;
@@ -298,7 +310,6 @@ const turn: Turn = async (from, to, dir) => {
     still.u.uFromLeft.value = older ? 0 : 1;
     still.u.uTheta.value = older ? 0 : Math.PI;
     still.u.uBend.value = 0;
-
     const draw = (p: number) => {
       leaf.u.uTheta.value = older ? Math.PI * (1 - p) : Math.PI * p;
       leaf.u.uBend.value = (older ? BEND : -BEND) * Math.sin(Math.PI * p);
@@ -306,48 +317,92 @@ const turn: Turn = async (from, to, dir) => {
     };
     draw(0);
     renderer.domElement.hidden = false;
-    shown = true;
     from.setAttribute("hidden", "");
     to.removeAttribute("hidden");
-
-    const progress = { value: 0 };
-    const frames: number[] = [];
-    const hurry = () => tween && gsap.to(tween, { progress: 1, duration: 0.15, ease: "none" });
-    const resize = () => tween?.progress(1);
-    addEventListener("changelog:hurry", hurry);
-    addEventListener("resize", resize);
-    try {
-      await new Promise<void>((done) => {
-        tween = gsap.to(progress, {
-          value: 1,
-          duration: DURATION,
-          ease: "power2.inOut",
-          onUpdate: () => {
-            frames.push(performance.now());
-            draw(progress.value);
-          },
-          onComplete: done,
-        });
-      });
-    } finally {
-      tween = null;
-      removeEventListener("changelog:hurry", hurry);
-      removeEventListener("resize", resize);
-    }
-    // A GPU that could not keep up gets the slide from now on.
-    if (frames.length > 8 && !FORCE) {
-      const span = frames.at(-1)! - frames[3];
-      if ((frames.length - 4) / (span / 1000) < MIN_FPS) fail();
-    }
+    return {
+      draw,
+      cleanup(landed) {
+        renderer.domElement.hidden = true;
+        (landed ? from : to).setAttribute("hidden", "");
+        (landed ? to : from).removeAttribute("hidden");
+        warm();
+      },
+    };
   } catch {
     fail();
+    return null;
+  }
+}
+
+function run(leaf: Leaf, fromP: number, toP: number, duration: number, check: boolean) {
+  const progress = { value: fromP };
+  const frames: number[] = [];
+  const hurry = () => tween && gsap.to(tween, { progress: 1, duration: 0.15, ease: "none" });
+  const resize = () => tween?.progress(1);
+  addEventListener("changelog:hurry", hurry);
+  addEventListener("resize", resize);
+  return new Promise<void>((done) => {
+    tween = gsap.to(progress, {
+      value: toP,
+      duration,
+      ease: check ? "power2.inOut" : "power2.out",
+      onUpdate: () => {
+        frames.push(performance.now());
+        try {
+          leaf.draw(progress.value);
+        } catch {}
+      },
+      onComplete: done,
+    });
+  }).finally(() => {
+    tween = null;
+    removeEventListener("changelog:hurry", hurry);
+    removeEventListener("resize", resize);
+    // A GPU that could not keep up gets the slide from now on.
+    if (check && frames.length > 8 && !FORCE) {
+      const span = frames.at(-1)! - frames[3];
+      if ((frames.length - 4) / (span / 1000) < MIN_FPS) broken = true;
+    }
+  });
+}
+
+const turn: Turn = async (from, to, dir) => {
+  const leaf = await prepare(from, to, dir);
+  if (!leaf) {
     to.removeAttribute("hidden");
     from.setAttribute("hidden", "");
-    if (!shown) return slide(from, to, dir);
-  } finally {
-    if (gl) gl.renderer.domElement.hidden = true;
+    return slide(from, to, dir);
   }
-  warm();
+  await run(leaf, 0, 1, DURATION, true);
+  leaf.cleanup(true);
+  if (broken) fail();
+};
+
+// The finger holds the page's corner: set() follows it, end() lets go, and
+// the leaf lands past halfway or falls back.
+const drag: DragTurn = async (from, to, dir) => {
+  const leaf = await prepare(from, to, dir);
+  if (!leaf) {
+    to.setAttribute("hidden", "");
+    from.removeAttribute("hidden");
+    return null;
+  }
+  let p = 0;
+  let raf = 0;
+  return {
+    set(next) {
+      p = next;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => leaf.draw(p));
+    },
+    async end(commit) {
+      cancelAnimationFrame(raf);
+      const target = commit ? 1 : 0;
+      await run(leaf, p, target, 0.2 + 0.5 * Math.abs(target - p), false);
+      leaf.cleanup(commit);
+      return commit;
+    },
+  };
 };
 
 // Capture ahead, so a turn finds its textures ready.
@@ -355,7 +410,6 @@ function warm() {
   if (broken) return;
   const idle = (fn: () => void) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 300));
   idle(async () => {
-    if (!wide.matches) return;
     const at = reader.current;
     const rect = reader.spreads[at].getBoundingClientRect();
     if (!rect.width) return;
@@ -374,7 +428,7 @@ export function attach() {
   } catch {
     return fail();
   }
-  reader.useTurn(turn);
+  reader.useTurn(turn, drag);
   warm();
   addEventListener("pagehide", dispose);
   addEventListener("changelog:motion", (e) => {

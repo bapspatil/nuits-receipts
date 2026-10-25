@@ -209,22 +209,99 @@ addEventListener("keydown", (e) => {
   void go(step[e.key]);
 });
 
-// Swipe the book: finger to the right brings in the older page, as in a
-// manga. Vertical scrolling stays native.
-let start: { x: number; y: number; t: number } | null = null;
+// Swipe or drag the book: finger to the right brings in the older page, as
+// in a manga. With the 3D book the page follows the finger and lands or
+// falls back on release; without it a swipe plays the slide. Vertical
+// scrolling stays native. A mouse drags from the book's outer edges only, so
+// text stays selectable.
+const EDGE = 0.18;
+let start: { x: number; y: number; id: number; mouse: boolean } | null = null;
+let drag: { dir: Dir; handle: Promise<DragHandle | null>; p: number } | null = null;
 book.style.touchAction = "pan-y";
+const nearEdge = (x: number) => {
+  const r = book.getBoundingClientRect();
+  return x < r.left + r.width * EDGE || x > r.right - r.width * EDGE;
+};
 book.addEventListener("pointerdown", (e) => {
-  if (e.pointerType !== "mouse") start = { x: e.clientX, y: e.clientY, t: performance.now() };
+  const mouse = e.pointerType === "mouse";
+  if (mouse && (e.button !== 0 || !nearEdge(e.clientX))) return;
+  if ((e.target as HTMLElement).closest("a, button, summary, input, .full-body")) return;
+  start = { x: e.clientX, y: e.clientY, id: e.pointerId, mouse };
+  if (mouse) e.preventDefault();
 });
-book.addEventListener("pointerup", (e) => {
-  if (!start) return;
+book.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "mouse" && !start) book.style.cursor = dragEffect && nearEdge(e.clientX) ? "grab" : "";
+  if (!start || e.pointerId !== start.id) return;
   const dx = e.clientX - start.x;
   const dy = e.clientY - start.y;
-  start = null;
-  if (Math.abs(dx) < 48 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
-  void go(current + (dx > 0 ? 1 : -1));
+  if (!drag) {
+    if (Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    const dir: Dir = dx > 0 ? 1 : -1;
+    if (!dragEffect || busy || still() || current + dir < 0 || current + dir >= spreads.length) return;
+    book.setPointerCapture(e.pointerId);
+    drag = { dir, p: 0, handle: beginDrag(dir) };
+  }
+  drag.p = Math.max(0, Math.min(1, (dx * drag.dir) / (book.clientWidth * (wideQuery.matches ? 0.5 : 0.85))));
+  void drag.handle.then((h) => h?.set(drag ? drag.p : 0));
 });
-book.addEventListener("pointercancel", () => (start = null));
+const release = (e: PointerEvent, cancelled = false) => {
+  if (!start || e.pointerId !== start.id) return;
+  const dx = e.clientX - start.x;
+  const dy = e.clientY - start.y;
+  const s = start;
+  start = null;
+  if (drag) {
+    const d = drag;
+    drag = null;
+    void d.handle.then((h) => h?.end(!cancelled && d.p > 0.3));
+    return;
+  }
+  if (cancelled || s.mouse || Math.abs(dx) < 48 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+  void go(current + (dx > 0 ? 1 : -1));
+};
+book.addEventListener("pointerup", (e) => release(e));
+book.addEventListener("pointercancel", (e) => release(e, true));
+
+// A turn the reader drives. The 3D book prepares the leaf; until it is ready
+// the finger's position is kept, so the page catches up when it appears.
+export type DragHandle = { set(p: number): void; end(commit: boolean): Promise<boolean> };
+export type DragTurn = (from: HTMLElement, to: HTMLElement, dir: Dir) => Promise<DragHandle | null>;
+let dragEffect: DragTurn | null = null;
+
+function beginDrag(dir: Dir): Promise<DragHandle | null> {
+  const from = current;
+  const to = current + dir;
+  let release!: () => void;
+  busy = new Promise<void>((r) => (release = r));
+  const done = () => {
+    busy = null;
+    release();
+  };
+  return dragEffect!(spreads[from], spreads[to], dir)
+    .catch(() => null)
+    .then((h) => {
+      if (!h) {
+        done();
+        return null;
+      }
+      return {
+        set: h.set,
+        async end(commit: boolean) {
+          const landed = await h.end(commit).catch(() => false);
+          if (landed) {
+            current = to;
+            paint(to);
+            history.replaceState(null, "", `#${versionOf(to)}`);
+            live.textContent = `Release ${versionOf(to)}`;
+            dispatchEvent(new CustomEvent("changelog:turned", { detail: { from, to } }));
+            prefetchAround(to);
+          } else paint(from);
+          done();
+          return landed;
+        },
+      };
+    });
+}
 
 // Links to a release anywhere on the page (chips, scrubber, All releases)
 // open it in the book.
@@ -307,21 +384,35 @@ list.addEventListener("pointerup", () => {
 });
 list.addEventListener("pointercancel", () => ((dragging = null), (peek.hidden = true)));
 
-// Copy link.
+// Copy link: an icon, with "Copied" beside it for a moment.
 for (const button of book.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
   if (!navigator.clipboard) continue;
   button.hidden = false;
+  const state = button.querySelector<HTMLElement>(".copy-state")!;
+  let reset = 0;
   button.addEventListener("click", async () => {
     const v = button.closest<HTMLElement>(".spread")!.dataset.v;
     try {
       await navigator.clipboard.writeText(`${location.origin}${location.pathname}#${v}`);
-      button.textContent = "Copied";
+      state.textContent = "Copied";
     } catch {
-      button.textContent = "Copy failed";
+      state.textContent = "Copy failed";
     }
-    setTimeout(() => (button.textContent = "Copy link"), 1600);
+    clearTimeout(reset);
+    reset = setTimeout(() => (state.textContent = ""), 1600);
   });
 }
+
+// All releases: the link beside the actions opens the list under the book.
+const all = document.querySelector<HTMLDetailsElement>("#all")!;
+document.addEventListener("click", (e) => {
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("[data-all]");
+  if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  e.preventDefault();
+  all.open = true;
+  all.scrollIntoView({ block: "start", behavior: still() ? "auto" : "smooth" });
+  all.querySelector<HTMLElement>("summary")!.focus({ preventScroll: true });
+});
 
 // --- boot -------------------------------------------------------------------
 
@@ -340,18 +431,17 @@ for (const button of book.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
 // --- the 3D book --------------------------------------------------------------
 //
 // src/book3d.ts and three.js load after first paint, only where the turn is
-// worth its weight: two pages on screen, motion on, WebGL2, no Save-Data and
-// a device that is not short of memory. Until then, and if it fails, the
+// worth its weight: motion on, WebGL2, no Save-Data and
+// a device that is not short of memory. Phones get it too, one page wide. Until then, and if it fails, the
 // slide above turns the page.
 let book3d: Promise<void> | null = null;
 function load3d() {
   const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
-  if (book3d || still() || !wideQuery.matches || nav.connection?.saveData || (nav.deviceMemory ?? 8) < 4) return;
+  if (book3d || still() || nav.connection?.saveData || (nav.deviceMemory ?? 8) < 4) return;
   if (!("WebGL2RenderingContext" in window)) return;
   book3d = import("./book3d").then((m) => m.attach()).catch(() => {});
 }
 addEventListener("load", () => idle(load3d), { once: true });
-wideQuery.addEventListener("change", load3d);
 addEventListener("changelog:motion", load3d);
 
 export const reader = {
@@ -362,7 +452,8 @@ export const reader = {
   },
   go,
   artUrl,
-  useTurn(next: Turn | null) {
+  useTurn(next: Turn | null, drag: DragTurn | null = null) {
     turnEffect = next;
+    dragEffect = next ? drag : null;
   },
 };
