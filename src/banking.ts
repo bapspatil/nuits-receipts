@@ -773,24 +773,50 @@ export type EurValue = {
   minor: number | null;
   rateDate: string | null;
   transaction: string | null;
+  // The matched payment's booking date, when there is one.
+  bookingDate: string | null;
   accountId: string | null;
   accountName: string | null;
 };
 export async function eurValue(env: Env, row: Receipt): Promise<EurValue> {
-  const bank = await env.DB.prepare(
-    "SELECT t.*,a.label AS account_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE t.receipt_id=? AND i.status='complete'",
-  )
-    .bind(row.id)
-    .first<Transaction & { account_name: string }>();
-  const account = { accountId: bank?.account_key ?? null, accountName: bank?.account_name ?? null };
+  return (await eurValues(env, [row]))[0]!;
+}
+// The EUR value of many rows in one round trip: the matched payments and the
+// ECB rate dates are each one query over a JSON list, however many rows.
+export async function eurValues(env: Env, rows: readonly Receipt[]): Promise<EurValue[]> {
+  if (!rows.length) return [];
+  const rated = rows.filter((r) => r.currency !== 'EUR' && r.currency !== null);
+  const [banks, rates] = await env.DB.batch([
+    env.DB.prepare(
+      "SELECT t.*,a.label AS account_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE t.receipt_id IN (SELECT value FROM json_each(?)) AND i.status='complete'",
+    ).bind(JSON.stringify([...new Set(rows.map((r) => r.id))])),
+    env.DB.prepare(
+      "SELECT f.currency,f.requested_date,f.rate_date FROM fx_rates f JOIN json_each(?) j ON f.currency=json_extract(j.value,'$[0]') AND f.requested_date=json_extract(j.value,'$[1]')",
+    ).bind(JSON.stringify(rated.map((r) => [r.currency, r.fx_requested_date]))),
+  ]);
+  const bankOf = new Map<string, Transaction & { account_name: string }>();
+  for (const t of (banks?.results ?? []) as (Transaction & { account_name: string })[])
+    if (t.receipt_id && !bankOf.has(t.receipt_id)) bankOf.set(t.receipt_id, t);
+  const rateOf = new Map<string, string>();
+  for (const f of (rates?.results ?? []) as { currency: string; requested_date: string; rate_date: string }[])
+    rateOf.set(`${f.currency}\u0000${f.requested_date}`, f.rate_date);
+  return rows.map((row) =>
+    eurFrom(row, bankOf.get(row.id), rateOf.get(`${row.currency}\u0000${row.fx_requested_date}`)),
+  );
+}
+function eurFrom(
+  row: Receipt,
+  bank: (Transaction & { account_name: string }) | undefined,
+  rateDate: string | undefined,
+): EurValue {
+  const account = {
+    accountId: bank?.account_key ?? null,
+    accountName: bank?.account_name ?? null,
+    transaction: bank?.id ?? null,
+    bookingDate: bank?.booking_date ?? null,
+  };
   if (row.eur_override_minor !== null)
-    return {
-      ...account,
-      source: 'manual',
-      minor: row.eur_override_minor,
-      rateDate: null,
-      transaction: bank?.id ?? null,
-    };
+    return { ...account, source: 'manual', minor: row.eur_override_minor, rateDate: null };
   if (bank?.currency === 'EUR')
     return {
       ...account,
@@ -798,18 +824,12 @@ export async function eurValue(env: Env, row: Receipt): Promise<EurValue> {
       // Money out is negative on the statement; money in (a paid sales invoice) is positive.
       minor: row.kind === 'sales' ? bank.amount_minor : -bank.amount_minor,
       rateDate: null,
-      transaction: bank.id,
     };
-  if (row.currency === 'EUR')
-    return { ...account, source: 'native', minor: row.total_minor, rateDate: null, transaction: bank?.id ?? null };
-  const rateDate = await env.DB.prepare('SELECT rate_date FROM fx_rates WHERE currency=? AND requested_date=?')
-    .bind(row.currency, row.fx_requested_date)
-    .first<string>('rate_date');
+  if (row.currency === 'EUR') return { ...account, source: 'native', minor: row.total_minor, rateDate: null };
   return {
     ...account,
     source: row.fx_eur_minor === null ? 'missing' : 'ecb',
     minor: row.fx_eur_minor,
-    rateDate,
-    transaction: bank?.id ?? null,
+    rateDate: rateDate ?? null,
   };
 }

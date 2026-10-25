@@ -11,7 +11,7 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month } from './ui';
+import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
 import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import {
   afterLastReview,
@@ -174,6 +174,18 @@ async function transferRow(env: Env, debitId: string): Promise<{ to: string; nam
   };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
+// Pages that always render the tab bar, so their counts can start early.
+const TAB_PAGES = new Set([
+  '/',
+  '/add',
+  '/help',
+  '/import',
+  '/invoices',
+  '/payments',
+  '/receipts',
+  '/review',
+  '/settings',
+]);
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
   const who = await authorized(request, env);
   if (!who)
@@ -188,6 +200,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         });
   const url = new URL(request.url),
     path = url.pathname;
+  // Start the tab counts now, so they load alongside the page's own queries.
+  if (request.method === 'GET' && TAB_PAGES.has(path)) void navCounts(env);
   if (!['GET', 'HEAD'].includes(request.method)) {
     requireInput(request.method === 'POST', 'Method not allowed', 405);
     requireInput(request.headers.get('Origin') === url.origin, 'Origin does not match', 403);
@@ -286,6 +300,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     response.headers.set('Content-Security-Policy', ADD_CSP);
     return response;
   }
+  if (request.method === 'GET' && path === '/assets/speculation-rules.json')
+    return new Response(SPECULATION_RULES, {
+      headers: { 'Content-Type': 'application/speculationrules+json', 'Cache-Control': 'private, max-age=300' },
+    });
   if (request.method === 'GET' && path === '/assets/add.js')
     return new Response(ADD_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },

@@ -5,6 +5,7 @@ import {
   collisions,
   eligible,
   eurValue,
+  eurValues,
   importBankCsv,
   importIdentity,
   parsePreset,
@@ -14,6 +15,7 @@ import {
 import { hash, type Receipt } from '../src/domain';
 import { getReceipt } from '../src/receipts';
 import { request, uploadPdf, confirmationForm, idFrom } from './helpers';
+import { seed } from './package-helpers';
 
 const csv =
   'Transaction ID;Booking date;Amount;Currency;Payee;Reference\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy;SAMPLE-1001\nb;2026-09-08;-9,99;EUR;Sample Missing;missing\n';
@@ -272,4 +274,28 @@ test('saving a receipt keeps its manual match unless the matched facts change', 
   expect(await linked()).toBe(row.id);
   await save({ total: '125.60', net: '100.10' });
   expect(await linked()).toBeNull();
+});
+test('eurValues answers a whole list in one call, the same as eurValue row by row', async () => {
+  const matched = await receipt();
+  await importCsv();
+  const usd = await seed({
+    currency: 'USD',
+    total_minor: 2000,
+    fx_requested_date: '2026-09-05',
+    fx_eur_minor: 1800,
+  });
+  await env.DB.prepare(
+    "INSERT INTO fx_rates VALUES ('USD','2026-09-05','2026-09-04','0.9','synthetic','2026-09-06')",
+  ).run();
+  const unrated = await seed({ currency: 'USD', total_minor: 500, fx_requested_date: '2026-09-09' });
+  const native = await seed({});
+  // The matched row twice: duplicates in the list each get their own answer.
+  const fresh = await Promise.all([matched, usd, unrated, native, matched].map((r) => getReceipt(env, r.id)));
+  const all = await eurValues(env, fresh);
+  expect(all).toEqual(await Promise.all(fresh.map((r) => eurValue(env, r))));
+  expect(all.map((e) => e.source)).toEqual(['bank', 'ecb', 'missing', 'native', 'bank']);
+  expect(all[0]).toMatchObject({ minor: 12550, bookingDate: '2026-09-07' });
+  expect(all[1]).toMatchObject({ minor: 1800, rateDate: '2026-09-04', transaction: null });
+  expect(all[2]!.rateDate).toBeNull();
+  expect(await eurValues(env, [])).toEqual([]);
 });

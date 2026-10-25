@@ -1,7 +1,7 @@
 // Sales invoices you sent: the Invoices list, payment status, the receipt
 // page's money-in matching, and the Add page (several files, either kind).
 import { DEFAULT_TUNING, money, type Receipt } from './domain';
-import { creditFit, eurValue, type Transaction } from './banking';
+import { creditFit, eurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
@@ -111,8 +111,9 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
   let invoiced = 0n,
     received = 0n,
     noEur = 0;
-  for (const r of month) {
-    const eur = await eurValue(env, r);
+  const eurs = await eurValues(env, month);
+  for (const [i, r] of month.entries()) {
+    const eur = eurs[i]!;
     if (eur.minor === null) {
       noEur++;
       continue;

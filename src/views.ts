@@ -1,7 +1,16 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
 import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule, type Tuning } from './domain';
-import { creditFit, eligible, eurValue, lookalike, openSales, type EurValue, type Transaction } from './banking';
+import {
+  creditFit,
+  eligible,
+  eurValue,
+  eurValues,
+  lookalike,
+  openSales,
+  type EurValue,
+  type Transaction,
+} from './banking';
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
@@ -15,7 +24,7 @@ import { mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import { feedback } from './events';
-import { arrivalMonth, type Arrival } from './arrival';
+import { arrivalMonth } from './arrival';
 import { DISCARD_REASONS } from './domain';
 import { aboutBody } from './about';
 import { MAX_PACKAGE_FILES, options, planPackage, query, sendStatus, type PackageOptions } from './package';
@@ -136,9 +145,36 @@ function receiptOption(r: Receipt, selected = false): string {
 
 type MonthState = Awaited<ReturnType<typeof monthState>>;
 async function monthState(env: Env, selected: string) {
-  const rows = await monthRows(env, selected);
-  const eurs: EurValue[] = [];
-  for (const r of rows) eurs.push(await eurValue(env, r));
+  // Everything below depends only on the month, so it loads at once.
+  const [rows, payments, imported, sales, undated] = await Promise.all([
+    monthRows(env, selected),
+    env.DB.prepare(
+      "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id",
+    )
+      .bind(selected)
+      .all<Payment>()
+      .then((r) => r.results),
+    env.DB.prepare(
+      "SELECT max(i.imported_at) d FROM imports i WHERE i.status='complete' AND EXISTS (SELECT 1 FROM bank_transactions t WHERE t.import_id=i.id AND substr(t.booking_date,1,7)=?)",
+    )
+      .bind(selected)
+      .first<string | null>('d'),
+    // Sales invoices issued in the month. One that needs a look blocks the
+    // month like a receipt does; an unpaid one does not.
+    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
+    // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
+    // while any is left (a month already sent stays closed).
+    env.DB.prepare(
+      "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
+    )
+      .first<number>('n')
+      .then((n) => n ?? 0),
+  ]);
+  const [all, send] = await Promise.all([
+    eurValues(env, [...rows, ...sales]),
+    sendStatus(env, selected, [...rows, ...sales]),
+  ]);
+  const eurs: EurValue[] = all.slice(0, rows.length);
   const matrix = new Map<string, bigint>();
   let total = 0n,
     estimated = 0n,
@@ -156,37 +192,15 @@ async function monthState(env: Env, selected: string) {
     const key = r.product + '\u0000' + r.expense_type;
     matrix.set(key, (matrix.get(key) ?? 0n) + BigInt(eur.minor));
   });
-  const payments = (
-    await env.DB.prepare(
-      "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id",
-    )
-      .bind(selected)
-      .all<Payment>()
-  ).results;
   const out = payments.filter((t) => t.amount_minor < 0);
   const missing = out.filter((t) => t.receipt_required && !t.receipt_id);
-  const imported = await env.DB.prepare(
-    "SELECT max(i.imported_at) d FROM imports i WHERE i.status='complete' AND EXISTS (SELECT 1 FROM bank_transactions t WHERE t.import_id=i.id AND substr(t.booking_date,1,7)=?)",
-  )
-    .bind(selected)
-    .first<string | null>('d');
-  // Sales invoices issued in the month. One that needs a look blocks the
-  // month like a receipt does; an unpaid one does not.
-  const sales = await salesRows(env, 'substr(r.issue_date,1,7)=?', selected);
   let invoiced = 0n;
-  for (const r of sales) invoiced += BigInt((await eurValue(env, r)).minor ?? 0);
+  for (const eur of all.slice(rows.length)) invoiced += BigInt(eur.minor ?? 0);
   const isReading = (r: Receipt) => r.status === 'pending' || r.status === 'processing';
   const flagged = [...rows, ...sales].filter((r) => r.status === 'needs_review');
   const reading = [...rows, ...sales].filter(isReading);
-  const send = await sendStatus(env, selected, [...rows, ...sales]);
   const docs = rows.length + sales.length;
   const sent = !!send.last && !send.changed && docs > 0;
-  // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
-  // while any is left (a month already sent stays closed).
-  const undated =
-    (await env.DB.prepare(
-      "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
-    ).first<number>('n')) ?? 0;
   return {
     send,
     // Marked as sent, and nothing added or corrected since.
@@ -1005,10 +1019,15 @@ function nextStep(s: MonthState, selected: string): { label: string; href: strin
 // One status row per step (Check, Match, Send), and one panel for the current step.
 export async function home(env: Env, requested: string | null, params = new URLSearchParams()): Promise<Response> {
   const settings = config(env);
-  const ever = await env.DB.prepare(
-    "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
-  ).first<{ r: number; i: number }>();
-  const checklist = setupChecklist(await setupSteps(env));
+  // The month Home opens on is worked out alongside, though a new install doesn't need it.
+  const [ever, steps, arrival] = await Promise.all([
+    env.DB.prepare(
+      "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
+    ).first<{ r: number; i: number }>(),
+    setupSteps(env),
+    requested ? null : arrivalMonth(env),
+  ]);
+  const checklist = setupChecklist(steps);
   if (!ever?.r && !ever?.i)
     return page(
       'home',
@@ -1018,10 +1037,12 @@ export async function home(env: Env, requested: string | null, params = new URLS
       { head: pageHead('Welcome') },
     );
   // No month in the address: open on the oldest one that is not sent.
-  const arrival: Arrival | null = requested ? null : await arrivalMonth(env);
   const selected = requested ?? arrival!.month;
-  const s: MonthState = await monthState(env, selected);
-  const [queue, overdue] = await Promise.all([reviewQueue(env), overdueInvoices(env)]);
+  const [s, queue, overdue]: [MonthState, Receipt[], Awaited<ReturnType<typeof overdueInvoices>>] = await Promise.all([
+    monthState(env, selected),
+    reviewQueue(env),
+    overdueInvoices(env),
+  ]);
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
   const alert = overdue.length
     ? `<a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'invoice')} overdue ›</a>`
