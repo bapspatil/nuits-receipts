@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nuits Receipts changelog</title>
+    <meta
+      name="description"
+      content="What changed in each release of Nuits Receipts, read like a comic: one receipt slip per release, newest first, built from the project's CHANGELOG.md."
+    />
+    <meta name="theme-color" content="#E6EFE9" />
+    <link rel="canonical" href="https://receipts.nuits.net/changelog/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nuits Receipts" />
+    <meta property="og:url" content="https://receipts.nuits.net/changelog/" />
+    <meta property="og:title" content="Nuits Receipts changelog" />
+    <meta
+      property="og:description"
+      content="Every release of Nuits Receipts, printed on a receipt slip and read like a comic."
+    />
+    <meta property="og:image" content="https://receipts.nuits.net/og-changelog.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A receipt slip printed with the newest Nuits Receipts version, curling off the roll."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+      // Runs before first paint, so a reader who turned motion off never sees
+      // one frame of it. The stored choice beats the OS setting both ways.
+      (function () {
+        var stored = null;
+        try { stored = localStorage.getItem("motion"); } catch (e) {}
+        var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document.documentElement.dataset.motion = stored || (reduce ? "off" : "on");
+        // The same for the book: wide screens lay out as one slip at a time
+        // from the first frame, so nothing shifts when the reader starts.
+        if (window.matchMedia("(min-width: 64rem) and (min-height: 37.5rem)").matches) document.documentElement.dataset.book = "";
+      })();
+    </script>
+    <!-- changelog:tones -->
+    <link rel="stylesheet" href="/src/styles/changelog.css" />
+    <script type="module" src="/src/changelog.ts"></script>
+    <!-- changelog:jsonld -->
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <!-- partial:bar -->
+
+    <main id="main" class="cl">
+      <!-- First in the tab order, drawn under the book. -->
+      <div class="controls" hidden>
+        <button class="ctl ctl-back" type="button">Back</button>
+        <a class="ctl ctl-index" href="#index">Index</a>
+        <button class="ctl ctl-next" type="button">Next</button>
+      </div>
+      <div class="book" id="book">
+        <section class="cover leaf" id="cover" aria-labelledby="cl-title">
+          <div class="cover-head">
+            <h1 class="cl-title" id="cl-title" tabindex="-1">Changelog</h1>
+            <p class="cover-latest"><!-- changelog:version --></p>
+          </div>
+          <nav class="index slip" id="index" aria-labelledby="index-title">
+            <h2 class="index-title" id="index-title" tabindex="-1">Index</h2>
+            <!-- changelog:index -->
+          </nav>
+        </section>
+        <!-- changelog:book -->
+        <p class="folio" aria-hidden="true" hidden></p>
+      </div>
+      <p class="vh" aria-live="polite" data-live></p>
+    </main>
+
+    <!-- partial:footer -->
+  </body>
+</html>

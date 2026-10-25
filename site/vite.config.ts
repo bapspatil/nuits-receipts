@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
+import changelog from "./scripts/changelog-plugin.mjs";
 
 // The bar and the footer carry the trader identification and the small print,
 // which must be identical on every page. One file each, inlined at build time,
@@ -33,12 +34,12 @@ const svgs = (): Plugin => ({
 });
 
 export default defineConfig({
-  plugins: [partials(), svgs()],
+  plugins: [partials(), svgs(), changelog()],
   build: {
     target: "es2022",
     assetsInlineLimit: 0,
     rollupOptions: {
-      input: { main: resolve(import.meta.dirname, "index.html"), privacy: resolve(import.meta.dirname, "privacy/index.html"), notFound: resolve(import.meta.dirname, "404.html") },
+      input: { main: resolve(import.meta.dirname, "index.html"), privacy: resolve(import.meta.dirname, "privacy/index.html"), notFound: resolve(import.meta.dirname, "404.html"), changelog: resolve(import.meta.dirname, "changelog/index.html") },
     },
   },
 });

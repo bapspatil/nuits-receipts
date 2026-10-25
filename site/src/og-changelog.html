@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Source for public/og-changelog.png. Rendered by scripts/og.mjs at 1200x630. Not shipped. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- changelog:tones -->
+    <link rel="stylesheet" href="/src/styles/site.css" />
+    <style>
+      body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: var(--color-paper); }
+      .og { box-sizing: border-box; position: relative; width: 1200px; height: 630px; padding: 64px 72px; display: grid; align-content: space-between; }
+      .og-name { display: flex; align-items: center; gap: 16px; font-size: 30px; }
+      .og-name b { font-family: var(--font-display); font-weight: 800; }
+      .og-name svg { width: 40px; height: 40px; }
+      .og-title { font-family: var(--font-display); font-weight: 800; font-size: 168px; line-height: 0.86; letter-spacing: -0.045em; margin-left: -8px; }
+      .og-slip { position: absolute; right: 84px; top: 70px; width: 330px; height: 430px; rotate: 4deg; background: var(--color-slip); box-shadow: var(--shadow-system);
+        clip-path: polygon(0 0, 100% 0, 100% 72%, 66% 100%, 0 100%); padding: 34px 30px; box-sizing: border-box; }
+      .og-panel { height: 100%; border: 3px solid var(--color-ink); border-radius: 2px; position: relative; overflow: hidden; padding: 28px 22px; box-sizing: border-box; }
+      .og-panel::after { content: ""; position: absolute; inset: auto 0 0 0; height: 55%; background: var(--color-slip) var(--tone-50) 0 0 / 6px 6px; clip-path: polygon(0 100%, 100% 20%, 100% 100%); }
+      .og-v { font-family: var(--font-display); font-weight: 800; font-size: 92px; line-height: 0.9; letter-spacing: -0.02em; font-variant-numeric: proportional-nums; }
+      .og-v a { text-decoration: none; }
+      .og-curl { position: absolute; right: 84px; top: 70px; width: 330px; height: 430px; rotate: 4deg; pointer-events: none; }
+      .og-curl::before { content: ""; position: absolute; right: 0; bottom: 0; width: 112px; height: 120px;
+        background: var(--color-slip) var(--tone-25) 0 0 / 6px 6px; clip-path: polygon(0 100%, 100% 0, 0 0); box-shadow: var(--shadow-system); }
+    </style>
+  </head>
+  <body>
+    <div class="og">
+      <p class="og-name">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="currentColor"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="var(--color-paper)" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <b>Nuits Receipts</b>
+      </p>
+      <h1 class="og-title">Change&shy;log</h1>
+      <div class="og-slip"><div class="og-panel"><p class="og-v"><!-- changelog:version --></p></div></div>
+      <div class="og-curl" aria-hidden="true"></div>
+    </div>
+  </body>
+</html>
