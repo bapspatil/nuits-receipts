@@ -1,0 +1,63 @@
+---
+title: Make pages load faster
+description: Run the Worker near its D1 database, or turn on D1 read replication, so each page spends less time waiting on the database.
+sidebar:
+  order: 9.5
+  label: Make pages load faster
+---
+
+Use this guide when pages take a noticeable moment to appear. Building a page takes the Worker a few milliseconds. Almost all the rest is the trip between the Worker and its D1 database, and that trip is short only when the two run close together.
+
+A page waits on the database once or twice in a row. If the Worker runs near you and the database is on another continent, each wait can take 100 ms or more.
+
+## Prerequisites
+
+- The config file you deploy with (`wrangler.production.jsonc` if you used `bun run setup`, or `wrangler.jsonc` in your repository copy if you used the Deploy button).
+- Access to the D1 database in the Cloudflare dashboard.
+
+## Check where the time goes
+
+In your browser's developer tools, open **Network**, click a tab in the app, and select the page request. **Waiting for server response** is the time spent in the Worker and the database. If it is small and the page still feels slow, the cause is not covered by this guide.
+
+## Run the Worker near the database
+
+<Steps>
+  <Step title="Turn on Smart Placement">
+
+```jsonc title="wrangler.production.jsonc"
+"placement": { "mode": "smart" }
+```
+
+`wrangler.jsonc` sets this already. A private config made before version 1.12.3 needs the line added.
+
+  </Step>
+  <Step title="Deploy">
+
+```sh
+bun run deploy
+```
+
+  </Step>
+</Steps>
+
+Smart Placement costs nothing extra. It decides where to run the Worker from steady traffic arriving from more than one location. An app one person uses from one place may never get there: the Worker's **Settings > Placement** in the dashboard then says there were not enough requests, and the Worker keeps running near you. In that case, use read replication instead.
+
+## Turn on read replication
+
+Read replication keeps read-only copies of the database in several regions, so a page can read from the copy nearest the Worker. Saving still goes to the main copy. The app already sends its reads this way; with replication off, every query goes to the main copy.
+
+<Steps>
+  <Step title="Enable it on the database">
+
+In the Cloudflare dashboard, open **Storage & databases > D1**, select the app's database, then **Settings > Enable Read Replication**.
+
+  </Step>
+</Steps>
+
+Replicas add no charge: D1 bills rows read and written the same way with or without them. A copy can be a moment behind the main one, so after you save, the app hands your browser a bookmark in the `__Host-d1` cookie, and the next page reads at least up to your change. A receipt read from an email in the background can take a moment longer to show up.
+
+## What the app does on every page
+
+- It loads a page's database queries together rather than one after another.
+- It starts on the settings it read last and checks them in the same round. If they changed, it builds the page again with the new ones.
+- In Chrome and Edge, it fetches a tab while your pointer rests on it, so the page is often ready by the time you click.

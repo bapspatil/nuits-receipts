@@ -363,13 +363,23 @@ export function put(target: object, key: string, value: unknown): void {
   Object.defineProperty(target, key, { value, writable: true, enumerable: true, configurable: true });
 }
 const layers = new WeakMap<object, Map<string, { values: [SettingKey, string][]; applied: Applied }>>();
+// One request's env: the deploy env with its own database handle (a D1
+// session). The caches here stay keyed by the deploy env underneath.
+const ORIGIN = Symbol('origin');
+const keyOf = (env: Env): object => ((env as unknown as Record<symbol, object>)[ORIGIN] ?? env) as object;
+export function withDatabase(env: Env, db: D1Database): Env {
+  const own = Object.create(env) as Record<string | symbol, unknown>;
+  put(own, 'DB', db);
+  Object.defineProperty(own, ORIGIN, { value: keyOf(env) });
+  return own as unknown as Env;
+}
 // The env for one request: env with valid app values on top. Values are
 // checked one at a time in FIELDS order; one that fails (alone or with the
 // ones before it) is skipped and reported, never a 503.
 export function layer(env: Env, rows: readonly Row[], revision: number): Env {
   const signature = JSON.stringify([revision, rows]);
-  let byEnv = layers.get(env);
-  if (!byEnv) layers.set(env, (byEnv = new Map()));
+  let byEnv = layers.get(keyOf(env));
+  if (!byEnv) layers.set(keyOf(env), (byEnv = new Map()));
   let cached = byEnv.get(signature);
   if (!cached) {
     const stored = new Map(rows.map((r) => [r.key, r]));
@@ -424,26 +434,46 @@ export function layer(env: Env, rows: readonly Row[], revision: number): Env {
   Object.defineProperty(result, APPLIED, { value: cached.applied });
   return result as unknown as Env;
 }
-// One read per request or email. A missing table (migration not applied yet)
-// or a D1 error leaves the deploy values in force.
-export async function withSettings(env: Env): Promise<Env> {
-  if ((env as unknown as Record<symbol, unknown>)[APPLIED]) return env;
+type Read = { rows: Row[]; revision: number; signature: string };
+// The last settings this isolate read, per deploy env.
+const lastRead = new WeakMap<object, Read>();
+// A missing table (migration not applied yet) or a D1 error gives null, and
+// the deploy values stay in force.
+async function readSettings(env: Env): Promise<Read | null> {
   try {
     const [rows, audit] = await env.DB.batch([
       env.DB.prepare('SELECT key,value_json,updated_at,updated_by FROM settings ORDER BY key'),
       env.DB.prepare('SELECT COALESCE(MAX(id),0) AS revision FROM settings_audit'),
     ]);
-    return layer(
-      env,
-      (rows!.results as Row[]) ?? [],
-      Number((audit!.results[0] as { revision?: number } | undefined)?.revision ?? 0),
-    );
+    const list = (rows!.results as Row[]) ?? [];
+    const revision = Number((audit!.results[0] as { revision?: number } | undefined)?.revision ?? 0);
+    const read = { rows: list, revision, signature: JSON.stringify([revision, list]) };
+    lastRead.set(keyOf(env), read);
+    return read;
   } catch (error) {
     console.warn(
       JSON.stringify({ reason: 'settings_unavailable', error: error instanceof Error ? error.message : String(error) }),
     );
-    return env;
+    return null;
   }
+}
+// One read per request or email.
+export async function withSettings(env: Env): Promise<Env> {
+  if ((env as unknown as Record<symbol, unknown>)[APPLIED]) return env;
+  const read = await readSettings(env);
+  return read ? layer(env, read.rows, read.revision) : env;
+}
+// The settings this isolate read last, so a page can start without waiting
+// for them. The caller must compare the signature with freshSettings and
+// serve again when they differ. Null when nothing was read yet.
+export function cachedSettings(env: Env): { env: Env; signature: string } | null {
+  const last = lastRead.get(keyOf(env));
+  return last ? { env: layer(env, last.rows, last.revision), signature: last.signature } : null;
+}
+// A fresh read, with the signature to compare. An error never matches.
+export async function freshSettings(env: Env): Promise<{ env: Env; signature: string }> {
+  const read = await readSettings(env);
+  return { env: read ? layer(env, read.rows, read.revision) : env, signature: read?.signature ?? '' };
 }
 // The deploy env underneath the app layer.
 export function deployEnv(env: Env): Env {

@@ -1,11 +1,21 @@
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
-import { beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 });
+// Requests run on a D1 session (see fetch in src/index.ts). Tests that spy on
+// env.DB to inject failures need those queries on env.DB itself, so here the
+// session passes straight through. test/replication.test.ts uses the real one.
+const passThrough = {
+  prepare: (query: string) => env.DB.prepare(query),
+  batch: (statements: D1PreparedStatement[]) => env.DB.batch(statements),
+  getBookmark: () => null,
+} as unknown as D1DatabaseSession;
+let session: MockInstance | undefined;
 beforeEach(async () => {
+  session = vi.spyOn(env.DB, 'withSession').mockImplementation(() => passThrough);
   vi.stubGlobal(
     'fetch',
     vi.fn(() => {
@@ -40,4 +50,7 @@ beforeEach(async () => {
   const objects = await env.ORIGINALS.list();
   for (const object of objects.objects) await env.ORIGINALS.delete(object.key);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  session?.mockRestore();
+});

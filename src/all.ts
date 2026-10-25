@@ -174,13 +174,17 @@ function link(query: AllQuery, change: Partial<AllQuery>): string {
 
 export async function allReceiptsPage(env: Env, params: URLSearchParams, offset: number): Promise<Response> {
   const query = parseQuery(params, offset);
-  const rows = await allRows(env, query);
+  const [rows, tally, counts, tabTotals] = await Promise.all([
+    allRows(env, query),
+    env.DB.prepare(
+      "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
+    ).first<Record<'reading' | 'duplicate' | 'discarded', number>>(),
+    navCounts(env),
+    tabCounts(env, query.month),
+  ]);
   const more = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
   const filtered = !!(query.show || query.q);
-  const tally = await env.DB.prepare(
-    "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
-  ).first<Record<'reading' | 'duplicate' | 'discarded', number>>();
   const chips = chipRow('Show', [
     { href: link(query, { show: null }), label: 'All', current: !query.show },
     ...CHIPS.map((k) => ({
@@ -227,12 +231,11 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
                   : 'No receipts yet.',
                 addButton('all', true),
               );
-  const counts = await navCounts(env);
   const waiting = counts.review
     ? `<p class="small waiting"><a href="/review">${counts.review} in Review ›</a></p>`
     : '';
   const add = shown.length ? addButton('all', true) : '';
-  const tabs = receiptsTabs(await tabCounts(env, query.month), 'all', query.month);
+  const tabs = receiptsTabs(tabTotals, 'all', query.month);
   return page('receipts', `${tabs}${waiting}${chips}${find}${list}`, 200, env, {
     detail: query.month ? monthName(query.month) : undefined,
     head: query.month ? monthHead('/receipts', query.month, add) : pageHead('Receipts', add),

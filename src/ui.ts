@@ -830,7 +830,8 @@ export async function salesMonthRows(env: Env, selected: string): Promise<Receip
 }
 // Everything dated in the month that the month package and "sent" cover.
 export async function documentRows(env: Env, selected: string): Promise<Receipt[]> {
-  return [...(await monthRows(env, selected)), ...(await salesMonthRows(env, selected))];
+  const [rows, sales] = await Promise.all([monthRows(env, selected), salesMonthRows(env, selected)]);
+  return [...rows, ...sales];
 }
 export function uploadForm(receiptAddress = '', primary = false, kind: 'expense' | 'sales' = 'expense'): string {
   const mail = receiptAddress ? `Or forward to <code>${escape(receiptAddress)}</code>` : '';
