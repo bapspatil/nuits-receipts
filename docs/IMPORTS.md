@@ -1,4 +1,6 @@
-# Import bank CSV files
+# Import bank statements
+
+XLSX and CSV statements are accepted as downloaded. A spreadsheet becomes a CSV on upload (`src/xlsx.ts`), the column names row is found past any preamble, a statement's own totals are checked, and a file no layout matches is mapped by one Workers AI call that the whole file must then pass.
 
 This page moved to the documentation site:
 
