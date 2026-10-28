@@ -2,9 +2,11 @@ import { InputError, MAX_CSV_BYTES, MAX_CSV_ROWS, requireInput } from './domain'
 
 // Reads the first sheet of an .xlsx workbook into rows of cell text, with no
 // dependencies: the ZIP container through DecompressionStream and the sheet XML
-// through a few regular expressions. The rows become a plain CSV file, so a
-// spreadsheet takes the same checks and storage path as a bank CSV.
-const MAX_PART_BYTES = 32 * 1024 * 1024;
+// through a single left-to-right element scan. The rows become a plain CSV
+// file, so a spreadsheet takes the same checks and storage path as a bank CSV.
+// All parts together may inflate to at most 16 MiB: a 5,000-row statement
+// needs a few MiB, and the cap holds a ZIP bomb to a bounded amount of work.
+const MAX_INFLATED_BYTES = 16 * 1024 * 1024;
 const MAX_ROWS = MAX_CSV_ROWS + 200;
 const MAX_COLUMNS = 100;
 
@@ -12,7 +14,7 @@ export function isXlsx(bytes: Uint8Array): boolean {
   return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
 }
 
-type Entry = { method: number; flags: number; size: number; offset: number };
+type Entry = { method: number; flags: number; size: number; inflated: number; offset: number };
 function entries(bytes: Uint8Array): Map<string, Entry> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let end = -1;
@@ -35,46 +37,74 @@ function entries(bytes: Uint8Array): Map<string, Entry> {
       flags: view.getUint16(at + 8, true),
       method: view.getUint16(at + 10, true),
       size: view.getUint32(at + 20, true),
+      inflated: view.getUint32(at + 24, true),
       offset: view.getUint32(at + 42, true),
     });
     at += 46 + nameLength + extra + comment;
   }
   return found;
 }
-async function part(bytes: Uint8Array, all: Map<string, Entry>, name: string): Promise<string | null> {
+type Budget = { left: number };
+async function part(bytes: Uint8Array, all: Map<string, Entry>, name: string, budget: Budget): Promise<string | null> {
   const entry = all.get(name);
   if (!entry) return null;
+  requireInput(entry.inflated <= budget.left, 'CSV too large', 413);
   requireInput(!(entry.flags & 1), 'Spreadsheet password protected');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   requireInput(view.getUint32(entry.offset, true) === 0x04034b50, 'Spreadsheet unreadable');
   const start = entry.offset + 30 + view.getUint16(entry.offset + 26, true) + view.getUint16(entry.offset + 28, true);
   const data = bytes.subarray(start, start + entry.size);
   requireInput(data.length === entry.size, 'Spreadsheet unreadable');
-  if (entry.method === 0) return new TextDecoder().decode(data);
+  if (entry.method === 0) {
+    budget.left -= data.length;
+    requireInput(budget.left >= 0, 'CSV too large', 413);
+    return new TextDecoder().decode(data);
+  }
   requireInput(entry.method === 8, 'Spreadsheet unreadable');
+  // The declared size can lie, so the inflated bytes are counted as they arrive.
   const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+  const decoder = new TextDecoder(),
+    pieces: string[] = [];
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      total += value.length;
-      requireInput(total <= MAX_PART_BYTES, 'CSV too large', 413);
-      chunks.push(value);
+      budget.left -= value.length;
+      if (budget.left < 0) {
+        await reader.cancel();
+        throw new InputError('CSV too large', 413);
+      }
+      pieces.push(decoder.decode(value, { stream: true }));
     }
   } catch (error) {
     if (error instanceof InputError) throw error;
     throw new InputError('Spreadsheet unreadable');
   }
-  const joined = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    joined.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new TextDecoder().decode(joined);
+  pieces.push(decoder.decode());
+  return pieces.join('');
 }
+
+// Each <name ...>body</name> or <name .../> in order, found with one forward
+// pass: the opening tag cannot run past the next "<", and the closing tag is
+// looked up with indexOf from there. A missing closing tag is refused.
+type Element = { attrs: string; body: string; start: number; end: number };
+function* elements(xml: string, name: string): Generator<Element> {
+  const open = new RegExp(`<((?:\\w+:)?${name})\\b([^<>]*)>`, 'g');
+  for (let m = open.exec(xml); m; m = open.exec(xml)) {
+    const attrs = m[2]!;
+    if (attrs.endsWith('/')) {
+      yield { attrs: attrs.slice(0, -1), body: '', start: m.index, end: open.lastIndex };
+      continue;
+    }
+    const close = `</${m[1]}>`,
+      at = xml.indexOf(close, open.lastIndex);
+    requireInput(at >= 0, 'Spreadsheet unreadable');
+    yield { attrs, body: xml.slice(open.lastIndex, at), start: m.index, end: at + close.length };
+    open.lastIndex = at + close.length;
+  }
+}
+const first = (xml: string, name: string) => elements(xml, name).next().value as Element | undefined;
+const tags = (xml: string, name: string) => xml.match(new RegExp(`<(?:\\w+:)?${name}\\b[^<>]*>`, 'g')) ?? [];
 
 const ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
 function text(xml: string): string {
@@ -93,34 +123,32 @@ function attribute(tag: string, name: string): string | null {
 }
 // All <t> runs of a string item, without phonetic hints.
 function runs(xml: string): string {
-  return text(
-    [
-      ...xml
-        .replace(/<(?:\w+:)?rPh\b[\s\S]*?<\/(?:\w+:)?rPh>/g, '')
-        .matchAll(/<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/g),
-    ]
-      .map((m) => m[1])
-      .join(''),
-  );
+  let kept = '',
+    from = 0;
+  for (const hint of elements(xml, 'rPh')) {
+    kept += xml.slice(from, hint.start);
+    from = hint.end;
+  }
+  kept += xml.slice(from);
+  return text([...elements(kept, 't')].map((t) => t.body).join(''));
 }
 function sharedStrings(xml: string | null): string[] {
   if (!xml) return [];
-  return [...xml.matchAll(/<(?:\w+:)?si\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?si>)/g)].map((m) => runs(m[1] ?? ''));
+  return [...elements(xml, 'si')].map((si) => runs(si.body));
 }
 const BUILTIN_DATE_FORMATS = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 30, 36, 45, 46, 47, 50, 57]);
 // Which cell styles show a number as a date.
 function dateStyles(xml: string | null): boolean[] {
   if (!xml) return [];
   const custom = new Map<number, boolean>();
-  for (const m of xml.matchAll(/<(?:\w+:)?numFmt\b[^>]*>/g)) {
-    const code = text(attribute(m[0], 'formatCode') ?? '')
+  for (const tag of tags(xml, 'numFmt')) {
+    const code = text(attribute(tag, 'formatCode') ?? '')
       .replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')
       .toLowerCase();
-    custom.set(Number(attribute(m[0], 'numFmtId')), /[dy]/.test(code));
+    custom.set(Number(attribute(tag, 'numFmtId')), /[dy]/.test(code));
   }
-  const xfs = xml.match(/<(?:\w+:)?cellXfs\b[^>]*>([\s\S]*?)<\/(?:\w+:)?cellXfs>/)?.[1] ?? '';
-  return [...xfs.matchAll(/<(?:\w+:)?xf\b[^>]*>/g)].map((m) => {
-    const id = Number(attribute(m[0], 'numFmtId') ?? 0);
+  return tags(first(xml, 'cellXfs')?.body ?? '', 'xf').map((tag) => {
+    const id = Number(attribute(tag, 'numFmtId') ?? 0);
     return custom.get(id) ?? BUILTIN_DATE_FORMATS.has(id);
   });
 }
@@ -144,11 +172,9 @@ function column(ref: string | null): number | null {
   return index - 1;
 }
 function sheetPath(workbook: string | null, rels: string | null): string {
-  const id = workbook?.match(/<(?:\w+:)?sheet\b[^>]*>/)?.[0];
-  const rid = id ? attribute(id, 'id') : null;
-  const target = rid
-    ? [...(rels ?? '').matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((r) => attribute(r, 'Id') === rid)
-    : undefined;
+  const sheet = tags(workbook ?? '', 'sheet')[0];
+  const rid = sheet ? attribute(sheet, 'id') : null;
+  const target = rid ? tags(rels ?? '', 'Relationship').find((r) => attribute(r, 'Id') === rid) : undefined;
   const path = target ? attribute(target, 'Target') : null;
   if (!path) return 'xl/worksheets/sheet1.xml';
   return path.startsWith('/') ? path.slice(1) : 'xl/' + path.replace(/^\.\//, '');
@@ -156,30 +182,32 @@ function sheetPath(workbook: string | null, rels: string | null): string {
 
 export async function readXlsx(bytes: Uint8Array): Promise<string[][]> {
   requireInput(bytes.byteLength <= MAX_CSV_BYTES, 'CSV too large', 413);
-  const all = entries(bytes);
-  const workbook = await part(bytes, all, 'xl/workbook.xml');
-  const sheet = await part(bytes, all, sheetPath(workbook, await part(bytes, all, 'xl/_rels/workbook.xml.rels')));
+  const all = entries(bytes),
+    budget = { left: MAX_INFLATED_BYTES },
+    read = (name: string) => part(bytes, all, name, budget);
+  const workbook = await read('xl/workbook.xml');
+  const sheet = await read(sheetPath(workbook, await read('xl/_rels/workbook.xml.rels')));
   requireInput(sheet, 'Spreadsheet unreadable');
-  const strings = sharedStrings(await part(bytes, all, 'xl/sharedStrings.xml'));
-  const dates = dateStyles(await part(bytes, all, 'xl/styles.xml'));
-  const date1904 = /<(?:\w+:)?workbookPr\b[^>]*\sdate1904="(?:1|true)"/.test(workbook ?? '');
+  const strings = sharedStrings(await read('xl/sharedStrings.xml'));
+  const dates = dateStyles(await read('xl/styles.xml'));
+  const settings = tags(workbook ?? '', 'workbookPr')[0];
+  const date1904 = ['1', 'true'].includes(settings ? (attribute(settings, 'date1904') ?? '') : '');
   const rows: string[][] = [];
-  const data = sheet.match(/<(?:\w+:)?sheetData\b[^>]*>([\s\S]*?)<\/(?:\w+:)?sheetData>/)?.[1] ?? '';
-  for (const row of data.matchAll(/<(?:\w+:)?row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?row>)/g)) {
-    const number = Number(attribute(row[1]!, 'r'));
+  for (const row of elements(first(sheet, 'sheetData')?.body ?? '', 'row')) {
+    const number = Number(attribute(row.attrs, 'r'));
     const index = Number.isInteger(number) && number > 0 ? number - 1 : rows.length;
     requireInput(index >= rows.length && index < MAX_ROWS, 'CSV requires 1 to 5000 rows');
     while (rows.length < index) rows.push([]);
     const cells: string[] = [];
-    for (const cell of (row[2] ?? '').matchAll(/<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g)) {
-      const tag = cell[1]!,
-        body = cell[2] ?? '',
+    for (const cell of elements(row.body, 'c')) {
+      const tag = cell.attrs,
+        body = cell.body,
         type = attribute(tag, 't') ?? 'n',
         at = column(attribute(tag, 'r')) ?? cells.length;
       requireInput(at < MAX_COLUMNS, 'CSV exceeds 100 columns');
-      const raw = body.match(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/)?.[1];
+      const raw = first(body, 'v')?.body;
       let value = '';
-      if (type === 'inlineStr') value = runs(body.match(/<(?:\w+:)?is\b[^>]*>([\s\S]*?)<\/(?:\w+:)?is>/)?.[1] ?? '');
+      if (type === 'inlineStr') value = runs(first(body, 'is')?.body ?? '');
       else if (raw === undefined) value = '';
       else if (type === 's') value = strings[Number(raw)] ?? '';
       else if (type === 'b') value = raw === '1' ? 'TRUE' : 'FALSE';

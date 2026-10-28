@@ -249,6 +249,18 @@ test('xlsx cells read as text: inline and shared strings, float noise, dates, ga
       '<worksheet><sheetData><row r="1"><c r="A1" s="1"><v>46266</v></c><c r="C1" s="2"><v>46267.5</v></c><c r="D1" t="b"><v>1</v></c><c r="E1" t="str"><v>a &amp; b</v></c></row><row r="3"><c r="B3"><v>12</v></c></row></sheetData></worksheet>',
   });
   expect(await readXlsx(styled)).toEqual([['2026-09-01', '', '2026-09-02 12:00:00', 'TRUE', 'a & b'], [], ['', '12']]);
+  // An unclosed cell and a sheet that inflates past the budget are refused, not scanned forever.
+  const sheetOnly = (sheet: string) => zip({ 'xl/workbook.xml': '<workbook/>', 'xl/worksheets/sheet1.xml': sheet });
+  await expect(
+    xlsxToCsv(
+      await sheetOnly(
+        `<worksheet><sheetData><row r="1">${'<c r="A1"><v>1</v>'.repeat(2000)}</row></sheetData></worksheet>`,
+      ),
+    ),
+  ).rejects.toThrow(/couldn't read that spreadsheet/);
+  await expect(xlsxToCsv(await sheetOnly(`<worksheet>${' '.repeat(17 * 1024 * 1024)}</worksheet>`))).rejects.toThrow(
+    /too big/,
+  );
   await expect(xlsxToCsv(new Uint8Array([0x50, 0x4b, 3, 4, 1, 2, 3]))).rejects.toThrow(
     /couldn't read that spreadsheet/,
   );
