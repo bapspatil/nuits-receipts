@@ -6,6 +6,7 @@ import { parseCsv, validateMapping, inspectCsv, statedTotals, DATE_FORMATS, type
 import { suggestMappings } from './presets';
 import { columnSample, suggestColumns } from './ai';
 import { isXlsx, xlsxToCsv } from './xlsx';
+import { isPdf, pdfToCsv } from './pdf';
 import {
   collisions,
   importBankCsv,
@@ -71,7 +72,7 @@ export const IMPORT = 'import';
 export async function importForm(env: Env): Promise<string> {
   const refused = failureFor(IMPORT);
   const accounts = await listAccounts(env.DB);
-  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX or CSV)<input type="file" name="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
+  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX, CSV or PDF)<input type="file" name="file" accept=".xlsx,.csv,.pdf,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
     accounts.length
       ? `${options(
           'account',
@@ -135,13 +136,15 @@ function bytesFromForm(form: FormData): Uint8Array {
     throw new InputError('Invalid CSV preview data');
   }
 }
-async function readBytes(form: FormData): Promise<Uint8Array> {
+async function readBytes(env: Env, form: FormData): Promise<Uint8Array> {
   const file = form.get('file');
   if (file instanceof File) {
     requireInput(file.size <= MAX_CSV_BYTES, 'CSV too large', 413, 'file');
     const bytes = new Uint8Array(await file.arrayBuffer());
-    // A spreadsheet becomes a CSV here; every later step reads that CSV.
-    return isXlsx(bytes) ? xlsxToCsv(bytes).catch(fileField) : bytes;
+    // A spreadsheet or PDF statement becomes a CSV here; every later step reads that CSV.
+    if (isXlsx(bytes)) return xlsxToCsv(bytes).catch(fileField);
+    if (isPdf(bytes)) return pdfToCsv(env, bytes).catch(fileField);
+    return bytes;
   }
   return bytesFromForm(form);
 }
@@ -343,7 +346,7 @@ async function signature(env: Env, form: FormData, bytes: Uint8Array): Promise<s
   ).join('');
 }
 export async function importPreview(env: Env, form: FormData): Promise<Response> {
-  const bytes = await readBytes(form),
+  const bytes = await readBytes(env, form),
     account = await accountFromForm(env, form);
   const savedAccount =
     account.kind === 'existing'
@@ -532,7 +535,10 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   });
 }
 // A statement that states its own totals must add up to them before it is imported.
-function totalsProblems(stated: ReturnType<typeof statedTotals>, rows: ReturnType<typeof parseCsv>['rows']): string[] {
+export function totalsProblems(
+  stated: ReturnType<typeof statedTotals>,
+  rows: ReturnType<typeof parseCsv>['rows'],
+): string[] {
   const problems: string[] = [];
   const currencies = new Set(rows.map((r) => r.value.currency));
   for (const side of ['credit', 'debit'] as const) {
@@ -556,6 +562,20 @@ function totalsProblems(stated: ReturnType<typeof statedTotals>, rows: ReturnTyp
       problems.push(
         `The file totals ${word} at ${money(claimed, code!)} ${code}, but the rows add up to ${money(sum, code!)} ${code}.`,
       );
+  }
+  // Opening balance plus every row must come to the closing balance.
+  const code = [...currencies][0],
+    { opening, closing } = stated.balance ?? {};
+  if (opening && closing && currencies.size === 1 && code) {
+    try {
+      const start = BigInt(minor(opening, code)),
+        end = BigInt(minor(closing, code));
+      const net = rows.reduce((total, r) => total + BigInt(r.value.amount_minor), 0n);
+      if (start + net !== end)
+        problems.push(
+          `The file's balance goes from ${money(start, code)} to ${money(end, code)} ${code}, but the rows add up to ${money(net, code)} ${code}.`,
+        );
+    } catch {}
   }
   return problems;
 }
@@ -587,7 +607,7 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
     'Preview expired or missing. Preview again.',
     409,
   );
-  const bytes = await readBytes(form),
+  const bytes = await readBytes(env, form),
     expected = await signature(env, form, bytes);
   requireInput(
     crypto.subtle.timingSafeEqual(new TextEncoder().encode(token), new TextEncoder().encode(expected)),

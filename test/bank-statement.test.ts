@@ -294,10 +294,10 @@ test('the same statement as CSV imports too, and a total that does not add up st
   expect(html).not.toContain('formaction="/imports/csv/confirm"');
 });
 
-test('the picker takes XLSX or CSV', async () => {
+test('the picker takes XLSX, CSV or PDF', async () => {
   const html = await (await request('/import')).text();
-  expect(html).toContain('Bank statement (XLSX or CSV)');
-  expect(html).toMatch(/accept="\.xlsx,\.csv/);
+  expect(html).toContain('Bank statement (XLSX, CSV or PDF)');
+  expect(html).toMatch(/accept="\.xlsx,\.csv,\.pdf/);
 });
 
 const UNKNOWN =

@@ -44,6 +44,11 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'CSV too large': 'That file is too big. The limit is 2 MB.',
   'Spreadsheet unreadable': "We couldn't read that spreadsheet. Download it again from your bank.",
   'Spreadsheet password protected': 'That spreadsheet has a password. Save a copy without one.',
+  'PDF statement unreadable':
+    "We couldn't read payments from that PDF. Try again, or use your bank's XLSX or CSV download.",
+  'PDF statement too long': 'That PDF is too long to read. Import it in parts, or use XLSX or CSV.',
+  'PDF statement layout changed':
+    "Some lines in that PDF don't fit the statement layout, so nothing was read. Use your bank's XLSX or CSV download.",
   'CSV requires 1 to 5000 rows': 'The file needs between 1 and 5,000 payments.',
   'Import must use one account': 'One file can only hold payments for one account.',
   'This file already belongs to another account': 'You already imported this file into a different account.',

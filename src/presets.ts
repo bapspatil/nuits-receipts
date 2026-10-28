@@ -1,6 +1,8 @@
 import { EXPONENTS, normalize, requireInput } from './domain';
 import type { CsvMapping } from './csv';
 
+// The columns a PDF statement of a bank with no known layout becomes (src/pdf.ts).
+export const PDF_HEADER = ['Date', 'Amount', 'Counterparty', 'Description', 'Reference', 'Transaction ID', 'Currency'];
 export type BankPreset = {
   id: string;
   bank_name: string;
@@ -157,6 +159,14 @@ export function suggestMappings(
     add('builtin-n26', 'N26', {
       ...build('Date', 'Payee', 'Amount (EUR)', 'Currency', 'ISO', '.', '', ','),
       reference: find('Payment reference'),
+    });
+  if (PDF_HEADER.every((name, i) => normalized[i] === normalize(name)) && headers.length === PDF_HEADER.length)
+    add('builtin-pdf-statement', 'PDF statement', {
+      ...build('Date', 'Counterparty', 'Amount', 'Currency', 'ISO', '.', '', ','),
+      moreReferences: [find('Description')],
+      reference: find('Reference'),
+      currency: { kind: 'column', column: find('Currency'), blankDefault: currency },
+      externalId: find('Transaction ID'),
     });
   return suggestions;
 }

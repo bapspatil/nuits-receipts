@@ -295,7 +295,7 @@ function field<T>(name: string, parse: () => T): T {
     throw new FieldError(name, 'invalid_' + name, error instanceof Error ? error.message : 'Invalid value');
   }
 }
-const MONTHS = [
+export const MONTHS = [
   'january',
   'february',
   'march',
@@ -543,17 +543,27 @@ export async function headerFingerprint(headers: string[]): Promise<string> {
   );
 }
 
-export type StatedTotals = Partial<Record<'credit' | 'debit', { count: number | null; sum: string | null }>>;
+export type StatedTotals = Partial<Record<'credit' | 'debit', { count: number | null; sum: string | null }>> & {
+  balance?: { opening: string | null; closing: string | null };
+};
 // Totals a statement states above its column names, as in Holvi's
 // "Total credits | Total volume of credits | Total count of credits" with the
-// figures on the next row. Only labelled figures count.
+// figures on the next row, and "Opening balance | Closing balance" the same
+// way. Only labelled figures count.
 export function statedTotals(data: string[][], headerRecord: number): StatedTotals {
   const stated: StatedTotals = {};
   for (let i = 0; i + 1 < headerRecord; i++)
     data[i]!.forEach((label, column) => {
-      const found = label.match(/\b(volume|sum|amount|count|number)\b.*\b(credit|debit)s?\b/i);
       const figure = data[i + 1]![column]?.trim() ?? '';
-      if (!found || !/^[+-]?\d+(\.\d+)?$/.test(figure)) return;
+      if (!/^[+-]?\d+(\.\d+)?$/.test(figure)) return;
+      const balance = label.match(/^\s*(opening|closing) balance\s*$/i);
+      if (balance) {
+        stated.balance ??= { opening: null, closing: null };
+        stated.balance[balance[1]!.toLowerCase() as 'opening' | 'closing'] = figure;
+        return;
+      }
+      const found = label.match(/\b(volume|sum|amount|count|number)\b.*\b(credit|debit)s?\b/i);
+      if (!found) return;
       const side = (stated[found[2]!.toLowerCase() as 'credit' | 'debit'] ??= { count: null, sum: null });
       if (/count|number/i.test(found[1]!)) side.count = Number(figure);
       else side.sum = figure;

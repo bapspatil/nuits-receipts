@@ -19,7 +19,7 @@ import {
 import { isBuyer, parseDocument, sellerMatches } from './parse';
 import { readSales } from './sales';
 import { cleanVendor, isOwnName } from './vendor';
-import { emptySales, type Kind, type SalesFacts } from './domain';
+import { emptySales, InputError, type Kind, type SalesFacts } from './domain';
 import { DATE_FORMATS, dateFormatFor, numberFormatFor, type CsvMapping, type DateFormat } from './csv';
 
 type FieldSpec = {
@@ -833,6 +833,135 @@ export async function suggestColumns(env: Env, sample: ColumnSample, currency: s
   } catch {
     return null;
   }
+}
+// PDF statements no layout knows: Clairic reads each payment block's fields.
+// Blocks go 20 to a call, each field named after its block ("r3_amount"), and
+// at most 4 calls run at once. A value below the review confidence comes back
+// null; the caller then checks every value against the block's own text.
+export const STATEMENT_FIELDS: Record<string, FieldSpec> = {
+  date: { type: 'date', instructions: 'Booking date of the payment.' },
+  amount: {
+    type: 'number',
+    decimals: 2,
+    instructions: 'Amount as printed, negative for money out and positive for money in.',
+  },
+  currency: { type: 'text', instructions: 'Currency code of the amount, null if not printed.' },
+  counterparty: { type: 'text', instructions: 'The other party: payee, payer, shop or sender.' },
+  description: { type: 'text', instructions: 'Payment message or description, null if absent.' },
+  reference: { type: 'text', instructions: 'Printed payment reference number, null if absent.' },
+  external_id: { type: 'text', instructions: "The bank's unique ID for this payment, null if absent." },
+};
+export type StatementAnswer = {
+  date: string | null;
+  amount: number | null;
+  currency: string | null;
+  counterparty: string | null;
+  description: string | null;
+  reference: string | null;
+  external_id: string | null;
+};
+export const BLOCKS_PER_CALL = 20,
+  CALLS_AT_ONCE = 4,
+  MAX_STATEMENT_BLOCKS = 1000;
+const blockState = (blocks: string[]) => blocks.map((block, i) => `[r${i + 1}]\n${block}`).join('\n\n');
+// Reads a block the way a simple statement prints it, for local use and tests:
+// the leading date, the last amount on the first line, and the rest of that line.
+function mockStatement(blocks: string[]): unknown {
+  const answers: Record<string, unknown> = {};
+  blocks.forEach((block, i) => {
+    const first = block.split('\n')[0] ?? '';
+    const day = first.match(/^(\d{4})-(\d{2})-(\d{2})|^(\d{2})[./](\d{2})[./](\d{4})/);
+    const money = first.match(/[+-]?\s?\d[\d,]*\.\d{2}/g)?.at(-1);
+    const values: StatementAnswer = {
+      date: day ? (day[1] ? `${day[1]}-${day[2]}-${day[3]}` : `${day[6]}-${day[5]}-${day[4]}`) : null,
+      amount: money ? Number(money.replace(/[\s,]/g, '')) : null,
+      currency: first.match(/\b(EUR|USD|GBP|SEK)\b/)?.[1] ?? null,
+      counterparty:
+        first
+          .replace(day?.[0] ?? '', '')
+          .replace(money ?? '', '')
+          .replace(/\b(EUR|USD|GBP|SEK)\b/, '')
+          .trim() || null,
+      description: block.split('\n')[1]?.trim() || null,
+      reference: null,
+      external_id: block.match(/\bID:\s*(\S+)/)?.[1] ?? null,
+    };
+    for (const [key, spec] of Object.entries(STATEMENT_FIELDS)) {
+      const value = values[key as keyof StatementAnswer];
+      answers[`r${i + 1}_${key}`] = { type: spec.type, value, confidence: 1, p_null: value === null ? 1 : 0 };
+    }
+  });
+  return {
+    model: 'deterministic-local-mock-v1',
+    answers,
+    truncated: false,
+    usage: { input_tokens: 0, output_tokens: 0 },
+  };
+}
+function statementAnswers(raw: unknown, count: number, tuning: Tuning): StatementAnswer[] {
+  const answers = object(object(raw).answers);
+  return Array.from({ length: count }, (_, i) => {
+    const read = (key: keyof StatementAnswer) => {
+      const answer = answers[`r${i + 1}_${key}`];
+      if (!answer || typeof answer !== 'object') return null;
+      const { value, confidence, p_null } = answer as Record<string, unknown>;
+      const sure =
+        typeof confidence === 'number' &&
+        confidence >= tuning.minFieldConfidence &&
+        (typeof p_null !== 'number' || p_null <= tuning.maxFieldPNull);
+      return sure && value !== null && value !== undefined ? value : null;
+    };
+    const text = (key: keyof StatementAnswer) => {
+      const value = read(key);
+      return typeof value === 'string' && value.trim() && value.length <= 500 ? value.trim() : null;
+    };
+    const amount = read('amount');
+    return {
+      date: text('date'),
+      amount: typeof amount === 'number' && Number.isFinite(amount) ? amount : null,
+      currency: text('currency'),
+      counterparty: text('counterparty'),
+      description: text('description'),
+      reference: text('reference'),
+      external_id: text('external_id'),
+    };
+  });
+}
+export async function readStatementBlocks(env: Env, blocks: string[]): Promise<StatementAnswer[]> {
+  requireInput(blocks.length <= MAX_STATEMENT_BLOCKS, 'PDF statement too long');
+  const tuning = config(env).tuning,
+    chunks: string[][] = [];
+  for (let i = 0; i < blocks.length; i += BLOCKS_PER_CALL) chunks.push(blocks.slice(i, i + BLOCKS_PER_CALL));
+  const results: StatementAnswer[][] = new Array(chunks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < chunks.length) {
+      const n = next++,
+        chunk = chunks[n]!;
+      const raw =
+        env.AI_MODE === 'mock'
+          ? mockStatement(chunk)
+          : await live(env, '@cf/cloudflare/clairic', {
+              model: 'clairic',
+              state: blockState(chunk),
+              fields: Object.fromEntries(
+                chunk.flatMap((_, i) =>
+                  Object.entries(STATEMENT_FIELDS).map(([key, spec]) => [
+                    `r${i + 1}_${key}`,
+                    { ...spec, instructions: `Payment [r${i + 1}] only. ${spec.instructions}` },
+                  ]),
+                ),
+              ),
+            });
+      results[n] = statementAnswers(raw, chunk.length, tuning);
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: Math.min(CALLS_AT_ONCE, chunks.length) }, worker));
+  } catch {
+    throw new InputError('PDF statement unreadable');
+  }
+  return results.flat();
 }
 async function live(env: Env, model: string, input: Record<string, unknown>) {
   requireInput(env.AI_MODE === 'live' && env.AI, 'Live AI binding unavailable');
