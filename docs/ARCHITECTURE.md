@@ -8,9 +8,9 @@ One Cloudflare Worker with server-rendered HTML. No SPA, ORM, cron triggers or q
 | `src/config.ts` | Parses and validates the deployment vars into one `AppConfig`. Invalid config fails closed. |
 | `src/receipts.ts` | Uploads and email ingestion, storage of originals in R2, the processing lease, corrections and approvals. |
 | `src/sender.ts` | Reads Cloudflare's own `Authentication-Results` header to verify the envelope sender (SPF). |
-| `src/ai.ts` | Clairic extraction and Clef categorisation, with a deterministic mock for local use and tests. |
+| `src/ai.ts` | Clairic extraction, Clef categorisation and Clef bank column mapping, with a deterministic mock for local use and tests. |
 | `src/domain.ts` | Shared types, limits, money and date helpers (integer minor units, never floats). |
-| Bank import module | CSV parsing and mapping, bank rows, matching, FX lookups. |
+| Bank import module | XLSX reading (`src/xlsx.ts`), CSV parsing and mapping, bank rows, matching, FX lookups. |
 | `src/ui.ts` | Pages, forms and the CSV export, including the in-app notices. |
 | `schema/` | Bootstrap schema for a new installation, applied by `bun run deploy`. |
 | `migrations/` | Upgrade chain for databases created before `schema/` (ledger `d1_migrations`). Applied files are never changed. See `migrations/README.md`. |

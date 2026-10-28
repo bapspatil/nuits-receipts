@@ -6,7 +6,7 @@ sidebar:
   label: Bank CSV import
 ---
 
-The import reads a CSV export of booked payments. There are presets for some layouts and a column mapper for others, and it has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
+The import reads an XLSX or CSV export of booked payments. There are presets for some layouts, other layouts are read automatically, and a column mapper remains as a last resort. It has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
 
 ## Flow
 
@@ -22,7 +22,7 @@ Preview reads the whole file and shows up to 50 rows and up to 100 row problems.
 
 | Label | Field | Values |
 | --- | --- | --- |
-| Bank statement (CSV file) | `file` | `.csv` or `.txt` file |
+| Bank statement (XLSX or CSV) | `file` | `.xlsx`, `.csv` or `.txt` file |
 | Which account is this? | `account` | An existing account |
 | Import into | `account_action` | `existing`: the account chosen here; `new`: a new account |
 | Account name | `account_label` | New account only |
@@ -51,7 +51,7 @@ Shown under **The columns look wrong? Adjust how we read the file**. Column numb
 | Label | Mapping key | Values |
 | --- | --- | --- |
 | Date column | `date.column` | Required |
-| Date format | `date.format` | `ISO` (`YYYY-MM-DD`), `DD.MM.YYYY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `ISO_OR_DOTTED` (either `YYYY-MM-DD` or `DD.MM.YYYY` per row) |
+| Date format | `date.format` | `ISO` (`YYYY-MM-DD`), `DD.MM.YYYY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `ISO_OR_DOTTED` (either `YYYY-MM-DD` or `DD.MM.YYYY` per row), `D MMM YYYY` (`31 May 2026`, `1 Sept 2026`: English month names, short or full) |
 | Dates include a time | `date.time` | **No** (`none`), **Sometimes** (`optional`) |
 
 With **Sometimes**, a date may be followed by `T` or a space and `HH:MM`, optional seconds and fractions, and an optional `Z` or `+HH:MM` offset. The printed calendar day is kept. A date format with slashes needs the tick **The day and month order above is right for dates written with slashes.**
@@ -83,6 +83,7 @@ With **Sometimes**, a date may be followed by `T` or a space and `HH:MM`, option
 | Currency when that column is empty | `currency.blankDefault` | For `column`. Empty means a blank cell is an error. |
 | Paid to column | `merchant` | Required. A blank cell is an error. |
 | Reference column | `reference` | Optional |
+| | `moreReferences` | Optional, set by layouts only. Up to 5 more text columns, such as a message or description, joined onto the reference with ` / `. A value already contained in an earlier one is left out. |
 | Transaction ID column | `externalId` | Optional. The bank's own ID for the row. |
 | Original amount column | `original.amount` | Optional. Must be paired with the next. |
 | Original currency column | `original.currency` | Optional. Must be paired with the previous. |
@@ -108,10 +109,11 @@ A saved layout is stored with a fingerprint of the normalised column names and i
 | Item | Accepted |
 | --- | --- |
 | Encodings | UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252. A byte order mark selects the UTF encoding. Without one, the file must be valid in the chosen encoding. |
+| Files | `.xlsx` (first sheet; inline and shared strings, numbers, and dates stored as Excel serial numbers) and CSV. A spreadsheet is turned into a CSV on upload, and that CSV is what is checked and stored as the original. |
 | Separators | `,` `;` tab `\|`. Detected from the column names row when not chosen. |
 | Currencies | EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY |
 | Amounts | Integer minor units. More decimals than the currency has are allowed only when they are zero. |
-| Not accepted | XLSX, bank API connections, filtering of pending rows |
+| Not accepted | PDF statements, `.xls`, bank API connections, filtering of pending rows |
 
 ## Built-in layouts
 
@@ -119,6 +121,7 @@ Built-in layouts are matched by column names. They were tested with synthetic fi
 
 | Layout | Matches column names | Date | Decimal | Separator |
 | --- | --- | --- | --- | --- |
+| Holvi (CSV layout), statement | `Value date`, `Booking date`, `Amount`, `Currency`, `Counterparty`, `Description`, `Filing ID` (XLSX or CSV statement). Date from `Booking date`; `Reference`, `Description` and `Message` joined into the reference; `Filing ID` is the transaction ID. | `D MMM YYYY` | `.` | `,` |
 | Holvi (CSV layout) | Recognised aliases for date, payee, amount or debit and credit, and optional currency, reference, transaction ID and original amount and currency | `ISO_OR_DOTTED` | `dot-or-comma` | `;` |
 | Nordea (CSV layout) | `Kirjauspäivä`, `Saaja`, `Summa`, `Valuutta`, `Viite` | `DD.MM.YYYY` | `,` with space grouping | `;` |
 | OP (CSV layout) | Same as Nordea | `DD.MM.YYYY` | `,` with space grouping | `;` |
@@ -127,6 +130,20 @@ Built-in layouts are matched by column names. They were tested with synthetic fi
 | N26 (CSV layout) | `Date`, `Payee`, `Payment reference`, `Amount (EUR)`, `Currency` | `ISO` | `.` | `,` |
 
 When exactly one layout matches, it is applied automatically. When several match, you choose one or **Custom mapping**.
+
+### Column names row
+
+For a new file, the row with the column names is found automatically: the first row of two or more names with no gaps, none of them a number or a date, whose following rows fit under it. Rows above it, such as an account line or stated totals, are left out and listed under the preview. When no row qualifies, the first row is used. **Which row has the column names?** overrides it.
+
+### Stated totals
+
+Above the column names, a label that names a volume, sum or amount, or a count or number, of credits or debits (for example `Total volume of credits` and `Total count of debits`) is read with the figure in the cell below it. Credits are compared with the payments read as money in and debits with money out. A different count or sum is a problem and blocks the import.
+
+### Layouts read automatically
+
+When no saved or built-in layout matches, one request goes to Workers AI (Clef). It sends only the column names and up to 5 rows, each cell cut to 40 characters, and asks which column holds the date, the amount (or money out and money in), the currency, the payee, a description, a reference and the transaction ID, plus the date format and how money out is shown. The answer can only name columns of the file. The decimal mark and the date format are confirmed against the sample rows, and the account currency is used when there is no currency column.
+
+The proposal is used only if the whole file then reads with no row problems. Otherwise, or if the request fails, the page asks for the columns as before. The proposal travels with the preview, so **Check again** and **Import** make no further requests. With `AI_MODE` `mock`, columns are picked by their names instead.
 
 ### Column name aliases (Holvi layout)
 

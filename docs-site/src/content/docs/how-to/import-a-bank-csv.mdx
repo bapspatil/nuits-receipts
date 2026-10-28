@@ -6,11 +6,11 @@ sidebar:
   label: Import a bank CSV
 ---
 
-Use this guide to bring a bank statement into the app so each payment out can be checked for a receipt. Nuits Receipts imports CSV exports from banks that provide one: there are presets for some layouts and a column mapper for other layouts, so you map the columns once. It has been tested with Holvi exports so far. Nothing is saved until you confirm the preview.
+Use this guide to bring a bank statement into the app so each payment out can be checked for a receipt. Nuits Receipts imports XLSX and CSV exports exactly as your bank gives them: there are presets for some layouts, other layouts are read automatically, and a column mapper remains for files neither can read. It has been tested with Holvi exports so far. Nothing is saved until you confirm the preview.
 
 ## Prerequisites
 
-- A CSV export of booked transactions from your bank, at most 2 MiB and 5,000 rows. No XLSX and no pending transactions.
+- An XLSX or CSV export of booked transactions from your bank, at most 2 MiB and 5,000 rows. No pending transactions.
 - Optional: a bank account set up under **Settings** > **Bank accounts**. You can also create one during the import.
 
 ![The Check the file page with a recognised layout, the payments read from the file and the Import button](../../../assets/screenshots/import-preview.png)
@@ -25,7 +25,7 @@ Select **Import statement** on **Bank** (at the bottom, once a statement is in) 
   </Step>
   <Step title="Choose the file and the account">
 
-Under **Bank statement (CSV file)**, choose the file. Pick the account in **Which account is this?** and keep **Import into** on **The account chosen here**.
+Under **Bank statement (XLSX or CSV)**, choose the file as downloaded. There is no need to convert it or remove the lines above the column names. Pick the account in **Which account is this?** and keep **Import into** on **The account chosen here**.
 
 For a new account, set **Import into** to **A new account (fill in below)** and fill in **Account name**, **Bank** and **Currency** under **Only for a new account**. The account is created only when you import.
 
@@ -34,7 +34,7 @@ If accented letters come out wrong later, open **File options** and pick the **T
   </Step>
   <Step title="Read the preview">
 
-The **Check the file** page names the layout if it recognised one (for example "We recognised a Revolut export."), counts the payments and their date range, and shows the net total per currency. Up to 50 rows are shown; the whole file is checked.
+The **Check the file** page names the layout if it recognised one (for example "We recognised a Holvi export."), or says "Columns read automatically." for a layout it worked out itself. It counts the payments and their date range, and shows the net total per currency. If the file states its own totals, as Holvi statements do, a count or sum that differs is listed as a problem. Up to 50 rows are shown; the whole file is checked.
 
 Compare the count, dates and net total with your bank. Money out must show as negative amounts.
 

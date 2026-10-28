@@ -42,6 +42,8 @@ export const MESSAGES: Readonly<Record<string, string>> = {
     'The bank gave two different payments the same ID. Check the file for repeated IDs.',
   'Fix CSV errors before import': 'Fix the problems listed above before you import.',
   'CSV too large': 'That file is too big. The limit is 2 MB.',
+  'Spreadsheet unreadable': "We couldn't read that spreadsheet. Download it again from your bank.",
+  'Spreadsheet password protected': 'That spreadsheet has a password. Save a copy without one.',
   'CSV requires 1 to 5000 rows': 'The file needs between 1 and 5,000 payments.',
   'Import must use one account': 'One file can only hold payments for one account.',
   'This file already belongs to another account': 'You already imported this file into a different account.',
@@ -278,6 +280,7 @@ export const MESSAGES: Readonly<Record<string, string>> = {
 // the euro amount blank), and checks that an earlier check already caught.
 // Add to this list only with a reason.
 export const INTERNAL: readonly string[] = [
+  'Invalid reference columns',
   'Invalid extraction envelope',
   'Invalid usage',
   'Invalid descriptions',
