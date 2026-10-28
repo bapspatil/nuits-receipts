@@ -1,6 +1,6 @@
 # Import bank statements
 
-XLSX and CSV statements are accepted as downloaded. A spreadsheet becomes a CSV on upload (`src/xlsx.ts`), the column names row is found past any preamble, a statement's own totals are checked, and a file no layout matches is mapped by one Workers AI call that the whole file must then pass.
+XLSX, CSV and PDF statements are accepted as downloaded. A spreadsheet (`src/xlsx.ts`) or PDF (`src/pdf.ts`) becomes a CSV on upload, the column names row is found past any preamble, a statement's own totals and balances are checked, and a file no layout matches is mapped by one Workers AI call that the whole file must then pass. A Holvi PDF is read by its layout with no model call; other PDFs are read payment by payment with Clairic, every value checked against the PDF's text.
 
 This page moved to the documentation site:
 

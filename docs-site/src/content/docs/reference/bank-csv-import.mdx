@@ -6,7 +6,7 @@ sidebar:
   label: Bank CSV import
 ---
 
-The import reads an XLSX or CSV export of booked payments. There are presets for some layouts, other layouts are read automatically, and a column mapper remains as a last resort. It has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
+The import reads an XLSX, CSV or PDF statement of booked payments. There are presets for some layouts, other layouts are read automatically, and a column mapper remains as a last resort. It has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
 
 ## Flow
 
@@ -22,7 +22,7 @@ Preview reads the whole file and shows up to 50 rows and up to 100 row problems.
 
 | Label | Field | Values |
 | --- | --- | --- |
-| Bank statement (XLSX or CSV) | `file` | `.xlsx`, `.csv` or `.txt` file |
+| Bank statement (XLSX, CSV or PDF) | `file` | `.xlsx`, `.csv`, `.pdf` or `.txt` file |
 | Which account is this? | `account` | An existing account |
 | Import into | `account_action` | `existing`: the account chosen here; `new`: a new account |
 | Account name | `account_label` | New account only |
@@ -110,10 +110,11 @@ A saved layout is stored with a fingerprint of the normalised column names and i
 | --- | --- |
 | Encodings | UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252. A byte order mark selects the UTF encoding. Without one, the file must be valid in the chosen encoding. |
 | Files | `.xlsx` (first sheet; inline and shared strings, numbers, and dates stored as Excel serial numbers) and CSV. A spreadsheet is turned into a CSV on upload, and that CSV is what is checked and stored as the original. |
+| PDF | A statement with a text layer, up to 400 pages. It is turned into a CSV on upload the same way; see [PDF statements](#pdf-statements). |
 | Separators | `,` `;` tab `\|`. Detected from the column names row when not chosen. |
 | Currencies | EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY |
 | Amounts | Integer minor units. More decimals than the currency has are allowed only when they are zero. |
-| Not accepted | PDF statements, `.xls`, bank API connections, filtering of pending rows |
+| Not accepted | Scanned PDFs without text, `.xls`, bank API connections, filtering of pending rows |
 
 ## Built-in layouts
 
@@ -122,6 +123,7 @@ Built-in layouts are matched by column names. They were tested with synthetic fi
 | Layout | Matches column names | Date | Decimal | Separator |
 | --- | --- | --- | --- | --- |
 | Holvi (CSV layout), statement | `Value date`, `Booking date`, `Amount`, `Currency`, `Counterparty`, `Description`, `Filing ID` (XLSX or CSV statement). Date from `Booking date`; `Reference`, `Description` and `Message` joined into the reference; `Filing ID` is the transaction ID. | `D MMM YYYY` | `.` | `,` |
+| PDF statement (CSV layout) | `Date`, `Amount`, `Counterparty`, `Description`, `Reference`, `Transaction ID`, `Currency`, in that order: what a PDF statement of another bank becomes on upload. A blank currency is the account currency. | `ISO` | `.` | `,` |
 | Holvi (CSV layout) | Recognised aliases for date, payee, amount or debit and credit, and optional currency, reference, transaction ID and original amount and currency | `ISO_OR_DOTTED` | `dot-or-comma` | `;` |
 | Nordea (CSV layout) | `Kirjauspäivä`, `Saaja`, `Summa`, `Valuutta`, `Viite` | `DD.MM.YYYY` | `,` with space grouping | `;` |
 | OP (CSV layout) | Same as Nordea | `DD.MM.YYYY` | `,` with space grouping | `;` |
@@ -137,13 +139,22 @@ For a new file, the row with the column names is found automatically: the first 
 
 ### Stated totals
 
-Above the column names, a label that names a volume, sum or amount, or a count or number, of credits or debits (for example `Total volume of credits` and `Total count of debits`) is read with the figure in the cell below it. Credits are compared with the payments read as money in and debits with money out. A different count or sum is a problem and blocks the import.
+Above the column names, a label that names a volume, sum or amount, or a count or number, of credits or debits (for example `Total volume of credits` and `Total count of debits`) is read with the figure in the cell below it. Credits are compared with the payments read as money in and debits with money out. `Opening balance` and `Closing balance` are read the same way: the opening balance plus every payment must come to the closing balance. A different count, sum or balance is a problem and blocks the import.
 
 ### Layouts read automatically
 
 When no saved or built-in layout matches, one request goes to Workers AI (Clef). It sends only the column names and up to 5 rows, each cell cut to 40 characters, and asks which column holds the date, the amount (or money out and money in), the currency, the payee, a description, a reference and the transaction ID, plus the date format and how money out is shown. The answer can only name columns of the file. The decimal mark and the date format are confirmed against the sample rows, and the account currency is used when there is no currency column.
 
 The proposal is used only if the whole file then reads with no row problems. Otherwise, or if the request fails, the page asks for the columns as before. The proposal travels with the preview, so **Check again** and **Import** make no further requests. With `AI_MODE` `mock`, columns are picked by their names instead.
+
+### PDF statements
+
+A PDF statement is turned into a CSV on upload, with the statement's printed balances and totals above the column names, so the checks above apply to it. The text is read with its position on the page, which keeps the columns apart.
+
+- **Holvi** (`EUR - ACCOUNT STATEMENT`, columns `Booking date`, `Payment information`, `Transaction no.`, `Amount EUR`) is read by its layout, with no model request. Each payment becomes a row of the Holvi statement layout: the booking date, the signed amount, the other party from the payment information (an IBAN line left out), the payment type, the `Message` and `Reference` parts, and the `Filing ID` as the transaction ID. The `BALANCE` lines and the `TOTAL NUMBER OF DEPOSITS` and `WITHDRAWALS` lines are the stated figures. A line in no known place stops the read instead of being skipped.
+- **Other layouts** are cut into one block per payment: a line that starts with a date, up to the next one. Lines printed in the same place on most pages, such as page headers and footers, are left out, and labelled opening and closing balance and total lines are read as stated figures. Workers AI (Clairic) reads the date, amount, currency, other party, description, reference and transaction ID of each block, 20 blocks per request and up to 4 requests at a time, at most 1,000 blocks. Each value is then checked against the block's own text: the amount must be printed in it, the date must be a reading of its leading date, and text values must appear in it. A value that fails, or that Clairic is not sure of, is left blank, so the row is listed as a problem.
+
+The PDF is read once, on the first **Check the file**. **Check again** and **Import** use the CSV it became, which is also what is stored as the original. With `AI_MODE` `mock`, other layouts are read by a fixed local reader instead.
 
 ### Column name aliases (Holvi layout)
 
