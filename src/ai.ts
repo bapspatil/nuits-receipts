@@ -20,6 +20,7 @@ import { isBuyer, parseDocument, sellerMatches } from './parse';
 import { readSales } from './sales';
 import { cleanVendor, isOwnName } from './vendor';
 import { emptySales, type Kind, type SalesFacts } from './domain';
+import { DATE_FORMATS, dateFormatFor, numberFormatFor, type CsvMapping, type DateFormat } from './csv';
 
 type FieldSpec = {
   type: 'text' | 'date' | 'number' | 'list';
@@ -662,6 +663,176 @@ function salesExtraction(env: Env, raw: unknown, document: string) {
     classification: null,
     sales: salesFacts,
   };
+}
+// Bank files no preset knows: one small Clef call picks each column's role from
+// the file's own column names, shown with a few truncated sample rows. Nothing
+// else from the file is sent. The answer is only a proposal; the caller parses
+// the whole file with it and falls back to manual mapping if anything fails.
+export const COLUMN_ROLES = {
+  date: 'The date each payment was booked.',
+  amount: 'One column holding every amount, money in and money out.',
+  debit: 'Only money out, when amounts are split over two columns.',
+  credit: 'Only money in, when amounts are split over two columns.',
+  currency: 'The currency code of each row.',
+  merchant: 'The other party: payee, payer or counterparty.',
+  description: 'A free-text description or message.',
+  reference: 'A payment reference number.',
+  external_id: 'A unique transaction ID from the bank.',
+} as const;
+type Role = keyof typeof COLUMN_ROLES;
+const SAMPLE_ROWS = 5,
+  SAMPLE_CELL = 40;
+export type ColumnSample = { headers: string[]; rows: string[][] };
+export function columnSample(headers: string[], rows: string[][]): ColumnSample {
+  const cut = (cell: string) => cell.trim().slice(0, SAMPLE_CELL);
+  return {
+    headers: headers.map(cut),
+    rows: rows
+      .filter((row) => row.some((cell) => cell.trim()))
+      .slice(0, SAMPLE_ROWS)
+      .map((row) => headers.map((_, i) => cut(row[i] ?? ''))),
+  };
+}
+const DATE_EXAMPLES: Record<DateFormat, string> = {
+  ISO: '2026-05-31',
+  'DD.MM.YYYY': '31.05.2026',
+  'DD/MM/YYYY': '31/05/2026',
+  'MM/DD/YYYY': '05/31/2026',
+  ISO_OR_DOTTED: '2026-05-31 or 31.05.2026',
+  'D MMM YYYY': '31 May 2026',
+};
+function columnQuestions(sample: ColumnSample) {
+  const columns = {
+    none: 'No such column',
+    ...Object.fromEntries(
+      sample.headers.map((h, i) => [`c${i}`, `${h || `Column ${i + 1}`}: ${sample.rows[0]?.[i] ?? ''}`]),
+    ),
+  };
+  return {
+    ...Object.fromEntries(
+      Object.entries(COLUMN_ROLES).map(([role, instructions]) => [
+        role,
+        { type: 'choice', instructions, criteria: columns },
+      ]),
+    ),
+    date_format: { type: 'choice', instructions: 'How the dates are written.', criteria: DATE_EXAMPLES },
+    sign: {
+      type: 'choice',
+      instructions: 'How the single amount column shows money out.',
+      criteria: { negative: 'Money out is negative', positive: 'Money out is positive' },
+    },
+  };
+}
+// Picks columns by their names alone, for local use and tests.
+function mockColumns(sample: ColumnSample): unknown {
+  const names = sample.headers.map(normalize),
+    used = new Set<number>();
+  const pick = (...patterns: RegExp[]) => {
+    for (const pattern of patterns) {
+      const found = names.findIndex((name, i) => !used.has(i) && pattern.test(name));
+      if (found >= 0) {
+        used.add(found);
+        return `c${found}`;
+      }
+    }
+    return 'none';
+  };
+  const choices: Record<string, string> = {
+    external_id: pick(/\b(transaction|filing|archive) id\b/, /^id$/),
+    date: pick(/\bbooking date\b/, /\bdate\b/, /\b(kirjauspaiva|paivamaara|datum)\b/),
+    amount: pick(/^amount\b/, /\b(amount|summa|maara|betrag)\b/),
+    currency: pick(/\b(currency|valuutta)\b/),
+    merchant: pick(/\b(counterparty|payee|payer|recipient|merchant|beneficiary|saaja|maksaja)\b/, /\bname\b/),
+    description: pick(/\b(description|message|details|memo|viesti|selite)\b/),
+    reference: pick(/\b(reference|viite)\b/),
+  };
+  choices.debit = choices.amount === 'none' ? pick(/\b(debit|money out|paid out|withdrawal)s?\b/) : 'none';
+  choices.credit = choices.amount === 'none' ? pick(/\b(credit|money in|paid in|deposit)s?\b/) : 'none';
+  const dates = choices.date === 'none' ? [] : sample.rows.map((row) => row[Number(choices.date!.slice(1))] ?? '');
+  choices.date_format = dateFormatFor(dates) ?? 'ISO';
+  choices.sign = 'negative';
+  return {
+    model: 'deterministic-local-mock-v1',
+    answers: Object.fromEntries(
+      Object.entries(choices).map(([key, choice]) => [
+        key,
+        { type: 'choice', choice, probabilities: { [choice]: 1 }, confidence: 1 },
+      ]),
+    ),
+    usage: { input_tokens: 0, output_tokens: 0 },
+  };
+}
+// The proposed mapping, or null when the answer lacks a date, an amount or a payee.
+export function columnsMapping(raw: unknown, sample: ColumnSample, currency: string): CsvMapping | null {
+  const columns = ['none', ...sample.headers.map((_, i) => `c${i}`)];
+  const answer = (key: string, options: readonly string[]) => {
+    try {
+      return parseChoice(raw, key, options, 0);
+    } catch {
+      return null;
+    }
+  };
+  const at = (role: Role) => {
+    const choice = answer(role, columns);
+    return choice && choice !== 'none' ? Number(choice.slice(1)) : null;
+  };
+  const date = at('date'),
+    amount = at('amount'),
+    debit = at('debit'),
+    credit = at('credit'),
+    description = at('description');
+  const merchant = at('merchant') ?? description;
+  if (date === null || merchant === null || (amount === null && (debit === null || credit === null))) return null;
+  const values = (...cols: number[]) => sample.rows.flatMap((row) => cols.map((c) => row[c] ?? ''));
+  const dates = values(date);
+  const named = DATE_FORMATS.find((f) => f === answer('date_format', DATE_FORMATS));
+  const format = named && dateFormatFor(dates) === named ? named : (dateFormatFor(dates) ?? named ?? 'ISO');
+  const currencyColumn = at('currency');
+  const reference = at('reference');
+  return {
+    version: 1,
+    encoding: 'utf-8',
+    delimiter: ',',
+    headerRecord: 0,
+    trailingRecords: 0,
+    date: { column: date, format, time: 'optional' },
+    number: numberFormatFor(amount === null ? values(debit!, credit!) : values(amount)),
+    amount:
+      amount === null
+        ? { kind: 'split', debit: debit!, credit: credit! }
+        : {
+            kind: 'signed',
+            column: amount,
+            outgoing: answer('sign', ['negative', 'positive']) === 'positive' ? 'positive' : 'negative',
+          },
+    currency:
+      currencyColumn === null
+        ? { kind: 'default', currency }
+        : { kind: 'column', column: currencyColumn, blankDefault: currency },
+    merchant,
+    reference,
+    ...(description !== null && description !== merchant && description !== reference
+      ? { moreReferences: [description] }
+      : {}),
+    externalId: at('external_id'),
+    original: null,
+  };
+}
+export async function suggestColumns(env: Env, sample: ColumnSample, currency: string): Promise<CsvMapping | null> {
+  if (sample.headers.length < 2 || !sample.rows.length) return null;
+  try {
+    const raw =
+      env.AI_MODE === 'mock'
+        ? mockColumns(sample)
+        : await live(env, '@cf/cloudflare/clef', {
+            model: 'clef',
+            state: { headers: sample.headers, rows: sample.rows },
+            questions: columnQuestions(sample),
+          });
+    return columnsMapping(raw, sample, currency);
+  } catch {
+    return null;
+  }
 }
 async function live(env: Env, model: string, input: Record<string, unknown>) {
   requireInput(env.AI_MODE === 'live' && env.AI, 'Live AI binding unavailable');

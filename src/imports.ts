@@ -1,9 +1,11 @@
-import { EXPONENTS, hash, InputError, MAX_CSV_BYTES, money, requireInput } from './domain';
+import { EXPONENTS, hash, InputError, MAX_CSV_BYTES, minor, money, requireInput } from './domain';
 import type { Env } from './env';
 import { config } from './config';
 import { listAccounts, validateAccountChoice, type AccountChoice } from './accounts';
-import { parseCsv, validateMapping, inspectCsv, type CsvMapping } from './csv';
+import { parseCsv, validateMapping, inspectCsv, statedTotals, DATE_FORMATS, type CsvMapping } from './csv';
 import { suggestMappings } from './presets';
+import { columnSample, suggestColumns } from './ai';
+import { isXlsx, xlsxToCsv } from './xlsx';
 import {
   collisions,
   importBankCsv,
@@ -69,7 +71,7 @@ export const IMPORT = 'import';
 export async function importForm(env: Env): Promise<string> {
   const refused = failureFor(IMPORT);
   const accounts = await listAccounts(env.DB);
-  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (CSV file)<input type="file" name="file" accept=".csv,.txt" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
+  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX or CSV)<input type="file" name="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
     accounts.length
       ? `${options(
           'account',
@@ -136,10 +138,16 @@ function bytesFromForm(form: FormData): Uint8Array {
 async function readBytes(form: FormData): Promise<Uint8Array> {
   const file = form.get('file');
   if (file instanceof File) {
-    requireInput(file.size <= MAX_CSV_BYTES, 'CSV too large', 413);
-    return new Uint8Array(await file.arrayBuffer());
+    requireInput(file.size <= MAX_CSV_BYTES, 'CSV too large', 413, 'file');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // A spreadsheet becomes a CSV here; every later step reads that CSV.
+    return isXlsx(bytes) ? xlsxToCsv(bytes).catch(fileField) : bytes;
   }
   return bytesFromForm(form);
+}
+function fileField(error: unknown): never {
+  if (error instanceof InputError && !error.field) error.field = 'file';
+  throw error;
 }
 function json(value: string | File | null): unknown {
   try {
@@ -246,7 +254,7 @@ function mappingEditor(mapping: CsvMapping, headers: string[], currency: string,
     ],
     mapping.delimiter,
   )}${input('header_record', mapping.headerRecord, 'number', label('header_record'), { hint: '0 is the first row of the file' })}${input('trailing_records', mapping.trailingRecords, 'number', label('trailing_records'))}</div><p class="small">Rows above the column names and skipped rows at the end are listed under the preview.</p></fieldset>
-    <fieldset><legend>Dates</legend><div class="fields">${col('map_booking_date', mapping.date.column)}${pick('date_format', ['ISO', 'DD.MM.YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'ISO_OR_DOTTED'], mapping.date.format)}${options(
+    <fieldset><legend>Dates</legend><div class="fields">${col('map_booking_date', mapping.date.column)}${pick('date_format', DATE_FORMATS, mapping.date.format)}${options(
       'date_time',
       [
         { value: 'none', label: 'No' },
@@ -351,7 +359,8 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   requireInput(!fileOwner || fileOwner.account_key === account.id, 'This file already belongs to another account', 409);
   const currency = savedAccount.default_currency;
   const provided = form.has('mapping') ? validateMapping(json(form.get('mapping'))) : null;
-  const headerRecord = form.get('editor') === '1' ? Number(form.get('header_record')) : (provided?.headerRecord ?? 0);
+  // A new file has its column names found; after that the chosen row is kept.
+  const requestedHeader = form.get('editor') === '1' ? Number(form.get('header_record')) : provided?.headerRecord;
   const encodingValue = String(form.get('encoding') ?? provided?.encoding ?? 'auto');
   requireInput(['auto', 'utf-8', 'utf-16le', 'utf-16be', 'windows-1252'].includes(encodingValue), 'Invalid encoding');
   const encoding =
@@ -361,7 +370,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   const explicitDelimiter = form.get('editor') === '1' ? form.get('delimiter') : provided?.delimiter;
   const layout = inspectCsv(bytes, {
     encoding,
-    headerRecord,
+    headerRecord: requestedHeader,
     ...(explicitDelimiter
       ? {
           delimiter: validateMapping({ ...(provided ?? fallbackMapping(currency)), delimiter: explicitDelimiter })
@@ -369,6 +378,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
         }
       : {}),
   });
+  const headerRecord = layout.headerRecord;
   const suggestions = [
     ...(await savedPresets(env, layout.headers, savedAccount.bank_name)),
     ...suggestMappings(layout.headers, currency),
@@ -388,13 +398,35 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
       ? suggestions[0]!
       : undefined;
   const shownPresetId = autoPreset?.id ?? selectedId;
+  // No layout known: ask the model once, and keep its proposal only if the whole file reads with it.
+  let proposed: CsvMapping | null = null;
+  if (!provided && !selected && !suggestions.length && form.get('editor') !== '1') {
+    const sample = columnSample(layout.headers, layout.records.slice(headerRecord + 1));
+    const guess = await suggestColumns(env, sample, currency);
+    if (guess) {
+      try {
+        const trial = validateMapping({
+          ...guess,
+          encoding: layout.encoding,
+          delimiter: layout.delimiter,
+          headerRecord,
+        });
+        const read = parseCsv(bytes, trial);
+        if (!read.issues.length && read.rows.length) proposed = trial;
+      } catch (error) {
+        if (!(error instanceof InputError)) throw error;
+      }
+    }
+  }
   let mapping = changingPreset
     ? selected!.mapping
     : autoPreset
       ? autoPreset.mapping
-      : layoutChanged
-        ? fallbackMapping(currency)
-        : (provided ?? selected?.mapping ?? fallbackMapping(currency));
+      : proposed
+        ? proposed
+        : layoutChanged
+          ? fallbackMapping(currency)
+          : (provided ?? selected?.mapping ?? fallbackMapping(currency));
   if (form.get('editor') === '1' && !changingPreset && !layoutChanged) mapping = mappingFromEditor(form, mapping);
   mapping = validateMapping({
     ...mapping,
@@ -406,8 +438,10 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   const preview = parseCsv(bytes, mapping),
     parsed = normalizedImport(preview, account.id),
     problems: string[] = [];
-  if (!provided && !selected && !suggestions.length)
+  if (!provided && !selected && !suggestions.length && !proposed)
     problems.push('No preset maps these headers. Map amount and other columns, then update preview.');
+  if (provided || selected || autoPreset || proposed)
+    problems.push(...totalsProblems(statedTotals(layout.records, headerRecord), preview.rows));
   if (!provided && !selected && suggestions.length > 1 && selectedId !== 'custom')
     problems.push('Several presets match these headers. Select a preset or choose Custom mapping.');
   if (!provided && !explicitDelimiter && layout.delimiterChoices.length > 1)
@@ -428,7 +462,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
     hidden('account_choice', JSON.stringify(account)) +
     hidden('mapping', JSON.stringify(mapping));
   // No layout chosen yet: the columns come first. Row errors from a guessed mapping would only mislead.
-  const unmapped = !provided && !selected && !autoPreset && problems.length > 0;
+  const unmapped = !provided && !selected && !autoPreset && !proposed && problems.length > 0;
   const issues = unmapped ? [] : preview.issues;
   const errors = issues.length + problems.length;
   const totals = new Map<string, bigint>();
@@ -438,7 +472,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   const preset = suggestions.find((p) => p.id === shownPresetId);
   const status = unmapped
     ? `<p class="lede">${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.</p>`
-    : `<p class="lede"><strong>${preset ? `We recognised a ${escape(presetLabel(preset).replace(' (CSV layout)', ''))} export. ` : ''}${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}${dates.length ? ` from ${day(dates[0])} to ${day(dates.at(-1))}` : ''}.</strong> ${errors ? `${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.` : 'No problems found.'} <span class="small">Net total ${[...totals].map(([c, v]) => `${escape(c)} ${money(v, c)}`).join(' · ') || '0'}.</span></p>`;
+    : `<p class="lede"><strong>${preset ? `We recognised a ${escape(presetLabel(preset).replace(' (CSV layout)', ''))} export. ` : proposed ? 'Columns read automatically. ' : ''}${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}${dates.length ? ` from ${day(dates[0])} to ${day(dates.at(-1))}` : ''}.</strong> ${errors ? `${errors === 1 ? '1 problem' : `${errors} problems`} to fix first.` : 'No problems found.'} <span class="small">Net total ${[...totals].map(([c, v]) => `${escape(c)} ${money(v, c)}`).join(' · ') || '0'}.</span></p>`;
   const warnings =
     errors > 0
       ? `<div class="alert" role="alert">${problems.map((e) => `<p class="warning">${escape(e)}</p>`).join('')}${issues
@@ -496,6 +530,34 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
     detail: 'Check the file',
     head: pageHead('Check the file'),
   });
+}
+// A statement that states its own totals must add up to them before it is imported.
+function totalsProblems(stated: ReturnType<typeof statedTotals>, rows: ReturnType<typeof parseCsv>['rows']): string[] {
+  const problems: string[] = [];
+  const currencies = new Set(rows.map((r) => r.value.currency));
+  for (const side of ['credit', 'debit'] as const) {
+    const claim = stated[side];
+    if (!claim) continue;
+    const read = rows.filter((r) => (side === 'credit' ? r.value.amount_minor > 0 : r.value.amount_minor < 0));
+    const sum = read.reduce((total, r) => total + BigInt(r.value.amount_minor), 0n);
+    const code = [...currencies][0];
+    let claimed: bigint | null = null;
+    if (claim.sum !== null && currencies.size === 1 && code) {
+      try {
+        claimed = BigInt(minor(claim.sum, code));
+      } catch {
+        claimed = null;
+      }
+    }
+    const word = side === 'credit' ? 'money in' : 'money out';
+    if (claim.count !== null && claim.count !== read.length)
+      problems.push(`The file lists ${claim.count} ${word} payments, but ${read.length} were read.`);
+    else if (claimed !== null && claimed !== sum)
+      problems.push(
+        `The file totals ${word} at ${money(claimed, code!)} ${code}, but the rows add up to ${money(sum, code!)} ${code}.`,
+      );
+  }
+  return problems;
 }
 function fallbackMapping(currency: string): CsvMapping {
   return {

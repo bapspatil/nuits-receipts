@@ -19,6 +19,8 @@ export type AmountColumns =
 export type CurrencyColumns =
   | { kind: 'default'; currency: string }
   | { kind: 'column'; column: number; blankDefault: string | null };
+export const DATE_FORMATS = ['ISO', 'DD.MM.YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'ISO_OR_DOTTED', 'D MMM YYYY'] as const;
+export type DateFormat = (typeof DATE_FORMATS)[number];
 export type CsvMapping = {
   version: 1;
   encoding: 'utf-8' | 'utf-16le' | 'utf-16be' | 'windows-1252';
@@ -27,7 +29,7 @@ export type CsvMapping = {
   trailingRecords: number;
   date: {
     column: number;
-    format: 'ISO' | 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'ISO_OR_DOTTED';
+    format: DateFormat;
     time: 'none' | 'optional';
   };
   number: { decimal: '.' | ',' | 'dot-or-comma'; grouping: '' | '.' | ',' | 'space' | "'" };
@@ -35,6 +37,8 @@ export type CsvMapping = {
   currency: CurrencyColumns;
   merchant: number;
   reference: number | null;
+  // Further text columns joined onto the reference, such as a message or description.
+  moreReferences?: number[];
   externalId: number | null;
   original: { amount: number; currency: number } | null;
 };
@@ -142,6 +146,8 @@ export function validateMapping(input: unknown): CsvMapping {
     };
   }
   const original = root.original === null ? null : object(root.original);
+  const more = root.moreReferences ?? [];
+  requireInput(Array.isArray(more) && more.length <= 5, 'Invalid reference columns');
   const headerRecord = root.headerRecord,
     trailingRecords = root.trailingRecords;
   requireInput(typeof headerRecord === 'number' && typeof trailingRecords === 'number', 'Invalid record range');
@@ -153,7 +159,7 @@ export function validateMapping(input: unknown): CsvMapping {
     trailingRecords,
     date: {
       column: index(d.column),
-      format: choice(d.format, ['ISO', 'DD.MM.YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'ISO_OR_DOTTED'], 'date format'),
+      format: choice(d.format, DATE_FORMATS, 'date format'),
       time: choice(d.time, ['none', 'optional'], 'date time'),
     },
     number,
@@ -161,6 +167,7 @@ export function validateMapping(input: unknown): CsvMapping {
     currency: columns,
     merchant: index(root.merchant),
     reference: root.reference === null ? null : index(root.reference),
+    ...(more.length ? { moreReferences: more.map(index) } : {}),
     externalId: root.externalId === null ? null : index(root.externalId),
     original: original ? { amount: index(original.amount), currency: index(original.currency) } : null,
   };
@@ -205,24 +212,56 @@ function checkBounds(data: string[][]): void {
     );
   }
 }
+const filled = (row: string[]) => row.filter((cell) => cell.trim()).length;
+const lastFilled = (row: string[]) => {
+  let i = row.length - 1;
+  while (i >= 0 && !row[i]!.trim()) i--;
+  return i;
+};
+const numberLike = (cell: string) => /^[+-]?[\d\s.,'\u00a0\u202f]+$/.test(cell.trim());
+const dateLike = (cell: string) => /^\d{1,4}[-./ ]\d{1,2}[-./ ]\d{1,4}\b/.test(cell.trim());
+// The first row that reads as column names: two or more names with no gaps, no
+// numbers or dates among them, and the rows below it fitting under them. Bank
+// statements often open with an account line and stated totals before it.
+export function detectHeaderRecord(data: string[][]): number | null {
+  for (let i = 0; i < Math.min(data.length, 100); i++) {
+    const row = data[i]!,
+      width = lastFilled(row) + 1,
+      names = filled(row);
+    if (names < 2 || names !== width || row.slice(0, width).some((cell) => numberLike(cell) || dateLike(cell)))
+      continue;
+    const below = data
+      .slice(i + 1)
+      .filter((r) => filled(r) > 0)
+      .slice(0, 10);
+    const fits = below.filter((r) => lastFilled(r) < width && filled(r) * 2 >= names).length;
+    if (below.length && fits >= below.length * 0.8) return i;
+  }
+  return null;
+}
 export function inspectCsv(
   bytes: Uint8Array,
   options: { encoding?: CsvMapping['encoding']; delimiter?: CsvMapping['delimiter']; headerRecord?: number } = {},
 ): {
   headers: string[];
+  headerRecord: number;
   encoding: CsvMapping['encoding'];
   delimiter: CsvMapping['delimiter'];
   delimiterChoices: CsvMapping['delimiter'][];
   records: string[][];
 } {
-  const decoded = decodeCsv(bytes, options.encoding),
-    header = options.headerRecord ?? 0;
-  requireInput(Number.isInteger(header) && header >= 0 && header <= 100, 'Invalid header record');
+  const decoded = decodeCsv(bytes, options.encoding);
+  requireInput(
+    options.headerRecord === undefined ||
+      (Number.isInteger(options.headerRecord) && options.headerRecord >= 0 && options.headerRecord <= 100),
+    'Invalid header record',
+  );
   const candidates = (options.delimiter ? [options.delimiter] : delimiters).map((delimiter) => {
     const parsed = records(decoded.text, delimiter),
+      header = options.headerRecord ?? detectHeaderRecord(parsed.data) ?? 0,
       width = parsed.data[header]?.length ?? 0;
     const matching = parsed.data.slice(header + 1).filter((row) => row.length === width).length;
-    return { delimiter, parsed, score: width > 1 ? matching : -1 };
+    return { delimiter, parsed, header, score: width > 1 ? matching : -1 };
   });
   const best = Math.max(...candidates.map((candidate) => candidate.score));
   const choices = candidates
@@ -231,7 +270,8 @@ export function inspectCsv(
   const selected = candidates.find((candidate) => candidate.delimiter === (options.delimiter ?? choices[0] ?? ';'))!;
   checkBounds(selected.parsed.data);
   return {
-    headers: selected.parsed.data[header] ?? [],
+    headers: selected.parsed.data[selected.header] ?? [],
+    headerRecord: selected.header,
     encoding: decoded.encoding,
     delimiter: selected.delimiter,
     delimiterChoices: choices,
@@ -255,7 +295,36 @@ function field<T>(name: string, parse: () => T): T {
     throw new FieldError(name, 'invalid_' + name, error instanceof Error ? error.message : 'Invalid value');
   }
 }
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+];
+// "31 May 2026", "1 Sept 2026", "02-Jan-2026": English month names, abbreviated or not.
+function monthDate(text: string): { calendar: string; tail: string } {
+  const found = text.match(/^(\d{1,2})[ .-]([a-z]{3,9})\.?[ .-](\d{4})(.*)$/i);
+  const month = found ? MONTHS.findIndex((name) => name.startsWith(found[2]!.toLowerCase())) : -1;
+  requireInput(found && month >= 0, 'Date does not match selected format');
+  return {
+    calendar: `${found[3]}-${String(month + 1).padStart(2, '0')}-${found[1]!.padStart(2, '0')}`,
+    tail: found[4] ?? '',
+  };
+}
 function bankDate(text: string, mapping: CsvMapping['date']): string {
+  if (mapping.format === 'D MMM YYYY') {
+    const { calendar, tail } = monthDate(text);
+    timeTail(tail, mapping);
+    return date(calendar);
+  }
   const iso = mapping.format === 'ISO' || (mapping.format === 'ISO_OR_DOTTED' && /^\d{4}-/.test(text));
   const dotted = mapping.format === 'DD.MM.YYYY' || mapping.format === 'ISO_OR_DOTTED';
   const pattern = iso
@@ -270,7 +339,10 @@ function bankDate(text: string, mapping: CsvMapping['date']): string {
     : mapping.format === 'MM/DD/YYYY'
       ? `${found[3]}-${found[1]}-${found[2]}`
       : `${found[3]}-${found[2]}-${found[1]}`;
-  const tail = found[4] ?? '';
+  timeTail(found[4] ?? '', mapping);
+  return date(calendar);
+}
+function timeTail(tail: string, mapping: CsvMapping['date']): void {
   if (tail) {
     requireInput(mapping.time === 'optional', 'Time not permitted by mapping');
     const time = tail.match(/^[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|([+-])(\d{2}):(\d{2}))?$/);
@@ -284,7 +356,6 @@ function bankDate(text: string, mapping: CsvMapping['date']): string {
       'Invalid time or offset',
     );
   }
-  return date(calendar);
 }
 function amount(text: string, currencyCode: string, rule: CsvMapping['number']): number {
   let clean = text.trim(),
@@ -347,10 +418,20 @@ function usedColumns(mapping: CsvMapping): number[] {
     mapping.date.column,
     mapping.merchant,
     ...[mapping.reference, mapping.externalId].filter((column) => column !== null),
+    ...(mapping.moreReferences ?? []),
     ...(a.kind === 'signed' ? [a.column] : a.kind === 'split' ? [a.debit, a.credit] : [a.amount, a.direction]),
     ...(mapping.currency.kind === 'column' ? [mapping.currency.column] : []),
     ...(mapping.original ? [mapping.original.amount, mapping.original.currency] : []),
   ];
+}
+// The reference and any further text columns, each kept once.
+function reference(cells: string[], mapping: CsvMapping): string | null {
+  const kept: string[] = [];
+  for (const column of [mapping.reference, ...(mapping.moreReferences ?? [])]) {
+    const text = column === null ? '' : (cells[column]?.trim() ?? '');
+    if (text && !kept.some((k) => k.toLowerCase().includes(text.toLowerCase()))) kept.push(text);
+  }
+  return kept.join(' / ') || null;
 }
 export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
   const decoded = decodeCsv(bytes, mapping.encoding),
@@ -435,7 +516,7 @@ export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
           original_amount_minor,
           original_currency,
           external_id: mapping.externalId === null ? null : value(mapping.externalId) || null,
-          reference: mapping.reference === null ? null : value(mapping.reference) || null,
+          reference: reference(cells, mapping),
           raw_json,
         },
       });
@@ -459,5 +540,66 @@ export async function headerFingerprint(headers: string[]): Promise<string> {
         return [label, occurrence];
       }),
     }),
+  );
+}
+
+export type StatedTotals = Partial<Record<'credit' | 'debit', { count: number | null; sum: string | null }>>;
+// Totals a statement states above its column names, as in Holvi's
+// "Total credits | Total volume of credits | Total count of credits" with the
+// figures on the next row. Only labelled figures count.
+export function statedTotals(data: string[][], headerRecord: number): StatedTotals {
+  const stated: StatedTotals = {};
+  for (let i = 0; i + 1 < headerRecord; i++)
+    data[i]!.forEach((label, column) => {
+      const found = label.match(/\b(volume|sum|amount|count|number)\b.*\b(credit|debit)s?\b/i);
+      const figure = data[i + 1]![column]?.trim() ?? '';
+      if (!found || !/^[+-]?\d+(\.\d+)?$/.test(figure)) return;
+      const side = (stated[found[2]!.toLowerCase() as 'credit' | 'debit'] ??= { count: null, sum: null });
+      if (/count|number/i.test(found[1]!)) side.count = Number(figure);
+      else side.sum = figure;
+    });
+  return stated;
+}
+// The first date format every sample reads in, for a mapping proposed without a preset.
+export function dateFormatFor(values: string[]): DateFormat | null {
+  const samples = values.map((v) => v.trim()).filter(Boolean);
+  if (!samples.length) return null;
+  const order: DateFormat[] = ['ISO', 'DD.MM.YYYY', 'D MMM YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY'];
+  return (
+    order.find((format) =>
+      samples.every((sample) => {
+        try {
+          bankDate(sample, { column: 0, format, time: 'optional' });
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    ) ?? null
+  );
+}
+// The first decimal mark and grouping every sample amount reads with.
+export function numberFormatFor(values: string[]): CsvMapping['number'] {
+  const samples = values.map((v) => v.trim()).filter(Boolean);
+  const rules: CsvMapping['number'][] = [
+    { decimal: '.', grouping: '' },
+    { decimal: ',', grouping: '' },
+    { decimal: '.', grouping: ',' },
+    { decimal: ',', grouping: '.' },
+    { decimal: ',', grouping: 'space' },
+    { decimal: '.', grouping: 'space' },
+    { decimal: '.', grouping: "'" },
+  ];
+  return (
+    rules.find((rule) =>
+      samples.every((sample) => {
+        try {
+          amount(sample, 'EUR', rule);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    ) ?? rules[0]!
   );
 }

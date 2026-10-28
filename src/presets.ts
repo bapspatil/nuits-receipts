@@ -85,9 +85,31 @@ export function suggestMappings(
     find = (name: string) => normalized.indexOf(normalize(name));
   const add = (id: string, bank_name: string, mapping: CsvMapping) =>
     suggestions.push({ id, bank_name, name: 'Built-in synthetic-tested layout', mapping });
-  try {
-    add('builtin-holvi', 'Holvi', holviMapping(headers, currency));
-  } catch {}
+  const has = (...names: string[]) =>
+    names.every((name) => find(name) >= 0 && normalized.filter((header) => header === normalize(name)).length === 1);
+  // Holvi's account statement (XLSX or CSV): booked date, signed amounts, and a
+  // Filing ID per transaction. The value date is left unused.
+  if (has('Value date', 'Booking date', 'Amount', 'Currency', 'Counterparty', 'Description', 'Filing ID'))
+    add('builtin-holvi-statement', 'Holvi', {
+      version: 1,
+      encoding: 'utf-8',
+      delimiter: ',',
+      headerRecord: 0,
+      trailingRecords: 0,
+      date: { column: find('Booking date'), format: 'D MMM YYYY', time: 'optional' },
+      number: { decimal: '.', grouping: '' },
+      amount: { kind: 'signed', column: find('Amount'), outgoing: 'negative' },
+      currency: { kind: 'column', column: find('Currency'), blankDefault: currency },
+      merchant: find('Counterparty'),
+      reference: find('Reference') < 0 ? null : find('Reference'),
+      moreReferences: [find('Description'), find('Message')].filter((column) => column >= 0),
+      externalId: find('Filing ID'),
+      original: null,
+    });
+  else
+    try {
+      add('builtin-holvi', 'Holvi', holviMapping(headers, currency));
+    } catch {}
   const build = (
     date: string,
     merchant: string,
@@ -115,8 +137,6 @@ export function suggestMappings(
     externalId: find('ID') < 0 ? null : find('ID'),
     original: null,
   });
-  const has = (...names: string[]) =>
-    names.every((name) => find(name) >= 0 && normalized.filter((header) => header === normalize(name)).length === 1);
   if (has('Kirjauspäivä', 'Saaja', 'Summa', 'Valuutta', 'Viite')) {
     const mapping = {
       ...build('Kirjauspäivä', 'Saaja', 'Summa', 'Valuutta', 'DD.MM.YYYY', ',', 'space', ';'),
