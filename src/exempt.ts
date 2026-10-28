@@ -1,5 +1,5 @@
 // Payments that are not purchases, marked so on their own: money to yourself,
-// tax, bank fees, cash, statutory pension and card top-ups by rule, then a
+// tax, bank fees, cash, statutory pension, card top-ups and food delivery by rule, then a
 // capped Clef question for the few rows a rule can't place. A rule or Clef
 // only ever fills an empty exempt_by; once the owner has chosen ('owner'),
 // nothing here touches the row again.
@@ -8,9 +8,9 @@ import type { Transaction } from './banking';
 import { normalize } from './domain';
 import { live, parseChoice } from './ai';
 
-export type ExemptRule = 'own' | 'tax' | 'fee' | 'cash' | 'pension' | 'topup';
+export type ExemptRule = 'own' | 'tax' | 'fee' | 'cash' | 'pension' | 'topup' | 'delivery';
 export type ExemptBy = ExemptRule | 'clef' | 'owner';
-export const AUTO_EXEMPT: readonly ExemptBy[] = ['own', 'tax', 'fee', 'cash', 'pension', 'topup', 'clef'];
+export const AUTO_EXEMPT: readonly ExemptBy[] = ['own', 'tax', 'fee', 'cash', 'pension', 'topup', 'delivery', 'clef'];
 // The word shown next to "Not a purchase" for a row marked automatically.
 export const EXEMPT_LABELS: Record<Exclude<ExemptBy, 'owner'>, string> = {
   own: 'Own transfer',
@@ -19,6 +19,7 @@ export const EXEMPT_LABELS: Record<Exclude<ExemptBy, 'owner'>, string> = {
   cash: 'Cash',
   pension: 'Pension',
   topup: 'Top-up',
+  delivery: 'Delivery',
   clef: 'Auto',
 };
 
@@ -30,6 +31,8 @@ const CASH = /^atm\b|\bcash withdrawal\b|\b(kateisnosto|kateisautomaatti)\b/;
 const PENSION =
   /\b(pension insurance|pension fund|elakevakuutus|tyoelakevakuutus|tyoelake|elakekassa|yel)\b|\b(ilmarinen|varma|veritas|elo)\b.*\b(pension|elake)\b/;
 const TOPUP = /\btop ?up\b|\badd money\b|\blataus\b/;
+// Food delivery is personal. Uber Eats only: a plain Uber ride is a business trip.
+const DELIVERY = /\buber ?eats\b|\b(wolt|foodora|zomato|swiggy|deliveroo)\b/;
 
 // SELLER_NAMES are the owner's own names (sole traders invoice under their
 // own). Only the whole name counts: "Fake Studio Supplies" is somebody else.
@@ -47,6 +50,7 @@ export function exemptionFor(t: Transaction, ownNames: readonly string[]): Exemp
   if (CASH.test(merchant)) return 'cash';
   if (PENSION.test(merchant)) return 'pension';
   if (TOPUP.test(merchant)) return 'topup';
+  if (DELIVERY.test(merchant)) return 'delivery';
   return null;
 }
 

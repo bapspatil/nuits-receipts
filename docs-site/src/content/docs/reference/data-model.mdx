@@ -102,7 +102,7 @@ Seed row: `default-account`, label `Bank account`, currency `EUR`, default.
 | `reference` | TEXT | | |
 | `raw_json` | TEXT | Not null | The CSV row as read. |
 | `receipt_required` | INTEGER | 0 or 1, default 1 | 0 for exempt rows and own-account transfers. |
-| `exempt_by` | TEXT | `owner`, `own`, `tax`, `fee`, `cash`, `pension`, `topup`, `clef`, or null | Who decided `receipt_required`: you on **Bank**, a built-in rule, or Clef. A rule or Clef only fills an empty value. |
+| `exempt_by` | TEXT | `owner`, `own`, `tax`, `fee`, `cash`, `pension`, `topup`, `delivery`, `clef`, or null | Who decided `receipt_required`: you on **Bank**, a built-in rule, or Clef. A rule or Clef only fills an empty value. |
 | `receipt_id` | TEXT | Unique; references `receipts(id)` | Matched document. |
 | `match_method` | TEXT | `automatic` or `manual` | |
 | `matched_at` | TEXT | | |

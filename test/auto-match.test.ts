@@ -296,6 +296,59 @@ test('the import banner reports matched, not a purchase and missing, with Clef i
   expect(said.text).not.toMatch(/[\u2013\u2014]/);
 });
 
+test('food delivery is marked by rule; Uber rides and restaurants are not', () => {
+  const rule = (merchant: string) => exemptionFor(payment({ merchant, amount_minor: -2350 }), []);
+  for (const merchant of [
+    'UBER * EATS PENDING',
+    'UBER *EATS',
+    'UBER EATS',
+    'Uber Eats Fakecity',
+    'WOLT FAKE KITCHEN',
+    'Foodora Fakecity',
+    'ZOMATO FAKE',
+    'Swiggy*Fake Order',
+    'Deliveroo Fake',
+  ])
+    expect(rule(merchant)).toBe('delivery');
+  for (const merchant of [
+    'UBER *TRIP',
+    'UBER *TRIP HELP.UBER.C',
+    'UBER * PENDING',
+    'Fake Bistro Oy',
+    'Trattoria Fakeria',
+  ])
+    expect(rule(merchant)).toBeNull();
+});
+
+test('a delivery mark shows its label, Undo brings it back, and an owner choice is never overridden', async () => {
+  const id = await importText(
+    statement(
+      'a;2026-09-11;-23,50;EUR;UBER * EATS PENDING;card\nb;2026-09-12;-18,90;EUR;WOLT FAKE KITCHEN;card\nc;2026-09-13;-14,20;EUR;UBER *TRIP;card\nd;2026-09-14;-42,00;EUR;Fake Bistro Oy;card\n',
+    ),
+  );
+  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 0, exempt_by: 'delivery' });
+  expect(await row('WOLT FAKE KITCHEN')).toMatchObject({ receipt_required: 0, exempt_by: 'delivery' });
+  expect(await row('UBER *TRIP')).toMatchObject({ receipt_required: 1, exempt_by: null });
+  expect(await row('Fake Bistro Oy')).toMatchObject({ receipt_required: 1, exempt_by: null });
+  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  expect(bank).toContain('<span class="tag">Delivery</span>');
+  // The owner says the Wolt order needs a receipt: no rule marks it again.
+  const wolt = (await env.DB.prepare("SELECT id FROM bank_transactions WHERE merchant='WOLT FAKE KITCHEN'").first<{
+    id: string;
+  }>())!.id;
+  await request('/payments/' + wolt, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) });
+  await reconcile(env);
+  expect(await row('WOLT FAKE KITCHEN')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
+  const undone = await request(`/imports/${id}/exempt/undo`, {
+    method: 'POST',
+    body: new URLSearchParams({ month: '2026-09' }),
+  });
+  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=1$/);
+  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
+  await reconcile(env);
+  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
+});
+
 test('matching runs again for every month when a receipt arrives, and a removed match stays removed', async () => {
   await importText(statement('a;2026-09-05;-125,50;EUR;SumUp *Sample Cloud Lantern;card\n'));
   expect(await row('SumUp *Sample Cloud Lantern')).toMatchObject({ receipt_id: null, receipt_required: 1 });

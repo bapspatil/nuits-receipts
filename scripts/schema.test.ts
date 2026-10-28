@@ -195,6 +195,7 @@ test.skipIf(!existsSync('migrations'))(
     db.transaction(() => db.exec(readFileSync('migrations/0010_auto_match.sql', 'utf8')))();
     expect(db.query('SELECT count(*) n FROM bank_transactions WHERE exempt_by IS NOT NULL').get()).toEqual({ n: 0 });
     db.exec("UPDATE bank_transactions SET exempt_by='tax' WHERE id='tx-exempt'");
+    db.exec("UPDATE bank_transactions SET exempt_by='delivery' WHERE id='tx-exempt'");
     expect(() => db.exec("UPDATE bank_transactions SET exempt_by='guess' WHERE id='tx-exempt'")).toThrow();
     db.exec("UPDATE bank_transactions SET exempt_by=NULL WHERE id='tx-exempt'");
     expect(db.query('SELECT count(*) n FROM match_rejections').get()).toEqual({ n: 0 });

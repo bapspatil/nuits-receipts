@@ -5,7 +5,7 @@
 -- overrides an owner's choice. Additive only. Kept identical to
 -- migrations/0010_auto_match.sql.
 ALTER TABLE bank_transactions ADD COLUMN exempt_by TEXT
-  CHECK (exempt_by IS NULL OR exempt_by IN ('owner','own','tax','fee','cash','pension','topup','clef'));
+  CHECK (exempt_by IS NULL OR exempt_by IN ('owner','own','tax','fee','cash','pension','topup','delivery','clef'));
 CREATE TABLE match_rejections (
   transaction_id TEXT NOT NULL,
   receipt_id TEXT NOT NULL,
