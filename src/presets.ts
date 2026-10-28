@@ -107,6 +107,7 @@ export function suggestMappings(
       moreReferences: [find('Description'), find('Message')].filter((column) => column >= 0),
       externalId: find('Filing ID'),
       original: null,
+      originalText: find('Description'),
     });
   else
     try {

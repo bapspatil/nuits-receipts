@@ -6,12 +6,12 @@ sidebar:
   label: Match payments
 ---
 
-Use this guide to make sure every payment out in a month has a receipt, or a reason not to. The app matches payments automatically when exactly one approved receipt fits; this guide covers the rest.
+Use this guide to make sure every payment out in a month has a receipt, or a reason not to. The app matches payments automatically across every imported month and marks obvious non-purchases; this guide covers the rest.
 
 ## Prerequisites
 
 - A bank statement imported for the month. See [Import a bank CSV](/how-to/import-a-bank-csv/).
-- The receipts for that month approved. Only approved receipts can be matched. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
+- The receipts for that month in the app. Receipts still in **Review** are matched too and show **Needs you** next to the match until you approve them. See [Review and approve a receipt](/how-to/review-and-approve-a-receipt/).
 
 ![The Bank page for September 2026, with one payment matched automatically and one missing a receipt, with Match and Not a purchase](../../../assets/screenshots/payments.png)
 
@@ -25,14 +25,14 @@ Select **Bank** in the top bar (on a phone, the tab bar at the bottom) and pick 
   </Step>
   <Step title="Compare the likely receipt">
 
-When a ready receipt looks like the payment, it is shown beside it as **Likely**, with the seller, date and amount. A small table puts the **Bank** and **Receipt** values side by side under **Compared**, so you can see what differs.
+When a receipt looks like the payment, it is shown beside it as **Likely**, with the seller, date and amount. A small table puts the **Bank** and **Receipt** values side by side under **Compared**, so you can see what differs.
 
   </Step>
   <Step title="Match it, or pick another">
 
 If it is the right receipt, select **Match**. If it does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), the app says why and the button is **Match anyway**.
 
-If it is the wrong receipt, open **Pick another receipt** and type the seller, date or amount. With no likely receipt, the payment says "No ready receipt looks like this one." and shows the same search box. Choose one and select **Match**. You can also paste a receipt ID there.
+If it is the wrong receipt, open **Pick another receipt** and type the seller, date or amount. With no likely receipt, the payment says "No receipt fits." and shows the same search box and **Add receipt**. Choose one and select **Match**. You can also paste a receipt ID there.
 
   </Step>
   <Step title="Match the rest at once">
@@ -46,11 +46,11 @@ The payment now shows a **Receipt** link instead of the **Missing** stamp.
 
 You can also match from the receipt side. A receipt page shows **Payment?** when an unmatched payment fits it; select **Match** (or **Match anyway**).
 
-If no approved receipt exists yet, the payment says "No receipt found yet." with **Add receipt**. Upload it, approve it, then come back.
+If no receipt exists yet, the payment says "No receipt found yet." with **Add receipt**. Upload it; it is matched as soon as it is read.
 
 ## Mark payments that need no receipt
 
-Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Select **Not a purchase** on the payment. It now shows **Not a purchase** and no longer counts as missing. The banner offers **Undo**.
+Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Many are marked for you on import, with a label such as **Tax**, **Bank fee** or **Cash** next to **Not a purchase**; the import banner's **Undo not a purchase** turns them all back. For the rest, select **Not a purchase** on the payment. It now shows **Not a purchase** and no longer counts as missing. The banner offers **Undo**.
 
 To reverse it, open the payment's **More** and select **Needs a receipt**.
 

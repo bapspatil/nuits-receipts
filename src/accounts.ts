@@ -177,7 +177,7 @@ export async function confirmTransfer(db: D1Database, input: unknown): Promise<v
         AND d.account_key<>c.account_key AND d.currency=c.currency
         AND d.amount_minor<0 AND c.amount_minor=-d.amount_minor
         AND d.receipt_id IS NULL AND c.receipt_id IS NULL
-        AND d.receipt_required=1 AND c.receipt_required=1
+        AND (d.receipt_required=1 OR d.exempt_by NOT IN ('owner')) AND (c.receipt_required=1 OR c.exempt_by NOT IN ('owner'))
         AND NOT EXISTS (SELECT 1 FROM internal_transfers p
           WHERE p.debit_id IN (d.id,c.id) OR p.credit_id IN (d.id,c.id))`,
         )

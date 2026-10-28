@@ -23,6 +23,7 @@ import { heldSection } from './all';
 import { matchedIds, mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
+import { EXEMPT_LABELS } from './exempt';
 import { feedback } from './events';
 import { arrivalMonth } from './arrival';
 import { DISCARD_REASONS } from './domain';
@@ -136,7 +137,7 @@ function reasonWord(r: Receipt): string {
 // the same amount and date under another name (the person decides those).
 function suggestionsFor(t: Transaction, receipts: Receipt[], rules: Rule[], tuning: Tuning): Receipt[] {
   const near = (r: Receipt) => Math.abs(Date.parse(r.issue_date ?? '') - Date.parse(t.booking_date));
-  const rank = (r: Receipt) => (eligible(r, t, rules, true, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
+  const rank = (r: Receipt) => (eligible(r, t, rules, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
   return receipts
     .filter((r) => rank(r) < 2)
     .sort(
@@ -393,7 +394,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     eur.transaction || sales
       ? []
       : candidateRows
-          .filter((t) => eligible(r, t, rules, true, config(env).tuning))
+          .filter((t) => eligible(r, t, rules, config(env).tuning))
           .sort(
             (a, b) =>
               Math.abs(Date.parse(a.booking_date) - Date.parse(r.issue_date ?? '')) -
@@ -737,6 +738,26 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
 }
 
 // ---------- Payments ----------
+// A month's money out, as the Bank page sums it up: own-account transfers left
+// out, each other payment matched, not a purchase, or missing a receipt.
+async function monthCounts(env: Env, month: string) {
+  const [sums, reviewing] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
+    ).bind(month),
+    env.DB.prepare(
+      "SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE r.status='needs_review' AND substr(t.booking_date,1,7)=?",
+    ).bind(month),
+  ]);
+  const n = (sums?.results[0] ?? {}) as Record<string, number>;
+  return {
+    out: n.out ?? 0,
+    matched: n.matched ?? 0,
+    exempt: n.exempt ?? 0,
+    missing: n.missing ?? 0,
+    reviewing: new Set(((reviewing?.results ?? []) as { id: string }[]).map((r) => r.id)),
+  };
+}
 // month: the month to show, or the lookup that picks it, so the queries that
 // don't need it start right away.
 export async function payments(
@@ -757,7 +778,7 @@ export async function payments(
     rules,
     transfers,
     allCredits,
-    waiting,
+    counts,
     elsewhere,
     droppedRecently,
     history,
@@ -783,12 +804,9 @@ export async function payments(
     )
       .all<Payment>()
       .then((r) => r.results),
-    // Receipts that would fit a payment but still need review: the person is sent there first.
-    env.DB.prepare(
-      `SELECT * FROM receipts WHERE kind='expense' AND status='needs_review' AND review_reasons_json<>'["missing_eur"]' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY issue_date DESC,id LIMIT 200`,
-    )
-      .all<Receipt>()
-      .then((r) => r.results),
+    // The whole month in numbers, whichever page of it is shown, and the
+    // matched receipts that still need a look.
+    chosen.then((m) => monthCounts(env, m)),
     chosen.then((m) =>
       env.DB.prepare(
         `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
@@ -815,8 +833,6 @@ export async function payments(
     : [];
   const unmatched = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
   const open = rows.filter(unmatched);
-  const out = rows.filter((t) => t.amount_minor < 0 && !paired.has(t.id));
-  const matched = out.filter((t) => t.receipt_id);
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
   const tuning = config(env).tuning;
@@ -841,16 +857,8 @@ export async function payments(
     const facts = pairFacts(r, t, rules, tuning);
     if (facts.exact) bulk.push({ t, r, facts });
   }
-  const waitOf = new Map<string, Receipt>();
-  for (const t of open) {
-    const w = likelyOf.has(t.id)
-      ? undefined
-      : waiting.find((r) => eligible({ ...r, status: 'ready' }, t, rules, true, tuning));
-    if (w) waitOf.set(t.id, w);
-  }
-  // Missing is a real gap. A payment whose receipt is still in Review is not one.
-  const isMissing = (t: Payment) => unmatched(t) && !waitOf.has(t.id);
-  const missing = open.filter(isMissing);
+  const isMissing = unmatched;
+  const missing = open;
   // Missing first: it is the only thing Bank asks of you.
   const automatic = rows.filter((t) => t.receipt_id && t.match_method === 'automatic');
   const show =
@@ -899,7 +907,7 @@ export async function payments(
     const pair = chosenOf(t, pool) ?? likely;
     return pair
       ? `${likelyForm(t, pair, noun, primary)}<details${failureFor(`match:${t.id}`)?.field === 'receipt_id' ? ' open' : ''}><summary>Pick another ${lower}</summary><div class="body">${picker(t, listId, noun)}</div></details>`
-      : `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'ready receipt'} looks like this one.</p>${picker(t, listId, noun)}`;
+      : `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'receipt'} fits.</p>${picker(t, listId, noun)}${lower === 'invoice' ? '' : `<a class="btn ${primary ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`}`;
   };
   const items = shown
     .map((t) => {
@@ -917,7 +925,7 @@ export async function payments(
           `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
         );
       } else if (t.receipt_id) {
-        status = `${tag(matchStatus(t.match_method), true, t.match_method === 'automatic')} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>`;
+        status = `${tag(matchStatus(t.match_method), true, t.match_method === 'automatic')} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>${counts.reviewing.has(t.receipt_id) ? ` <a class="stamp needs" href="/receipts/${t.receipt_id}">${STATUS.needs}</a>` : ''}`;
         extra.push(
           `<form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
         );
@@ -927,29 +935,24 @@ export async function payments(
         if (invoices.length && t.amount_minor > 0 && t.receipt_required)
           controls = `${matchControls(t, invoices, 'pick-invoices', 'Invoice', likely, false)}${matchError(t.id)}`;
       } else if (!t.receipt_required) {
-        status = tag(STATUS.notPurchase);
+        const by = t.exempt_by && t.exempt_by !== 'owner' ? EXEMPT_LABELS[t.exempt_by] : '';
+        status = `${tag(STATUS.notPurchase)}${by ? ` <span class="tag">${by}</span>` : ''}`;
         extra.push(
           `<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
         );
       } else {
         const first = t.id === firstMissing;
         const likely = likelyOf.get(t.id);
-        // Its receipt exists but needs review first: send the person there, offer no Match.
-        const wait = waitOf.get(t.id);
-        status = wait
-          ? `<span class="stamp needs">${STATUS.needs}</span>`
-          : `<span class="stamp missing">${STATUS.missing}</span>`;
-        const find = wait
-          ? `<p class="none">Its receipt needs you first. <a href="/receipts/${wait.id}">Check it.</a></p>`
-          : receipts.length
-            ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
-            : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
+        status = `<span class="stamp missing">${STATUS.missing}</span>`;
+        const find = receipts.length
+          ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
+          : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
         const dropped =
-          droppedRecently && !likely && !wait
+          droppedRecently && !likely
             ? `<p class="small"><a href="/settings?open=mail#mail">Check mail we didn't keep</a></p>`
             : '';
         controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
-        if (receipts.length && !wait) extra.push('<p><a href="/add">Add a receipt</a></p>');
+        if (receipts.length && likely) extra.push('<p><a href="/add">Add a receipt</a></p>');
         const sides = credits.filter(
           (c) => c.account_key !== t.account_key && c.currency === t.currency && c.amount_minor === -t.amount_minor,
         );
@@ -983,7 +986,7 @@ export async function payments(
     {
       href: `/payments?month=${selected}&show=missing`,
       label: STATUS.missing,
-      count: missing.length,
+      count: counts.missing,
       current: show === 'missing',
     },
     {
@@ -994,7 +997,7 @@ export async function payments(
     },
   ]);
   const body = rows.length
-    ? `<p class="summary"><span>${out.length} out, ${matched.length} matched, <span${missing.length ? ' class="red"' : ''}>${missing.length} missing</span>${waitOf.size ? `, ${waitOf.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
+    ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${counts.missing ? ' class="red"' : ''}>${counts.missing} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
         open.length ? '' : await settled(env, selected)
       }${matchAll}${shown.length ? `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>${lists}` : ''}${
         offset > 0 || rows.length === 100

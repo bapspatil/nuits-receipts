@@ -261,13 +261,26 @@ export const EVENTS = {
         skipped = count(p, 'skipped'),
         again = count(p, 'replayed');
       if (again) return `You imported this file before, so nothing changed. It has ${plural(again, 'payment')}.`;
-      const auto = count(p, 'auto');
-      return `Added ${plural(added, 'payment')}.${auto ? ` We matched ${auto} for you.` : ''}${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
+      const tally = p.has('missing')
+        ? ` Paid out: ${count(p, 'auto')} matched, ${count(p, 'np')} not a purchase, ${count(p, 'missing')} missing.`
+        : '';
+      return `Added ${plural(added, 'payment')}.${tally}${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
+    },
+    // Undo the automatic "Not a purchase" marks of this file.
+    undo: (p) => {
+      const imp = id(p, 'imp'),
+        month = p.get('month') ?? '';
+      return imp && MONTH.test(month)
+        ? { action: `/imports/${imp}/exempt/undo`, fields: { month }, label: 'Undo not a purchase' }
+        : null;
     },
     link: (p) =>
       count(p, 'auto') && MONTH.test(p.get('month') ?? '')
         ? { href: `/payments?month=${p.get('month')}&show=auto`, label: 'See them' }
         : null,
+  },
+  exemptUndone: {
+    text: (p) => `${plural(count(p, 'n'), 'payment')} need${count(p, 'n') === 1 ? 's' : ''} a receipt again.`,
   },
   // ---------- Month ----------
   // Undo drops that one send, so the month is back as it was before: the earlier send, or not sent.

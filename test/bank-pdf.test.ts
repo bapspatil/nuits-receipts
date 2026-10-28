@@ -168,6 +168,9 @@ test('a Holvi statement PDF is read by layout: parts of each cell, balances and 
     ['2026-09-04', '-7.00', id(4), 'Card payment'],
   ]);
   expect(statement.rows[0]).toMatchObject({ counterparty: 'Fake Cafe', message: 'Payment sent to Fake Cafe' });
+  // A card payment abroad keeps its original amount for matching.
+  expect(statement.rows[1]!.original).toBe('Currency and amount: USD 1,400.00');
+  expect(statement.rows[0]!.original).toBeUndefined();
   // The IBAN is left out of the payer; a wrapped message is joined; the reference is its own part.
   expect(statement.rows[2]).toMatchObject({
     counterparty: 'Example Client Oy',
@@ -191,6 +194,14 @@ test('a Holvi PDF uploads as downloaded and imports with no mapping and no model
     'SELECT count(*) n, sum(amount_minor) total, count(DISTINCT external_id) ids FROM bank_transactions',
   ).first();
   expect(stored).toEqual({ n: 4, total: 127675, ids: 4 });
+  expect(
+    await env.DB.prepare(
+      'SELECT original_amount_minor a,original_currency c FROM bank_transactions WHERE amount_minor=-120400',
+    ).first(),
+  ).toEqual({ a: -140000, c: 'USD' });
+  expect(
+    await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE original_currency IS NOT NULL').first('n'),
+  ).toBe(1);
 });
 
 test('printed totals and balances that the rows do not add up to stop the import', async () => {

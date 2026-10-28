@@ -364,9 +364,9 @@ export async function processReceipt(
       )
       .run();
   }
-  const completed = await getReceipt(env, id);
+  // The ECB estimate first: the matcher uses it for a foreign receipt paid in euros.
+  await cacheFx(env, await getReceipt(env, id));
   await reconcile(env);
-  await cacheFx(env, completed);
   return getReceipt(env, id);
 }
 export async function upload(
@@ -742,10 +742,13 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     facts.issue_date !== current.issue_date ||
     facts.total_minor !== current.total_minor;
   const status = approved || !reasons.length ? 'ready' : 'needs_review';
-  // A manual match stays unless the facts it was made on change or the receipt stops being matchable.
-  // Automatic matches are dropped and re-run by reconcile below.
+  // A manual match stays unless the facts it was made on change or the receipt
+  // becomes a duplicate (a receipt in Review can stay matched; a sales invoice
+  // can't). Automatic matches are dropped and re-run by reconcile below.
   const unlinks =
-    invalidatesFx || duplicate !== null || (status !== 'ready' && JSON.stringify(reasons) !== '["missing_eur"]');
+    invalidatesFx ||
+    duplicate !== null ||
+    (isSales && status !== 'ready' && JSON.stringify(reasons) !== '["missing_eur"]');
   const result = await env.DB.batch([
     env.DB.prepare(
       "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=? AND (?=1 OR match_method IS NOT 'manual') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=?)",
@@ -770,8 +773,8 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     ),
   ]);
   requireInput(result[1]?.meta.changes === 1, 'Stale receipt. Reload before saving.', 409);
-  await reconcile(env);
   await cacheFx(env, await getReceipt(env, id));
+  await reconcile(env);
 }
 
 // The sales fields of the invoice form. Empty values are unknown.

@@ -97,11 +97,12 @@ Seed row: `default-account`, label `Bank account`, currency `EUR`, default.
 | `booking_date` | TEXT | Not null | |
 | `amount_minor` | INTEGER | Not null | Negative for money out. |
 | `currency` | TEXT | Not null | |
-| `original_amount_minor`, `original_currency` | | | Foreign amount, when the bank gives one. |
+| `original_amount_minor`, `original_currency` | | | Foreign amount, when the bank gives one (Holvi's "Currency and amount" line included). |
 | `merchant` | TEXT | Not null | Paid to, or paid by. |
 | `reference` | TEXT | | |
 | `raw_json` | TEXT | Not null | The CSV row as read. |
 | `receipt_required` | INTEGER | 0 or 1, default 1 | 0 for exempt rows and own-account transfers. |
+| `exempt_by` | TEXT | `owner`, `own`, `tax`, `fee`, `cash`, `pension`, `topup`, `delivery`, `clef`, or null | Who decided `receipt_required`: you on **Bank**, a built-in rule, or Clef. A rule or Clef only fills an empty value. |
 | `receipt_id` | TEXT | Unique; references `receipts(id)` | Matched document. |
 | `match_method` | TEXT | `automatic` or `manual` | |
 | `matched_at` | TEXT | | |
@@ -114,6 +115,16 @@ Seed row: `default-account`, label `Bank account`, currency `EUR`, default.
 | `credit_id` | TEXT | Not null, unique; references `bank_transactions(id)`; differs from `debit_id` | Money in leg. |
 | `reason` | TEXT | Not null | Note entered when pairing. |
 | `confirmed_at` | TEXT | Not null | |
+
+## `match_rejections`
+
+Pairs you took apart with **Remove match**. The matcher never links them again on its own; matching the pair by hand deletes the row.
+
+| Column | Type | Rules | Meaning |
+| --- | --- | --- | --- |
+| `transaction_id` | TEXT | With `receipt_id`, primary key | The payment. |
+| `receipt_id` | TEXT | | The receipt it was matched to. |
+| `rejected_at` | TEXT | Not null | |
 
 ## `bank_presets`
 

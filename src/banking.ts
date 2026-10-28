@@ -1,8 +1,10 @@
 import type { Env } from './env';
 import { config } from './config';
-import { parseCsv, inspectCsv, headerFingerprint, validateMapping, type CsvMapping } from './csv';
+import { parseCsv, inspectCsv, headerFingerprint, originalFromText, validateMapping, type CsvMapping } from './csv';
 import { holviMapping, aliases, type BankPreset } from './presets';
 import type { AccountChoice } from './accounts';
+import { AUTO_EXEMPT, clefExemptions, exemptionFor, unclear, type ExemptBy } from './exempt';
+import { chargeLeaders, pairFit, planMatches } from './matcher';
 import {
   convertEur,
   date,
@@ -40,6 +42,8 @@ export type Transaction = {
   receipt_id: string | null;
   match_method: 'automatic' | 'manual' | null;
   matched_at: string | null;
+  // Who decided receipt_required (src/exempt.ts). Absent on rows not yet stored.
+  exempt_by?: ExemptBy | null;
 };
 export type ParsedImport = {
   headers: string[];
@@ -438,12 +442,17 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
   await reconcile(env);
   return identity.id;
 }
+// A sales invoice is matched once approved (or only missing its euro amount).
+// A receipt is matched while still in Review too: the match is shown with the
+// receipt's flags, and correcting the receipt works the match out again.
 export function matchable(receipt: Receipt): boolean {
+  if (receipt.kind !== 'sales') return receipt.status === 'ready' || receipt.status === 'needs_review';
   return (
     receipt.status === 'ready' ||
     (receipt.status === 'needs_review' && receipt.review_reasons_json === '["missing_eur"]')
   );
 }
+export const MATCHABLE_SQL = `(kind='expense' AND status IN ('ready','needs_review') OR status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]'))`;
 function samePaymentFacts(receipt: Receipt, transaction: Transaction, tuning: Tuning): boolean {
   return (
     receipt.total_minor !== null &&
@@ -472,109 +481,155 @@ function pairable(receipt: Receipt, transaction: Transaction): boolean {
 export function lookalike(receipt: Receipt, transaction: Transaction, tuning: Tuning = DEFAULT_TUNING): boolean {
   return pairable(receipt, transaction) && samePaymentFacts(receipt, transaction, tuning);
 }
+// The pairs the matcher would link on its own (src/matcher.ts), and that Match takes without an exception.
 export function eligible(
   receipt: Receipt,
   transaction: Transaction,
   rules: Rule[],
-  approximate = false,
   tuning: Tuning = DEFAULT_TUNING,
 ): boolean {
-  if (!pairable(receipt, transaction)) return false;
-  const exact = samePaymentFacts(receipt, transaction, tuning);
-  const estimated =
-    approximate &&
-    receipt.currency !== 'EUR' &&
-    transaction.currency === 'EUR' &&
-    receipt.fx_eur_minor !== null &&
-    Math.abs(receipt.fx_eur_minor + transaction.amount_minor) <= Math.max(100, Math.abs(receipt.fx_eur_minor) * 0.03) &&
-    withinWindow(receipt.issue_date!, transaction.booking_date, tuning);
-  if (!exact && !estimated) return false;
-  const alias = rules.some(
-    (rule) =>
-      normalize(rule.bank_alias ?? '') &&
-      normalize(receipt.vendor ?? '').includes(normalize(rule.vendor_contains)) &&
-      normalize(transaction.merchant) === normalize(rule.bank_alias ?? ''),
-  );
-  return alias || similar(receipt.vendor ?? '', transaction.merchant, tuning.minVendorSimilarity);
+  return pairable(receipt, transaction) && pairFit(receipt, transaction, rules, tuning) !== null;
 }
-const matchableReceipts = `SELECT * FROM receipts WHERE kind='expense' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
-const unmatchedTransactions =
-  "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.receipt_id IS NULL AND t.amount_minor<0 AND t.receipt_required=1";
-const receiptSnapshotSql = (t: Tuning) =>
-  `SELECT json_group_array(json_array(id,revision,vendor,issue_date,currency,total_minor)) FROM (${matchableReceipts} AND currency=? AND abs(total_minor-?)<=${MONEY_TOLERANCE_MINOR} AND julianday(?)-julianday(issue_date) BETWEEN -${t.matchDaysBefore} AND ${t.matchDaysAfter} ORDER BY id)`;
-const transactionSnapshotSql = (t: Tuning) =>
-  `SELECT json_group_array(id) FROM (${unmatchedTransactions} AND COALESCE(t.original_currency,t.currency)=? AND abs(?-abs(COALESCE(t.original_amount_minor,t.amount_minor)))<=${MONEY_TOLERANCE_MINOR} AND julianday(t.booking_date)-julianday(?) BETWEEN -${t.matchDaysBefore} AND ${t.matchDaysAfter} ORDER BY t.id)`;
-const ruleSnapshotSql =
-  'SELECT json_group_array(json_array(id,vendor_contains,bank_alias)) FROM (SELECT * FROM vendor_rules ORDER BY id)';
-export async function reconcile(env: Env): Promise<void> {
-  const tuning = config(env).tuning;
+
+const AUTO = `(${AUTO_EXEMPT.map((v) => `'${v}'`).join(',')})`;
+const COMPLETE = "EXISTS(SELECT 1 FROM imports i WHERE i.id=t.import_id AND i.status='complete')";
+const NO_TRANSFER = 'NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id OR p.credit_id=t.id)';
+const ACTIVE_EXPENSES =
+  "SELECT * FROM receipts WHERE kind='expense' AND status IN ('ready','needs_review') AND duplicate_of IS NULL AND discarded_at IS NULL";
+// Open money out: needing a receipt, or marked not a purchase by a rule or Clef
+// (a receipt that turns up for one of those wins).
+const OPEN_OUT = `SELECT t.* FROM bank_transactions t WHERE ${COMPLETE} AND t.receipt_id IS NULL AND t.amount_minor<0 AND (t.receipt_required=1 OR t.exempt_by IN ${AUTO}) AND ${NO_TRANSFER}`;
+// Anything that changes which pairs fit. Every automatic write checks it is
+// unchanged since the plan was made, or the write does nothing and the plan is made again.
+const FINGERPRINT = `(SELECT count(*)||':'||total(revision)||':'||count(discarded_at)||':'||count(duplicate_of)||':'||total(status='ready') FROM receipts)||'|'||(SELECT count(*) FROM imports WHERE status='complete')||'|'||(SELECT count(*)||':'||total(length(vendor_contains)+length(coalesce(bank_alias,''))) FROM vendor_rules)||'|'||(SELECT count(*) FROM match_rejections)||'|'||(SELECT count(*) FROM internal_transfers)`;
+export type Reconciled = { matched: number; exempted: number };
+export async function reconcile(env: Env): Promise<Reconciled> {
+  const settings = config(env),
+    tuning = settings.tuning;
+  await backfillOriginals(env);
+  let matched = 0;
   for (let pass = 0; pass < 3; pass++) {
-    const receipts = (await env.DB.prepare(matchableReceipts + ' ORDER BY id').all<Receipt>()).results;
-    const transactions = (await env.DB.prepare(unmatchedTransactions + ' ORDER BY t.id').all<Transaction>()).results;
-    const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY id').all<Rule>()).results;
-    const receiptState = new Map(
-      receipts.map((r) => [r.id, [r.id, r.revision, r.vendor, r.issue_date, r.currency, r.total_minor]]),
+    const [open, done, transactions, rules, rejections, fingerprint] = await env.DB.batch([
+      env.DB.prepare(
+        `${ACTIVE_EXPENSES} AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY id`,
+      ),
+      env.DB.prepare(
+        `${ACTIVE_EXPENSES} AND id IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL)`,
+      ),
+      env.DB.prepare(OPEN_OUT + ' ORDER BY t.id'),
+      env.DB.prepare('SELECT * FROM vendor_rules ORDER BY id'),
+      env.DB.prepare('SELECT transaction_id,receipt_id FROM match_rejections'),
+      env.DB.prepare(`SELECT ${FINGERPRINT} AS f`),
+    ]);
+    const receipts = chargeLeaders(open!.results as Receipt[], done!.results as Receipt[]);
+    const rejected = new Set(
+      (rejections!.results as { transaction_id: string; receipt_id: string }[]).map(
+        (r) => `${r.transaction_id}|${r.receipt_id}`,
+      ),
     );
-    const transactionState = new Set(transactions.map((t) => t.id));
-    const ruleState = JSON.stringify(rules.map((r) => [r.id, r.vendor_contains, r.bank_alias]));
-    const candidates = receipts.flatMap((r) =>
-      transactions.filter((t) => eligible(r, t, rules, false, tuning)).map((t) => ({ r, t })),
+    const plan = planMatches(
+      receipts,
+      transactions!.results as Transaction[],
+      rules!.results as Rule[],
+      tuning,
+      rejected,
     );
-    const receiptCounts = new Map<string, number>(),
-      transactionCounts = new Map<string, number>();
-    for (const { r, t } of candidates) {
-      receiptCounts.set(r.id, (receiptCounts.get(r.id) ?? 0) + 1);
-      transactionCounts.set(t.id, (transactionCounts.get(t.id) ?? 0) + 1);
-    }
+    const at = new Date().toISOString(),
+      f = (fingerprint!.results[0] as { f: string }).f;
+    const writes = plan.pairs.map(({ receipt, transaction }) =>
+      env.DB.prepare(
+        `UPDATE OR IGNORE bank_transactions SET receipt_id=?,match_method='automatic',matched_at=?,receipt_required=1
+        WHERE id=? AND receipt_id IS NULL AND amount_minor<0 AND (receipt_required=1 OR exempt_by IN ${AUTO})
+        AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=bank_transactions.id)
+        AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=? AND kind='expense' AND status IN ('ready','needs_review') AND duplicate_of IS NULL AND discarded_at IS NULL)
+        AND (${FINGERPRINT})=?`,
+      ).bind(receipt.id, at, transaction.id, receipt.id, receipt.revision, f),
+    );
     let stale = false;
-    for (const { r, t } of candidates) {
-      if (receiptCounts.get(r.id) !== 1 || transactionCounts.get(t.id) !== 1) continue;
-      try {
-        // Guard every possible currency/amount/date candidate, including vendors not currently eligible.
-        const result = await env.DB.prepare(
-          `UPDATE bank_transactions SET receipt_id=?,match_method='automatic',matched_at=?
-          WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND amount_minor<0
-          AND (${receiptSnapshotSql(tuning)})=? AND (${transactionSnapshotSql(tuning)})=? AND (${ruleSnapshotSql})=?`,
-        )
-          .bind(
-            r.id,
-            new Date().toISOString(),
-            t.id,
-            t.original_currency ?? t.currency,
-            Math.abs(t.original_amount_minor ?? t.amount_minor),
-            t.booking_date,
-            JSON.stringify(
-              receipts
-                .filter((other) => receiptState.has(other.id) && samePaymentFacts(other, t, tuning))
-                .map((other) => receiptState.get(other.id)),
-            ),
-            r.currency,
-            r.total_minor,
-            r.issue_date,
-            JSON.stringify(
-              transactions
-                .filter((other) => transactionState.has(other.id) && samePaymentFacts(r, other, tuning))
-                .map((other) => other.id),
-            ),
-            ruleState,
-          )
-          .run();
-        if (result.meta.changes !== 1) {
-          stale = true;
-          break;
-        }
-        receiptState.delete(r.id);
-        transactionState.delete(t.id);
-      } catch (error) {
-        if (!(error instanceof Error) || !error.message.includes('UNIQUE constraint')) throw error;
-        stale = true;
-        break;
+    for (let offset = 0; offset < writes.length; offset += 50)
+      for (const result of await env.DB.batch(writes.slice(offset, offset + 50))) {
+        if (result.meta.changes === 1) matched++;
+        else stale = true;
       }
-    }
     if (!stale) break;
   }
+  const exempted = await exemptByRules(env, settings.sellerNames);
   await reconcileSales(env);
   await clearBankReview(env);
+  return { matched, exempted };
+}
+// Rows no receipt has been found for and nobody has decided about: the
+// built-in rules mark the obvious non-purchases.
+async function exemptByRules(env: Env, ownNames: readonly string[]): Promise<number> {
+  const rows = (
+    await env.DB.prepare(
+      `SELECT t.* FROM bank_transactions t WHERE ${COMPLETE} AND t.receipt_id IS NULL AND t.amount_minor<0 AND t.receipt_required=1 AND t.exempt_by IS NULL AND ${NO_TRANSFER}`,
+    ).all<Transaction>()
+  ).results;
+  const marks = rows.flatMap((t) => {
+    const rule = exemptionFor(t, ownNames);
+    return rule ? [[t.id, rule] as const] : [];
+  });
+  return markExempt(env, marks);
+}
+async function markExempt(env: Env, marks: readonly (readonly [string, ExemptBy])[]): Promise<number> {
+  let changed = 0;
+  const writes = marks.map(([id, by]) =>
+    env.DB.prepare(
+      `UPDATE bank_transactions SET receipt_required=0,exempt_by=? WHERE id=? AND exempt_by IS NULL AND receipt_required=1 AND receipt_id IS NULL AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=bank_transactions.id OR p.credit_id=bank_transactions.id)`,
+    ).bind(by, id),
+  );
+  for (let offset = 0; offset < writes.length; offset += 50)
+    for (const result of await env.DB.batch(writes.slice(offset, offset + 50))) changed += result.meta.changes;
+  return changed;
+}
+// After an import: the rows of that file still missing a receipt that read like
+// a transfer to a person get one capped Clef question.
+export async function exemptByClef(env: Env, importId: string): Promise<number> {
+  const rows = (
+    await env.DB.prepare(
+      `SELECT t.* FROM bank_transactions t WHERE t.import_id=? AND ${COMPLETE} AND t.receipt_id IS NULL AND t.amount_minor<0 AND t.receipt_required=1 AND t.exempt_by IS NULL AND ${NO_TRANSFER} ORDER BY t.booking_date,t.id`,
+    )
+      .bind(importId)
+      .all<Transaction>()
+  ).results.filter(unclear);
+  const ids = await clefExemptions(env, rows, config(env).tuning.minCategoryProbability);
+  return markExempt(
+    env,
+    ids.map((id) => [id, 'clef'] as const),
+  );
+}
+// Undo for the automatic marks of one import: the rows need a receipt again,
+// and the choice is the owner's from now on.
+export async function undoExemptions(env: Env, importId: string): Promise<number> {
+  const result = await env.DB.prepare(
+    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO}`,
+  )
+    .bind(importId)
+    .run();
+  await reconcile(env);
+  return result.meta.changes;
+}
+// Statements imported before the original amount was read from Holvi's
+// "Currency and amount: USD 10.46" line get it now, once. Rows of a pending
+// import are left alone so its frozen manifest still holds.
+async function backfillOriginals(env: Env): Promise<void> {
+  const rows = (
+    await env.DB.prepare(
+      `SELECT t.id,t.amount_minor,t.currency,t.reference FROM bank_transactions t WHERE t.original_currency IS NULL AND t.reference LIKE '%Currency and amount:%' AND ${COMPLETE} LIMIT 1000`,
+    ).all<{ id: string; amount_minor: number; currency: string; reference: string }>()
+  ).results;
+  const writes = rows.flatMap((t) => {
+    const original = originalFromText(t.reference, t.currency, t.amount_minor);
+    return original
+      ? [
+          env.DB.prepare(
+            'UPDATE bank_transactions SET original_amount_minor=?,original_currency=? WHERE id=? AND original_currency IS NULL',
+          ).bind(original.amount, original.currency, t.id),
+        ]
+      : [];
+  });
+  for (let offset = 0; offset < writes.length; offset += 50) await env.DB.batch(writes.slice(offset, offset + 50));
 }
 
 // ---------- Sales invoices and money in ----------

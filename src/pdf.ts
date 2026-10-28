@@ -71,6 +71,8 @@ export type StatementRow = {
   description: string;
   reference: string;
   message?: string;
+  // Holvi's "Currency and amount: USD 10.46" for a card payment abroad.
+  original?: string;
   id: string;
 };
 type Side = { count: number | null; sum: string | null };
@@ -190,7 +192,11 @@ function holviRow(found: { date: string; amount: string; info: string[] }, curre
     const inline = info.shift()!.replace(/^Filing ID:\s*/, '');
     id = inline || (info.shift() ?? '');
   }
-  while (info.length && /^(Currency and amount|Ex ?change rate):/.test(info.at(-1)!)) info.pop();
+  let original = '';
+  while (info.length && /^(Currency and amount|Ex ?change rate):/.test(info.at(-1)!)) {
+    const line = info.pop()!;
+    if (line.startsWith('Currency and amount:')) original = line;
+  }
   const last = info.at(-1) ?? '';
   const type = info.length > 1 && !LABEL.test(last) && !/^[ap]\.m\.$/.test(last) ? info.pop()! : '';
   const parts: Record<string, string[]> = { party: [] };
@@ -210,6 +216,7 @@ function holviRow(found: { date: string; amount: string; info: string[] }, curre
     description: type,
     reference: joined('reference'),
     message: joined('message'),
+    ...(original ? { original } : {}),
     id: /^[0-9a-f]{32}$/i.test(id) ? id : '',
   };
 }
@@ -388,7 +395,7 @@ export function statementRows(statement: Statement): string[][] {
             r.amount ?? '',
             r.currency ?? '',
             r.counterparty,
-            r.description,
+            [r.description, r.original].filter(Boolean).join('\n'),
             r.reference,
             r.message ?? '',
             r.id,

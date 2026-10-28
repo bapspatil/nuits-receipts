@@ -26,6 +26,8 @@ This is an estimate, not a measured bill. It assumes 200 receipts a month, at ab
 
 That is about $0.12, which with some headroom is the "about 15 cents a month" figure for AI reading.
 
+A bank import adds at most one more Clef call, for up to 40 payments that read like transfers to a person, at roughly 4,000 input tokens: about $0.001 per import. Matching itself and the built-in "Not a purchase" rules make no AI call.
+
 The 5,000 tokens per receipt is deliberately generous. In tests, a text PDF or an email used 1,300 to 1,600 tokens and a photo about 2,900. The allowance covers photos, longer documents and the occasional second reading. Clef only runs for receipts no vendor rule matches, so the more rules you have, the fewer Clef calls you make.
 
 
