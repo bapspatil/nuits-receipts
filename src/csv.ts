@@ -41,6 +41,9 @@ export type CsvMapping = {
   moreReferences?: number[];
   externalId: number | null;
   original: { amount: number; currency: number } | null;
+  // A text column that may say "Currency and amount: USD 10.46", as Holvi's
+  // Description does for a card payment abroad. Used when original is null.
+  originalText?: number;
 };
 export type RowIssue = { record: number; field: string; code: string; message: string };
 export type NormalizedRow = Pick<
@@ -170,6 +173,7 @@ export function validateMapping(input: unknown): CsvMapping {
     ...(more.length ? { moreReferences: more.map(index) } : {}),
     externalId: root.externalId === null ? null : index(root.externalId),
     original: original ? { amount: index(original.amount), currency: index(original.currency) } : null,
+    ...(root.originalText === undefined ? {} : { originalText: index(root.originalText) }),
   };
 }
 
@@ -422,6 +426,7 @@ function usedColumns(mapping: CsvMapping): number[] {
     ...(a.kind === 'signed' ? [a.column] : a.kind === 'split' ? [a.debit, a.credit] : [a.amount, a.direction]),
     ...(mapping.currency.kind === 'column' ? [mapping.currency.column] : []),
     ...(mapping.original ? [mapping.original.amount, mapping.original.currency] : []),
+    ...(mapping.originalText === undefined ? [] : [mapping.originalText]),
   ];
 }
 // The reference and any further text columns, each kept once.
@@ -505,6 +510,12 @@ export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
           requireInput(Math.sign(originalAmount) === Math.sign(amount_minor), 'Original amount direction differs');
           return originalAmount;
         });
+      } else if (mapping.originalText !== undefined) {
+        const found = originalFromText(value(mapping.originalText), currencyCode, amount_minor);
+        if (found) {
+          original_amount_minor = found.amount;
+          original_currency = found.currency;
+        }
       }
       preview.rows.push({
         record: i + 1,
@@ -526,6 +537,25 @@ export function parseCsv(bytes: Uint8Array, mapping: CsvMapping): CsvPreview {
     }
   }
   return preview;
+}
+// "Currency and amount: USD 10.46" in a statement's text: the amount in the
+// currency the card was charged in, signed like the bank amount. Unsupported
+// currencies and the account's own currency give null.
+export function originalFromText(
+  text: string,
+  bankCurrency: string,
+  signedAmount: number,
+): { amount: number; currency: string } | null {
+  const found = /Currency and amount:\s*([A-Z]{3})\s+(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?=\s|$)/.exec(text);
+  const code = found?.[1];
+  if (!code || code === bankCurrency || EXPONENTS[code] === undefined || signedAmount === 0) return null;
+  const whole = found[2]!.replace(/,/g, ''),
+    fraction = found[3] ?? '';
+  const exponent = EXPONENTS[code]!;
+  if (fraction.length > exponent) return null;
+  const minor = Number(whole + fraction.padEnd(exponent, '0'));
+  if (!Number.isSafeInteger(minor) || minor === 0) return null;
+  return { amount: signedAmount < 0 ? -minor : minor, currency: code };
 }
 export async function headerFingerprint(headers: string[]): Promise<string> {
   const occurrences = new Map<string, number>();

@@ -125,7 +125,7 @@ test('schema/ accepts configured products and rejects invalid product lengths', 
 });
 
 test.skipIf(!existsSync('migrations'))(
-  'populated migrations/0001..0009 preserve every legacy value, link and constraint',
+  'populated migrations/0001..0010 preserve every legacy value, link and constraint',
   () => {
     using db = apply('migrations', '0003_duplicate_integrity.sql');
     seedLegacy(db);
@@ -191,6 +191,13 @@ test.skipIf(!existsSync('migrations'))(
     db.exec("UPDATE receipts SET discarded_at='now',discard_reason='personal' WHERE id='receipt-manual'");
     expect(() => db.exec("UPDATE receipts SET discard_reason='food' WHERE id='receipt-manual'")).toThrow();
     db.exec("UPDATE receipts SET discarded_at=NULL,discard_reason=NULL WHERE id='receipt-manual'");
+    // 0010: nothing is decided yet on existing payments; only known deciders are accepted.
+    db.transaction(() => db.exec(readFileSync('migrations/0010_auto_match.sql', 'utf8')))();
+    expect(db.query('SELECT count(*) n FROM bank_transactions WHERE exempt_by IS NOT NULL').get()).toEqual({ n: 0 });
+    db.exec("UPDATE bank_transactions SET exempt_by='tax' WHERE id='tx-exempt'");
+    expect(() => db.exec("UPDATE bank_transactions SET exempt_by='guess' WHERE id='tx-exempt'")).toThrow();
+    db.exec("UPDATE bank_transactions SET exempt_by=NULL WHERE id='tx-exempt'");
+    expect(db.query('SELECT count(*) n FROM match_rejections').get()).toEqual({ n: 0 });
     healthy(db);
     using fresh = apply('schema');
     expect(shape(fresh)).toEqual(shape(db));
@@ -199,7 +206,7 @@ test.skipIf(!existsSync('migrations'))(
 );
 
 test.skipIf(!existsSync('migrations'))(
-  'schema/ and empty migrations/0001..0009 have identical tables, columns, indexes, triggers and foreign keys',
+  'schema/ and empty migrations/0001..0010 have identical tables, columns, indexes, triggers and foreign keys',
   () => {
     using fresh = apply('schema');
     using upgraded = apply('migrations');

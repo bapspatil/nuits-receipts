@@ -24,6 +24,7 @@ beforeEach(async () => {
   );
   await env.DB.batch([
     env.DB.prepare('DELETE FROM internal_transfers'),
+    env.DB.prepare('DELETE FROM match_rejections'),
     env.DB.prepare('DELETE FROM bank_transactions'),
     env.DB.prepare('DELETE FROM imports'),
     env.DB.prepare('DELETE FROM bank_presets'),

@@ -45,7 +45,7 @@ test('a row with an exact pair has no exception field, and typing a label in the
   const page = await (await request('/payments?month=2026-09&show=all')).text();
   // Nothing looks like this payment: the line says so and the search box stands alone.
   const row = page.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
-  expect(row).toContain('No ready receipt looks like this one.');
+  expect(row).toContain('No receipt fits.');
   expect(row).toContain('<input name="receipt_id" list="pick-receipts"');
   expect(row).not.toContain('name="confirm_exception"');
   expect(row).not.toContain('Receipt ID');

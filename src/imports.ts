@@ -9,6 +9,7 @@ import { isXlsx, xlsxToCsv } from './xlsx';
 import { isPdf, pdfToCsv } from './pdf';
 import {
   collisions,
+  exemptByClef,
   importBankCsv,
   importIdentity,
   normalizedImport,
@@ -677,14 +678,16 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
             .first('n'),
         );
   const skipped = prior?.status === 'complete' ? 0 : parsed.rows.length - inserted;
-  // How many of this file's payments the app matched on its own, for the banner.
-  const auto = inserted
-    ? Number(
-        await env.DB.prepare("SELECT count(*) n FROM bank_transactions WHERE import_id=? AND match_method='automatic'")
-          .bind(importedId)
-          .first('n'),
+  // Rows a rule left open that read like a transfer to a person: one capped Clef question.
+  if (inserted) await exemptByClef(env, importedId);
+  // Where this file's payments out stand, for the banner.
+  const tally = inserted
+    ? ((await env.DB.prepare(
+        `SELECT total(t.receipt_id IS NOT NULL) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing,total(t.receipt_id IS NULL AND t.receipt_required=0 AND t.exempt_by IS NOT NULL AND t.exempt_by<>'owner') auto FROM bank_transactions t WHERE t.import_id=? AND t.amount_minor<0 AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
       )
-    : 0;
+        .bind(importedId)
+        .first<Record<string, number>>()) ?? {})
+    : {};
   return new Response(null, {
     status: 303,
     headers: {
@@ -692,7 +695,10 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
         inserted,
         skipped,
         replayed: prior?.status === 'complete' ? parsed.rows.length : 0,
-        auto,
+        auto: tally.matched ?? 0,
+        np: tally.exempt ?? 0,
+        missing: tally.missing ?? 0,
+        imp: tally.auto ? importedId : null,
       }),
     },
   });

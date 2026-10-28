@@ -10,7 +10,8 @@ async function seed(two = false) {
     id = idFrom(response);
   const csv =
     'Transaction ID;Date;Amount;Currency;Payee\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy\n' +
-    (two ? 'b;2026-09-08;-125,50;EUR;Sample Cloud Lantern Oy\n' : '');
+    // Same day, same amount, a different but alike name: a tie the matcher leaves alone.
+    (two ? 'b;2026-09-07;-125,50;EUR;Sample Cloud Lantern Helsinki\n' : '');
   await importBankCsv(env, {
     bytes: new TextEncoder().encode(csv),
     parsed: parsePreset(csv, 'race', 'EUR'),
@@ -18,19 +19,26 @@ async function seed(two = false) {
   });
   return { id, transaction: await hash('race:id:a') };
 }
+// Runs mutate just before the first statement starting with prefix is written,
+// whether it runs alone or in a batch.
 function beforeUpdate(prefix: string, mutate: () => Promise<unknown>) {
-  const prepare = env.DB.prepare.bind(env.DB);
+  const prepare = env.DB.prepare.bind(env.DB),
+    batch = env.DB.batch.bind(env.DB);
+  const marked = new WeakSet<D1PreparedStatement>();
   let intercepted = false;
-  return vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
+  const prepared = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
     const statement = prepare(sql);
-    if (sql.startsWith(prefix) && !intercepted) {
+    if (sql.startsWith(prefix)) {
       const bind = statement.bind.bind(statement);
       statement.bind = (...values: unknown[]) => {
         const bound = bind(...values),
           run = bound.run.bind(bound);
+        marked.add(bound);
         bound.run = async <T = Record<string, unknown>>() => {
-          intercepted = true;
-          await mutate();
+          if (!intercepted) {
+            intercepted = true;
+            await mutate();
+          }
           return run<T>();
         };
         return bound;
@@ -38,7 +46,21 @@ function beforeUpdate(prefix: string, mutate: () => Promise<unknown>) {
     }
     return statement;
   });
+  const batched = vi.spyOn(env.DB, 'batch').mockImplementation(async (statements) => {
+    if (!intercepted && statements.some((s) => marked.has(s))) {
+      intercepted = true;
+      await mutate();
+    }
+    return batch(statements);
+  });
+  return {
+    mockRestore() {
+      prepared.mockRestore();
+      batched.mockRestore();
+    },
+  };
 }
+const AUTOMATIC = "UPDATE OR IGNORE bank_transactions SET receipt_id=?,match_method='automatic'";
 test('manual match rejects a receipt corrected after the form was read', async () => {
   const { id, transaction } = await seed(true);
   const spy = beforeUpdate("UPDATE bank_transactions SET receipt_id=?,match_method='manual'", () =>
@@ -63,7 +85,7 @@ test('reconciliation cannot relink a payment exempted after candidate selection'
   await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
     .bind(transaction)
     .run();
-  const spy = beforeUpdate("UPDATE bank_transactions SET receipt_id=?,match_method='automatic'", () =>
+  const spy = beforeUpdate(AUTOMATIC, () =>
     env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE id=?').bind(transaction).run(),
   );
   await reconcile(env);
@@ -134,10 +156,10 @@ test('a second account completing after candidate selection prevents a stale aut
       "INSERT INTO imports(id,account_key,original_key,status,row_count,imported_at,snapshot_json) VALUES ('race-pending','second-race','imports/race-pending.csv','pending',1,'2026-10-20','{}')",
     ),
     env.DB.prepare(
-      "INSERT INTO bank_transactions(id,account_key,external_id,import_id,booking_date,amount_minor,currency,merchant,raw_json) VALUES ('second-race-tx','second-race','b','race-pending','2026-09-08',-12550,'EUR','Sample Cloud Lantern Oy','{}')",
+      "INSERT INTO bank_transactions(id,account_key,external_id,import_id,booking_date,amount_minor,currency,merchant,raw_json) VALUES ('second-race-tx','second-race','b','race-pending','2026-09-05',-12550,'EUR','Sample Cloud Lantern Oy','{}')",
     ),
   ]);
-  const spy = beforeUpdate("UPDATE bank_transactions SET receipt_id=?,match_method='automatic'", () =>
+  const spy = beforeUpdate(AUTOMATIC, () =>
     env.DB.prepare("UPDATE imports SET status='complete' WHERE id='race-pending'").run(),
   );
   try {
@@ -145,8 +167,10 @@ test('a second account completing after candidate selection prevents a stale aut
   } finally {
     spy.mockRestore();
   }
-  expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_id=?').bind(id).first('n')).toBe(
-    0,
+  // The plan made before the second account completed is not written; the plan
+  // made again picks the payment a day after the receipt.
+  expect(await env.DB.prepare('SELECT id FROM bank_transactions WHERE receipt_id=?').bind(id).first('id')).toBe(
+    'second-race-tx',
   );
 });
 
@@ -168,15 +192,18 @@ test('a competing receipt corrected after candidate selection prevents stale mat
   )
     .bind(...entries.map(([, v]) => v))
     .run();
-  const spy = beforeUpdate("UPDATE bank_transactions SET receipt_id=?,match_method='automatic'", () =>
-    env.DB.prepare('UPDATE receipts SET vendor=?,revision=revision+1 WHERE id=?').bind(original.vendor, other.id).run(),
+  const spy = beforeUpdate(AUTOMATIC, () =>
+    env.DB.prepare("UPDATE receipts SET vendor=?,issue_date='2026-09-06',revision=revision+1 WHERE id=?")
+      .bind(original.vendor, other.id)
+      .run(),
   );
   try {
     await reconcile(env);
   } finally {
     spy.mockRestore();
   }
-  expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n')).toBe(
-    0,
-  );
+  // The stale plan (the original receipt) is not written; the corrected receipt is a day closer and wins.
+  expect(
+    await env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(transaction).first('receipt_id'),
+  ).toBe(other.id);
 });

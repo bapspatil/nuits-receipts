@@ -963,7 +963,7 @@ export async function readStatementBlocks(env: Env, blocks: string[]): Promise<S
   }
   return results.flat();
 }
-async function live(env: Env, model: string, input: Record<string, unknown>) {
+export async function live(env: Env, model: string, input: Record<string, unknown>) {
   requireInput(env.AI_MODE === 'live' && env.AI, 'Live AI binding unavailable');
   return env.AI.run(model, input);
 }

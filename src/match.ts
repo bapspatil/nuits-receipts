@@ -2,8 +2,9 @@
 // pair is compared for the person, the searchable picker's labels, and the
 // bulk "Match all likely" write. The single-match route in index.ts uses the
 // same fits() and linkMatch().
-import { creditFit, eligible, matchable, openSales, type Transaction } from './banking';
-import { InputError, money, normalize, similar, withinWindow, type Receipt, type Rule, type Tuning } from './domain';
+import { creditFit, eligible, matchable, MATCHABLE_SQL, openSales, type Transaction } from './banking';
+import { InputError, money, normalize, withinWindow, type Receipt, type Rule, type Tuning } from './domain';
+import { aliased, nameScore } from './matcher';
 import type { Env } from './env';
 import { invoiceName } from './invoices';
 import { plural } from './ui';
@@ -16,7 +17,7 @@ export function receiptName(r: Receipt): string {
 export async function matchableReceipts(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE kind='expense' AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete') ORDER BY issue_date DESC,id`,
+      `SELECT * FROM receipts WHERE kind='expense' AND duplicate_of IS NULL AND discarded_at IS NULL AND status IN ('ready','needs_review') AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete') ORDER BY issue_date DESC,id`,
     ).all<Receipt>()
   ).results;
 }
@@ -26,7 +27,7 @@ export const candidatesFor = (env: Env, t: Transaction): Promise<Receipt[]> =>
 
 // Whether a pair passes the check POST /matches makes before it asks for the exception.
 export function fits(r: Receipt, t: Transaction, rules: Rule[], tuning: Tuning): boolean {
-  return t.amount_minor > 0 ? creditFit(r, t, tuning) !== null : eligible(r, t, rules, false, tuning);
+  return t.amount_minor > 0 ? creditFit(r, t, tuning) !== null : eligible(r, t, rules, tuning);
 }
 
 // ---------- The comparison ----------
@@ -53,7 +54,11 @@ export function pairFacts(r: Receipt, t: Transaction, rules: Rule[], tuning: Tun
   if (apart === null) clauses.push('the receipt has no date');
   else if (t.amount_minor < 0 && r.issue_date && !withinWindow(r.issue_date, t.booking_date, tuning))
     clauses.push(`the dates are ${plural(apart, 'day')} apart`);
-  if (t.amount_minor < 0 && !similar(receiptName(r), t.merchant, tuning.minVendorSimilarity))
+  if (
+    t.amount_minor < 0 &&
+    !aliased(receiptName(r), t.merchant, rules) &&
+    nameScore(receiptName(r), t.merchant) < tuning.minVendorSimilarity
+  )
     clauses.push("the names don't look alike");
   return {
     name: { text: sameName ? 'Same' : 'Differs', same: sameName },
@@ -116,7 +121,7 @@ export const matchAllLabel = (n: number): string => (n === 1 ? 'Match the likely
 export async function linkMatch(env: Env, t: Transaction, r: Receipt, at: string): Promise<boolean> {
   const credit = t.amount_minor > 0;
   const result = await env.DB.prepare(
-    `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')))`,
+    `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND ${MATCHABLE_SQL})`,
   )
     .bind(r.id, at, t.id, r.id, r.kind, r.revision)
     .run();

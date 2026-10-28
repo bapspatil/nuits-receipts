@@ -28,7 +28,7 @@ import {
 } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
-import { clearBankReview, matchable, reconcile, type Transaction } from './banking';
+import { clearBankReview, matchable, reconcile, undoExemptions, type Transaction } from './banking';
 import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unmatchLikely } from './match';
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
@@ -252,6 +252,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const form = await formData(request, 16 * 1024);
     const at = form.get('at');
     const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, receiptIds(form.getAll('id')));
+    if (n) await reconcile(env);
     return redirect(withDone('restored', backPath(form.get('back')), { n }));
   }
   if (request.method === 'POST' && path === '/review/merge')
@@ -475,7 +476,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       .first<Transaction>();
     requireInput(transaction, 'Payment not found', 404);
     const changed = await env.DB.prepare(
-      "UPDATE bank_transactions SET receipt_required=?,receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=? AND NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')",
+      "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=? AND NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')",
     )
       .bind(Number(required), transaction.id)
       .run();
@@ -518,9 +519,19 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
         exception = !fits(was, transaction, rules, config(env).tuning);
       }
-      await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?')
-        .bind(id)
-        .run();
+      // Taken apart by the owner: the matcher never links this pair again on its own.
+      await env.DB.batch([
+        env.DB.prepare(
+          'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?',
+        ).bind(id),
+        ...(matchedTo
+          ? [
+              env.DB.prepare(
+                'INSERT INTO match_rejections(transaction_id,receipt_id,rejected_at) VALUES (?,?,?) ON CONFLICT DO NOTHING',
+              ).bind(id, matchedTo, new Date().toISOString()),
+            ]
+          : []),
+      ]);
     } else {
       // Money out pairs with a receipt, money in with a sales invoice.
       const credit = transaction.amount_minor > 0;
@@ -563,6 +574,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       try {
         requireInput(await linkMatch(env, transaction, row, new Date().toISOString()), 'Match changed. Reload.', 409);
         matchedTo = row.id;
+        await env.DB.prepare('DELETE FROM match_rejections WHERE transaction_id=? AND receipt_id=?')
+          .bind(transaction.id, row.id)
+          .run();
       } catch (error) {
         if (error instanceof Error && error.message.includes('UNIQUE constraint'))
           throw new InputError('Receipt is already matched', 409);
@@ -612,6 +626,13 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         at: matched ? at : null,
       }),
     );
+  }
+  const exemptUndo = path.match(/^\/imports\/([a-f0-9]{64})\/exempt\/undo$/);
+  if (request.method === 'POST' && exemptUndo?.[1]) {
+    const form = await formData(request, 4096);
+    const selected = month(String(form.get('month') ?? '') || null);
+    const n = await undoExemptions(env, exemptUndo[1]);
+    return redirect(withDone('exemptUndone', `/payments?month=${selected}`, { n }));
   }
   if (request.method === 'POST' && path === '/matches/undo') {
     const form = await formData(request, 4096),

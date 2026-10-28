@@ -7,31 +7,16 @@
 import type { Env } from './env';
 import { normalize, type Receipt } from './domain';
 import { reconcile } from './banking';
+import { chargeKey, documentScore } from './matcher';
 
-const INVOICE_NAME = /invoice|lasku|rechnung|facture|faktura|factura/i;
 const SETTLED = "status IN ('ready','needs_review') AND media_type<>'message/rfc822'";
 
-// The better document of one charge: one that read a vendor and a total, then
-// an invoice over a receipt, then a PDF over a body or a photo.
-export function documentScore(r: Receipt): number {
-  return (
-    (r.total_minor !== null && r.vendor ? 8 : 0) +
-    (INVOICE_NAME.test(r.filename) ? 4 : 0) +
-    (r.media_type === 'application/pdf' ? 2 : 0) +
-    (r.status === 'ready' ? 1 : 0)
-  );
-}
 // Two documents of one email are one charge unless they say otherwise.
 export function compatible(a: Receipt, b: Receipt): boolean {
   const differ = <T>(x: T | null, y: T | null) => x !== null && y !== null && x !== y;
   if (differ(a.total_minor, b.total_minor) || differ(a.currency, b.currency)) return false;
   const number = (r: Receipt) => (r.invoice_number ? normalize(r.invoice_number) : null);
   return !(differ(number(a), number(b)) && differ(a.issue_date, b.issue_date));
-}
-// The same charge in another email: everything that identifies it matches.
-export function chargeKey(r: Receipt): string | null {
-  if (!r.vendor || !r.invoice_number || !r.issue_date || !r.currency || r.total_minor === null) return null;
-  return [r.kind, normalize(r.vendor), r.currency, r.total_minor, r.issue_date, normalize(r.invoice_number)].join('|');
 }
 // Rows a person touched or a bank line points at are never hidden.
 function touched(r: Receipt, matched: ReadonlySet<string>): boolean {

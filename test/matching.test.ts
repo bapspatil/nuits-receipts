@@ -12,18 +12,18 @@ const rowOf = (html: string, merchant: string) =>
     .map((m) => m[0])
     .find((r) => r.includes(merchant))!;
 
-// The mock receipt is Sample Cloud Lantern Oy, EUR 125.50, 4 Sep. Two payments fit it, so
-// nothing matches on its own and the page offers it to both.
+// The mock receipt is Sample Cloud Lantern Oy, EUR 125.50, 4 Sep. Two payments on one day
+// fit it equally under two alike names, so nothing matches on its own and the page offers it to both.
 async function seedTwoPayments() {
   const id = idFrom(await uploadPdf());
   const csv =
-    'Transaction ID;Date;Amount;Currency;Payee\na;2026-09-05;-125,50;EUR;Sample Cloud Lantern Oy\nb;2026-09-06;-125,50;EUR;Sample Cloud Lantern Oy\n';
+    'Transaction ID;Date;Amount;Currency;Payee\na;2026-09-05;-125,50;EUR;Sample Cloud Lantern Oy\nb;2026-09-05;-125,50;EUR;Sample Cloud Lantern Helsinki\n';
   await importBankCsv(env, {
     bytes: new TextEncoder().encode(csv),
     parsed: parsePreset(csv, 'race', 'EUR'),
     collision: '',
   });
-  const txs = (await env.DB.prepare('SELECT id FROM bank_transactions ORDER BY booking_date').all<{ id: string }>())
+  const txs = (await env.DB.prepare('SELECT id FROM bank_transactions ORDER BY merchant DESC').all<{ id: string }>())
     .results;
   return { id, a: txs[0]!.id, b: txs[1]!.id };
 }
@@ -114,7 +114,7 @@ test('a forged Undo for Match all gets no form', () => {
   expect(feedback(new URLSearchParams({ done: 'matchedMany', n: '0', at, month: '2026-09' }))?.undo).toBeNull();
 });
 
-test('a payment whose receipt still needs review sends you to it and offers no Match', async () => {
+test('a receipt still in Review is matched, and the payment says the receipt needs you', async () => {
   const id = idFrom(await uploadPdf());
   await env.DB.prepare(`UPDATE receipts SET status='needs_review',review_reasons_json='["low_confidence"]' WHERE id=?`)
     .bind(id)
@@ -126,17 +126,10 @@ test('a payment whose receipt still needs review sends you to it and offers no M
     collision: '',
   });
   const row = rowOf(await bank(), 'Sample Cloud Lantern Oy');
-  expect(row).toContain(`Its receipt needs you first. <a href="/receipts/${id}">Check it.</a>`);
-  expect(row).not.toContain('action="/matches"');
-  expect(row).not.toContain('Match');
-  // Its receipt is in Review, not missing: Missing is only for real gaps.
-  expect(row).toContain('<span class="stamp needs">Needs you</span>');
+  expect(row).toContain('Matched automatically');
+  expect(row).toContain(`<a class="stamp needs" href="/receipts/${id}">Needs you</a>`);
   expect(row).not.toContain('Missing');
-  expect(row).toMatch(/^<li class="pay"/);
-  const html = await bank();
-  expect(html).toContain('1 out, 0 matched, <span>0 missing</span>, 1 needs you');
-  expect(html).not.toContain('>Missing (');
-  expect(html).not.toContain('Every payment has a receipt.');
+  expect(await bank()).toContain('1 out, 1 matched, 0 not a purchase, <span>0 missing</span>, 1 needs you');
   // A real gap next to it still says Missing.
   await importBankCsv(env, {
     bytes: new TextEncoder().encode(csv + 'b;2026-09-06;-7,00;EUR;Nothing Like It Oy\n'),
@@ -145,9 +138,11 @@ test('a payment whose receipt still needs review sends you to it and offers no M
   });
   const both = await bank();
   expect(rowOf(both, 'Nothing Like It Oy')).toContain('<span class="stamp missing">Missing</span>');
-  expect(rowOf(both, 'Sample Cloud Lantern Oy')).toContain('<span class="stamp needs">Needs you</span>');
-  expect(both).toContain('2 out, 0 matched, <span class="red">1 missing</span>, 1 needs you');
+  expect(both).toContain('2 out, 1 matched, 0 not a purchase, <span class="red">1 missing</span>, 1 needs you');
   expect(both).toContain('>Missing (1)<');
+  // Approving it keeps the match and the stamp goes.
+  await env.DB.prepare(`UPDATE receipts SET status='ready',review_reasons_json='[]' WHERE id=?`).bind(id).run();
+  expect(rowOf(await bank(), 'Sample Cloud Lantern Oy')).not.toContain('Needs you');
 });
 
 test('a payment with nothing like it says so, and the search box resolves a typed date or amount', async () => {
@@ -160,7 +155,7 @@ test('a payment with nothing like it says so, and the search box resolves a type
   });
   const tx = (await env.DB.prepare('SELECT id FROM bank_transactions').first<{ id: string }>())!.id;
   const row = rowOf(await bank(), 'Unrelated Shop');
-  expect(row).toContain('No ready receipt looks like this one.');
+  expect(row).toContain('No receipt fits.');
   expect(row).not.toContain('Likely:');
   // Text that only one label contains is enough; an exception is still asked for.
   const refused = await post(
@@ -194,7 +189,8 @@ test('an import banner counts the payments matched for you and links to them', a
   expect(location).toContain('done=imported&inserted=2');
   expect(location).toContain('auto=1');
   const said = feedback(new URL(location, 'https://x.example').searchParams)!;
-  expect(said.text).toBe('Added 2 payments. We matched 1 for you.');
+  expect(said.text).toBe('Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.');
+  expect(said.undo).toBeNull();
   expect(said.link).toEqual({ href: '/payments?month=2026-09&show=auto', label: 'See them' });
   // The filter lists exactly those rows.
   const filtered = await (await request('/payments?month=2026-09&show=auto')).text();

@@ -97,27 +97,36 @@ test('interrupted import replays safely and pending transactions never reconcile
     await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n'),
   ).toBe(1);
 });
-test('ambiguous recurring payments stay unlinked and exemptions remove missing warnings', async () => {
-  await receipt();
+test('two equal payments for one receipt: the closer date wins, and exemptions remove missing warnings', async () => {
+  const r = await receipt();
   await importCsv(
     csv.replace(
       'b;2026-09-08;-9,99;EUR;Sample Missing;missing',
       'b;2026-09-08;-125,50;EUR;Sample Cloud Lantern Oy;recurring',
     ),
   );
+  // The receipt is dated 4 Sep: the payment of 7 Sep is closer than the one of 8 Sep.
+  const a = await hash('holvi:id:a'),
+    b = await hash('holvi:id:b');
+  expect(await env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(a).first('receipt_id')).toBe(
+    r.id,
+  );
+  const body = new URLSearchParams({ receipt_required: '0' });
+  expect((await request('/payments/' + b, { method: 'POST', body })).status).toBe(303);
+  expect(
+    await env.DB.prepare('SELECT receipt_required,exempt_by FROM bank_transactions WHERE id=?').bind(b).first(),
+  ).toEqual({ receipt_required: 0, exempt_by: 'owner' });
+});
+test('two equal payments on the same day with different merchants are a tie: nothing is linked', async () => {
+  await receipt();
+  await importCsv(
+    'Transaction ID;Booking date;Amount;Currency;Payee;Reference\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy;one\nb;2026-09-07;-125,50;EUR;Sample Cloud Lantern Helsinki;two\n',
+  );
   expect(
     await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n'),
   ).toBe(0);
-  const id = await hash('holvi:id:a');
-  const body = new URLSearchParams({ receipt_required: '0' });
-  expect((await request('/payments/' + id, { method: 'POST', body })).status).toBe(303);
-  expect(
-    await env.DB.prepare('SELECT receipt_required FROM bank_transactions WHERE id=?')
-      .bind(id)
-      .first('receipt_required'),
-  ).toBe(0);
 });
-test('foreign original amount auto-matches; approximate EUR only suggests until confirmed', async () => {
+test('foreign original amount auto-matches, and so does an ECB estimate within the bank margin', async () => {
   const row = await seedForeign();
   await cacheFx(env, row);
   const updated = await getReceipt(env, row.id);
@@ -127,20 +136,22 @@ test('foreign original amount auto-matches; approximate EUR only suggests until 
   expect((await eurValue(env, updated)).minor).toBe(1842);
   expect((await eurValue(env, updated)).source).toBe('bank');
   await env.DB.prepare('DELETE FROM bank_transactions').run();
+  // No original amount: USD 20.00 at the mock 0.9 is EUR 18.00, and the bank's 18.42 is within 4 %.
   await importCsv('Transaction ID;Date;Amount;Currency;Payee\ng;2026-09-07;-18,42;EUR;Sample Foreign\n');
   const transaction = await env.DB.prepare('SELECT * FROM bank_transactions').first<Transaction>();
-  expect(transaction?.receipt_id).toBeNull();
-  expect(eligible(updated, transaction!, [], true)).toBe(true);
-  expect(eligible(updated, transaction!, [])).toBe(false);
-  const form = new URLSearchParams({
-    transaction_id: transaction!.id,
-    receipt_id: row.id,
-    action: 'link',
-  });
+  expect(transaction).toMatchObject({ receipt_id: row.id, match_method: 'automatic' });
+  expect((await eurValue(env, await getReceipt(env, row.id))).minor).toBe(1842);
+  // Far from the estimate it is only a suggestion, and Match asks for the exception.
+  await env.DB.prepare('DELETE FROM bank_transactions').run();
+  await importCsv('Transaction ID;Date;Amount;Currency;Payee\nh;2026-09-07;-19,50;EUR;Sample Foreign\n');
+  const far = await env.DB.prepare('SELECT * FROM bank_transactions').first<Transaction>();
+  expect(far?.receipt_id).toBeNull();
+  expect(eligible(updated, far!, [])).toBe(false);
+  const form = new URLSearchParams({ transaction_id: far!.id, receipt_id: row.id, action: 'link' });
   expect((await request('/matches', { method: 'POST', body: form })).status).toBe(422);
   form.set('confirm_exception', 'yes');
   expect((await request('/matches', { method: 'POST', body: form })).status).toBe(303);
-  expect((await eurValue(env, await getReceipt(env, row.id))).minor).toBe(1842);
+  expect((await eurValue(env, await getReceipt(env, row.id))).minor).toBe(1950);
 });
 test('weekend FX uses the preceding date, outage stays null, and GET never fetches FX', async () => {
   const row = await seedForeign();
