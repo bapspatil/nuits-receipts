@@ -22,7 +22,7 @@ Optional pieces sit around this core: Email Routing to give you an inbox address
 2. **The original is saved.** It goes into R2 untouched. Every later step works from this copy, which is why reading it again later gives you a fresh result from the same file.
 3. **It is read.** The text of the PDF (or the image itself) goes to Clairic, and the code then checks the answer against the document's own labelled lines and the VAT arithmetic. Anything unsettled is flagged for review. See [How reading works](/explanation/how-reading-works/).
 4. **It is sorted.** Your vendor rules give it a product and an expense type. If none match, Clef suggests one. See [How costs are sorted](/explanation/how-costs-are-sorted/).
-5. **It is matched.** After every receipt is read and every bank CSV is imported, the app looks for payments that fit approved receipts. See [How matching works](/explanation/how-matching-works/).
+5. **It is matched.** After every receipt is read and every bank CSV is imported, the app looks for payments that fit receipts across every imported month, and marks payments that clearly need none. See [How matching works](/explanation/how-matching-works/).
 6. **It gets a euro amount.** From the matched bank payment if there is one, otherwise from the receipt itself if it is in euros, otherwise from an ECB reference rate. See [Currencies and reference rates](/explanation/currencies-and-reference-rates/).
 7. **It lands in a month.** The month is the receipt's issue date. You review the month, then download a CSV or a ZIP for your accountant.
 

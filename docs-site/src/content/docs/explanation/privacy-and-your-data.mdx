@@ -21,7 +21,7 @@ Cloudflare runs the infrastructure, so your data is processed under your Cloudfl
 
 A few calls go outside the Worker. Each has a reason, and none goes to Nuits.
 
-- **Cloudflare Workers AI.** Clairic receives each document's text or image, with the text of the email it came in. Clef, when no vendor rule matches, receives the vendor name, line descriptions and receipt text, plus your product names. This happens under your Cloudflare account. Mail from an unverified sender is never sent here until you choose to have it read.
+- **Cloudflare Workers AI.** Clairic receives each document's text or image, with the text of the email it came in. Clef, when no vendor rule matches, receives the vendor name, line descriptions and receipt text, plus your product names. After a bank import, Clef may also receive the names and reference text of up to 40 payments that read like transfers to a person, to tell whether they are purchases. This happens under your Cloudflare account. Mail from an unverified sender is never sent here until you choose to have it read.
 - **Frankfurter** (ECB reference rates) receives a currency code and two dates, only when a foreign-currency receipt needs a rate. No amounts or receipt content.
 - **Cloudflare Access**, if you use it: the Worker fetches your team's public signing keys to check sign-in tokens. Nothing about you or your receipts is sent.
 - **Microsoft Graph**, only if you connect a Microsoft account for the OneDrive upload: the month's files and index go to the folder you chose. Nothing is sent before you connect, and disconnecting deletes the stored sign-in.
