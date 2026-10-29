@@ -6,7 +6,7 @@ import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts, SETTINGS_CSP } from './setup';
+import { setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
@@ -1412,15 +1412,13 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
-  const response = await page(
+  return page(
     'settings',
     `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
     200,
     env,
     { head: pageHead('Settings', signOutLink(env)) },
   );
-  response.headers.set('Content-Security-Policy', SETTINGS_CSP);
-  return response;
 }
 
 // ---------- Help ----------

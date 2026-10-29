@@ -365,12 +365,8 @@ export async function setupParts(
 }
 
 // ---------- Unsaved changes ----------
-// Settings is the one page besides /add that runs a script, from its own file so
-// the policy stays script-src 'self' with no inline script. Each group has its
-// own Save, so the script warns before a change in one group is lost by saving
-// another, and before leaving the page with changes.
-export const SETTINGS_CSP =
-  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+// Each group has its own Save, so the script warns before a change in one group
+// is lost by saving another, and before leaving the page with changes.
 export const SETTINGS_JS = `(() => {
   const forms = [...document.querySelectorAll('form.setup-form')];
   if (!forms.length || !window.FormData) return;

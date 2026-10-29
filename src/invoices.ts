@@ -250,8 +250,6 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
 }
 
 // ---------- Add page ----------
-export const ADD_CSP =
-  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 export const MAX_UPLOAD_FILES = 10;
 export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
   const settings = config(env);

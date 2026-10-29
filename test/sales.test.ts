@@ -240,8 +240,6 @@ test('uploads take several files and a kind; the Add page loads its script under
   expect(html).toMatch(/value="sales" checked/);
   const js = await request('/assets/add.js');
   expect(js.headers.get('Content-Type')).toContain('text/javascript');
-  // Other pages still allow no script at all.
-  expect((await request('/')).headers.get('Content-Security-Policy')).not.toContain('script-src');
   const form = new FormData();
   form.set('kind', 'sales');
   form.append('file', new File([pdfBytes()], 'a.pdf', { type: 'application/pdf' }));

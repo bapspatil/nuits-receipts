@@ -13,7 +13,7 @@ test('with no bank account the import form creates one instead of preselecting a
   expect(html).toMatch(/name="account_label"[^>]*required/);
 });
 
-test('Settings loads its own script under a policy that allows only same-origin scripts, and no other page does', async () => {
+test('Settings loads its own script under a policy that allows only same-origin scripts', async () => {
   const settings = await request('/settings');
   expect(settings.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
   expect(settings.headers.get('Content-Security-Policy')).not.toContain("unsafe-inline'; script");
@@ -22,7 +22,7 @@ test('Settings loads its own script under a policy that allows only same-origin 
   expect(script.headers.get('Content-Type')).toContain('text/javascript');
   expect(await script.text()).toContain('beforeunload');
   for (const path of ['/', '/help', '/review', '/import'])
-    expect((await request(path)).headers.get('Content-Security-Policy'), path).not.toContain('script-src');
+    expect((await request(path)).headers.get('Content-Security-Policy'), path).toContain("script-src 'self';");
 });
 
 test('Settings shows where each value comes from in plain words', async () => {

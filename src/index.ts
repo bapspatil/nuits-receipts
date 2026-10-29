@@ -12,7 +12,8 @@ import {
   upload,
 } from './receipts';
 import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
-import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
+import { BULK_JS } from './bulk';
+import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import {
   afterLastReview,
   home,
@@ -306,17 +307,17 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return redirect(withDone('oneDriveFolder', '/settings#onedrive'));
   }
   if (request.method === 'GET' && path === '/import') return importPage(env);
-  if (request.method === 'GET' && path === '/add') {
-    const response = await addPage(env, url.searchParams);
-    response.headers.set('Content-Security-Policy', ADD_CSP);
-    return response;
-  }
+  if (request.method === 'GET' && path === '/add') return addPage(env, url.searchParams);
   if (request.method === 'GET' && path === '/assets/speculation-rules.json')
     return new Response(SPECULATION_RULES, {
       headers: { 'Content-Type': 'application/speculationrules+json', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/add.js')
     return new Response(ADD_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  if (request.method === 'GET' && path === '/assets/bulk.js')
+    return new Response(BULK_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/settings.js')
@@ -716,11 +717,12 @@ function fontBytes(name: string): Uint8Array {
   return bytes;
 }
 // Non-HTML responses keep the original policy. App pages may also load the
-// self-hosted fonts and inline receipt images from this origin.
+// self-hosted fonts, inline receipt images and their scripts from this origin.
+// Scripts are files, never inline.
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const HTML_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const INLINE_CSP =
   "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 // Where an error page's back link goes: the same-origin page that sent the

@@ -478,8 +478,29 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .bulk .bar{position:sticky;bottom:var(--tabbar-height);z-index:4;background:var(--surface-raised);padding:var(--space-2) var(--space-4);display:flex;gap:var(--space-2) var(--space-4);align-items:center;flex-wrap:wrap;border:1px solid var(--border)}
 .bulk .bar details.discard>summary{display:none}.bulk .bar details.discard>.body{padding:0}
 .list.all li>form{grid-column:2;grid-row:2;justify-self:end}
+[data-bulk-list]{counter-reset:bulk}
+[data-bulk-list] .pick{min-width:44px;justify-content:center}
+[data-bulk-list] .pick input[name=id]:checked{counter-increment:bulk}
+.bulktools{display:flex;align-items:center;gap:var(--space-3)}
+.bulktools [hidden],.bulkbar [hidden]{display:none}
+.bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin-top:var(--space-3);padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
+[data-bulk-list]:has(.pick input[name=id]:checked)+.bulkbar,.bulkbar[data-count]:not([data-count="0"]){display:flex}
+.bulkcount{margin:0;flex:1 1 auto;min-height:44px;display:flex;align-items:center;gap:var(--space-3);font-weight:600}
+.bulkbar:not([data-count]) [data-bulk-count]::before{content:counter(bulk) " selected"}
+.bulkstatus{font-weight:400;color:var(--text-muted)}.bulkstatus:empty{display:none}.bulkstatus.bad{color:var(--danger);font-weight:600}
+.bulkacts{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
+.bulkbar summary{list-style:none}.bulkbar summary::-webkit-details-marker{display:none}
+.bulkbar details[open]{flex:1 1 100%}
+.bulkbar details>.body{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;padding:var(--space-2) 0}
+.bulkbar .body>.ask{flex:1 1 100%;margin:0}
+.bulkbar .btn.danger{color:var(--danger);border-color:var(--danger)}.bulkbar .btn.danger:hover{background:var(--danger-surface)}
+.bulkbar progress{flex:1 1 100%;height:4px;accent-color:var(--accent)}
+.is-pending{opacity:.5}
+@media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}}
+@media (max-width:40rem){[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
+@media not (max-width:40rem){.bulktools [data-bulk-select]{display:none}}
 .gone{margin:0 0 var(--space-4)}
-@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;
 }
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
 export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${PALETTE.paper}"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="${PALETTE.petrol900}"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="${PALETTE.paper}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -622,7 +643,7 @@ export async function page(
       status: requestState.getStore()?.failure?.status ?? status,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        // The rules live in a file, not an inline script, so the page needs no script-src.
+        // The rules live in a file, not an inline script.
         'Speculation-Rules': `"${basePath}/assets/speculation-rules.json"`,
       },
     },
