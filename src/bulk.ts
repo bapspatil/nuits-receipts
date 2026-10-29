@@ -62,6 +62,54 @@ export function countOf(state: Selection, total: number): number {
   return state.all ? total : state.picked.length;
 }
 
+// Why an action is off: the server refuses all=1 over its cap, so the bar says so first.
+export function capped(all: boolean, total: number, max: number): string | null {
+  return all && max > 0 && total > max ? 'Up to ' + max + ' at a time' : null;
+}
+
+// What Escape does in the bar. Shipped as source, like select.
+export function escapeTo(at: { typing: boolean; stepOpen: boolean; picked: boolean }): 'step' | 'clear' | 'none' {
+  if (at.stepOpen) return 'step';
+  if (at.typing || !at.picked) return 'none';
+  return 'clear';
+}
+
+// The totals so far, posted with each chunk after the first; the server adds them to its own.
+export type Before = { n: number; skipped: number };
+// What one post came back with: a redirect, a refusal, or the running totals and banner link.
+export type Reply = { url: string } | { error: string } | { n: number; skipped: number; location: string };
+// Posts the chunks in turn and never throws: once a post has gone out, a failure
+// is reported, not retried, so no row is acted on twice. Shipped as source, like select.
+export async function postChunks(
+  chunks: string[][],
+  post: (ids: string[], before: Before | null) => Promise<Reply | null>,
+  step: (sent: number, total: number) => void,
+): Promise<{ url: string } | { error: string }> {
+  const total = chunks.reduce((sum, c) => sum + c.length, 0);
+  const before = { n: 0, skipped: 0 };
+  let sent = 0;
+  let location = '';
+  for (const chunk of chunks) {
+    let reply: Reply | null = null;
+    try {
+      reply = await post(chunk, chunks.length > 1 ? { n: before.n, skipped: before.skipped } : null);
+    } catch {
+      reply = null;
+    }
+    const done = sent ? sent + ' of ' + total + ' done. ' : '';
+    if (reply && 'url' in reply && typeof reply.url === 'string') return { url: reply.url };
+    if (reply && 'error' in reply && typeof reply.error === 'string') return { error: done + reply.error };
+    if (!reply || !('n' in reply) || typeof reply.n !== 'number' || typeof reply.location !== 'string')
+      return { error: done + 'That did not work. Reload to see what changed.' };
+    before.n = reply.n;
+    before.skipped = typeof reply.skipped === 'number' ? reply.skipped : 0;
+    location = reply.location;
+    sent += chunk.length;
+    step(sent, total);
+  }
+  return { url: location };
+}
+
 export function bulkCheck(list: BulkList, id: string, name: string): string {
   return `<label class="pick"><input type="checkbox" name="id" value="${escape(id)}" form="${escape(list.form)}"><span class="vh">Select ${escape(name)}</span></label>`;
 }
@@ -174,7 +222,7 @@ export const SENDER_ACTIONS = {
 
 // Runs once per bar: reducer state, rendering, keys, long-press and posting.
 // A plain string like ADD_JS, since the worker build has no DOM types.
-const CLIENT = `(select) => {
+const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
   const typing = (el) => !!(el && el.closest && el.closest('input:not([type=checkbox]):not([type=radio]),textarea,select,[contenteditable]'));
   document.querySelectorAll('form[data-bulk]').forEach((form) => {
     // form.id would return the checkboxes named id, not the attribute.
@@ -204,6 +252,7 @@ const CLIENT = `(select) => {
       status.classList.toggle('bad', !!bad);
     };
     const close = () => form.querySelectorAll('details[open]').forEach((d) => { d.open = false; });
+    const limited = Array.from(form.querySelectorAll('button[data-max]'));
     const render = () => {
       const on = new Set(state.picked);
       boxes.forEach((b) => { b.checked = on.has(b.value); });
@@ -217,6 +266,17 @@ const CLIENT = `(select) => {
         page.indeterminate = on.size > 0 && on.size < boxes.length;
       }
       if (allButton) allButton.hidden = state.all || total <= boxes.length || on.size < boxes.length;
+      limited.forEach((b) => {
+        const why = capped(state.all, total, Number(b.dataset.max));
+        b.disabled = !!why;
+        if (why) {
+          b.setAttribute('aria-disabled', 'true');
+          b.title = why;
+        } else {
+          b.removeAttribute('aria-disabled');
+          b.removeAttribute('title');
+        }
+      });
       if (!n) close();
     };
     const apply = (event) => {
@@ -248,8 +308,14 @@ const CLIENT = `(select) => {
     });
     const keys = (e) => {
       if (e.key === 'Escape') {
-        close();
-        if (state.picked.length || state.all) apply({ type: 'clear' });
+        const open = Array.from(form.querySelectorAll('details[open]'));
+        const to = escapeTo({ typing: typing(e.target), stepOpen: open.length > 0, picked: state.picked.length > 0 || state.all });
+        if (to === 'step') {
+          // Document order lists More before a step nested in it: the last is innermost.
+          const step = open[open.length - 1];
+          step.open = false;
+          step.querySelector('summary').focus();
+        } else if (to === 'clear') apply({ type: 'clear' });
         return;
       }
       if (!wrap.contains(e.target) || typing(e.target) || e.altKey) return;
@@ -310,34 +376,33 @@ const CLIENT = `(select) => {
         progress.value = 0;
         progress.hidden = false;
       }
-      let done = 0;
-      let json = null;
-      for (const chunk of chunks) {
+      const post = async (chunk, before) => {
         const body = new FormData();
         base.forEach((v, k) => body.append(k, v));
         chunk.forEach((v) => body.append('id', v));
-        if (many) body.set('done_before', String(done));
+        if (before) {
+          body.set('done_before', String(before.n));
+          body.set('skipped_before', String(before.skipped));
+        }
         const res = await fetch(form.getAttribute('action'), { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        if (res.redirected) return location.assign(res.url);
+        if (res.redirected) return { url: res.url };
         const type = res.headers.get('Content-Type') || '';
-        json = type.indexOf('json') >= 0 ? await res.json() : null;
-        if (!res.ok) {
-          const text = json && json.error ? json.error : type.indexOf('text/plain') === 0 ? await res.text() : 'That did not work. Try again.';
-          busy(rows, false);
-          progress.hidden = true;
-          sending = false;
-          say(done ? done + ' of ' + ids.length + ' done. ' + text : text, true);
-          return;
-        }
-        done += chunk.length;
-        if (many) {
-          progress.value = done;
-          say(done + ' of ' + ids.length + ' ' + noun[1]);
-        }
-      }
-      if (json && json.location) location.assign(json.location);
-      else location.reload();
+        const json = type.indexOf('json') >= 0 ? await res.json() : null;
+        if (res.ok) return json;
+        return { error: json && json.error ? json.error : type.indexOf('text/plain') === 0 ? await res.text() : 'That did not work. Try again.' };
+      };
+      const end = await postChunks(chunks, post, (sent, all) => {
+        if (!many) return;
+        progress.value = sent;
+        say(sent + ' of ' + all + ' ' + noun[1]);
+      });
+      if ('url' in end) return location.assign(end.url);
+      busy(rows, false);
+      progress.hidden = true;
+      sending = false;
+      say(end.error, true);
     };
+    // Native submit only when nothing was posted yet: postChunks never throws.
     form.addEventListener('submit', (e) => {
       const button = e.submitter;
       if (native || !window.fetch || !window.FormData || !button || button.name !== 'op') return;
@@ -358,4 +423,6 @@ const CLIENT = `(select) => {
   });
 }`;
 
-export const BULK_JS = `(${CLIENT})(${select.toString()});`;
+// The pure helpers the script runs, as source.
+export const BULK_HELPERS = `{ select: ${select.toString()}, capped: ${capped.toString()}, escapeTo: ${escapeTo.toString()}, postChunks: ${postChunks.toString()} }`;
+export const BULK_JS = `(${CLIENT})(${BULK_HELPERS});`;

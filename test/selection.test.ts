@@ -1,13 +1,19 @@
 import { expect, test } from 'vitest';
 import {
   BULK_CAP,
+  BULK_HELPERS,
   BULK_JS,
   bulkBar,
   bulkCheck,
   bulkTools,
+  capped,
   countOf,
+  escapeTo,
+  postChunks,
   select,
+  type Before,
   type BulkList,
+  type Reply,
   type Selection,
 } from '../src/bulk';
 import { request } from './helpers';
@@ -66,15 +72,94 @@ test('clear resets the selection, all mode and the anchor', () => {
   expect(state).toEqual(fresh(['a', 'b']));
 });
 
+// The helpers as the browser gets them: their source alone, outside the module.
+const shipped = new Function(`return (${BULK_HELPERS})`)() as {
+  select: typeof select;
+  capped: typeof capped;
+  escapeTo: typeof escapeTo;
+  postChunks: typeof postChunks;
+};
+
 test('the shipped reducer runs on its own, outside the module', () => {
   expect(BULK_JS).not.toContain('__name');
-  const source = BULK_JS.slice(BULK_JS.lastIndexOf(')(') + 2, -2);
-  const shipped = new Function(`return (${source})`)() as typeof select;
+  expect(BULK_JS).toContain(BULK_HELPERS);
   const state = run(fresh(['a', 'b', 'c']), { type: 'toggle', id: 'a', range: false });
-  expect(shipped(state, { type: 'toggle', id: 'c', range: true })).toEqual(
+  expect(shipped.select(state, { type: 'toggle', id: 'c', range: true })).toEqual(
     select(state, { type: 'toggle', id: 'c', range: true }),
   );
   expect(() => new Function(BULK_JS)).not.toThrow();
+});
+
+test('Escape closes an open step first, never clears from a field, and clears the selection otherwise', () => {
+  const at = { typing: false, stepOpen: false, picked: true };
+  expect(shipped.escapeTo(at)).toBe('clear');
+  expect(shipped.escapeTo({ ...at, typing: true })).toBe('none');
+  expect(shipped.escapeTo({ ...at, typing: true, stepOpen: true })).toBe('step');
+  expect(shipped.escapeTo({ ...at, stepOpen: true })).toBe('step');
+  expect(shipped.escapeTo({ ...at, picked: false })).toBe('none');
+});
+
+// A server that adds the posted totals to its own, as runBulk does; each id is done unless it starts with s.
+function server(fail: (call: number) => Reply | 'throw' | null | undefined = () => undefined) {
+  const calls: { ids: string[]; before: Before | null }[] = [];
+  const post = async (ids: string[], before: Before | null): Promise<Reply | null> => {
+    calls.push({ ids, before });
+    const failed = fail(calls.length);
+    if (failed === 'throw') throw new Error('offline');
+    if (failed !== undefined) return failed;
+    const n = ids.filter((id) => !id.startsWith('s')).length;
+    return {
+      n: (before?.n ?? 0) + n,
+      skipped: (before?.skipped ?? 0) + ids.length - n,
+      location: `/receipts?n=${calls.length}`,
+    };
+  };
+  return { calls, post };
+}
+
+test('chunks post the running totals of what was done and skipped, and land on the last banner', async () => {
+  const { calls, post } = server();
+  const steps: number[] = [];
+  const end = await shipped.postChunks([['a', 's1'], ['s2', 'b'], ['c']], post, (sent) => steps.push(sent));
+  expect(end).toEqual({ url: '/receipts?n=3' });
+  expect(calls.map((c) => c.before)).toEqual([
+    { n: 0, skipped: 0 },
+    { n: 1, skipped: 1 },
+    { n: 2, skipped: 2 },
+  ]);
+  expect(steps).toEqual([2, 4, 5]);
+  const one = server();
+  await shipped.postChunks([['a']], one.post, () => {});
+  expect(one.calls[0]!.before).toBeNull();
+});
+
+test('after a post has gone out, a failure is reported and nothing is posted again', async () => {
+  for (const bad of ['throw', null, { location: '/x' } as unknown as Reply] as const) {
+    const { calls, post } = server((call) => (call === 2 ? bad : undefined));
+    expect(await shipped.postChunks([['a'], ['b'], ['c']], post, () => {})).toEqual({
+      error: '1 of 3 done. That did not work. Reload to see what changed.',
+    });
+    expect(calls).toHaveLength(2);
+  }
+  // A 200 with no usable body on the only post: reported too, never resubmitted.
+  const first = server(() => 'throw');
+  expect(await shipped.postChunks([['a', 'b']], first.post, () => {})).toEqual({
+    error: 'That did not work. Reload to see what changed.',
+  });
+  expect(first.calls).toHaveLength(1);
+  const refused = server((call) => (call === 2 ? { error: 'Up to 10 at a time.' } : undefined));
+  expect(await shipped.postChunks([['a'], ['b']], refused.post, () => {})).toEqual({
+    error: '1 of 2 done. Up to 10 at a time.',
+  });
+  const moved = server(() => ({ url: '/login' }));
+  expect(await shipped.postChunks([['a']], moved.post, () => {})).toEqual({ url: '/login' });
+});
+
+test('in all mode the bar turns off the actions whose cap is below the filter', () => {
+  expect(shipped.capped(true, 120, 10)).toBe('Up to 10 at a time');
+  expect(shipped.capped(true, 8, 10)).toBeNull();
+  expect(shipped.capped(false, 120, 10)).toBeNull();
+  expect(shipped.capped(true, 120, 0)).toBeNull();
 });
 
 test('the bulk script is served as JavaScript and app pages allow same-origin scripts', async () => {
