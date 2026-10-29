@@ -353,7 +353,7 @@ export async function approveSenders(
 export async function heldSenders(env: Env, ids: readonly string[]): Promise<{ held: number; senders: string[] }> {
   const rows = (
     await env.DB.prepare(
-      "SELECT sender FROM inbound_mail WHERE state='held' AND id IN (SELECT value FROM json_each(?))",
+      "SELECT m.sender FROM json_each(?) j JOIN inbound_mail m ON m.id=j.value WHERE m.state='held' ORDER BY j.key",
     )
       .bind(JSON.stringify(ids))
       .all<{ sender: string }>()
