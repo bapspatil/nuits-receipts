@@ -1,5 +1,13 @@
 {
   "strips": {
+    "1.15.0": {
+      "width": 1024,
+      "height": 1536,
+      "small": 640,
+      "avif": 55409,
+      "webp": 140236,
+      "blur": "data:image/webp;base64,UklGRn4AAABXRUJQVlA4IHIAAABwBQCdASoYACQAPt1cpE2opSOiOrZoARAbiWcAAD0TNKjoDYVy2Ci9T6jD/C9cLlvk8PwAAP7v0GYf0+vgfyZNoSrHP9d6VcmKWo7BPxsoHayjzpcnPT8gnRPASgiau730QAgbWKFT+FBKEHhbr5CoAAA="
+    },
     "1.14.0": {
       "width": 1024,
       "height": 1536,
