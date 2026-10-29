@@ -474,7 +474,7 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .chip:hover,.chip:focus-visible{border-color:var(--text)}
 .ask{margin:0 0 var(--space-2);font-weight:600;color:var(--danger)}
 .banner.undo{display:flex;align-items:center;gap:var(--space-2);padding-top:0;padding-bottom:0;min-height:44px}.banner.undo form{margin-left:auto}
-.pick{display:flex;align-items:center;gap:var(--space-3);min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none}
+.pick{display:flex;align-items:center;gap:var(--space-3);min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
 .list.all li>form{grid-column:2;grid-row:2;justify-self:end}
 [data-bulk-list]{counter-reset:bulk}
 [data-bulk-list] .pick{min-width:44px;justify-content:center}
