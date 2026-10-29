@@ -119,7 +119,7 @@ export const RECEIPT_ACTIONS = {
     op: 'discard',
     label: 'Discard',
     tone: 'danger',
-    confirm: 'Discard the selected? Their payment matches are removed.',
+    confirm: 'Discard these? Matched ones lose their match.',
     fields: `<div class="reasons" role="group" aria-label="Reason">${Object.entries(DISCARD_REASONS)
       .map(([k, v]) => chip('reason', k, v))
       .join('')}</div>`,
