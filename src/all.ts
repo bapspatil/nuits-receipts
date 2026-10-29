@@ -73,8 +73,8 @@ const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,
 
 export type AllQuery = { show: Show | null; month: string | null; q: string; offset: number };
 
-// One page of rows (PAGE_SIZE + 1, so the caller knows if there is more).
-export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
+// The list's filter as SQL over RECEIPTS and HELD, shared by the page and its bulk actions.
+export function allWhere(query: Omit<AllQuery, 'offset'>): { where: string; binds: unknown[] } {
   const where: string[] = [],
     binds: unknown[] = [];
   // Discarded rows show only under their own chip.
@@ -93,8 +93,14 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
     );
     binds.push(`%${query.q.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
   }
+  return { where: where.join(' AND '), binds };
+}
+
+// One page of rows (PAGE_SIZE + 1, so the caller knows if there is more).
+export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
+  const { where, binds } = allWhere(query);
   const sql = (held: boolean) =>
-    `SELECT * FROM (${RECEIPTS}${held ? ` UNION ALL ${HELD}` : ''})${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY received_at DESC,id DESC LIMIT ? OFFSET ?`;
+    `SELECT * FROM (${RECEIPTS}${held ? ` UNION ALL ${HELD}` : ''}) WHERE ${where} ORDER BY received_at DESC,id DESC LIMIT ? OFFSET ?`;
   try {
     return (
       await env.DB.prepare(sql(true))

@@ -2,7 +2,7 @@
 // pair is compared for the person, the searchable picker's labels, and the
 // bulk "Match all likely" write. The single-match route in index.ts uses the
 // same fits() and linkMatch().
-import { creditFit, eligible, matchable, MATCHABLE_SQL, openSales, type Transaction } from './banking';
+import { creditFit, eligible, lookalike, matchable, MATCHABLE_SQL, openSales, type Transaction } from './banking';
 import { InputError, money, normalize, withinWindow, type Receipt, type Rule, type Tuning } from './domain';
 import { aliased, nameScore } from './matcher';
 import type { Env } from './env';
@@ -72,6 +72,45 @@ export function pairFacts(r: Receipt, t: Transaction, rules: Rule[], tuning: Tun
       ? ''
       : `This pair isn't exact: ${clauses.join('; ') || 'it is not a close fit'}. "Match anyway" says that is fine.`,
   };
+}
+
+// Receipts that look like this payment: a fit by name, amount and date first, then ones with
+// the same amount and date under another name (the person decides those).
+export function suggestionsFor(t: Transaction, receipts: Receipt[], rules: Rule[], tuning: Tuning): Receipt[] {
+  const near = (r: Receipt) => Math.abs(Date.parse(r.issue_date ?? '') - Date.parse(t.booking_date));
+  const rank = (r: Receipt) => (eligible(r, t, rules, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
+  return receipts
+    .filter((r) => rank(r) < 2)
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        near(a) - near(b) ||
+        (a.issue_date ?? '').localeCompare(b.issue_date ?? '') ||
+        a.id.localeCompare(b.id),
+    );
+}
+// One likely receipt for each missing payment, no receipt twice, in the order given. Only exact
+// fits go in Match all. Bank and its bulk Match both pair through here, so they agree.
+export function likelyPairs<T extends Transaction>(
+  open: readonly T[],
+  receipts: Receipt[],
+  rules: Rule[],
+  tuning: Tuning,
+): { likely: Map<string, Receipt>; exact: { t: T; r: Receipt; facts: PairFacts }[] } {
+  const taken = new Set<string>();
+  const likely = new Map<string, Receipt>();
+  const exact: { t: T; r: Receipt; facts: PairFacts }[] = [];
+  for (const t of open) {
+    const list = suggestionsFor(t, receipts, rules, tuning);
+    const r = list.find((x) => !taken.has(x.id)) ?? list[0];
+    if (!r) continue;
+    likely.set(t.id, r);
+    if (taken.has(r.id)) continue;
+    taken.add(r.id);
+    const facts = pairFacts(r, t, rules, tuning);
+    if (facts.exact) exact.push({ t, r, facts });
+  }
+  return { likely, exact };
 }
 
 // ---------- The searchable picker ----------

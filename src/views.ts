@@ -1,16 +1,7 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
-import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule, type Tuning } from './domain';
-import {
-  creditFit,
-  eligible,
-  eurValue,
-  lookalike,
-  monthEurValues,
-  openSales,
-  type EurValue,
-  type Transaction,
-} from './banking';
+import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule } from './domain';
+import { creditFit, eligible, eurValue, monthEurValues, openSales, type EurValue, type Transaction } from './banking';
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
@@ -87,6 +78,7 @@ import {
 import { failureFor, kept } from './request';
 import { STATUS, matchStatus } from './status';
 import {
+  likelyPairs,
   matchableReceipts,
   matchAllLabel,
   pairFacts,
@@ -95,7 +87,6 @@ import {
   receiptName,
   whyLikely,
   type Cell,
-  type PairFacts,
 } from './match';
 
 type Payment = Transaction & { account_name: string; bank_name: string };
@@ -132,21 +123,6 @@ function reasonWord(r: Receipt): string {
   const cards = flagCards(reasonCodes(r.review_reasons_json));
   const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
   return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
-}
-// Receipts that look like this payment: a fit by name, amount and date first, then ones with
-// the same amount and date under another name (the person decides those).
-function suggestionsFor(t: Transaction, receipts: Receipt[], rules: Rule[], tuning: Tuning): Receipt[] {
-  const near = (r: Receipt) => Math.abs(Date.parse(r.issue_date ?? '') - Date.parse(t.booking_date));
-  const rank = (r: Receipt) => (eligible(r, t, rules, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
-  return receipts
-    .filter((r) => rank(r) < 2)
-    .sort(
-      (a, b) =>
-        rank(a) - rank(b) ||
-        near(a) - near(b) ||
-        (a.issue_date ?? '').localeCompare(b.issue_date ?? '') ||
-        a.id.localeCompare(b.id),
-    );
 }
 function receiptOption(r: Receipt, selected = false): string {
   return `<option value="${r.id}"${selected ? ' selected' : ''}>${escape(receiptName(r))} · ${escape(day(r.issue_date)) || 'no date'} · ${amount(r.total_minor, r.currency)}</option>`;
@@ -843,20 +819,7 @@ export async function payments(
     const found = pickMatches(chosenReceipt(t.id), pool, year);
     return found.length === 1 ? found[0] : undefined;
   };
-  // One likely receipt for each missing payment, no receipt twice. Only exact fits go in Match all.
-  const taken = new Set<string>();
-  const likelyOf = new Map<string, Receipt>();
-  const bulk: { t: Payment; r: Receipt; facts: PairFacts }[] = [];
-  for (const t of open) {
-    const list = suggestionsFor(t, receipts, rules, tuning);
-    const r = list.find((x) => !taken.has(x.id)) ?? list[0];
-    if (!r) continue;
-    likelyOf.set(t.id, r);
-    if (taken.has(r.id)) continue;
-    taken.add(r.id);
-    const facts = pairFacts(r, t, rules, tuning);
-    if (facts.exact) bulk.push({ t, r, facts });
-  }
+  const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
   const isMissing = unmatched;
   const missing = open;
   // Missing first: it is the only thing Bank asks of you.
