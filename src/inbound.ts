@@ -371,24 +371,25 @@ async function heldFrom(env: Env, senders: readonly string[]): Promise<MailRow[]
   ).results;
 }
 
-// Ends one waiting email and deletes its stored copy unless a receipt or
-// another log row still points at it.
-async function discard(env: Env, row: MailRow, state: MailState, reason: string): Promise<boolean> {
-  const result = await env.DB.prepare(
-    "UPDATE inbound_mail SET state=?,reason=?,email_key=NULL WHERE id=? AND state='held'",
-  )
-    .bind(state, reason, row.id)
-    .run();
-  if (result.meta.changes !== 1) return false;
-  if (row.email_key) {
-    const used = await env.DB.prepare(
-      'SELECT 1 FROM receipts WHERE email_key=? UNION ALL SELECT 1 FROM inbound_mail WHERE email_key=? LIMIT 1',
-    )
-      .bind(row.email_key, row.email_key)
-      .first();
-    if (!used) await env.ORIGINALS.delete(row.email_key);
-  }
-  return true;
+// Ends these waiting emails in one D1 batch, however many, then deletes each
+// stored copy no receipt or other log row still points at. Returns how many it ended.
+async function discardHeld(env: Env, rows: readonly MailRow[], state: MailState, reason: string): Promise<number> {
+  if (!rows.length) return 0;
+  const keys = [...new Set(rows.flatMap((r) => (r.email_key ? [r.email_key] : [])))];
+  const [update, unused] = await env.DB.batch<{ id?: string; key?: string }>([
+    env.DB.prepare(
+      "UPDATE inbound_mail SET state=?,reason=?,email_key=NULL WHERE state='held' AND id IN (SELECT value FROM json_each(?)) RETURNING id",
+    ).bind(state, reason, JSON.stringify(rows.map((r) => r.id))),
+    env.DB.prepare(
+      'SELECT value AS key FROM json_each(?) WHERE NOT EXISTS (SELECT 1 FROM receipts WHERE email_key=value) AND NOT EXISTS (SELECT 1 FROM inbound_mail WHERE email_key=value)',
+    ).bind(JSON.stringify(keys)),
+  ]);
+  const endedIds = new Set(update?.results.map((r) => r.id));
+  const ended = rows.filter((r) => endedIds.has(r.id));
+  const free = new Set(unused?.results.map((r) => r.key));
+  const gone = [...new Set(ended.flatMap((r) => (r.email_key && free.has(r.email_key) ? [r.email_key] : [])))];
+  if (gone.length) await env.ORIGINALS.delete(gone);
+  return ended.length;
 }
 
 // Future mail from the sender is logged only; their waiting mail is deleted.
@@ -419,9 +420,7 @@ export async function ignoreSenders(env: Env, senders: readonly string[], who: s
   )
     .bind(new Date().toISOString(), who.slice(0, 254), list)
     .run();
-  let removed = 0;
-  for (const row of await heldFrom(env, senders)) if (await discard(env, row, 'ignored', 'sender_ignored')) removed++;
-  return removed;
+  return discardHeld(env, await heldFrom(env, senders), 'ignored', 'sender_ignored');
 }
 
 export async function deleteHeld(env: Env, id: string): Promise<void> {
@@ -434,9 +433,7 @@ export async function deleteHeldMail(env: Env, ids: readonly string[]): Promise<
       .bind(JSON.stringify(ids))
       .all<MailRow>()
   ).results;
-  let deleted = 0;
-  for (const row of rows) if (await discard(env, row, 'dropped', 'deleted')) deleted++;
-  return deleted;
+  return discardHeld(env, rows, 'dropped', 'deleted');
 }
 
 export async function unignoreSender(env: Env, value: unknown): Promise<void> {

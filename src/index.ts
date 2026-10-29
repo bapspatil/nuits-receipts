@@ -229,7 +229,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (read && path === '/more') return moved('/settings');
   if (request.method === 'GET' && path === '/review') {
     const reason = url.searchParams.get('reason') ?? '';
-    return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
+    return reviewPage(env, Object.hasOwn(REVIEW_FILTERS, reason) ? (reason as ReviewFilter) : null, url.searchParams);
   }
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);

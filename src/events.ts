@@ -31,6 +31,9 @@ const words = (p: URLSearchParams, key: string, fallback: string) => (p.get(key)
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 // Rows a bulk action left alone because it did not apply to them.
 const skipped = (p: URLSearchParams) => (count(p, 'skipped') ? ` ${count(p, 'skipped')} skipped.` : '');
+// A bulk run that changed no row says so, whatever its message would be.
+const none = (p: URLSearchParams) => p.has('n') && !count(p, 'n');
+const many = (p: URLSearchParams, text: string) => (none(p) ? 'Nothing changed.' : text) + skipped(p);
 const date = (value: string | null) =>
   value && /^\d{4}-\d\d-\d\d$/.test(value)
     ? new Date(`${value}T00:00:00Z`).toLocaleDateString('en-GB', {
@@ -164,32 +167,33 @@ export const EVENTS = {
       (count(p, 'n') ? `Approved ${plural(count(p, 'n'), 'receipt')}.` : 'Nothing was approved.') + skipped(p),
   },
   readAgainMany: {
-    text: (p) => `Reading ${plural(count(p, 'n'), 'document')} again. This can take a minute.` + skipped(p),
+    text: (p) => many(p, `Reading ${plural(count(p, 'n'), 'document')} again. This can take a minute.`),
   },
   kindMovedMany: {
     text: (p) =>
-      `Moved ${plural(count(p, 'n'), 'document')} to ${p.get('to') === 'sales' ? 'invoices' : 'receipts'}.` +
-      skipped(p),
+      many(p, `Moved ${plural(count(p, 'n'), 'document')} to ${p.get('to') === 'sales' ? 'invoices' : 'receipts'}.`),
   },
   paidMany: {
     text: (p) =>
-      `Marked ${plural(count(p, 'n'), 'invoice')} as paid${date(p.get('on')) ? ` on ${date(p.get('on'))}` : ''}.` +
-      skipped(p),
+      many(
+        p,
+        `Marked ${plural(count(p, 'n'), 'invoice')} as paid${date(p.get('on')) ? ` on ${date(p.get('on'))}` : ''}.`,
+      ),
   },
   ruleSaved: { text: () => 'Rule saved.', section: () => 'rules' },
   ruleDeleted: { text: () => 'Rule deleted.', section: () => 'rules' },
   // ---------- Discard ----------
   discarded: {
-    text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} discarded.` : 'Discarded.') + skipped(p),
+    text: (p) => many(p, count(p, 'n') > 1 ? `${count(p, 'n')} discarded.` : 'Discarded.'),
     undo: (p) => {
       const at = p.get('at') ?? '',
         back = p.get('back') ?? '';
-      return /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && backPath(back, '') === back
+      return !none(p) && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && backPath(back, '') === back
         ? { action: '/restore', fields: { at, back } }
         : null;
     },
   },
-  restored: { text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') + skipped(p) },
+  restored: { text: (p) => many(p, count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') },
   merged: { text: (p) => `Merged ${plural(count(p, 'n'), 'duplicate')}.` },
   // ---------- Unknown senders and Settings > Senders ----------
   // A bulk action adds senders (how many senders it took) and skipped.
@@ -307,7 +311,7 @@ export const EVENTS = {
     },
   },
   // No Undo: matching them again is the bulk button, which asks again what to accept.
-  unmatchedMany: { text: (p) => `Removed ${plural(count(p, 'n'), 'match', 'matches')}.` + skipped(p) },
+  unmatchedMany: { text: (p) => many(p, `Removed ${plural(count(p, 'n'), 'match', 'matches')}.`) },
   notPurchaseMany: {
     text: (p) =>
       (count(p, 'n') ? `Marked ${plural(count(p, 'n'), 'payment')} as not a purchase.` : 'Nothing changed.') +

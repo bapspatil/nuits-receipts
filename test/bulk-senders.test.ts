@@ -220,3 +220,22 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   expect(settings).toContain('<script src="/assets/settings.js" defer></script>');
   expect([...settings.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
 });
+
+test('Delete ends every email in the same few queries, however many', async () => {
+  for (const n of [1, 2, 3, 4]) await fromLink(n);
+  await fromShop(1);
+  const [shop, ...link] = await held();
+  const prepared = vi.spyOn(env.DB, 'prepare');
+  const queries = async (fields: Record<string, string | string[]>) => {
+    prepared.mockClear();
+    expect((await bulk(fields)).status).toBe(303);
+    return prepared.mock.calls.length;
+  };
+  // The first post also loads what every request caches.
+  await queries({ op: 'delete', id: shop!.id });
+  const one = await queries({ op: 'delete', id: link[0]!.id });
+  expect(await queries({ op: 'delete', id: link.slice(1).map((r) => r.id) })).toBe(one);
+  for (const r of link) expect(await env.ORIGINALS.get(r.email_key)).toBeNull();
+  prepared.mockRestore();
+  expect(await held()).toEqual([]);
+});

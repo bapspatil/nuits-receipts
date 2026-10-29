@@ -14,7 +14,7 @@ const ID = /^[a-f0-9]{64}$/;
 export function discardReason(value: unknown): DiscardReason | null {
   const text = String(value ?? '');
   if (!text) return null;
-  requireInput(text in DISCARD_REASONS, 'Invalid reason', 400);
+  requireInput(Object.hasOwn(DISCARD_REASONS, text), 'Invalid reason', 400);
   return text as DiscardReason;
 }
 export function receiptIds(values: readonly unknown[], max = MAX_BULK): string[] {

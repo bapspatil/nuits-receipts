@@ -295,3 +295,40 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   expect(invoices).toContain('name="paid_outside_on" value="');
   expect(invoices).toContain('<input type="hidden" name="list" value="invoices">');
 });
+
+test('chunk totals of done and skipped add up, within bounds', async () => {
+  await receipt(1);
+  await receipt(2, { kind: 'sales', client: 'Example Client Oy' });
+  const moved = await json({ op: 'kind', id: ids(1, 2), to: 'sales', done_before: '7', skipped_before: '3' });
+  expect(await moved.json()).toMatchObject({ n: 8, skipped: 4 });
+  for (const bad of ['-1', '1.5', 'x', String(BULK_CAP * 2 + 1)])
+    for (const key of ['done_before', 'skipped_before'])
+      expect((await bulk({ op: 'restore', id: id(1), [key]: bad })).status, `${key}=${bad}`).toBe(400);
+});
+
+test('names from the object prototype are not filters or reasons', async () => {
+  await receipt(1, { status: 'needs_review' });
+  expect((await json({ op: 'discard', all: '1', list: 'review', filter: 'constructor' })).status).toBe(400);
+  expect((await json({ op: 'discard', id: id(1), reason: 'toString' })).status).toBe(400);
+  expect((await row(1))!.discarded_at).toBeNull();
+  for (const path of ['/review?reason=constructor', '/receipts?show=toString'])
+    expect((await request(path)).status, path).toBe(200);
+});
+
+test('approving a foreign receipt values it in euros, as approving one does', async () => {
+  await receipt(1, { status: 'needs_review', month: '2026-09' });
+  await env.DB.prepare("UPDATE receipts SET currency='USD',issue_date='2026-09-05' WHERE id=?").bind(id(1)).run();
+  const res = await json({ op: 'approve', id: id(1), approval_reason: 'Checked' });
+  expect(await res.json()).toMatchObject({ n: 1 });
+  expect(await row(1)).toMatchObject({ status: 'ready', fx_eur_minor: 901, fx_requested_date: '2026-09-05' });
+});
+
+test('a run that changed nothing says so, with no Undo', async () => {
+  await receipt(1);
+  await bulk({ op: 'discard', id: id(1) });
+  const res = await bulk({ op: 'discard', id: id(1), back: '/receipts' });
+  expect(locationOf(res)).toMatch(/^\/receipts\?done=discarded&n=0&at=[^&]+&back=%2Freceipts&skipped=1$/);
+  const page = await (await request(res.headers.get('Location')!)).text();
+  expect(page).toContain('Nothing changed. 1 skipped.');
+  expect(page).not.toContain('action="/restore"');
+});

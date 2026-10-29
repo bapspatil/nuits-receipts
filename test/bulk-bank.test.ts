@@ -225,3 +225,12 @@ test('Bank renders a box per payment, the bar for its filter, and the script onc
   expect(missing).toContain('<div data-bulk-list="bulk-payments" data-selecting>');
   expect(missing).toContain('data-total="1"');
 });
+
+test('the bar lands back on the page of the month it was posted from', async () => {
+  await statement('a;2026-09-10;-10,00;EUR;Fake Paper Shop;x\n');
+  const paper = await tx('Fake Paper Shop');
+  const res = await bulk({ ...sept, offset: '100', op: 'exempt', id: paper.id });
+  expect(locationOf(res)).toBe('/payments?month=2026-09&show=all&offset=100&done=notPurchaseMany&n=1');
+  for (const offset of ['-1', 'x', '1.5'])
+    expect((await bulk({ ...sept, offset, op: 'exempt', id: paper.id })).status, offset).toBe(400);
+});

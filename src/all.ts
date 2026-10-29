@@ -195,7 +195,7 @@ export function parseQuery(params: URLSearchParams, offset = 0): AllQuery {
   const month = params.get('month') ?? '';
   requireInput(!month || /^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
   return {
-    show: show in SHOW ? (show as Show) : null,
+    show: Object.hasOwn(SHOW, show) ? (show as Show) : null,
     month: month || null,
     q: (params.get('q') ?? '').trim().slice(0, 100),
     offset,

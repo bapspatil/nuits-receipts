@@ -862,7 +862,7 @@ export async function payments(
     action: '/payments/bulk',
     noun: ['payment', 'payments'],
     total: showTotals[show],
-    scope: { month: selected, show },
+    scope: { month: selected, show, ...(offset ? { offset: String(offset) } : {}) },
     actions: [...PAYMENT_ACTIONS],
   };
   const dayIn = (value: string | null, other: string) =>

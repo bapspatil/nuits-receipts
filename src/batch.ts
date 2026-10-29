@@ -13,7 +13,7 @@ import {
   type Receipt,
   type Rule,
 } from './domain';
-import { BANK_SHOWS, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
+import { BANK_SHOWS, cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
 import { discardReason, discardReceipts, restoreReceipts } from './discard';
@@ -61,7 +61,6 @@ const rowId = (value: string) => {
 };
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
-const changes = (results: readonly D1Result[]) => results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
 async function rowsOf(env: Env, ids: readonly string[]): Promise<Receipt[]> {
   return (
     await env.DB.prepare('SELECT * FROM receipts WHERE id IN (SELECT value FROM json_each(?))')
@@ -115,9 +114,14 @@ const OPS: Record<ReceiptOp, Op> = {
           ),
         ),
       );
-      const n = changes(results);
-      if (n) await reconcile(env);
-      return { n, event: 'approvedMany' };
+      const approved = todo.filter((_, i) => results[i]?.meta.changes === 1);
+      // As correctReceipt does: the ECB estimate before reconcile, which may put
+      // missing_eur back. A row already valued on its date has nothing to fetch.
+      for (const r of approved)
+        if (r.fx_eur_minor === null || r.fx_requested_date !== r.issue_date)
+          await cacheFx(env, { ...r, status: 'ready', review_reasons_json: '[]', revision: r.revision + 1 });
+      if (approved.length) await reconcile(env);
+      return { n: approved.length, event: 'approvedMany' };
     },
   },
   discard: {
@@ -177,7 +181,7 @@ const OPS: Record<ReceiptOp, Op> = {
 const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
   review: async (env, form) => {
     const filter = text(form, 'filter');
-    requireInput(!filter || filter in REVIEW_FILTERS, 'Invalid filter', 400);
+    requireInput(!filter || Object.hasOwn(REVIEW_FILTERS, filter), 'Invalid filter', 400);
     const rows = await reviewQueue(env);
     return (
       filter ? rows.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter as ReviewFilter)) : rows
@@ -204,17 +208,19 @@ const RECEIPTS: Endpoint = {
 };
 
 // ---------- Bank ----------
-// The month and Show chip the bar was drawn for.
-function bankScope(form: FormData): { month: string; show: BankShow } {
+// The month, Show chip and page the bar was drawn for.
+function bankScope(form: FormData): { month: string; show: BankShow; offset: number } {
   const month = text(form, 'month'),
-    show = text(form, 'show');
+    show = text(form, 'show'),
+    offset = Number(text(form, 'offset') || 0);
   requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
   requireInput(
     BANK_SHOWS.some((s) => s === show),
     'Invalid filter',
     400,
   );
-  return { month, show: show as BankShow };
+  requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page', 400);
+  return { month, show: show as BankShow, offset };
 }
 // Not a purchase (0) and Needs receipt (1): only money out that is not that already.
 const required = (to: 0 | 1, event: EventKey): Op => ({
@@ -273,8 +279,8 @@ const PAYMENTS: Endpoint = {
     return (await showRows(env, month, show, BULK_CAP + 1)).map((t) => t.id);
   },
   back: (form) => {
-    const { month, show } = bankScope(form);
-    return `/payments?month=${month}&show=${show}`;
+    const { month, show, offset } = bankScope(form);
+    return `/payments?month=${month}&show=${show}${offset ? `&offset=${offset}` : ''}`;
   },
 };
 
@@ -344,6 +350,14 @@ function bulkIds(values: readonly unknown[], max: number, parse: (value: string)
   return [...new Set(raw.map(parse))];
 }
 
+// The totals of the chunks the bar already posted; a run never passes BULK_CAP ids.
+function progress(form: FormData, key: string): number {
+  const raw = form.get(key);
+  const value = raw === null ? 0 : Number(raw);
+  requireInput(Number.isSafeInteger(value) && value >= 0 && value <= BULK_CAP * 2, 'Invalid progress', 400);
+  return value;
+}
+
 async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Caller): Promise<BulkResult> {
   const name = text(form, 'op');
   requireInput(Object.hasOwn(endpoint.ops, name), 'Invalid action', 400);
@@ -357,12 +371,12 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
     requireInput(all.length > 0, 'Nothing matches the filter.', 400);
     ids = all;
   } else ids = bulkIds(form.getAll('id'), max, op.id ?? endpoint.id);
-  const before = form.get('done_before') === null ? 0 : Number(form.get('done_before'));
-  requireInput(Number.isSafeInteger(before) && before >= 0, 'Invalid progress', 400);
+  const before = progress(form, 'done_before'),
+    skippedBefore = progress(form, 'skipped_before');
   const back = endpoint.back(form);
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
-    skipped = done.skipped ?? ids.length - done.n;
+    skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
   return {
     location: withDone(done.event, back, { n, ...done.params, skipped: skipped || null }),
     n,
