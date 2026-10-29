@@ -481,6 +481,7 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 [data-bulk-list] .pick input[name=id]:checked{counter-increment:bulk}
 [data-bulk-list] li:has(>.pick){position:relative;padding-left:var(--space-8)}
 [data-bulk-list] li>.pick{position:absolute;left:var(--space-2);top:var(--space-2)}
+[data-bulk-list] .pays-h{padding-left:var(--space-8)}
 .bulktools{display:flex;align-items:center;gap:var(--space-3)}
 .bulktools [hidden],.bulkbar [hidden]{display:none}
 .bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin-top:var(--space-3);padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
@@ -622,6 +623,8 @@ function feedbackBanner(): string {
   return `<div class="banner undo" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
 }
 
+// Once per page however many bulk lists it has: the script binds every bar it finds.
+const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
 export async function page(
   view: PageKey,
   body: string,
@@ -640,7 +643,7 @@ export async function page(
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes('<div data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
     {
       status: requestState.getStore()?.failure?.status ?? status,
       headers: {

@@ -176,7 +176,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           (r) =>
             `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
         )
-        .join('')}</ul></div>${bulkBar(bulk)}<script src="/assets/bulk.js" defer></script>`
+        .join('')}</ul></div>${bulkBar(bulk)}`
     : emptyState(
         month.length || across
           ? 'Nothing here.'

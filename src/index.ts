@@ -13,7 +13,7 @@ import {
 } from './receipts';
 import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
 import { BULK_CAP, BULK_JS } from './bulk';
-import { receiptsBulk } from './batch';
+import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
 import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import {
   afterLastReview,
@@ -30,8 +30,8 @@ import {
 } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
-import { clearBankReview, matchable, reconcile, undoExemptions, type Transaction } from './banking';
-import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unmatchLikely } from './match';
+import { clearBankReview, matchable, reconcile, SET_REQUIRED_SQL, undoExemptions, type Transaction } from './banking';
+import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unlinkMatches, unmatchLikely } from './match';
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
@@ -287,7 +287,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
-  if (request.method === 'POST' && path === '/receipts/bulk') return bulkReceipts(request, env);
+  const bulk = request.method === 'POST' ? BULK_ROUTES[path] : undefined;
+  if (bulk) return bulkAction(request, env, bulk, { who, ctx });
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
   if (request.method === 'GET' && path === '/help') return helpPage(env);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
@@ -478,11 +479,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       .bind(payment[1])
       .first<Transaction>();
     requireInput(transaction, 'Payment not found', 404);
-    const changed = await env.DB.prepare(
-      "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=? AND NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')",
-    )
-      .bind(Number(required), transaction.id)
-      .run();
+    const changed = await env.DB.prepare(`${SET_REQUIRED_SQL} AND id=?`).bind(Number(required), transaction.id).run();
     requireInput(
       changed.meta.changes === 1,
       'Payment changed or belongs to an own-account transfer. Undo the pair first.',
@@ -522,19 +519,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
         exception = !fits(was, transaction, rules, config(env).tuning);
       }
-      // Taken apart by the owner: the matcher never links this pair again on its own.
-      await env.DB.batch([
-        env.DB.prepare(
-          'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?',
-        ).bind(id),
-        ...(matchedTo
-          ? [
-              env.DB.prepare(
-                'INSERT INTO match_rejections(transaction_id,receipt_id,rejected_at) VALUES (?,?,?) ON CONFLICT DO NOTHING',
-              ).bind(id, matchedTo, new Date().toISOString()),
-            ]
-          : []),
-      ]);
+      await unlinkMatches(env, [id]);
     } else {
       // Money out pairs with a receipt, money in with a sales invoice.
       const credit = transaction.amount_minor > 0;
@@ -709,12 +694,17 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
     throw error;
   }
 }
+const BULK_ROUTES: Record<string, typeof receiptsBulk | undefined> = {
+  '/receipts/bulk': receiptsBulk,
+  '/payments/bulk': paymentsBulk,
+  '/senders/bulk': sendersBulk,
+};
 // The bulk bar's script asks for JSON: the signed banner link to go to, or the refusal.
-async function bulkReceipts(request: Request, env: Env): Promise<Response> {
+async function bulkAction(request: Request, env: Env, run: typeof receiptsBulk, caller: Caller): Promise<Response> {
   const json = (request.headers.get('Accept') ?? '').includes('application/json');
   try {
     // Room for BULK_CAP ids as multipart parts, plus the fields.
-    const result = await receiptsBulk(env, await formData(request, BULK_CAP * 256));
+    const result = await run(env, await formData(request, BULK_CAP * 256), caller);
     if (!json) return redirect(result.location);
     const location = withBase(await signedLocation(signer(env), result.location), config(env).basePath);
     return Response.json({ location, n: result.n, skipped: result.skipped });

@@ -300,19 +300,30 @@ export async function approveSender(
   who: string,
   ctx: Pick<ExecutionContext, 'waitUntil'>,
 ): Promise<number> {
-  const sender = senderAddress(value);
+  return approveSenders(env, [senderAddress(value)], who, ctx);
+}
+// The same for checked addresses, in one write of the list.
+export async function approveSenders(
+  env: Env,
+  senders: readonly string[],
+  who: string,
+  ctx: Pick<ExecutionContext, 'waitUntil'>,
+): Promise<number> {
   const current = [...config(env).allowedSenders];
-  if (!current.includes(sender)) {
+  const added = [...new Set(senders)].filter((s) => !current.includes(s));
+  if (added.length) {
     requireInput(
-      current.length < MAX_ALLOWED_SENDERS,
+      current.length + added.length <= MAX_ALLOWED_SENDERS,
       `You already have ${MAX_ALLOWED_SENDERS} approved senders, the most the app keeps. Remove one in Settings first.`,
       409,
     );
-    await saveAllowed(env, [...current, sender], who);
+    await saveAllowed(env, [...current, ...added], who);
   }
-  await env.DB.prepare('DELETE FROM ignored_senders WHERE address=?').bind(sender).run();
+  await env.DB.prepare('DELETE FROM ignored_senders WHERE address IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify(senders))
+    .run();
   let imported = 0;
-  for (const row of await heldFrom(env, sender)) {
+  for (const row of await heldFrom(env, senders)) {
     const claim = await env.DB.prepare(
       "UPDATE inbound_mail SET state='imported',reason='sender_approved' WHERE id=? AND state='held'",
     )
@@ -338,10 +349,24 @@ export async function approveSender(
   return imported;
 }
 
-async function heldFrom(env: Env, sender: string): Promise<MailRow[]> {
+// The senders of these waiting emails, and how many of the emails still wait.
+export async function heldSenders(env: Env, ids: readonly string[]): Promise<{ held: number; senders: string[] }> {
+  const rows = (
+    await env.DB.prepare(
+      "SELECT sender FROM inbound_mail WHERE state='held' AND id IN (SELECT value FROM json_each(?))",
+    )
+      .bind(JSON.stringify(ids))
+      .all<{ sender: string }>()
+  ).results;
+  return { held: rows.length, senders: [...new Set(rows.map((r) => r.sender))] };
+}
+
+async function heldFrom(env: Env, senders: readonly string[]): Promise<MailRow[]> {
   return (
-    await env.DB.prepare("SELECT * FROM inbound_mail WHERE state='held' AND sender=? ORDER BY received_at,id")
-      .bind(sender)
+    await env.DB.prepare(
+      "SELECT * FROM inbound_mail WHERE state='held' AND sender IN (SELECT value FROM json_each(?)) ORDER BY received_at,id",
+    )
+      .bind(JSON.stringify(senders))
       .all<MailRow>()
   ).results;
 }
@@ -368,44 +393,71 @@ async function discard(env: Env, row: MailRow, state: MailState, reason: string)
 
 // Future mail from the sender is logged only; their waiting mail is deleted.
 export async function ignoreSender(env: Env, value: unknown, who: string): Promise<number> {
-  const sender = senderAddress(value);
+  return ignoreSenders(env, [senderAddress(value)], who);
+}
+// The same for checked addresses, in one write of the list.
+export async function ignoreSenders(env: Env, senders: readonly string[], who: string): Promise<number> {
+  const allowed = config(env).allowedSenders;
   requireInput(
-    !config(env).allowedSenders.has(sender),
+    !senders.some((s) => allowed.has(s)),
     'That sender is approved. Remove it from approved senders in Settings first.',
   );
-  const count = (await env.DB.prepare('SELECT count(*) AS n FROM ignored_senders').first<number>('n')) ?? 0;
-  const listed = await env.DB.prepare('SELECT 1 FROM ignored_senders WHERE address=?').bind(sender).first();
+  const list = JSON.stringify(senders);
+  const [count, listed] = await env.DB.batch<{ n: number }>([
+    env.DB.prepare('SELECT count(*) AS n FROM ignored_senders'),
+    env.DB.prepare('SELECT count(*) AS n FROM ignored_senders WHERE address IN (SELECT value FROM json_each(?))').bind(
+      list,
+    ),
+  ]);
+  const fresh = new Set(senders).size - (listed?.results[0]?.n ?? 0);
   requireInput(
-    listed || count < MAX_IGNORED,
+    (count?.results[0]?.n ?? 0) + fresh <= MAX_IGNORED,
     `You can ignore up to ${MAX_IGNORED} senders. Remove one in Settings first.`,
   );
   await env.DB.prepare(
-    'INSERT INTO ignored_senders (address,added_at,added_by) VALUES (?,?,?) ON CONFLICT(address) DO NOTHING',
+    'INSERT INTO ignored_senders (address,added_at,added_by) SELECT value,?,? FROM json_each(?) WHERE true ON CONFLICT(address) DO NOTHING',
   )
-    .bind(sender, new Date().toISOString(), who.slice(0, 254))
+    .bind(new Date().toISOString(), who.slice(0, 254), list)
     .run();
   let removed = 0;
-  for (const row of await heldFrom(env, sender)) if (await discard(env, row, 'ignored', 'sender_ignored')) removed++;
+  for (const row of await heldFrom(env, senders)) if (await discard(env, row, 'ignored', 'sender_ignored')) removed++;
   return removed;
 }
 
 export async function deleteHeld(env: Env, id: string): Promise<void> {
-  const row = await env.DB.prepare("SELECT * FROM inbound_mail WHERE id=? AND state='held'").bind(id).first<MailRow>();
-  requireInput(row, 'That email is gone already.', 404);
-  await discard(env, row, 'dropped', 'deleted');
+  requireInput(await deleteHeldMail(env, [id]), 'That email is gone already.', 404);
+}
+// Deletes these waiting emails. Returns how many were still waiting.
+export async function deleteHeldMail(env: Env, ids: readonly string[]): Promise<number> {
+  const rows = (
+    await env.DB.prepare("SELECT * FROM inbound_mail WHERE state='held' AND id IN (SELECT value FROM json_each(?))")
+      .bind(JSON.stringify(ids))
+      .all<MailRow>()
+  ).results;
+  let deleted = 0;
+  for (const row of rows) if (await discard(env, row, 'dropped', 'deleted')) deleted++;
+  return deleted;
 }
 
 export async function unignoreSender(env: Env, value: unknown): Promise<void> {
-  await env.DB.prepare('DELETE FROM ignored_senders WHERE address=?').bind(senderAddress(value)).run();
+  await unignoreSenders(env, [senderAddress(value)]);
+}
+// Returns how many were ignored.
+export async function unignoreSenders(env: Env, senders: readonly string[]): Promise<number> {
+  const result = await env.DB.prepare('DELETE FROM ignored_senders WHERE address IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify(senders))
+    .run();
+  return result.meta.changes ?? 0;
 }
 
 export async function removeApproved(env: Env, value: unknown, who: string): Promise<void> {
-  const sender = senderAddress(value);
+  requireInput(await removeSenders(env, [senderAddress(value)], who), 'That sender is not on the list.', 404);
+}
+// Takes these off the allowed list in one write. Returns how many were on it.
+export async function removeSenders(env: Env, senders: readonly string[], who: string): Promise<number> {
   const current = [...config(env).allowedSenders];
-  requireInput(current.includes(sender), 'That sender is not on the list.', 404);
-  await saveAllowed(
-    env,
-    current.filter((s) => s !== sender),
-    who,
-  );
+  const gone = new Set(senders);
+  const kept = current.filter((s) => !gone.has(s));
+  if (kept.length < current.length) await saveAllowed(env, kept, who);
+  return current.length - kept.length;
 }

@@ -114,6 +114,8 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Nothing matches the filter.': 'Nothing matches the filter any more. Reload the page.',
   'Choose where to move them': 'Choose Sales invoices or Receipts.',
   'Choose the day it was paid': 'Choose the day it was paid.',
+  'Choose at least one': 'Select at least one row first.',
+  'Invalid selection': "Something you selected isn't there any more. Reload the page and try again.",
 
   // discard
   'Invalid reason': 'Pick one of the reasons listed.',

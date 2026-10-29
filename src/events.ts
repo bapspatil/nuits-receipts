@@ -192,15 +192,32 @@ export const EVENTS = {
   restored: { text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') + skipped(p) },
   merged: { text: (p) => `Merged ${plural(count(p, 'n'), 'duplicate')}.` },
   // ---------- Unknown senders and Settings > Senders ----------
+  // A bulk action adds senders (how many senders it took) and skipped.
   mailAllowed: {
-    text: (p) => (count(p, 'n') ? `Allowed. Reading ${plural(count(p, 'n'), 'email')}.` : 'Allowed.'),
+    text: (p) =>
+      (p.has('senders') && !count(p, 'senders')
+        ? 'Nothing was allowed.'
+        : (count(p, 'senders') > 1 ? `Allowed ${plural(count(p, 'senders'), 'sender')}.` : 'Allowed.') +
+          (count(p, 'n') ? ` Reading ${plural(count(p, 'n'), 'email')}.` : '')) + skipped(p),
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
   mailIgnored: {
-    text: (p) => (count(p, 'n') ? `Ignored. ${plural(count(p, 'n'), 'email')} deleted.` : 'Ignored.'),
+    text: (p) =>
+      (p.has('senders') && !count(p, 'senders')
+        ? 'Nothing was ignored.'
+        : (count(p, 'senders') > 1 ? `Ignored ${plural(count(p, 'senders'), 'sender')}.` : 'Ignored.') +
+          (count(p, 'n') ? ` ${plural(count(p, 'n'), 'email')} deleted.` : '')) + skipped(p),
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
-  mailDeleted: { text: () => 'Email deleted.', section: (p) => (p.get('from') === 'settings' ? 'senders' : null) },
+  mailDeleted: {
+    text: (p) =>
+      (p.has('n')
+        ? count(p, 'n')
+          ? `${plural(count(p, 'n'), 'email')} deleted.`
+          : 'Nothing was deleted.'
+        : 'Email deleted.') + skipped(p),
+    section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
+  },
   // Allow this sender, from Settings > Mail we didn't keep. Undo takes them off the list again.
   senderAllowed: {
     text: (p) => {
@@ -217,8 +234,24 @@ export const EVENTS = {
     },
     section: () => 'mail',
   },
-  senderRemoved: { text: () => 'Sender removed.', section: () => 'senders' },
-  senderUnignored: { text: () => 'No longer ignored.', section: () => 'senders' },
+  senderRemoved: {
+    text: (p) =>
+      (p.has('n')
+        ? count(p, 'n')
+          ? `Removed ${plural(count(p, 'n'), 'sender')}.`
+          : 'Nothing was removed.'
+        : 'Sender removed.') + skipped(p),
+    section: () => 'senders',
+  },
+  senderUnignored: {
+    text: (p) =>
+      (p.has('n')
+        ? count(p, 'n')
+          ? `${plural(count(p, 'n'), 'sender')} no longer ignored.`
+          : 'Nothing changed.'
+        : 'No longer ignored.') + skipped(p),
+    section: () => 'senders',
+  },
   // ---------- Bank ----------
   matched: {
     text: (p) =>
@@ -253,13 +286,16 @@ export const EVENTS = {
     },
   },
   // Match all likely: one Undo for the whole batch, found by the time they were all stamped with.
+  // picked=1: from the bulk bar, where skipped also counts rows with no exact likely receipt.
   matchedMany: {
     text: (p) => {
       const n = count(p, 'n'),
         left = count(p, 'skipped');
-      const changed = left
-        ? ` ${plural(left, 'payment')} changed since you opened the page and ${left === 1 ? 'was' : 'were'} left alone.`
-        : '';
+      const changed = !left
+        ? ''
+        : p.get('picked') === '1'
+          ? ` ${left} skipped: no exact likely receipt, or changed since you opened the page.`
+          : ` ${plural(left, 'payment')} changed since you opened the page and ${left === 1 ? 'was' : 'were'} left alone.`;
       return n ? `Matched ${plural(n, 'payment')}.${changed}` : `Nothing was matched.${changed}`;
     },
     undo: (p) => {
@@ -271,7 +307,18 @@ export const EVENTS = {
     },
   },
   // No Undo: matching them again is the bulk button, which asks again what to accept.
-  unmatchedMany: { text: (p) => `Removed ${plural(count(p, 'n'), 'match', 'matches')}.` },
+  unmatchedMany: { text: (p) => `Removed ${plural(count(p, 'n'), 'match', 'matches')}.` + skipped(p) },
+  notPurchaseMany: {
+    text: (p) =>
+      (count(p, 'n') ? `Marked ${plural(count(p, 'n'), 'payment')} as not a purchase.` : 'Nothing changed.') +
+      skipped(p),
+  },
+  needsReceiptMany: {
+    text: (p) =>
+      (count(p, 'n')
+        ? `${plural(count(p, 'n'), 'payment')} need${count(p, 'n') === 1 ? 's' : ''} a receipt again.`
+        : 'Nothing changed.') + skipped(p),
+  },
   notPurchase: {
     text: (p) => `${words(p, 'name', 'That payment')} is not a purchase, so it no longer needs a receipt.`,
     undo: (p) => {

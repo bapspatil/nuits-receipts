@@ -207,3 +207,19 @@ export async function unmatchLikely(env: Env, at: string): Promise<number> {
     .run();
   return result.meta.changes;
 }
+// Takes the matches off these payments. Taken apart by the owner, so the
+// matcher never links the same pair again on its own. Returns how many it unmatched.
+export async function unlinkMatches(env: Env, ids: readonly string[]): Promise<number> {
+  const picked =
+    "id IN (SELECT value FROM json_each(?)) AND receipt_id IS NOT NULL AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')";
+  const list = JSON.stringify(ids);
+  const [, unlinked] = await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO match_rejections(transaction_id,receipt_id,rejected_at) SELECT id,receipt_id,? FROM bank_transactions WHERE ${picked} ON CONFLICT DO NOTHING`,
+    ).bind(new Date().toISOString(), list),
+    env.DB.prepare(
+      `UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE ${picked}`,
+    ).bind(list),
+  ]);
+  return unlinked?.meta.changes ?? 0;
+}

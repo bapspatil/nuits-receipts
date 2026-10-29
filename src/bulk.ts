@@ -1,5 +1,6 @@
 import { DISCARD_REASONS, type Kind } from './domain';
 import { escape } from './ui';
+import { STATUS } from './status';
 
 // Ids per request, and per all=1 resolution on the server.
 export const BULK_CAP = 500;
@@ -141,6 +142,35 @@ export const RECEIPT_ACTIONS = {
   ReceiptOp,
   (BulkAction & { op: ReceiptOp }) | ((...a: never[]) => BulkAction & { op: ReceiptOp })
 >;
+
+// Bank's actions; src/batch.ts runs each op.
+export type PaymentOp = 'match' | 'exempt' | 'require' | 'unmatch';
+export const PAYMENT_ACTIONS = [
+  { op: 'match', label: 'Match', tone: 'primary' },
+  { op: 'exempt', label: STATUS.notPurchase },
+  { op: 'require', label: 'Needs receipt' },
+  {
+    op: 'unmatch',
+    label: 'Remove match',
+    tone: 'danger',
+    confirm: 'Remove the matches of the selected payments? They will not be matched again on their own.',
+  },
+] as const satisfies readonly (BulkAction & { op: PaymentOp })[];
+
+// Unknown senders' held mail by email, and Settings > Senders by address.
+export type SenderOp = 'allow' | 'ignore' | 'delete' | 'remove' | 'unignore';
+export const SENDER_ACTIONS = {
+  allow: { op: 'allow', label: 'Allow', tone: 'primary' },
+  ignore: { op: 'ignore', label: 'Ignore' },
+  delete: { op: 'delete', label: 'Delete', tone: 'danger', confirm: 'Delete the selected emails?' },
+  remove: {
+    op: 'remove',
+    label: 'Remove',
+    tone: 'danger',
+    confirm: 'Remove the selected senders? Their next emails wait in Review.',
+  },
+  unignore: { op: 'unignore', label: 'Stop ignoring' },
+} as const satisfies { [K in SenderOp]: BulkAction & { op: K } };
 
 // Runs once per bar: reducer state, rendering, keys, long-press and posting.
 // A plain string like ADD_JS, since the worker build has no DOM types.

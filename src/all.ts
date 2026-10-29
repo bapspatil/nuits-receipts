@@ -5,7 +5,7 @@ import { config } from './config';
 import { STATUS } from './status';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
 import { restoreForm } from './discard';
-import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
+import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, SENDER_ACTIONS, type BulkList } from './bulk';
 import { invoiceName } from './invoices';
 import type { MailRow } from './inbound';
 import {
@@ -154,8 +154,22 @@ function rowName(row: AllRow): string {
 
 // The Unknown senders block. back: where the forms return to. primary: the
 // first Allow is the screen's one primary (when nothing else is).
-export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
+export function heldSection(
+  rows: readonly MailRow[],
+  back: 'review' | 'receipts' = 'review',
+  primary = false,
+  selecting = false,
+): string {
   if (!rows.length) return '';
+  const bulk: BulkList = {
+    form: 'bulk-held',
+    action: '/senders/bulk',
+    noun: ['email', 'emails'],
+    total: rows.length,
+    scope: { back },
+    actions: [SENDER_ACTIONS.allow, SENDER_ACTIONS.ignore, SENDER_ACTIONS.delete],
+  };
+  const here = `/${back}`;
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
@@ -163,7 +177,7 @@ export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts
   const items = rows
     .map((r, i) => {
       const who = escape(r.sender);
-      return `<li id="mail-${escape(r.id)}"><p class="who"><b>${who}</b></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns">${form(
+      return `<li id="mail-${escape(r.id)}">${bulkCheck(bulk, r.id, `${r.sender}, ${r.subject || '(no subject)'}`)}<p class="who"><b>${who}</b></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns">${form(
         '/senders/approve',
         { address: r.sender },
         `<button class="btn ${primary && !i ? 'primary' : 'secondary'}" aria-label="Allow ${who}">Allow</button>`,
@@ -173,7 +187,7 @@ export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts
       )}</div></li>`;
     })
     .join('');
-  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><ul class="list">${items}</ul></section>`;
+  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
 }
 
 export function parseQuery(params: URLSearchParams, offset = 0): AllQuery {
@@ -264,7 +278,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const list = shown.length
     ? `${
         picks
-          ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, picks, selecting, selecting ? here : `${here}${here.includes('?') ? '&' : '?'}select=1`)}${ul}</div>${bulkBar(bulk)}<script src="/assets/bulk.js" defer></script>`
+          ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, picks, selecting, selecting ? here : `${here}${here.includes('?') ? '&' : '?'}select=1`)}${ul}</div>${bulkBar(bulk)}`
           : ul
       }${
         query.offset || more

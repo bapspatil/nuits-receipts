@@ -1,10 +1,32 @@
-// POST /receipts/bulk: one action on many receipts from a list. Each op keeps
-// the guards of its single-receipt endpoint and writes in one batch.
+// POST /receipts/bulk, /payments/bulk and /senders/bulk: one action on many
+// rows of a list. Each op keeps the guards of its single-row endpoint and
+// writes in one batch.
 import type { Env } from './env';
-import { emptyFacts, emptySales, EXPONENTS, KINDS, object, requireInput, type Kind, type Receipt } from './domain';
-import { reconcile } from './banking';
-import { AI_CAP, BULK_CAP, type ReceiptOp } from './bulk';
-import { discardReason, discardReceipts, receiptIds, restoreReceipts } from './discard';
+import {
+  emptyFacts,
+  emptySales,
+  EXPONENTS,
+  KINDS,
+  object,
+  requireInput,
+  type Kind,
+  type Receipt,
+  type Rule,
+} from './domain';
+import { BANK_SHOWS, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
+import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
+import { config } from './config';
+import { discardReason, discardReceipts, restoreReceipts } from './discard';
+import {
+  approveSenders,
+  deleteHeldMail,
+  heldSenders,
+  ignoreSenders,
+  removeSenders,
+  senderAddress,
+  unignoreSenders,
+} from './inbound';
+import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
 import { backPath, withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
 import { matchesFilter, reasonCodes, REVIEW_FILTERS, type ReviewFilter } from './flags';
@@ -13,10 +35,30 @@ import { filterIds, parseQuery } from './all';
 import { invoiceRows, invoiceShow } from './invoices';
 import { month } from './ui';
 
-type Done = { n: number; event: EventKey; params?: Record<string, string> };
-// back: the list to land on, which Undo returns to as well.
-type Op = { max?: number; run: (env: Env, ids: string[], form: FormData, back: string) => Promise<Done> };
+// skipped: rows the op left alone, when that is not simply the ids it did not change.
+type Done = { n: number; skipped?: number; event: EventKey; params?: Record<string, string | number | null> };
+export type Caller = { who: string; ctx: Pick<ExecutionContext, 'waitUntil'> };
+// back: the list to land on, which Undo returns to as well. id: parses one
+// posted id, when the op's rows differ from the endpoint's.
+type Op = {
+  max?: number;
+  id?: (value: string) => string;
+  run: (env: Env, ids: string[], form: FormData, back: string, caller: Caller) => Promise<Done>;
+};
+// One bulk route: its ops, the shape of its ids, every row of the list's
+// filter for all=1 (refused without), and the list it lands on.
+type Endpoint = {
+  ops: Record<string, Op>;
+  id: (value: string) => string;
+  all?: (env: Env, form: FormData) => Promise<string[]>;
+  back: (form: FormData) => string;
+};
 export type BulkResult = { location: string; n: number; skipped: number };
+const ROW_ID = /^[a-f0-9]{64}$/;
+const rowId = (value: string) => {
+  requireInput(ROW_ID.test(value), 'Invalid selection', 400);
+  return value;
+};
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
 const changes = (results: readonly D1Result[]) => results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
@@ -150,30 +192,183 @@ const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
     (await invoiceRows(env, month(text(form, 'month') || null), invoiceShow(form.get('show')))).shown.map((r) => r.id),
 };
 const HOME: Record<string, string> = { review: '/review', receipts: '/receipts', invoices: '/invoices' };
+const RECEIPTS: Endpoint = {
+  ops: OPS,
+  id: rowId,
+  all: (env, form) => {
+    const list = text(form, 'list');
+    requireInput(Object.hasOwn(LISTS, list), 'Invalid list', 400);
+    return LISTS[list]!(env, form);
+  },
+  back: (form) => backPath(form.get('back'), HOME[text(form, 'list')] ?? '/receipts'),
+};
 
-export async function receiptsBulk(env: Env, form: FormData): Promise<BulkResult> {
+// ---------- Bank ----------
+// The month and Show chip the bar was drawn for.
+function bankScope(form: FormData): { month: string; show: BankShow } {
+  const month = text(form, 'month'),
+    show = text(form, 'show');
+  requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
+  requireInput(
+    BANK_SHOWS.some((s) => s === show),
+    'Invalid filter',
+    400,
+  );
+  return { month, show: show as BankShow };
+}
+// Not a purchase (0) and Needs receipt (1): only money out that is not that already.
+const required = (to: 0 | 1, event: EventKey): Op => ({
+  run: async (env, ids) => {
+    const result = await env.DB.prepare(
+      `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=?`,
+    )
+      .bind(to, JSON.stringify(ids), 1 - to)
+      .run();
+    const n = result.meta.changes ?? 0;
+    if (n) await reconcile(env);
+    return { n, event };
+  },
+});
+const PAYMENT_OPS: Record<PaymentOp, Op> = {
+  // Only the exact likely pairs Bank shows for the month, as Match all takes them;
+  // one time on all of them, so the banner's Undo finds them.
+  match: {
+    run: async (env, ids, form) => {
+      const { month } = bankScope(form);
+      const tuning = config(env).tuning;
+      const [open, receipts, rules] = await Promise.all([
+        showRows(env, month, 'missing', BULK_CAP),
+        matchableReceipts(env),
+        env.DB.prepare('SELECT * FROM vendor_rules')
+          .all<Rule>()
+          .then((r) => r.results),
+      ]);
+      const picked = new Set(ids);
+      const pairs = likelyPairs(open, receipts, rules, tuning)
+        .exact.filter(({ t }) => picked.has(t.id))
+        .map(({ t, r }) => [t.id, r.id] as const);
+      requireInput(pairs.length <= BULK_MAX, `Up to ${BULK_MAX} matches at a time. Narrow the filter.`, 400);
+      const at = new Date().toISOString();
+      const { matched } = pairs.length ? await matchLikely(env, pairs, rules, tuning, at) : { matched: 0 };
+      if (matched) await clearBankReview(env);
+      // The Undo reads the month from the Bank address it lands on.
+      return { n: matched, event: 'matchedMany', params: { at: matched ? at : null, picked: 1 } };
+    },
+  },
+  exempt: required(0, 'notPurchaseMany'),
+  require: required(1, 'needsReceiptMany'),
+  unmatch: {
+    run: async (env, ids) => {
+      const n = await unlinkMatches(env, ids);
+      if (n) await clearBankReview(env);
+      return { n, event: 'unmatchedMany' };
+    },
+  },
+};
+const PAYMENTS: Endpoint = {
+  ops: PAYMENT_OPS,
+  id: rowId,
+  all: async (env, form) => {
+    const { month, show } = bankScope(form);
+    return (await showRows(env, month, show, BULK_CAP + 1)).map((t) => t.id);
+  },
+  back: (form) => {
+    const { month, show } = bankScope(form);
+    return `/payments?month=${month}&show=${show}`;
+  },
+};
+
+// ---------- Unknown senders and Settings > Senders ----------
+const BACK_TO: Record<string, string> = { settings: '/settings#senders', receipts: '/receipts' };
+// Settings opens its Senders section for the mail events too.
+const from = (back: string) => ({ from: back.startsWith('/settings') ? 'settings' : null });
+const SENDER_OPS: Record<SenderOp, Op> = {
+  // Every sender of the checked emails, added in one write; then all their waiting mail is read.
+  allow: {
+    run: async (env, ids, _form, back, { who, ctx }) => {
+      const { held, senders } = await heldSenders(env, ids);
+      const n = senders.length ? await approveSenders(env, senders, who, ctx) : 0;
+      return {
+        n,
+        skipped: ids.length - held,
+        event: 'mailAllowed',
+        params: { senders: senders.length, ...from(back) },
+      };
+    },
+  },
+  // An approved sender is left alone, as Ignore refuses it one at a time.
+  ignore: {
+    run: async (env, ids, _form, back, { who }) => {
+      const { held, senders } = await heldSenders(env, ids);
+      const allowed = config(env).allowedSenders;
+      const todo = senders.filter((s) => !allowed.has(s));
+      const n = todo.length ? await ignoreSenders(env, todo, who) : 0;
+      return {
+        n,
+        skipped: ids.length - held + (senders.length - todo.length),
+        event: 'mailIgnored',
+        params: { senders: todo.length, ...from(back) },
+      };
+    },
+  },
+  delete: {
+    run: async (env, ids, _form, back) => ({
+      n: await deleteHeldMail(env, ids),
+      event: 'mailDeleted',
+      params: from(back),
+    }),
+  },
+  remove: {
+    id: senderAddress,
+    run: async (env, ids, _form, _back, { who }) => ({ n: await removeSenders(env, ids, who), event: 'senderRemoved' }),
+  },
+  unignore: {
+    id: senderAddress,
+    run: async (env, ids) => ({ n: await unignoreSenders(env, ids), event: 'senderUnignored' }),
+  },
+};
+const SENDERS: Endpoint = {
+  ops: SENDER_OPS,
+  id: (value) => {
+    requireInput(/^[0-9a-f-]{36}$/.test(value), 'Invalid email', 400);
+    return value;
+  },
+  back: (form) => BACK_TO[text(form, 'back')] ?? '/review',
+};
+
+// The checked ids: at least one, at most max, each of the list's shape.
+function bulkIds(values: readonly unknown[], max: number, parse: (value: string) => string): string[] {
+  const raw = [...new Set(values.map(String))];
+  requireInput(raw.length > 0, 'Choose at least one', 400);
+  requireInput(raw.length <= max, `Up to ${max} at a time.`, 400);
+  return [...new Set(raw.map(parse))];
+}
+
+async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Caller): Promise<BulkResult> {
   const name = text(form, 'op');
-  requireInput(Object.hasOwn(OPS, name), 'Invalid action', 400);
-  const op = OPS[name as ReceiptOp];
+  requireInput(Object.hasOwn(endpoint.ops, name), 'Invalid action', 400);
+  const op = endpoint.ops[name]!;
   const max = op.max ?? BULK_CAP;
-  const list = text(form, 'list');
   let ids: string[];
   if (form.get('all') === '1') {
-    requireInput(Object.hasOwn(LISTS, list), 'Invalid list', 400);
-    const all = await LISTS[list]!(env, form);
+    requireInput(endpoint.all, 'Invalid list', 400);
+    const all = await endpoint.all(env, form);
     requireInput(all.length <= max, `Up to ${max} at a time. Narrow the filter.`, 400);
     requireInput(all.length > 0, 'Nothing matches the filter.', 400);
     ids = all;
-  } else ids = receiptIds(form.getAll('id'), max);
+  } else ids = bulkIds(form.getAll('id'), max, op.id ?? endpoint.id);
   const before = form.get('done_before') === null ? 0 : Number(form.get('done_before'));
   requireInput(Number.isSafeInteger(before) && before >= 0, 'Invalid progress', 400);
-  const back = backPath(form.get('back'), HOME[list] ?? '/receipts');
-  const done = await op.run(env, ids, form, back);
+  const back = endpoint.back(form);
+  const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
-    skipped = ids.length - done.n;
+    skipped = done.skipped ?? ids.length - done.n;
   return {
     location: withDone(done.event, back, { n, ...done.params, skipped: skipped || null }),
     n,
     skipped,
   };
 }
+export const receiptsBulk = (env: Env, form: FormData, caller: Caller) => runBulk(RECEIPTS, env, form, caller);
+export const paymentsBulk = (env: Env, form: FormData, caller: Caller) => runBulk(PAYMENTS, env, form, caller);
+export const sendersBulk = (env: Env, form: FormData, caller: Caller) => runBulk(SENDERS, env, form, caller);
