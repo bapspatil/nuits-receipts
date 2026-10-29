@@ -79,6 +79,7 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | Users | One user per deployment, with one shared password, or the emails in `ACCESS_ALLOWED_EMAILS` in Access mode. No roles. |
 | Sign-out | None with HTTP Basic. Access mode has **Sign out**. |
 | Bank connections | XLSX, CSV and PDF statement import only. No bank API sync, no scanned PDF statements. |
+| Bulk actions | 500 rows per action, including **Select all N**. A list with more shows no **Select all N**; narrow the filter. **Match** on Bank takes up to 100 matches at a time (`src/match.ts`). **Read again** and **Move** send 10 per request, and the page sends them in groups with a progress bar (`src/bulk.ts`). |
 | Matching | One bank row per document. Split and combined payments, refunds, fees and currency conversion are not matched automatically. |
 
 ## Cloudflare plan limits
