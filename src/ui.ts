@@ -482,16 +482,17 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 [data-bulk-list] li:has(>.pick){position:relative;padding-left:var(--space-8)}
 [data-bulk-list] li>.pick{position:absolute;left:var(--space-2);top:var(--space-2)}
 [data-bulk-list] .pays-h{padding-left:var(--space-8)}
-.bulktools{display:flex;align-items:center;gap:var(--space-3)}
+.bulktools{display:flex;align-items:center;gap:var(--space-3);padding-left:var(--space-2)}
 .bulktools [hidden],.bulkbar [hidden]{display:none}
-.bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin-top:var(--space-3);padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
+.bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin:var(--space-3) 0;padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
 [data-bulk-list]:has(.pick input[name=id]:checked)+.bulkbar,.bulkbar[data-count]:not([data-count="0"]){display:flex}
+html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 .bulkcount{margin:0;flex:1 1 auto;min-height:44px;display:flex;align-items:center;gap:var(--space-3);font-weight:600}
 .bulkbar:not([data-count]) [data-bulk-count]::before{content:counter(bulk) " selected"}
 .bulkstatus{font-weight:400;color:var(--text-muted)}.bulkstatus:empty{display:none}.bulkstatus.bad{color:var(--danger);font-weight:600}
 .bulkacts{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
 .bulkbar summary{list-style:none}.bulkbar summary::-webkit-details-marker{display:none}
-.bulkbar details[open]{flex:1 1 100%}
+.bulkbar details{margin:0;border:0;background:none}.bulkbar details[open]{flex:1 1 100%}
 .bulkbar details>.body{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;padding:var(--space-2) 0}
 .bulkbar .body>.ask{flex:1 1 100%;margin:0}
 .bulkbar .btn.danger{color:var(--danger);border-color:var(--danger)}.bulkbar .btn.danger:hover{background:var(--danger-surface)}
@@ -499,7 +500,7 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .bulkbar .chip{display:inline-flex;align-items:center;gap:var(--space-2)}.bulkbar .chip input{width:auto;min-height:0;margin:0;accent-color:var(--accent)}.bulkbar .chip:has(:checked){border-color:var(--text)}
 .bulkfield{display:flex;flex-direction:column;gap:var(--space-1);flex:1 1 14rem;font-size:var(--text-sm);font-weight:600}
 .is-pending{opacity:.5}
-@media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}}
+@media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:calc(var(--tabbar-height) + 9rem)}}
 @media (max-width:40rem){[data-bulk-list]:not([data-selecting]) li:has(>.pick){padding-left:var(--space-4)}[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
 @media not (max-width:40rem){.bulktools [data-bulk-select]{display:none}}
 .gone{margin:0 0 var(--space-4)}
