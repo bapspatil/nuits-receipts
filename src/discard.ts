@@ -40,9 +40,9 @@ export async function discardReceipts(
 ): Promise<{ at: string; n: number }> {
   const rows = (
     await env.DB.prepare(
-      `SELECT r.id,r.revision,r.discarded_at,EXISTS(SELECT 1 FROM bank_transactions t WHERE t.receipt_id=r.id) AS matched FROM receipts r WHERE r.id IN (${ids.map(() => '?').join(',')})`,
+      `SELECT r.id,r.revision,r.discarded_at,EXISTS(SELECT 1 FROM bank_transactions t WHERE t.receipt_id=r.id) AS matched FROM receipts r WHERE r.id IN (SELECT value FROM json_each(?))`,
     )
-      .bind(...ids)
+      .bind(JSON.stringify(ids))
       .all<{ id: string; revision: number; discarded_at: string | null; matched: number }>()
   ).results;
   requireInput(rows.length === ids.length, 'Receipt not found', 404);
@@ -77,9 +77,9 @@ export async function discardReceipts(
 
 export async function restoreReceipts(env: Env, ids: readonly string[]): Promise<number> {
   const result = await env.DB.prepare(
-    `UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`,
+    `UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at IS NOT NULL AND id IN (SELECT value FROM json_each(?))`,
   )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .run();
   return result.meta.changes ?? 0;
 }

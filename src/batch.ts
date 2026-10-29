@@ -64,8 +64,8 @@ const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim()
 const changes = (results: readonly D1Result[]) => results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
 async function rowsOf(env: Env, ids: readonly string[]): Promise<Receipt[]> {
   return (
-    await env.DB.prepare(`SELECT * FROM receipts WHERE id IN (${ids.map(() => '?').join(',')})`)
-      .bind(...ids)
+    await env.DB.prepare('SELECT * FROM receipts WHERE id IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(ids))
       .all<Receipt>()
   ).results;
 }
@@ -164,9 +164,9 @@ const OPS: Record<ReceiptOp, Op> = {
       const { on, note } = paidFields(form);
       requireInput(on.length > 0, 'Choose the day it was paid', 422, 'paid_outside_on');
       const result = await env.DB.prepare(
-        `UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE kind='sales' AND id IN (${ids.map(() => '?').join(',')})`,
+        "UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE kind='sales' AND id IN (SELECT value FROM json_each(?))",
       )
-        .bind(on, note, ...ids)
+        .bind(on, note, JSON.stringify(ids))
         .run();
       return { n: result.meta.changes ?? 0, event: 'paidMany', params: { on } };
     },
