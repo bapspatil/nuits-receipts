@@ -59,7 +59,7 @@ Within a minute or so the receipt appears on **Receipts** and, if anything needs
 
 If nothing appears:
 
-- **The sender is not approved yet.** Mail from anyone not on your allowed senders waits in **Review** under **Unknown senders**. Press **Allow** to read it, and their later mail is read as it arrives.
+- **The sender is not approved yet.** Mail from anyone not on your allowed senders waits in **Review** under **Unknown senders**. Press **Allow** to read it, and their later mail is read as it arrives. Tick several to allow them at once.
 - **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
 - **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept in **Review** with "We couldn't verify who sent this email." It is not read by AI. Download the original, check it, and upload it if it is genuine.
 - **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).

@@ -62,8 +62,10 @@ function tabsOf(html: string) {
     nav,
   };
 }
+// The bulk bar stays hidden until a row is picked, so its buttons don't count.
 function primaries(html: string) {
-  return [...html.matchAll(/class="[^"]*\bbtn primary\b[^"]*"/g)].length;
+  const shown = html.replace(/<form id="[^"]*" class="bulkbar"[\s\S]*?<\/form>/g, '');
+  return [...shown.matchAll(/class="[^"]*\bbtn primary\b[^"]*"/g)].length;
 }
 function visible(html: string) {
   return html
@@ -366,7 +368,7 @@ test('Invoices is a list like Receipts: one summary line, one status word, CSV w
   );
   expect(html).toMatch(
     new RegExp(
-      `<li><a href="/receipts/${sales}">Example Client Oy</a><span class="amt">EUR 125.50</span><span class="ok">INV-7 · <span class="stamp missing">Overdue</span> 18 Sep</span></li>`,
+      `<li><label class="pick"><input type="checkbox" name="id" value="${sales}" form="bulk-invoices"><span class="vh">Select Invoice to Example Client Oy</span></label><a href="/receipts/${sales}">Example Client Oy</a><span class="amt">EUR 125.50</span><span class="ok">INV-7 · <span class="stamp missing">Overdue</span> 18 Sep</span></li>`,
     ),
   );
   expect(html).toContain(`<p class="small">${EXPORT_LINE}</p>`);
@@ -856,7 +858,7 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   // Review rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/review')).text();
   expect(review).toContain(
-    `<li><a class="btn primary" href="/receipts/${flagged.id}">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span><details class="discard">`,
+    `<li><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-review"><span class="vh">Select photo.png</span></label><a class="btn primary" href="/receipts/${flagged.id}">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span><details class="discard">`,
   );
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('Start reviewing');

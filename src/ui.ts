@@ -461,7 +461,7 @@ body.p-reviewItem nav.tabs{display:none}
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) :is(nav.tabs,.sbar){display:none}
 }
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--text)}}
-.tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}.tools .select{margin-left:auto}
+.tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}
 .list li:has(>details.discard)>.why{align-self:center}
 details.discard{grid-column:2;grid-row:2;justify-self:end;border:0;background:none;margin:0}
 details.discard>summary{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);display:flex;align-items:center;justify-content:flex-end;list-style:none}
@@ -474,12 +474,37 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .chip:hover,.chip:focus-visible{border-color:var(--text)}
 .ask{margin:0 0 var(--space-2);font-weight:600;color:var(--danger)}
 .banner.undo{display:flex;align-items:center;gap:var(--space-2);padding-top:0;padding-bottom:0;min-height:44px}.banner.undo form{margin-left:auto}
-.pick{display:flex;align-items:center;gap:var(--space-3);min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none}
-.bulk .bar{position:sticky;bottom:var(--tabbar-height);z-index:4;background:var(--surface-raised);padding:var(--space-2) var(--space-4);display:flex;gap:var(--space-2) var(--space-4);align-items:center;flex-wrap:wrap;border:1px solid var(--border)}
-.bulk .bar details.discard>summary{display:none}.bulk .bar details.discard>.body{padding:0}
+.pick{display:flex;align-items:center;gap:var(--space-3);min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
 .list.all li>form{grid-column:2;grid-row:2;justify-self:end}
+[data-bulk-list]{counter-reset:bulk}
+[data-bulk-list] .pick{min-width:44px;justify-content:center}
+[data-bulk-list] .pick input[name=id]:checked{counter-increment:bulk}
+[data-bulk-list] li:has(>.pick){position:relative;padding-left:var(--space-8)}
+[data-bulk-list] li>.pick{position:absolute;left:var(--space-2);top:var(--space-2)}
+[data-bulk-list] .pays-h{padding-left:var(--space-8)}
+.bulktools{display:flex;align-items:center;gap:var(--space-3);padding-left:var(--space-2)}
+.bulktools [hidden],.bulkbar [hidden]{display:none}
+.bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin:var(--space-3) 0;padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
+[data-bulk-list]:has(.pick input[name=id]:checked)+.bulkbar,.bulkbar[data-count]:not([data-count="0"]){display:flex}
+html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
+.bulkcount{margin:0;flex:1 1 auto;min-height:44px;display:flex;align-items:center;gap:var(--space-3);font-weight:600}
+.bulkbar:not([data-count]) [data-bulk-count]::before{content:counter(bulk) " selected"}
+.bulkstatus{font-weight:400;color:var(--text-muted)}.bulkstatus:empty{display:none}.bulkstatus.bad{color:var(--danger);font-weight:600}
+.bulkacts{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
+.bulkbar summary{list-style:none}.bulkbar summary::-webkit-details-marker{display:none}
+.bulkbar details{margin:0;border:0;background:none}.bulkbar details[open]{flex:1 1 100%}
+.bulkbar details>.body{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;padding:var(--space-2) 0}
+.bulkbar .body>.ask{flex:1 1 100%;margin:0}
+.bulkbar .btn.danger{color:var(--danger);border-color:var(--danger)}.bulkbar .btn.danger:hover{background:var(--danger-surface)}
+.bulkbar progress{flex:1 1 100%;height:4px;accent-color:var(--accent)}
+.bulkbar .chip{display:inline-flex;align-items:center;gap:var(--space-2)}.bulkbar .chip input{width:auto;min-height:0;margin:0;accent-color:var(--accent)}.bulkbar .chip:has(:checked){border-color:var(--text)}
+.bulkfield{display:flex;flex-direction:column;gap:var(--space-1);flex:1 1 14rem;font-size:var(--text-sm);font-weight:600}
+.is-pending{opacity:.5}
+@media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:calc(var(--tabbar-height) + 9rem)}}
+@media (max-width:40rem){[data-bulk-list]:not([data-selecting]) li:has(>.pick){padding-left:var(--space-4)}[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
+@media not (max-width:40rem){.bulktools [data-bulk-select]{display:none}}
 .gone{margin:0 0 var(--space-4)}
-@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}}`;
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;
 }
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
 export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${PALETTE.paper}"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="${PALETTE.petrol900}"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="${PALETTE.paper}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -599,6 +624,8 @@ function feedbackBanner(): string {
   return `<div class="banner undo" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
 }
 
+// Once per page however many bulk lists it has: the script binds every bar it finds.
+const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
 export async function page(
   view: PageKey,
   body: string,
@@ -617,12 +644,12 @@ export async function page(
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes('<div data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
     {
       status: requestState.getStore()?.failure?.status ?? status,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        // The rules live in a file, not an inline script, so the page needs no script-src.
+        // The rules live in a file, not an inline script.
         'Speculation-Rules': `"${basePath}/assets/speculation-rules.json"`,
       },
     },

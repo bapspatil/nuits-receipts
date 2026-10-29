@@ -5,6 +5,7 @@ import { config } from './config';
 import { STATUS } from './status';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
 import { restoreForm } from './discard';
+import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, SENDER_ACTIONS, type BulkList } from './bulk';
 import { invoiceName } from './invoices';
 import type { MailRow } from './inbound';
 import {
@@ -73,8 +74,8 @@ const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,
 
 export type AllQuery = { show: Show | null; month: string | null; q: string; offset: number };
 
-// One page of rows (PAGE_SIZE + 1, so the caller knows if there is more).
-export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
+// The list's filter as SQL over RECEIPTS and HELD, shared by the page and its bulk actions.
+export function allWhere(query: Omit<AllQuery, 'offset'>): { where: string; binds: unknown[] } {
   const where: string[] = [],
     binds: unknown[] = [];
   // Discarded rows show only under their own chip.
@@ -93,8 +94,14 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
     );
     binds.push(`%${query.q.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
   }
+  return { where: where.join(' AND '), binds };
+}
+
+// One page of rows (PAGE_SIZE + 1, so the caller knows if there is more).
+export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
+  const { where, binds } = allWhere(query);
   const sql = (held: boolean) =>
-    `SELECT * FROM (${RECEIPTS}${held ? ` UNION ALL ${HELD}` : ''})${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY received_at DESC,id DESC LIMIT ? OFFSET ?`;
+    `SELECT * FROM (${RECEIPTS}${held ? ` UNION ALL ${HELD}` : ''}) WHERE ${where} ORDER BY received_at DESC,id DESC LIMIT ? OFFSET ?`;
   try {
     return (
       await env.DB.prepare(sql(true))
@@ -110,6 +117,25 @@ export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
         .all<AllRow>()
     ).results;
   }
+}
+
+// The receipt rows (never held mail) the filter matches, across pages: their
+// count for the bulk bar, or up to `limit` ids for a bulk action on all of them.
+export async function filterCount(env: Env, query: Omit<AllQuery, 'offset'>): Promise<number> {
+  const { where, binds } = allWhere(query);
+  return (
+    (await env.DB.prepare(`SELECT count(*) n FROM (${RECEIPTS}) WHERE ${where}`)
+      .bind(...binds)
+      .first<number>('n')) ?? 0
+  );
+}
+export async function filterIds(env: Env, query: Omit<AllQuery, 'offset'>, limit: number): Promise<string[]> {
+  const { where, binds } = allWhere(query);
+  return (
+    await env.DB.prepare(`SELECT id FROM (${RECEIPTS}) WHERE ${where} ORDER BY received_at DESC,id DESC LIMIT ?`)
+      .bind(...binds, limit)
+      .all<{ id: string }>()
+  ).results.map((r) => r.id);
 }
 
 export function chipOf(row: AllRow): { label: string; css: string } {
@@ -128,8 +154,22 @@ function rowName(row: AllRow): string {
 
 // The Unknown senders block. back: where the forms return to. primary: the
 // first Allow is the screen's one primary (when nothing else is).
-export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
+export function heldSection(
+  rows: readonly MailRow[],
+  back: 'review' | 'receipts' = 'review',
+  primary = false,
+  selecting = false,
+): string {
   if (!rows.length) return '';
+  const bulk: BulkList = {
+    form: 'bulk-held',
+    action: '/senders/bulk',
+    noun: ['email', 'emails'],
+    total: rows.length,
+    scope: { back },
+    actions: [SENDER_ACTIONS.allow, SENDER_ACTIONS.ignore, SENDER_ACTIONS.delete],
+  };
+  const here = `/${back}`;
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
@@ -137,7 +177,7 @@ export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts
   const items = rows
     .map((r, i) => {
       const who = escape(r.sender);
-      return `<li id="mail-${escape(r.id)}"><p class="who"><b>${who}</b></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns">${form(
+      return `<li id="mail-${escape(r.id)}">${bulkCheck(bulk, r.id, `${r.sender}, ${r.subject || '(no subject)'}`)}<p class="who"><b>${who}</b></p><p class="subj">${r.subject ? escape(r.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns">${form(
         '/senders/approve',
         { address: r.sender },
         `<button class="btn ${primary && !i ? 'primary' : 'secondary'}" aria-label="Allow ${who}">Allow</button>`,
@@ -147,21 +187,21 @@ export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts
       )}</div></li>`;
     })
     .join('');
-  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><ul class="list">${items}</ul></section>`;
+  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
 }
 
-function parseQuery(params: URLSearchParams, offset: number): AllQuery {
+export function parseQuery(params: URLSearchParams, offset = 0): AllQuery {
   const show = params.get('show') ?? '';
   const month = params.get('month') ?? '';
   requireInput(!month || /^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
   return {
-    show: show in SHOW ? (show as Show) : null,
+    show: Object.hasOwn(SHOW, show) ? (show as Show) : null,
     month: month || null,
     q: (params.get('q') ?? '').trim().slice(0, 100),
     offset,
   };
 }
-function link(query: AllQuery, change: Partial<AllQuery>): string {
+function path(query: AllQuery, change: Partial<AllQuery>): string {
   const next = { ...query, offset: 0, ...change };
   const params = new URLSearchParams();
   if (next.show) params.set('show', next.show);
@@ -169,18 +209,20 @@ function link(query: AllQuery, change: Partial<AllQuery>): string {
   if (next.q) params.set('q', next.q);
   if (next.offset) params.set('offset', String(next.offset));
   const text = params.toString();
-  return `/receipts${text ? `?${escape(text)}` : ''}`;
+  return `/receipts${text ? `?${text}` : ''}`;
 }
+const link = (query: AllQuery, change: Partial<AllQuery>) => escape(path(query, change));
 
 export async function allReceiptsPage(env: Env, params: URLSearchParams, offset: number): Promise<Response> {
   const query = parseQuery(params, offset);
-  const [rows, tally, counts, tabTotals] = await Promise.all([
+  const [rows, tally, counts, tabTotals, total] = await Promise.all([
     allRows(env, query),
     env.DB.prepare(
       "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
     ).first<Record<'reading' | 'duplicate' | 'discarded', number>>(),
     navCounts(env),
     tabCounts(env, query.month),
+    filterCount(env, query),
   ]);
   const more = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
@@ -195,21 +237,50 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     })),
   ]);
   const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
+  const selecting = params.get('select') === '1';
+  const here = path(query, { offset: query.offset });
+  const bulk: BulkList = {
+    form: 'bulk-receipts',
+    action: '/receipts/bulk',
+    noun: ['receipt', 'receipts'],
+    total,
+    scope: {
+      list: 'receipts',
+      ...(query.show ? { show: query.show } : {}),
+      ...(query.month ? { month: query.month } : {}),
+      ...(query.q ? { q: query.q } : {}),
+      back: here,
+    },
+    actions:
+      query.show === 'discarded'
+        ? [RECEIPT_ACTIONS.restore]
+        : [
+            RECEIPT_ACTIONS.discard,
+            RECEIPT_ACTIONS.retry,
+            RECEIPT_ACTIONS.kind(query.show === 'sales' ? 'sales' : 'expense'),
+          ],
+  };
+  const picks = shown.filter((r) => r.type === 'receipt').length;
+  const ul = `<ul class="list all">${shown
+    .map((r) => {
+      const chip = chipOf(r);
+      const href = r.type === 'mail' ? `/review#mail-${escape(r.id)}` : `/receipts/${escape(r.id)}`;
+      const status =
+        chip.css === 'needs'
+          ? `<span class="stamp needs">${chip.label}</span> `
+          : chip.css === 'muted'
+            ? `${tag(chip.label)} `
+            : '';
+      const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
+      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, '/receipts') : ''}</li>`;
+    })
+    .join('')}</ul>`;
   const list = shown.length
-    ? `<ul class="list all">${shown
-        .map((r) => {
-          const chip = chipOf(r);
-          const href = r.type === 'mail' ? `/review#mail-${escape(r.id)}` : `/receipts/${escape(r.id)}`;
-          const status =
-            chip.css === 'needs'
-              ? `<span class="stamp needs">${chip.label}</span> `
-              : chip.css === 'muted'
-                ? `${tag(chip.label)} `
-                : '';
-          const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
-          return `<li><a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, '/receipts') : ''}</li>`;
-        })
-        .join('')}</ul>${
+    ? `${
+        picks
+          ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, picks, selecting, selecting ? here : `${here}${here.includes('?') ? '&' : '?'}select=1`)}${ul}</div>${bulkBar(bulk)}`
+          : ul
+      }${
         query.offset || more
           ? `<nav class="btns" aria-label="Pages">${query.offset ? `<a class="btn secondary" href="${link(query, { offset: Math.max(0, query.offset - PAGE_SIZE) })}">Newer</a>` : ''}${more ? `<a class="btn secondary" href="${link(query, { offset: query.offset + PAGE_SIZE })}">Older</a>` : ''}</nav>`
           : ''

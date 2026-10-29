@@ -109,7 +109,8 @@ test('the Send step downloads first, then asks whether it was sent', async () =>
   expect(bank).toContain('Send March</a>');
   await markSent('2020-03');
   const after = await home('/payments?month=2020-03');
-  expect(after).not.toContain('btn primary');
+  // The bulk bar stays hidden until a row is picked.
+  expect(after.replace(/<form id="[^"]*" class="bulkbar"[\s\S]*?<\/form>/g, '')).not.toContain('btn primary');
   expect(after).toContain('March is sent');
 });
 

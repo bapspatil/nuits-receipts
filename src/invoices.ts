@@ -6,6 +6,7 @@ import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
 import { flagFor, reasonCodes } from './flags';
+import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import {
   amount,
   day,
@@ -89,7 +90,7 @@ export async function overdueInvoices(env: Env): Promise<SalesRow[]> {
   return open.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === 'overdue');
 }
 
-type Show = 'all' | 'review' | 'unpaid' | 'overdue' | 'paid';
+export type Show = 'all' | 'review' | 'unpaid' | 'overdue' | 'paid';
 const SHOWS: Record<Show, string> = {
   all: 'All',
   review: 'Check',
@@ -97,17 +98,23 @@ const SHOWS: Record<Show, string> = {
   overdue: 'Overdue',
   paid: 'Paid',
 };
-export async function invoicesPage(env: Env, selected: string, params: URLSearchParams): Promise<Response> {
-  const settings = config(env);
-  const show = (Object.keys(SHOWS) as Show[]).find((k) => k === params.get('show')) ?? 'all';
+export const invoiceShow = (value: unknown): Show => (Object.keys(SHOWS) as Show[]).find((k) => k === value) ?? 'all';
+// The month's invoices and the ones the Show chip picks, shared by the page and its bulk actions.
+export async function invoiceRows(env: Env, selected: string, show: Show) {
   // Unpaid and overdue span every month: an old invoice is still owed.
   const across = show === 'unpaid' || show === 'overdue';
   const month = await salesRows(env, 'substr(r.issue_date,1,7)=?', selected);
   const open = across ? await salesRows(env, 'r.issue_date IS NOT NULL') : month;
-  const undated = await salesRows(env, 'r.issue_date IS NULL');
   const base = across ? open : month;
   const shown =
     show === 'all' ? base : base.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === show);
+  return { across, month, open, base, shown };
+}
+export async function invoicesPage(env: Env, selected: string, params: URLSearchParams): Promise<Response> {
+  const settings = config(env);
+  const show = invoiceShow(params.get('show'));
+  const { across, month, open, base, shown } = await invoiceRows(env, selected, show);
+  const undated = await salesRows(env, 'r.issue_date IS NULL');
   let invoiced = 0n,
     received = 0n,
     noEur = 0;
@@ -153,13 +160,23 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
   };
+  const selecting = params.get('select') === '1';
+  const here = `/invoices?month=${selected}${show === 'all' ? '' : `&show=${show}`}`;
+  const bulk: BulkList = {
+    form: 'bulk-invoices',
+    action: '/receipts/bulk',
+    noun: ['invoice', 'invoices'],
+    total: shown.length,
+    scope: { list: 'invoices', month: selected, ...(show === 'all' ? {} : { show }), back: here },
+    actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
+  };
   const rows = shown.length
-    ? `<ul class="list all">${shown
+    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, shown.length, selecting, selecting ? here : `${here}&select=1`)}<ul class="list all">${shown
         .map(
           (r) =>
-            `<li><a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
+            `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
         )
-        .join('')}</ul>`
+        .join('')}</ul></div>${bulkBar(bulk)}`
     : emptyState(
         month.length || across
           ? 'Nothing here.'
@@ -250,8 +267,6 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
 }
 
 // ---------- Add page ----------
-export const ADD_CSP =
-  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 export const MAX_UPLOAD_FILES = 10;
 export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
   const settings = config(env);

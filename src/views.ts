@@ -1,13 +1,13 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
-import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule, type Tuning } from './domain';
+import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule } from './domain';
 import {
   creditFit,
   eligible,
   eurValue,
-  lookalike,
   monthEurValues,
   openSales,
+  showCounts,
   type EurValue,
   type Transaction,
 } from './banking';
@@ -15,7 +15,7 @@ import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts, SETTINGS_CSP } from './setup';
+import { setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
@@ -23,6 +23,16 @@ import { heldSection } from './all';
 import { matchedIds, mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
+import {
+  bulkBar,
+  bulkCheck,
+  bulkTools,
+  PAYMENT_ACTIONS,
+  RECEIPT_ACTIONS,
+  SENDER_ACTIONS,
+  type BulkAction,
+  type BulkList,
+} from './bulk';
 import { EXEMPT_LABELS } from './exempt';
 import { feedback } from './events';
 import { arrivalMonth } from './arrival';
@@ -87,6 +97,7 @@ import {
 import { failureFor, kept } from './request';
 import { STATUS, matchStatus } from './status';
 import {
+  likelyPairs,
   matchableReceipts,
   matchAllLabel,
   pairFacts,
@@ -95,7 +106,6 @@ import {
   receiptName,
   whyLikely,
   type Cell,
-  type PairFacts,
 } from './match';
 
 type Payment = Transaction & { account_name: string; bank_name: string };
@@ -105,7 +115,7 @@ export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
 }
 
 const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, id';
-async function reviewQueue(env: Env): Promise<Receipt[]> {
+export async function reviewQueue(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
       `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
@@ -132,21 +142,6 @@ function reasonWord(r: Receipt): string {
   const cards = flagCards(reasonCodes(r.review_reasons_json));
   const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
   return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
-}
-// Receipts that look like this payment: a fit by name, amount and date first, then ones with
-// the same amount and date under another name (the person decides those).
-function suggestionsFor(t: Transaction, receipts: Receipt[], rules: Rule[], tuning: Tuning): Receipt[] {
-  const near = (r: Receipt) => Math.abs(Date.parse(r.issue_date ?? '') - Date.parse(t.booking_date));
-  const rank = (r: Receipt) => (eligible(r, t, rules, tuning) ? 0 : lookalike(r, t, tuning) ? 1 : 2);
-  return receipts
-    .filter((r) => rank(r) < 2)
-    .sort(
-      (a, b) =>
-        rank(a) - rank(b) ||
-        near(a) - near(b) ||
-        (a.issue_date ?? '').localeCompare(b.issue_date ?? '') ||
-        a.id.localeCompare(b.id),
-    );
 }
 function receiptOption(r: Receipt, selected = false): string {
   return `<option value="${r.id}"${selected ? ' selected' : ''}>${escape(receiptName(r))} · ${escape(day(r.issue_date)) || 'no date'} · ${amount(r.total_minor, r.currency)}</option>`;
@@ -279,27 +274,28 @@ export async function reviewPage(
       current: k === filter,
     })),
   ]);
-  const selecting = params.get('select') === '1' && rows.length > 0;
+  const selecting = params.get('select') === '1';
   const here = filter ? `/review?reason=${filter}` : '/review';
-  const select =
-    rows.length > 1 && !selecting
-      ? `<a class="linkbtn select" href="${here}${filter ? '&' : '?'}select=1">Select</a>`
-      : '';
+  const bulk: BulkList = {
+    form: 'bulk-review',
+    action: '/receipts/bulk',
+    noun: ['receipt', 'receipts'],
+    total: rows.length,
+    // filter, not reason: the discard chips post reason.
+    scope: { list: 'review', ...(filter ? { filter } : {}), back: here },
+    actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
+  };
   // Row 1 is the next to check: its name is the screen's one primary.
   const items = rows
     .map((r, i) => {
       const name = escape(receiptName(r));
       const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
       const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      return selecting
-        ? `<li><label class="pick"><input type="checkbox" name="id" value="${r.id}">${name}</label>${amt}${why}</li>`
-        : `<li><a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
+      return `<li>${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
     })
     .join('');
   const list = rows.length
-    ? selecting
-      ? `<form class="bulk" method="post" action="/discard"><input type="hidden" name="back" value="/review"><ul class="list checks">${items}</ul><div class="bar">${discardControl(null, { back: '/review', matched: rows.some((r) => matched.has(r.id)), bare: true })}<a class="linkbtn" href="${here}">Cancel</a></div></form>`
-      : `<ul class="list checks">${items}</ul>`
+    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}${filter ? '&' : '?'}select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
     : all.length
       ? emptyState('Nothing in this filter.', `<a class="btn primary" href="/review">Show all ${all.length}</a>`)
       : held.length
@@ -307,7 +303,7 @@ export async function reviewPage(
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'review',
-    `${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length, selecting)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -779,6 +775,7 @@ export async function payments(
     transfers,
     allCredits,
     counts,
+    showTotals,
     elsewhere,
     droppedRecently,
     history,
@@ -807,6 +804,7 @@ export async function payments(
     // The whole month in numbers, whichever page of it is shown, and the
     // matched receipts that still need a look.
     chosen.then((m) => monthCounts(env, m)),
+    chosen.then((m) => showCounts(env, m)),
     chosen.then((m) =>
       env.DB.prepare(
         `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
@@ -843,20 +841,7 @@ export async function payments(
     const found = pickMatches(chosenReceipt(t.id), pool, year);
     return found.length === 1 ? found[0] : undefined;
   };
-  // One likely receipt for each missing payment, no receipt twice. Only exact fits go in Match all.
-  const taken = new Set<string>();
-  const likelyOf = new Map<string, Receipt>();
-  const bulk: { t: Payment; r: Receipt; facts: PairFacts }[] = [];
-  for (const t of open) {
-    const list = suggestionsFor(t, receipts, rules, tuning);
-    const r = list.find((x) => !taken.has(x.id)) ?? list[0];
-    if (!r) continue;
-    likelyOf.set(t.id, r);
-    if (taken.has(r.id)) continue;
-    taken.add(r.id);
-    const facts = pairFacts(r, t, rules, tuning);
-    if (facts.exact) bulk.push({ t, r, facts });
-  }
+  const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
   const isMissing = unmatched;
   const missing = open;
   // Missing first: it is the only thing Bank asks of you.
@@ -870,6 +855,16 @@ export async function payments(
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
   const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
+  const selecting = params.get('select') === '1';
+  const here = `/payments?month=${selected}&show=${show}${offset ? `&offset=${offset}` : ''}`;
+  const bar: BulkList = {
+    form: 'bulk-payments',
+    action: '/payments/bulk',
+    noun: ['payment', 'payments'],
+    total: showTotals[show],
+    scope: { month: selected, show, ...(offset ? { offset: String(offset) } : {}) },
+    actions: [...PAYMENT_ACTIONS],
+  };
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
@@ -961,7 +956,8 @@ export async function payments(
             `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}><div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
+      // No bulk action applies to a transfer side.
+      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}>${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -978,6 +974,8 @@ export async function payments(
           '',
         )}</ul></details>${bulk.map(({ t, r }) => `<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">`).join('')}<button class="btn secondary">${matchAllLabel(bulk.length)}</button></form>`
     : '';
+  const picks = shown.filter((t) => !paired.has(t.id)).length;
+  const table = `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>`;
   const others = elsewhere.length
     ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="/payments?month=${e.m}&show=missing">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
@@ -999,7 +997,7 @@ export async function payments(
   const body = rows.length
     ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${counts.missing ? ' class="red"' : ''}>${counts.missing} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
         open.length ? '' : await settled(env, selected)
-      }${matchAll}${shown.length ? `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>${lists}` : ''}${
+      }${matchAll}${shown.length ? `${picks ? `<div data-bulk-list="${bar.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bar, picks, selecting, selecting ? here : `${here}&select=1`)}${table}</div>${bulkBar(bar)}` : table}${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
           : ''
@@ -1346,16 +1344,34 @@ async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<st
 }
 
 // Settings > Senders: who is read automatically and who is ignored.
-async function sendersPart(env: Env, open: boolean): Promise<string> {
+async function sendersPart(env: Env, open: boolean, selecting: boolean): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const ignored = await ignoredSenders(env);
-  const row = (address: string, action: string, button: string) =>
-    `<li class="srow"><div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn" aria-label="${button} ${escape(address)}">${button}</button></form></li>`;
+  const here = '/settings?open=senders#senders';
+  const list = (form: string, action: BulkAction, addresses: readonly string[], button: string, path: string) => {
+    const bulk: BulkList = {
+      form,
+      action: '/senders/bulk',
+      noun: ['sender', 'senders'],
+      total: addresses.length,
+      scope: { back: 'settings' },
+      actions: [action],
+    };
+    return `<div data-bulk-list="${form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, addresses.length, selecting, selecting ? here : '/settings?open=senders&select=1#senders')}<ul class="plain rowlist">${addresses.map((a) => row(bulk, a, path, button)).join('')}</ul></div>${bulkBar(bulk)}`;
+  };
+  const row = (bulk: BulkList, address: string, action: string, button: string) =>
+    `<li class="srow">${bulkCheck(bulk, address, address)}<div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn" aria-label="${button} ${escape(address)}">${button}</button></form></li>`;
   const approved = allowed.length
-    ? `<ul class="plain rowlist">${allowed.map((a) => row(a, '/senders/remove', 'Remove')).join('')}</ul>`
+    ? list('bulk-allowed', SENDER_ACTIONS.remove, allowed, 'Remove', '/senders/remove')
     : '<p class="warning">None yet. All mail waits in Review.</p>';
   const ignoredList = ignored.length
-    ? `<h3>Ignored</h3><ul class="plain rowlist">${ignored.map((i) => row(i.address, '/senders/unignore', 'Stop ignoring')).join('')}</ul>`
+    ? `<h3>Ignored</h3>${list(
+        'bulk-ignored',
+        SENDER_ACTIONS.unignore,
+        ignored.map((i) => i.address),
+        'Stop ignoring',
+        '/senders/unignore',
+      )}`
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
   const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
@@ -1387,14 +1403,15 @@ export const NEW_ACCOUNT = 'account:new';
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
-  const opened = feedback(params)?.section ?? (params.get('open') === 'mail' ? 'mail' : '');
+  const open = params.get('open');
+  const opened = feedback(params)?.section ?? (open === 'mail' || open === 'senders' ? open : '');
   // The sections don't depend on each other, so they all load at once.
   const [oneDrive, setup, accounts, rules, senders, mailLog] = await Promise.all([
     oneDrivePart(env, opened === 'onedrive', origin),
     setupParts(env, params, opened),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
-    sendersPart(env, opened === 'senders'),
+    sendersPart(env, opened === 'senders', params.get('select') === '1'),
     mailLogPart(env, opened === 'mail'),
   ]);
   const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
@@ -1449,15 +1466,13 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
     sect('about', 'About', '', aboutBody(env)),
   ].join('');
-  const response = await page(
+  return page(
     'settings',
     `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
     200,
     env,
     { head: pageHead('Settings', signOutLink(env)) },
   );
-  response.headers.set('Content-Security-Policy', SETTINGS_CSP);
-  return response;
 }
 
 // ---------- Help ----------

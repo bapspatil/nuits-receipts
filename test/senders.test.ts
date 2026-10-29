@@ -306,7 +306,9 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
   const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
   expect(second).toContain('Newer');
-  expect([...second.matchAll(/<li><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(4);
+  expect([...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(
+    4,
+  );
 });
 
 test('Receipts empty states: one line and one action', async () => {

@@ -14,13 +14,13 @@ const ID = /^[a-f0-9]{64}$/;
 export function discardReason(value: unknown): DiscardReason | null {
   const text = String(value ?? '');
   if (!text) return null;
-  requireInput(text in DISCARD_REASONS, 'Invalid reason', 400);
+  requireInput(Object.hasOwn(DISCARD_REASONS, text), 'Invalid reason', 400);
   return text as DiscardReason;
 }
-export function receiptIds(values: readonly unknown[]): string[] {
+export function receiptIds(values: readonly unknown[], max = MAX_BULK): string[] {
   const ids = [...new Set(values.map(String))];
   requireInput(ids.length > 0, 'Choose a receipt', 400);
-  requireInput(ids.length <= MAX_BULK, `Up to ${MAX_BULK} at a time.`, 400);
+  requireInput(ids.length <= max, `Up to ${max} at a time.`, 400);
   requireInput(
     ids.every((id) => ID.test(id)),
     'Invalid receipt',
@@ -32,13 +32,17 @@ export function receiptIds(values: readonly unknown[]): string[] {
 export type DiscardOptions = { reason: DiscardReason | null; unmatch?: boolean; revision?: number | null };
 
 // Each row is discarded on its own terms (atomic per row). Returns the
-// action's timestamp, which Undo uses.
-export async function discardReceipts(env: Env, ids: readonly string[], o: DiscardOptions): Promise<string> {
+// action's timestamp, which Undo uses, and how many rows it discarded.
+export async function discardReceipts(
+  env: Env,
+  ids: readonly string[],
+  o: DiscardOptions,
+): Promise<{ at: string; n: number }> {
   const rows = (
     await env.DB.prepare(
-      `SELECT r.id,r.revision,r.discarded_at,EXISTS(SELECT 1 FROM bank_transactions t WHERE t.receipt_id=r.id) AS matched FROM receipts r WHERE r.id IN (${ids.map(() => '?').join(',')})`,
+      `SELECT r.id,r.revision,r.discarded_at,EXISTS(SELECT 1 FROM bank_transactions t WHERE t.receipt_id=r.id) AS matched FROM receipts r WHERE r.id IN (SELECT value FROM json_each(?))`,
     )
-      .bind(...ids)
+      .bind(JSON.stringify(ids))
       .all<{ id: string; revision: number; discarded_at: string | null; matched: number }>()
   ).results;
   requireInput(rows.length === ids.length, 'Receipt not found', 404);
@@ -51,31 +55,31 @@ export async function discardReceipts(env: Env, ids: readonly string[], o: Disca
   requireInput(!matched.length || o.unmatch, 'Remove the match first.', 409);
   const at = new Date().toISOString();
   const todo = rows.filter((r) => !r.discarded_at);
-  // Per row: the discard, then (only if it applied) the unmatch. A row that
+  // The discards, then (only where one applied) the unmatches. A row that
   // changed since the read is left as it was.
-  const statements = todo.flatMap((r) => [
+  const discards = todo.map((r) =>
     env.DB.prepare(
       'UPDATE receipts SET discarded_at=?,discard_reason=?,revision=revision+1 WHERE id=? AND revision=? AND discarded_at IS NULL',
     ).bind(at, o.reason, r.id, r.revision),
-    ...(r.matched
-      ? [
-          env.DB.prepare(
-            'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=?1 AND EXISTS(SELECT 1 FROM receipts WHERE id=?1 AND discarded_at=?2)',
-          ).bind(r.id, at),
-        ]
-      : []),
-  ]);
-  if (!statements.length) return at;
-  await env.DB.batch(statements);
+  );
+  const unmatches = todo
+    .filter((r) => r.matched)
+    .map((r) =>
+      env.DB.prepare(
+        'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=?1 AND EXISTS(SELECT 1 FROM receipts WHERE id=?1 AND discarded_at=?2)',
+      ).bind(r.id, at),
+    );
+  if (!discards.length) return { at, n: 0 };
+  const results = await env.DB.batch([...discards, ...unmatches]);
   if (matched.length) await reconcile(env);
-  return at;
+  return { at, n: results.slice(0, discards.length).reduce((n, r) => n + (r.meta.changes ?? 0), 0) };
 }
 
 export async function restoreReceipts(env: Env, ids: readonly string[]): Promise<number> {
   const result = await env.DB.prepare(
-    `UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`,
+    `UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at IS NOT NULL AND id IN (SELECT value FROM json_each(?))`,
   )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .run();
   return result.meta.changes ?? 0;
 }
@@ -92,29 +96,18 @@ export async function restoreBatch(env: Env, at: string): Promise<number> {
 
 // ---------- UI ----------
 // The reason chips. Each one discards; the plain button skips the reason.
-// bare: no form of its own (bulk select puts it inside the list's form).
 export function discardControl(
   id: string | null,
-  o: { back: string; matched?: boolean; revision?: number; name?: string; bare?: boolean },
-  // bare (bulk) is always open: the bar shows the chips straight away.
+  o: { back: string; matched?: boolean; revision?: number; name?: string },
 ): string {
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
-  const fields = `${id ? hidden('id', id) : ''}${o.bare ? '' : hidden('back', o.back)}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
+  const fields = `${id ? hidden('id', id) : ''}${hidden('back', o.back)}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
   const chips = (Object.keys(DISCARD_REASONS) as DiscardReason[])
     .map((k) => `<button class="chip" name="reason" value="${k}">${DISCARD_REASONS[k]}</button>`)
     .join('');
-  const body = `${fields}${o.matched ? '<p class="ask">Remove match?</p>' : ''}<div class="reasons">${chips}<button class="btn secondary" name="reason" value="">${o.matched ? 'Remove and discard' : 'Discard'}</button></div>`;
-  return `<details class="discard"${o.bare ? ' open' : ''}><summary${o.name ? ` aria-label="Discard ${escape(o.name)}"` : ''}>Discard</summary><div class="body">${
-    o.bare ? body : `<form method="post" action="/discard">${body}</form>`
-  }</div></details>`;
+  return `<details class="discard"><summary${o.name ? ` aria-label="Discard ${escape(o.name)}"` : ''}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}${o.matched ? '<p class="ask">Remove match?</p>' : ''}<div class="reasons">${chips}<button class="btn secondary" name="reason" value="">${o.matched ? 'Remove and discard' : 'Discard'}</button></div></form></div></details>`;
 }
 
 export function restoreForm(id: string, back: string, primary = false): string {
   return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}"><button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
-}
-
-// Where a discard or restore form may send you back to.
-export function backPath(value: unknown, fallback = '/review'): string {
-  const text = String(value ?? '');
-  return /^\/(review|receipts(\/[a-f0-9]{64})?)$/.test(text) ? text : fallback;
 }

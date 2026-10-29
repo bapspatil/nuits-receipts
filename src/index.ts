@@ -12,7 +12,9 @@ import {
   upload,
 } from './receipts';
 import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
-import { ADD_CSP, ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
+import { BULK_CAP, BULK_JS } from './bulk';
+import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
+import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import {
   afterLastReview,
   home,
@@ -28,8 +30,8 @@ import {
 } from './views';
 import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
-import { clearBankReview, matchable, reconcile, undoExemptions, type Transaction } from './banking';
-import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unmatchLikely } from './match';
+import { clearBankReview, matchable, reconcile, SET_REQUIRED_SQL, undoExemptions, type Transaction } from './banking';
+import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unlinkMatches, unmatchLikely } from './match';
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
@@ -39,11 +41,11 @@ import { verifyAccessJwt } from './access';
 import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
-import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
+import { discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
-import { withDone, type EventKey } from './events';
+import { backPath, withDone, type EventKey } from './events';
 import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
@@ -227,7 +229,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (read && path === '/more') return moved('/settings');
   if (request.method === 'GET' && path === '/review') {
     const reason = url.searchParams.get('reason') ?? '';
-    return reviewPage(env, reason in REVIEW_FILTERS ? (reason as ReviewFilter) : null, url.searchParams);
+    return reviewPage(env, Object.hasOwn(REVIEW_FILTERS, reason) ? (reason as ReviewFilter) : null, url.searchParams);
   }
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
@@ -235,7 +237,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const revision = form.get('revision');
     // From the receipt page in the queue: land on the next one, like Skip.
     const queue = form.get('back') === 'queue' && ids.length === 1 ? (await queueAround(env, ids[0]!)).next : null;
-    const at = await discardReceipts(env, ids, {
+    const { at } = await discardReceipts(env, ids, {
       reason: discardReason(form.get('reason')),
       unmatch: form.get('unmatch') === '1',
       revision: revision === null ? null : Number(revision),
@@ -285,6 +287,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
+  const bulk = request.method === 'POST' ? BULK_ROUTES[path] : undefined;
+  if (bulk) return bulkAction(request, env, bulk, { who, ctx });
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
   if (request.method === 'GET' && path === '/help') return helpPage(env);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
@@ -306,17 +310,17 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return redirect(withDone('oneDriveFolder', '/settings#onedrive'));
   }
   if (request.method === 'GET' && path === '/import') return importPage(env);
-  if (request.method === 'GET' && path === '/add') {
-    const response = await addPage(env, url.searchParams);
-    response.headers.set('Content-Security-Policy', ADD_CSP);
-    return response;
-  }
+  if (request.method === 'GET' && path === '/add') return addPage(env, url.searchParams);
   if (request.method === 'GET' && path === '/assets/speculation-rules.json')
     return new Response(SPECULATION_RULES, {
       headers: { 'Content-Type': 'application/speculationrules+json', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/add.js')
     return new Response(ADD_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  if (request.method === 'GET' && path === '/assets/bulk.js')
+    return new Response(BULK_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/settings.js')
@@ -475,11 +479,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       .bind(payment[1])
       .first<Transaction>();
     requireInput(transaction, 'Payment not found', 404);
-    const changed = await env.DB.prepare(
-      "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=? AND NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')",
-    )
-      .bind(Number(required), transaction.id)
-      .run();
+    const changed = await env.DB.prepare(`${SET_REQUIRED_SQL} AND id=?`).bind(Number(required), transaction.id).run();
     requireInput(
       changed.meta.changes === 1,
       'Payment changed or belongs to an own-account transfer. Undo the pair first.',
@@ -519,19 +519,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
         exception = !fits(was, transaction, rules, config(env).tuning);
       }
-      // Taken apart by the owner: the matcher never links this pair again on its own.
-      await env.DB.batch([
-        env.DB.prepare(
-          'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE id=?',
-        ).bind(id),
-        ...(matchedTo
-          ? [
-              env.DB.prepare(
-                'INSERT INTO match_rejections(transaction_id,receipt_id,rejected_at) VALUES (?,?,?) ON CONFLICT DO NOTHING',
-              ).bind(id, matchedTo, new Date().toISOString()),
-            ]
-          : []),
-      ]);
+      await unlinkMatches(env, [id]);
     } else {
       // Money out pairs with a receipt, money in with a sales invoice.
       const credit = transaction.amount_minor > 0;
@@ -706,6 +694,25 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
     throw error;
   }
 }
+const BULK_ROUTES: Record<string, typeof receiptsBulk | undefined> = {
+  '/receipts/bulk': receiptsBulk,
+  '/payments/bulk': paymentsBulk,
+  '/senders/bulk': sendersBulk,
+};
+// The bulk bar's script asks for JSON: the signed banner link to go to, or the refusal.
+async function bulkAction(request: Request, env: Env, run: typeof receiptsBulk, caller: Caller): Promise<Response> {
+  const json = (request.headers.get('Accept') ?? '').includes('application/json');
+  try {
+    // Room for BULK_CAP ids as multipart parts, plus the fields.
+    const result = await run(env, await formData(request, BULK_CAP * 256), caller);
+    if (!json) return redirect(result.location);
+    const location = withBase(await signedLocation(signer(env), result.location), config(env).basePath);
+    return Response.json({ location, n: result.n, skipped: result.skipped });
+  } catch (error) {
+    if (json && error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
+}
 const fonts = new Map<string, Uint8Array>();
 function fontBytes(name: string): Uint8Array {
   let bytes = fonts.get(name);
@@ -716,11 +723,12 @@ function fontBytes(name: string): Uint8Array {
   return bytes;
 }
 // Non-HTML responses keep the original policy. App pages may also load the
-// self-hosted fonts and inline receipt images from this origin.
+// self-hosted fonts, inline receipt images and their scripts from this origin.
+// Scripts are files, never inline.
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const HTML_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const INLINE_CSP =
   "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 // Where an error page's back link goes: the same-origin page that sent the
