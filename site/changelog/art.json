@@ -1,6 +1,69 @@
 {
   "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. Every release has its own three-panel strip (before, shipped, reaction) on the left page; a release with no strip yet shows its version big and loads no image. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
   "strips": {
+    "1.14.0": {
+      "src": "strip-1.14.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt sighs at a row of coins with empty receipt outlines, cheers as receipts fly onto every coin, then lounges in a deck chair while a takeaway bag sits apart in its own tray.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SIGH",
+          "x": 55,
+          "y": 6,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "ZIP ZIP!",
+          "x": 13,
+          "y": 37,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "They matched themselves.",
+          "x": 16,
+          "y": 69,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.13.0": {
+      "src": "strip-1.13.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt panics at a heap of spreadsheets and statements, tosses them into a machine that prints one tidy sheet, then leans on a neat stack, relaxed.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SHFF",
+          "x": 52,
+          "y": 6,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "sfx",
+          "text": "KA-CHUNK!",
+          "x": 82,
+          "y": 38,
+          "r": 8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Any statement.",
+          "x": 17,
+          "y": 70.5,
+          "w": 22
+        }
+      ]
+    },
     "1.12.4": {
       "src": "strip-1.12.4.png",
       "median": 0,
@@ -655,6 +718,8 @@
     }
   },
   "titles": {
+    "1.14.0": "Automatic matching",
+    "1.13.0": "Automatic statement import",
     "1.12.4": "Fewer waits",
     "1.12.3": "Fewer round trips",
     "1.12.2": "Spacing and tap targets",

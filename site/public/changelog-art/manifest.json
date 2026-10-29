@@ -1,5 +1,21 @@
 {
   "strips": {
+    "1.14.0": {
+      "width": 1024,
+      "height": 1536,
+      "small": 640,
+      "avif": 74130,
+      "webp": 181532,
+      "blur": "data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAACQBQCdASoYACQAPt1epU2opSOiNVgMARAbiWcAAFLuuzP4FuWI7rpszNHbpMNhdBysgHXMYAD+8DSnoqWFVHTunG85jQyr0sWczBzUpCtx2jlnf9IFKNbouuUxJsYES6mDW2XCoavw4qAAAAA="
+    },
+    "1.13.0": {
+      "width": 1024,
+      "height": 1536,
+      "small": 640,
+      "avif": 87426,
+      "webp": 218680,
+      "blur": "data:image/webp;base64,UklGRoAAAABXRUJQVlA4IHQAAADQBQCdASoYACQAPtlWo02oJKMiOrmYAQAbCWcAAFvw3RQVn7a9TG4Vqmwvyc+T6Eh/j7OL4RPYAP7v0HMKXdn0q3hp8awAhyJx6BeRG6RmAGSlkXB3bKuYWxvr71UKLuL1QT5XeKW+guM8GzZ3fctx2SAAAA=="
+    },
     "1.12.4": {
       "width": 1024,
       "height": 1536,
