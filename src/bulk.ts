@@ -1,7 +1,11 @@
+import { DISCARD_REASONS, type Kind } from './domain';
 import { escape } from './ui';
 
 // Ids per request, and per all=1 resolution on the server.
 export const BULK_CAP = 500;
+
+// Per request for the ops that read documents again with the model.
+export const AI_CAP = 10;
 
 export type BulkAction = {
   op: string;
@@ -95,6 +99,48 @@ export function bulkBar(list: BulkList): string {
       : ''
   }</div><progress hidden max="1" value="0"></progress></form>`;
 }
+
+// The receipt lists' actions; src/batch.ts runs each op.
+export type ReceiptOp = 'approve' | 'discard' | 'restore' | 'retry' | 'kind' | 'paid';
+const chip = (name: string, value: string, label: string, on = false) =>
+  `<label class="chip"><input type="radio" name="${name}" value="${value}"${on ? ' checked' : ''}>${escape(label)}</label>`;
+export const RECEIPT_ACTIONS = {
+  approve: {
+    op: 'approve',
+    label: 'Approve',
+    tone: 'primary',
+    confirm: 'Approve the selected receipts as they are?',
+    fields:
+      '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
+  },
+  // Radios, not buttons: the submit button has to be the one that carries op.
+  discard: {
+    op: 'discard',
+    label: 'Discard',
+    tone: 'danger',
+    confirm: 'Discard the selected? Their payment matches are removed.',
+    fields: `<div class="reasons" role="group" aria-label="Reason">${Object.entries(DISCARD_REASONS)
+      .map(([k, v]) => chip('reason', k, v))
+      .join('')}</div>`,
+  },
+  restore: { op: 'restore', label: 'Restore' },
+  retry: { op: 'retry', label: 'Read again', max: AI_CAP },
+  kind: (from: Kind) => ({
+    op: 'kind',
+    label: 'Move',
+    max: AI_CAP,
+    fields: `<div class="reasons" role="group" aria-label="Move to">${chip('to', 'sales', 'Sales invoices', from === 'expense')}${chip('to', 'expense', 'Receipts', from === 'sales')}</div>`,
+  }),
+  paid: (today: string) => ({
+    op: 'paid',
+    label: 'Paid',
+    tone: 'primary',
+    fields: `<label class="bulkfield">Paid on<input type="date" name="paid_outside_on" value="${escape(today)}"></label><label class="bulkfield">How<input type="text" name="paid_outside_note" maxlength="300" placeholder="Stripe payout 14 Oct"></label>`,
+  }),
+} as const satisfies Record<
+  ReceiptOp,
+  (BulkAction & { op: ReceiptOp }) | ((...a: never[]) => BulkAction & { op: ReceiptOp })
+>;
 
 // Runs once per bar: reducer state, rendering, keys, long-press and posting.
 // A plain string like ADD_JS, since the worker build has no DOM types.

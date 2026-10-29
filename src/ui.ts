@@ -461,7 +461,7 @@ body.p-reviewItem nav.tabs{display:none}
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) :is(nav.tabs,.sbar){display:none}
 }
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--text)}}
-.tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}.tools .select{margin-left:auto}
+.tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}
 .list li:has(>details.discard)>.why{align-self:center}
 details.discard{grid-column:2;grid-row:2;justify-self:end;border:0;background:none;margin:0}
 details.discard>summary{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);display:flex;align-items:center;justify-content:flex-end;list-style:none}
@@ -475,12 +475,12 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .ask{margin:0 0 var(--space-2);font-weight:600;color:var(--danger)}
 .banner.undo{display:flex;align-items:center;gap:var(--space-2);padding-top:0;padding-bottom:0;min-height:44px}.banner.undo form{margin-left:auto}
 .pick{display:flex;align-items:center;gap:var(--space-3);min-height:44px;font-weight:600;overflow-wrap:anywhere}.pick input{width:20px;height:20px;flex:none}
-.bulk .bar{position:sticky;bottom:var(--tabbar-height);z-index:4;background:var(--surface-raised);padding:var(--space-2) var(--space-4);display:flex;gap:var(--space-2) var(--space-4);align-items:center;flex-wrap:wrap;border:1px solid var(--border)}
-.bulk .bar details.discard>summary{display:none}.bulk .bar details.discard>.body{padding:0}
 .list.all li>form{grid-column:2;grid-row:2;justify-self:end}
 [data-bulk-list]{counter-reset:bulk}
 [data-bulk-list] .pick{min-width:44px;justify-content:center}
 [data-bulk-list] .pick input[name=id]:checked{counter-increment:bulk}
+[data-bulk-list] li:has(>.pick){position:relative;padding-left:var(--space-8)}
+[data-bulk-list] li>.pick{position:absolute;left:var(--space-2);top:var(--space-2)}
 .bulktools{display:flex;align-items:center;gap:var(--space-3)}
 .bulktools [hidden],.bulkbar [hidden]{display:none}
 .bulkbar{display:none;position:sticky;bottom:0;z-index:4;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin-top:var(--space-3);padding:var(--space-2) max(var(--space-4),env(safe-area-inset-right)) var(--space-2) max(var(--space-4),env(safe-area-inset-left));background:var(--surface-raised);border-top:1px solid var(--border);box-shadow:var(--shadow-raised)}
@@ -495,9 +495,11 @@ details.discard>.body{padding:var(--space-1) 0 var(--space-2)}
 .bulkbar .body>.ask{flex:1 1 100%;margin:0}
 .bulkbar .btn.danger{color:var(--danger);border-color:var(--danger)}.bulkbar .btn.danger:hover{background:var(--danger-surface)}
 .bulkbar progress{flex:1 1 100%;height:4px;accent-color:var(--accent)}
+.bulkbar .chip{display:inline-flex;align-items:center;gap:var(--space-2)}.bulkbar .chip input{width:auto;min-height:0;margin:0;accent-color:var(--accent)}.bulkbar .chip:has(:checked){border-color:var(--text)}
+.bulkfield{display:flex;flex-direction:column;gap:var(--space-1);flex:1 1 14rem;font-size:var(--text-sm);font-weight:600}
 .is-pending{opacity:.5}
 @media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}}
-@media (max-width:40rem){[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
+@media (max-width:40rem){[data-bulk-list]:not([data-selecting]) li:has(>.pick){padding-left:var(--space-4)}[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
 @media not (max-width:40rem){.bulktools [data-bulk-select]{display:none}}
 .gone{margin:0 0 var(--space-4)}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;

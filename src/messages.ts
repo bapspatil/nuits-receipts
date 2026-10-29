@@ -106,6 +106,15 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Original amount direction differs': 'The original amount has the opposite sign to the amount.',
   'Choose a column for every field the file needs': 'Choose a column for every field the file needs.',
 
+  // batch
+  'Invalid action': "That action isn't available here. Reload the page and try again.",
+  'Invalid list': "We couldn't tell which list this was. Reload the page and try again.",
+  'Invalid filter': "That filter isn't available. Reload the page and try again.",
+  'Invalid progress': 'Something went wrong part way through. Reload the page and try again.',
+  'Nothing matches the filter.': 'Nothing matches the filter any more. Reload the page.',
+  'Choose where to move them': 'Choose Sales invoices or Receipts.',
+  'Choose the day it was paid': 'Choose the day it was paid.',
+
   // discard
   'Invalid reason': 'Pick one of the reasons listed.',
   'Choose a receipt': 'Choose at least one receipt.',

@@ -12,7 +12,8 @@ import {
   upload,
 } from './receipts';
 import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
-import { BULK_JS } from './bulk';
+import { BULK_CAP, BULK_JS } from './bulk';
+import { receiptsBulk } from './batch';
 import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
 import {
   afterLastReview,
@@ -40,11 +41,11 @@ import { verifyAccessJwt } from './access';
 import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
-import { backPath, discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
+import { discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
-import { withDone, type EventKey } from './events';
+import { backPath, withDone, type EventKey } from './events';
 import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
@@ -236,7 +237,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const revision = form.get('revision');
     // From the receipt page in the queue: land on the next one, like Skip.
     const queue = form.get('back') === 'queue' && ids.length === 1 ? (await queueAround(env, ids[0]!)).next : null;
-    const at = await discardReceipts(env, ids, {
+    const { at } = await discardReceipts(env, ids, {
       reason: discardReason(form.get('reason')),
       unmatch: form.get('unmatch') === '1',
       revision: revision === null ? null : Number(revision),
@@ -286,6 +287,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
   }
   if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
+  if (request.method === 'POST' && path === '/receipts/bulk') return bulkReceipts(request, env);
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
   if (request.method === 'GET' && path === '/help') return helpPage(env);
   if (request.method === 'GET' && path === '/settings') return settingsPage(env, url.searchParams, url.origin + base);
@@ -702,6 +704,20 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
     return redirect(
       withDone('filesAdded', `/add?kind=${kind}`, { added: added.length, failed: results.length - added.length }),
     );
+  } catch (error) {
+    if (json && error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
+}
+// The bulk bar's script asks for JSON: the signed banner link to go to, or the refusal.
+async function bulkReceipts(request: Request, env: Env): Promise<Response> {
+  const json = (request.headers.get('Accept') ?? '').includes('application/json');
+  try {
+    // Room for BULK_CAP ids as multipart parts, plus the fields.
+    const result = await receiptsBulk(env, await formData(request, BULK_CAP * 256));
+    if (!json) return redirect(result.location);
+    const location = withBase(await signedLocation(signer(env), result.location), config(env).basePath);
+    return Response.json({ location, n: result.n, skipped: result.skipped });
   } catch (error) {
     if (json && error instanceof InputError) return Response.json({ error: error.message }, { status: error.status });
     throw error;

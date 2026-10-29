@@ -14,6 +14,7 @@ import { heldSection } from './all';
 import { matchedIds, mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
+import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import { EXEMPT_LABELS } from './exempt';
 import { feedback } from './events';
 import { arrivalMonth } from './arrival';
@@ -96,7 +97,7 @@ export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
 }
 
 const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, id';
-async function reviewQueue(env: Env): Promise<Receipt[]> {
+export async function reviewQueue(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
       `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
@@ -255,27 +256,28 @@ export async function reviewPage(
       current: k === filter,
     })),
   ]);
-  const selecting = params.get('select') === '1' && rows.length > 0;
+  const selecting = params.get('select') === '1';
   const here = filter ? `/review?reason=${filter}` : '/review';
-  const select =
-    rows.length > 1 && !selecting
-      ? `<a class="linkbtn select" href="${here}${filter ? '&' : '?'}select=1">Select</a>`
-      : '';
+  const bulk: BulkList = {
+    form: 'bulk-review',
+    action: '/receipts/bulk',
+    noun: ['receipt', 'receipts'],
+    total: rows.length,
+    // filter, not reason: the discard chips post reason.
+    scope: { list: 'review', ...(filter ? { filter } : {}), back: here },
+    actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
+  };
   // Row 1 is the next to check: its name is the screen's one primary.
   const items = rows
     .map((r, i) => {
       const name = escape(receiptName(r));
       const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
       const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      return selecting
-        ? `<li><label class="pick"><input type="checkbox" name="id" value="${r.id}">${name}</label>${amt}${why}</li>`
-        : `<li><a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
+      return `<li>${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
     })
     .join('');
   const list = rows.length
-    ? selecting
-      ? `<form class="bulk" method="post" action="/discard"><input type="hidden" name="back" value="/review"><ul class="list checks">${items}</ul><div class="bar">${discardControl(null, { back: '/review', matched: rows.some((r) => matched.has(r.id)), bare: true })}<a class="linkbtn" href="${here}">Cancel</a></div></form>`
-      : `<ul class="list checks">${items}</ul>`
+    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}${filter ? '&' : '?'}select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}<script src="/assets/bulk.js" defer></script>`
     : all.length
       ? emptyState('Nothing in this filter.', `<a class="btn primary" href="/review">Show all ${all.length}</a>`)
       : held.length
@@ -283,7 +285,7 @@ export async function reviewPage(
         : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'review',
-    `${merge || select ? `<div class="tools">${merge}${select}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {

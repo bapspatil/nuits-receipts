@@ -834,16 +834,21 @@ export async function changeKind(env: Env, id: string, kind: string, revision: n
   const current = await getReceipt(env, id);
   requireInput(revision === current.revision, 'Stale receipt. Reload before saving.', 409);
   requireInput(current.kind !== kind, 'It is already filed that way.');
-  const result = await env.DB.batch([
+  const result = await env.DB.batch(kindWrites(env, id, kind as Kind, revision));
+  requireInput(result[1]?.meta.changes === 1, 'Stale receipt. Reload before saving.', 409);
+  await processReceipt(env, id);
+}
+// The move itself, guarded by the revision it was read at; the second
+// statement's changes say whether it applied.
+export function kindWrites(env: Env, id: string, kind: Kind, revision: number): D1PreparedStatement[] {
+  return [
     env.DB.prepare(
       'UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=? AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=?)',
     ).bind(id, id, revision),
     env.DB.prepare(
       "UPDATE receipts SET kind=?,client=NULL,client_country=NULL,client_vat_id=NULL,vat_treatment=NULL,reference_number=NULL,paid_outside_on=NULL,paid_outside_note=NULL,manual_fields_json='{}',status=CASE WHEN status='processing' THEN status ELSE 'pending' END,revision=revision+1,attempt_id=NULL,lease_until=NULL WHERE id=? AND revision=?",
     ).bind(kind, id, revision),
-  ]);
-  requireInput(result[1]?.meta.changes === 1, 'Stale receipt. Reload before saving.', 409);
-  await processReceipt(env, id);
+  ];
 }
 
 // A sales invoice paid where no imported statement shows it (a Stripe payout,
@@ -851,12 +856,17 @@ export async function changeKind(env: Env, id: string, kind: string, revision: n
 export async function markPaidOutside(env: Env, id: string, form: FormData): Promise<void> {
   const current = await getReceipt(env, id);
   requireInput(current.kind === 'sales', 'Only sales invoices can be marked paid');
+  const { on, note } = paidFields(form);
+  await env.DB.prepare('UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE id=?')
+    .bind(on || null, on ? note : null, id)
+    .run();
+}
+// The paid date and how it was paid. No date means not paid.
+export function paidFields(form: FormData): { on: string; note: string } {
   const on = String(form.get('paid_outside_on') ?? '').trim(),
     note = String(form.get('paid_outside_note') ?? '').trim();
   if (on) date(on);
   requireInput(note.length <= 300, 'Note too long');
   requireInput(!on || note.length > 0, 'Say how it was paid, for example "Stripe payout 14 Oct"');
-  await env.DB.prepare('UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE id=?')
-    .bind(on || null, on ? note : null, id)
-    .run();
+  return { on, note };
 }

@@ -29,6 +29,8 @@ const count = (p: URLSearchParams, key: string) => {
 // Free text that came from the address bar: bounded, and escaped where it is shown.
 const words = (p: URLSearchParams, key: string, fallback: string) => (p.get(key) ?? '').trim().slice(0, 80) || fallback;
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+// Rows a bulk action left alone because it did not apply to them.
+const skipped = (p: URLSearchParams) => (count(p, 'skipped') ? ` ${count(p, 'skipped')} skipped.` : '');
 const date = (value: string | null) =>
   value && /^\d{4}-\d\d-\d\d$/.test(value)
     ? new Date(`${value}T00:00:00Z`).toLocaleDateString('en-GB', {
@@ -69,8 +71,28 @@ const NEXT_STEP: Record<
     link: (m) => ({ href: `/?month=${m}#send`, label: `Open ${monthWord(m)}` }),
   },
 };
-// Where a discard or restore form may send you back to (see backPath in discard.ts).
-const BACK = /^\/(review|receipts(\/[a-f0-9]{64})?)$/;
+// The lists a discard, restore or bulk form may send you back to, with the
+// query each one keeps. The path is one of these, so it never leaves the app.
+const BACK_QUERY: Record<string, readonly string[]> = {
+  '/review': ['reason'],
+  '/receipts': ['show', 'month', 'q', 'offset'],
+  '/invoices': ['month', 'show'],
+};
+export function backPath(value: unknown, fallback = '/review'): string {
+  const text = String(value ?? '');
+  if (/^\/receipts\/[a-f0-9]{64}$/.test(text)) return text;
+  if (!text.startsWith('/') || text.length > 300) return fallback;
+  const url = new URL(text, 'http://app.invalid');
+  const keys = BACK_QUERY[url.pathname];
+  if (url.origin !== 'http://app.invalid' || !keys) return fallback;
+  const query = new URLSearchParams();
+  for (const key of keys) {
+    const one = url.searchParams.get(key);
+    if (one) query.set(key, one.slice(0, 100));
+  }
+  const search = query.toString();
+  return search ? `${url.pathname}?${search}` : url.pathname;
+}
 // A receipt page that Match and Remove match send you back to.
 const returnTo = (p: URLSearchParams) => {
   const back = p.get('back') ?? '';
@@ -136,20 +158,38 @@ export const EVENTS = {
   },
   // No Undo: re-marking it paid needs the note, which was cleared with the date.
   notPaid: { text: () => 'Marked as not paid.' },
+  // Bulk actions on a list. No Undo: the inverse is another bulk action.
+  approvedMany: {
+    text: (p) =>
+      (count(p, 'n') ? `Approved ${plural(count(p, 'n'), 'receipt')}.` : 'Nothing was approved.') + skipped(p),
+  },
+  readAgainMany: {
+    text: (p) => `Reading ${plural(count(p, 'n'), 'document')} again. This can take a minute.` + skipped(p),
+  },
+  kindMovedMany: {
+    text: (p) =>
+      `Moved ${plural(count(p, 'n'), 'document')} to ${p.get('to') === 'sales' ? 'invoices' : 'receipts'}.` +
+      skipped(p),
+  },
+  paidMany: {
+    text: (p) =>
+      `Marked ${plural(count(p, 'n'), 'invoice')} as paid${date(p.get('on')) ? ` on ${date(p.get('on'))}` : ''}.` +
+      skipped(p),
+  },
   ruleSaved: { text: () => 'Rule saved.', section: () => 'rules' },
   ruleDeleted: { text: () => 'Rule deleted.', section: () => 'rules' },
   // ---------- Discard ----------
   discarded: {
-    text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} discarded.` : 'Discarded.'),
+    text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} discarded.` : 'Discarded.') + skipped(p),
     undo: (p) => {
       const at = p.get('at') ?? '',
         back = p.get('back') ?? '';
-      return /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && BACK.test(back)
+      return /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && backPath(back, '') === back
         ? { action: '/restore', fields: { at, back } }
         : null;
     },
   },
-  restored: { text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') },
+  restored: { text: (p) => (count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') + skipped(p) },
   merged: { text: (p) => `Merged ${plural(count(p, 'n'), 'duplicate')}.` },
   // ---------- Unknown senders and Settings > Senders ----------
   mailAllowed: {
