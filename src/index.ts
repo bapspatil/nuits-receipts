@@ -25,6 +25,7 @@ import {
   SPECULATION_RULES,
 } from './ui';
 import { BULK_CAP, BULK_JS } from './bulk';
+import { KEYS_JS } from './keys';
 import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
 import { ADD_JS, ADD_SCOPE, addPage, invoicesPage, MAX_UPLOAD_FILES, PAID_SCOPE } from './invoices';
 import {
@@ -416,6 +417,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     });
   if (request.method === 'GET' && path === '/assets/keyboard.js')
     return new Response(KEYBOARD_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  if (request.method === 'GET' && path === '/assets/keys.js')
+    return new Response(KEYS_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/bulk.js')
