@@ -10,6 +10,7 @@ import {
   EARLIER,
   classifyBank,
   isComplete,
+  isOverdue,
   isTodo,
   READY,
   SALES,
@@ -86,8 +87,10 @@ export async function seedBusyMonth() {
   };
   const reviewIds = review.map((r) => r.id as string);
   const approvable = inTodo(isComplete);
-  // A receipt flagged only for optional reasons is as good as ready, so it stays out of To do.
-  const todo = inTodo(isTodo);
+  // A receipt flagged only for optional reasons is as good as ready, so it stays out of To do,
+  // unless it is a sales invoice past its payment terms.
+  const today = new Date().toISOString().slice(0, 10);
+  const todo = inTodo((r) => isTodo(r) || isOverdue(r, today));
   return {
     month: MONTH,
     earlierMonth: earlierMonth(MONTH),
@@ -104,6 +107,8 @@ export async function seedBusyMonth() {
       (a: string, b: string) => todoOrder.indexOf(a) - todoOrder.indexOf(b),
     ),
     sales: SALES.map((j: number) => reviewIds[j]!),
+    // Sales invoices in To do because they are overdue, in To do order.
+    overdue: inTodo((r) => isOverdue(r, today)),
     undated: UNDATED.map((j: number) => reviewIds[j]!),
     heldMail: busyMail(MONTH).map((m) => m.id as string),
     bank,

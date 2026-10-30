@@ -36,7 +36,7 @@ Selection: a row's checkbox is `input[name=id]` inside it, the select-all-on-pag
 
 Receipts To do: undated first, then `issue_date`, `received_at`, `id`, all ascending. Bank To do and All oldest first: `booking_date`, `account_key`, `id`. The order is stable between renders and does not depend on the page.
 
-Open in Receipts To do: `status='needs_review'`, not a duplicate, not discarded. Open in Bank To do: money out that needs a receipt, has none, and is not a transfer leg. The tests read the open set from `Busy.todo` in `test/busy-month.ts`; the PR that keeps optional-only reasons out of To do changes that one line.
+Open in Receipts To do: not a duplicate, not discarded, and either needing a required fact or a sales invoice that is overdue (ready, not marked paid, no bank row paying it, and past its due date, else `issue_date` plus the payment terms). Held mail from unknown senders shows on the same page above the list, as its own rows that are not part of `data-total`. Open in Bank To do: money out that needs a receipt, has none, and is not a transfer leg. The tests read the open set from `Busy.todo` in `test/busy-month.ts`; the PR that keeps optional-only reasons out of To do changes that one line.
 
 ## Actions
 

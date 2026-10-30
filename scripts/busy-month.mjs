@@ -90,6 +90,14 @@ export function busyReceipts(month) {
 // Flagged for a reason that keeps it in To do, by the app's own rule.
 export const isTodo = (r) => r.status === 'needs_review' && hasTodoReason(JSON.parse(r.review_reasons_json));
 
+// A sales invoice ready by the app's rule and past its payment terms. No bank row pays one and
+// none is marked paid, so each is overdue and in To do too.
+export const isOverdue = (r, today, terms = 30) =>
+  r.kind === 'sales' &&
+  !isTodo(r) &&
+  !!r.issue_date &&
+  new Date(Date.parse(r.issue_date) + terms * 86400000).toISOString().slice(0, 10) < today;
+
 // Facts all there, so Approve accepts it.
 export const isComplete = (r) =>
   !!r.vendor &&
