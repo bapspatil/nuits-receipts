@@ -3,6 +3,8 @@ import { expect, test } from 'vitest';
 import { hash } from '../src/domain';
 import { importBankCsv, parsePreset } from '../src/banking';
 import { formById, htmlForm, idFrom, request, uploadPdf } from './helpers';
+import { seed } from './package-helpers';
+import { createAccount, defaultAccount, type AccountId } from '../src/accounts';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 
@@ -149,11 +151,9 @@ test('a refused Settings save re-renders Settings with the typed value and the f
 });
 
 test('a form that is not wired keeps the plain error page', async () => {
-  const refused = await post(
-    '/rules',
-    new URLSearchParams({ vendor_contains: '', product: 'x', expense_type: 'y', priority: '1' }),
-  );
-  expect(refused.status).toBe(422);
+  const id = idFrom(await uploadPdf());
+  const refused = await post(`/receipts/${id}/kind`, new URLSearchParams({ kind: 'nonsense', revision: '1' }));
+  expect(refused.status).toBeGreaterThanOrEqual(400);
   const html = await refused.text();
   expect(html).toContain('role="alert"');
   expect(html).not.toContain('Nothing was saved.');
@@ -173,4 +173,189 @@ test("one request's refusal never shows in another running at the same time", as
   // The pages that were not refused are what they were without any refusal running beside them.
   expect([rest[0], rest[2], rest[3]]).toEqual(quiet);
   expect(results.map((r) => r.status)).toEqual([422, 200, 422, 200, 200]);
+});
+
+// ---- Every other form that takes typed input answers a refusal in place ----
+// Each: the refused status, "Nothing was saved." at the top, what was typed still in its control,
+// the message beside that control (aria-describedby names it), and no full-page "That didn't work".
+const plainPage = (html: string) => html.includes("That didn't work") || html.includes('That didn&#39;t work');
+function described(html: string, id: string, scope: string) {
+  expect(html).toMatch(new RegExp(`id="${id}"[^>]*aria-invalid="true" aria-describedby="e-${scope}"`));
+  expect(html).toMatch(new RegExp(`<p class="ferr" id="e-${scope}">`));
+}
+
+test('a refused new vendor rule keeps what was typed, on Settings, with the message at the seller field', async () => {
+  const body = new URLSearchParams({
+    vendor_contains: '   ',
+    context_contains: 'typed context',
+    product: 'general',
+    expense_type: 'other',
+    priority: '3',
+  });
+  const refused = await post('/rules', body);
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(html).toContain('<h1>Settings</h1>');
+  expect(alertOf(html)).toContain('Nothing was saved.');
+  expect(alertOf(html)).toContain('<a href="#f-rule-new-vendor_contains">Go to it</a>');
+  described(html, 'f-rule-new-vendor_contains', 'rule-new');
+  expect(html).toContain('value="typed context"');
+  // The section holding it is open, and so is the add form.
+  expect(html).toMatch(/<details class="sect" open><summary><h2>Business<\/h2>/);
+  expect(html).toMatch(/<details class="add" open><summary>Add rule/);
+});
+
+test('a refused edit of one vendor rule shows the typed value in that rule only', async () => {
+  const created = await post(
+    '/rules',
+    new URLSearchParams({
+      vendor_contains: 'Edit Me Shop',
+      product: 'general',
+      expense_type: 'other',
+      priority: '1',
+    }),
+  );
+  expect(created.status).toBe(303);
+  const id = Number(
+    await env.DB.prepare("SELECT id FROM vendor_rules WHERE vendor_contains='Edit Me Shop'").first('id'),
+  );
+  const refused = await post(
+    `/rules/${id}`,
+    new URLSearchParams({
+      vendor_contains: 'Edit Me Shop',
+      bank_alias: 'x'.repeat(201),
+      product: 'general',
+      expense_type: 'other',
+      priority: '1',
+    }),
+  );
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(alertOf(html)).toContain('Nothing was saved.');
+  described(html, `f-rule-${id}-bank_alias`, `rule-${id}`);
+  expect(html).toContain('x'.repeat(201));
+  expect(html).toContain(`<details open><summary>Edit Me Shop`);
+});
+
+test('a refused rule made from a receipt page stays on that receipt with the form open', async () => {
+  const id = idFrom(await uploadPdf());
+  const refused = await post(
+    '/rules',
+    new URLSearchParams({
+      return_to: `/receipts/${id}`,
+      vendor_contains: ' ',
+      context_contains: 'kept words',
+      product: 'general',
+      expense_type: 'other',
+      priority: '0',
+    }),
+  );
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(html).toContain(`action="/receipts/${id}`);
+  described(html, 'f-rule-receipt-vendor_contains', 'rule-receipt');
+  expect(html).toContain('value="kept words"');
+  expect(html).toMatch(/<details open><summary>Always file as/);
+});
+
+test('a refused rename of an account keeps the typed name beside the account', async () => {
+  const [first] = (
+    await env.DB.prepare('SELECT id,label FROM accounts ORDER BY label').all<{ id: string; label: string }>()
+  ).results;
+  await env.DB.prepare(
+    "INSERT INTO accounts (id,label,bank_name,default_currency,created_at) VALUES ('second','Second','','EUR','2026-01-01')",
+  ).run();
+  const refused = await post(`/accounts/second`, new URLSearchParams({ label: first!.label }));
+  expect(refused.status).toBe(409);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(alertOf(html)).toContain('<a href="#f-rename-second-label">Go to it</a>');
+  described(html, 'f-rename-second-label', 'rename-second');
+  expect(html).toContain(`value="${first!.label}"`);
+  expect(html).toMatch(/<details class="sect" open><summary><h2>Bank<\/h2>/);
+});
+
+test('a refused sender address keeps what was typed in the Add row, in an open Email section', async () => {
+  const refused = await post('/senders/approve', new URLSearchParams({ address: 'not an address', back: 'settings' }));
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  described(html, 'f-address', 'sender-new');
+  expect(html).toContain('value="not an address"');
+  expect(html).toMatch(/<details class="sect" open><summary><h2>Email<\/h2>/);
+});
+
+test('a refused Mark paid on an invoice keeps the date and says what is missing at the field', async () => {
+  const row = await seed({ kind: 'sales', client: 'Sample Client GmbH', status: 'ready', issue_date: '2026-09-01' });
+  const refused = await post(
+    `/receipts/${row.id}/paid`,
+    new URLSearchParams({ paid_outside_on: '2026-09-30', paid_outside_note: '' }),
+  );
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(alertOf(html)).toContain('<a href="#f-paid_outside_note">Go to it</a>');
+  described(html, 'f-paid_outside_note', 'paid');
+  expect(html).toContain('value="2026-09-30"');
+});
+
+test('a refused Add keeps the kind and says to choose a file at the file field', async () => {
+  const body = new FormData();
+  body.set('kind', 'sales');
+  const refused = await post('/upload', body);
+  expect(refused.status).toBe(422);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(alertOf(html)).toContain('<a href="#f-file">Go to it</a>');
+  described(html, 'f-file', 'add');
+  expect(html).toMatch(/<input type="radio" name="kind" value="sales" checked>/);
+});
+
+test('a refused own-account transfer keeps the note typed, on the payment, in Bank', async () => {
+  const left = (await defaultAccount(env.DB)).id;
+  const right = (await createAccount(env.DB, { label: 'Right', bank_name: '', default_currency: 'EUR' })).id;
+  const side = async (account: AccountId, id: string, amount: string) => {
+    const csv = `Transaction ID;Date;Amount;Currency;Payee\n${id};2026-09-07;${amount};EUR;Own Transfer\n`;
+    await importBankCsv(env, {
+      bytes: new TextEncoder().encode(csv),
+      parsed: parsePreset(csv, account, 'EUR'),
+      collision: '',
+      accountChoice: { kind: 'existing', id: account },
+    });
+    return hash(`${account}:id:${id}`);
+  };
+  const debit = await side(left, 'a', '-99,00');
+  await side(right, 'b', '99,00');
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
+  expect(bank).toContain(`<input type="hidden" name="debit_id" value="${debit}">`);
+  const refused = await post(
+    '/transfers',
+    new URLSearchParams({ debit_id: debit, credit_id: 'f'.repeat(64), reason: 'moving money' }),
+  );
+  expect(refused.status).toBe(409);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(alertOf(html)).toContain('Nothing was saved.');
+  expect(html).toContain(
+    'name="reason" aria-label="Note" placeholder="Note" maxlength="500" required value="moving money"',
+  );
+  expect(html).toMatch(new RegExp(`<p class="ferr" id="e-transfer-${debit}">`));
+});
+
+test('the account question and the import preview answer a refusal in place', async () => {
+  const csv = 'Date;Amount;Payee\n2026-09-07;-9,00;Somewhere\n';
+  await env.DB.prepare(
+    "INSERT INTO accounts (id,label,bank_name,default_currency,created_at) VALUES ('other','Other','','EUR','2026-01-01')",
+  ).run();
+  const asked = new FormData();
+  asked.set('csv', btoa(csv));
+  asked.set('account', 'gone-account');
+  const refused = await post('/import', asked);
+  expect(refused.status).toBe(409);
+  const html = await refused.text();
+  expect(plainPage(html)).toBe(false);
+  expect(html).toContain('Which account is this?');
+  described(html, 'f-account', 'import');
 });

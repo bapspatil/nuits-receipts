@@ -26,7 +26,7 @@ import {
   transactionIds,
   transactionsById,
 } from './banking';
-import { escape, page, pageHead } from './ui';
+import { ariaFor, errorLine, escape, page, pageHead } from './ui';
 import {
   encodedBytes,
   hidden,
@@ -113,6 +113,11 @@ function editor(env: Env, bytes: Uint8Array, account: AccountChoice, encoding: s
   return importPreview(env, form);
 }
 
+// The question again, when its answer was refused: the file rides in the form.
+export async function questionAgain(env: Env, form: FormData): Promise<Response> {
+  return accountQuestion(env, await readBytes(env, form), await listAccounts(env.DB));
+}
+
 function accountQuestion(env: Env, bytes: Uint8Array, accounts: Account[]): Promise<Response> {
   const options = accounts
     .map(
@@ -122,7 +127,7 @@ function accountQuestion(env: Env, bytes: Uint8Array, accounts: Account[]): Prom
     .join('');
   return page(
     'import',
-    `<div class="card"><form action="/import" method="post" enctype="multipart/form-data">${hidden('csv', encodedBytes(bytes))}<h2>Which account is this?</h2><p class="small">We could not tell from the file. We will remember the columns, so you are asked this only once per bank.</p><div class="fields"><label>Account<select name="account" id="f-account">${options}</select></label></div>${button('importStmt', { tone: 'primary' })}</form></div>`,
+    `<div class="card"><form action="/import" method="post" enctype="multipart/form-data">${hidden('csv', encodedBytes(bytes))}<h2>Which account is this?</h2><p class="small">We could not tell from the file. We will remember the columns, so you are asked this only once per bank.</p><div class="fields"><label>Account<select name="account" id="f-account"${ariaFor('import', 'account')}>${options}</select>${errorLine('import', 'account')}</label></div>${errorLine('import', '')}${button('importStmt', { tone: 'primary' })}</form></div>`,
     200,
     env,
     { detail: 'Which account is this?', head: pageHead('Which account is this?') },

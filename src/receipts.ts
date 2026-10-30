@@ -878,7 +878,12 @@ export function paidFields(form: FormData): { on: string; note: string } {
   const on = String(form.get('paid_outside_on') ?? '').trim(),
     note = String(form.get('paid_outside_note') ?? '').trim();
   if (on) date(on);
-  requireInput(note.length <= 300, 'Note too long');
-  requireInput(!on || note.length > 0, 'Say how it was paid, for example "Stripe payout 14 Oct"');
+  requireInput(note.length <= 300, 'Note too long', 422, 'paid_outside_note');
+  requireInput(
+    !on || note.length > 0,
+    'Say how it was paid, for example "Stripe payout 14 Oct"',
+    422,
+    'paid_outside_note',
+  );
   return { on, note };
 }

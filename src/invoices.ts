@@ -26,6 +26,8 @@ import {
   receiptsTabs,
   shortDay,
   matchError,
+  errorLine,
+  ariaFor,
 } from './ui';
 import { button, buttonLink, statusMark } from './actions';
 import { row, rowList } from './row';
@@ -234,6 +236,8 @@ function firstFlag(r: Receipt): string {
 type Credit = Transaction & { account_name: string; bank_name: string };
 // The money-in box: the matched payment, or credits that may be this invoice. fields: the receipt
 // page's list (receiptFields), which every form here posts so its return keeps it.
+// The paid form on an invoice's page, as a failure scope names it.
+export const PAID_SCOPE = 'paid';
 export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise<string> {
   const back = `<input type="hidden" name="return_to" value="/receipts/${r.id}">${fields}`;
   const box = (title: string, body: string) =>
@@ -250,7 +254,7 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
         `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}">${back}${button('unmatch', { attrs: ' name="action" value="unlink"' })}</form></div>`,
       );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div>${r.paid_outside_on ? button('save') : button('paid')}</form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}${button('unpaid')}</form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on', { scope: PAID_SCOPE })}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout', scope: PAID_SCOPE })}</div>${errorLine(PAID_SCOPE, '')}${r.paid_outside_on ? button('save') : button('paid')}</form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}${button('unpaid')}</form>` : ''}`;
   if (r.paid_outside_on)
     return box(
       'Paid',
@@ -285,6 +289,8 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
 
 // ---------- Add page ----------
 export const MAX_UPLOAD_FILES = 10;
+// The Add form, as a failure scope names it.
+export const ADD_SCOPE = 'add';
 export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
   const settings = config(env);
   const kind = params.get('kind') === 'sales' ? 'sales' : 'expense';
@@ -294,7 +300,7 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
     settings.receiptAddress ? `receipts to <code>${escape(settings.receiptAddress)}</code>` : '',
     settings.invoicesAddress ? `invoices you sent to <code>${escape(settings.invoicesAddress)}</code>` : '',
   ].filter(Boolean);
-  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
+  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" id="f-file"${ariaFor(ADD_SCOPE, 'file')}></label>${errorLine(ADD_SCOPE)}<p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
   }<script src="/assets/add.js" defer></script>`;
   return page('add', body, 200, env, {

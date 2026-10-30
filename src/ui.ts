@@ -598,6 +598,9 @@ export function signOutLink(env: Env): string {
 // ---------- A refused form, shown in place ----------
 // The id of the message for the form (scope) that was refused.
 export const errorId = (scope: string) => `e-${scope.replace(/[^a-z0-9]+/gi, '-')}`;
+// The id of a control in a form that shares its control names with others on the page (one rule
+// form per rule), so the id carries the form's scope.
+export const fieldId = (scope: string, name: string) => `f-${scope.replace(/[^a-z0-9]+/gi, '-')}-${name}`;
 // aria on a control, when the refusal named it: invalid, and described by the message.
 export function ariaFor(scope: string, name: string): string {
   return failureFor(scope)?.field === name ? ` aria-invalid="true" aria-describedby="${errorId(scope)}"` : '';
@@ -767,10 +770,11 @@ export function input(
     attrs = '',
     wide = false,
     scope = '',
-  }: { hint?: string; attrs?: string; wide?: boolean; scope?: string } = {},
+    id = '',
+  }: { hint?: string; attrs?: string; wide?: boolean; scope?: string; id?: string } = {},
 ): string {
   const shown = scope ? kept(scope, name, value) : value;
-  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  const tied = scope ? ` id="${escape(id || `f-${name}`)}"${ariaFor(scope, name)}` : '';
   return `<label${wide ? ' class="wide"' : ''}>${escape(label)}${hint ? ` <span class="hint">${escape(hint)}</span>` : ''}<input name="${escape(name)}" value="${escape(shown)}" type="${escape(type)}"${tied}${attrs}>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 export function select(
@@ -779,9 +783,10 @@ export function select(
   current: unknown = '',
   label = name.replaceAll('_', ' '),
   scope = '',
+  id = '',
 ): string {
   const shown = scope ? kept(scope, name, current) : current;
-  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  const tied = scope ? ` id="${escape(id || `f-${name}`)}"${ariaFor(scope, name)}` : '';
   return `<label>${escape(label)}<select name="${escape(name)}"${tied}>${values.map((v) => `<option${v === shown ? ' selected' : ''}>${escape(v)}</option>`).join('')}</select>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 // Configured products, plus the current value when it is no longer configured,

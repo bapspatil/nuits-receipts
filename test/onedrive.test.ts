@@ -306,7 +306,12 @@ test('a folder link resolves through /shares, and other folders and failures are
   ms.shares = Response.json({ id: 'f', name: 'invoice.pdf', file: {}, parentReference: { driveId: 'd' } });
   const file = await post('/app/settings/onedrive/folder', { folder_link: link });
   expect(file.status).toBe(422);
-  expect(await file.text()).toContain('That link opens a file, not a folder.');
+  // Refused in place: Settings again, the link still in its box, the message beside it.
+  const refusedHtml = await file.text();
+  expect(refusedHtml).toContain('That link opens a file, not a folder.');
+  expect(refusedHtml).toContain('<h1>Settings</h1>');
+  expect(refusedHtml).toMatch(/id="f-folder_link" aria-invalid="true" aria-describedby="e-onedrive-folder"/);
+  expect(refusedHtml).toContain(`value="${link}"`);
 
   // Another organisation: /shares fails, "Shared with me" finds it by name.
   ms.shares = Response.json({ error: { code: 'itemNotFound' } }, { status: 404 });
