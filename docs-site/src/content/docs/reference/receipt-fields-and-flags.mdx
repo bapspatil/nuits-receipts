@@ -66,9 +66,9 @@ A document with status `needs_review` whose only flag is `missing_eur` can still
 
 ## Review flags
 
-The app shows one card per problem. Codes that describe the same problem share a card. The raw codes are in the receipt page's technical details and in the `review_reasons` export column.
+The app shows one card per problem. Codes that describe the same problem share a card. The raw codes are in the `review_reasons` export column.
 
-Filters on the **Review** page: **Missing info** (groups Seller, Date, Details, Filing, Duplicate), **Check the amount** (groups Amounts, Euro amount), **Email not verified** (`sender_unverified`).
+A receipt is in **Receipts To do** while it has a required flag: one that asks for the seller, date, currency, total, before-VAT or VAT amount (and the client on a sales invoice). Other flags are optional: they stay on the receipt as a note and never block **Approve receipt**.
 
 ### Missing or unsure values
 
@@ -160,9 +160,9 @@ Any other code shows as "Something needs a look." in group Other.
 
 | Situation | Result |
 | --- | --- |
-| Sender not approved, and DMARC passed for the From domain or SPF passed for the envelope sender | Raw email stored and shown in **Review** as **Unknown sender**. Not read. Logged as `sender_not_allowed` with the domain only. |
+| Sender not approved, and DMARC passed for the From domain or SPF passed for the envelope sender | Raw email stored and shown in **Receipts To do** as a **New sender** row. Not read. Logged as `sender_not_allowed` with the domain only. |
 | Sender not approved and not proven | Dropped. Logged as `sender_auth_failed` or `sender_unverified`. Nothing stored. |
-| Sender ignored in Review | Logged as `sender_ignored`. Nothing stored. |
+| Sender ignored from Receipts To do | Logged as `sender_ignored`. Nothing stored. |
 | Same Message-ID already waiting or read | Logged as `duplicate`. Nothing stored. |
 | 50 Unknown sender emails waiting, or 10 from this sender | Logged as `held_limit`. Nothing stored. |
 | From address approved and DMARC passed for its domain | Read like mail from an approved envelope sender. |

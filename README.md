@@ -4,7 +4,7 @@ A self-hosted receipt and invoice reader that runs on Cloudflare Workers. You de
 
 - reads vendor, amounts, VAT and dates from your receipts (PDF uploads, photos, or receipts you forward by email);
 - suggests matches between receipts and bank transactions, and flags payments that have no receipt yet;
-- imports bank CSV exports; you map the columns once ([import guide](https://receipts.nuits.net/docs/how-to/import-a-bank-csv/), [limits](https://receipts.nuits.net/docs/reference/limits/));
+- imports bank statements (CSV, XLSX or PDF) in one step: choose the file and press Import. It finds the account and the columns, and asks only when it can't ([import guide](https://receipts.nuits.net/docs/how-to/import-a-bank-csv/), [limits](https://receipts.nuits.net/docs/reference/limits/));
 - prepares a monthly CSV you can send to your accountant.
 
 You review everything; nothing is filed or submitted for you. It helps you get organised before you hand things to your accountant.
@@ -32,7 +32,7 @@ One Worker, server-rendered HTML, no cron jobs or queues:
 - Each cost gets a product and an expense type from your vendor rules, falling back to Cloudflare's Clef model (`@cf/cloudflare/clef`).
 - Bank rows from your CSV, XLSX or PDF statements are matched to receipts automatically, by exact amount, original currency, ECB estimate or a small tip, and obvious non-purchases (tax, bank fees, cash, own transfers) are marked for you. Foreign-currency receipts without a bank match get an ECB reference rate.
 - Home shows the month: what still needs a check, which payments lack a receipt, and costs in EUR by product and type. It exports a CSV or a ZIP with every original and an index spreadsheet. Optionally it uploads the same files to a OneDrive folder.
-- Five places, the same on a computer and a phone: **Home**, **Review** (what needs a check), **Receipts** (every document, plus invoices you sent), **Bank** (statements, matches and own-account transfers) and **Settings**.
+- Four places, the same on a computer and a phone: **Home**, **Receipts**, **Bank** and **Settings**. Receipts and Bank each have a **To do | All** switch. To do is what needs you, open items first: receipts missing a fact, overdue sales invoices and mail from new senders on Receipts, payments with no receipt on Bank. All is every document, or every payment, to browse.
 
 ## Deploy
 
@@ -59,11 +59,25 @@ bun run setup     # asks for names, senders and products, finds or creates D1, d
 
 ### Email
 
-Email is optional. It needs a domain on Cloudflare DNS with Email Routing and a **Send to a Worker** rule for your receipt address; only the senders you allow are read, and mail from anyone else waits in Review until you approve or ignore the sender. Follow [Set up email](https://receipts.nuits.net/docs/how-to/set-up-email/), and see [Forward a copy of incoming mail](https://receipts.nuits.net/docs/how-to/forward-a-copy-of-incoming-mail/) and [Keep sales invoices](https://receipts.nuits.net/docs/how-to/keep-sales-invoices/) for the optional extras.
+Email is optional. It needs a domain on Cloudflare DNS with Email Routing and a **Send to a Worker** rule for your receipt address; only the senders you allow are read, and mail from anyone else waits in Receipts To do until you allow or ignore the sender. Follow [Set up email](https://receipts.nuits.net/docs/how-to/set-up-email/), and see [Forward a copy of incoming mail](https://receipts.nuits.net/docs/how-to/forward-a-copy-of-incoming-mail/) and [Keep sales invoices](https://receipts.nuits.net/docs/how-to/keep-sales-invoices/) for the optional extras.
 
 ## Use it
 
-Add receipts, review what was read, import a bank CSV, check the suggested matches, then download the month for your accountant and press the "I've sent" button. [Your first month](https://receipts.nuits.net/docs/tutorials/your-first-month/) walks through it once with sample files; the [how-to guides](https://receipts.nuits.net/docs/how-to/) cover each step.
+Add receipts, clear Receipts To do, import a bank statement, settle Bank To do, then download the month for your accountant and mark it as sent. [Your first month](https://receipts.nuits.net/docs/tutorials/your-first-month/) walks through it once with sample files; the [how-to guides](https://receipts.nuits.net/docs/how-to/) cover each step.
+
+- **A resolved row leaves the list.** Approve, Discard, Not a purchase, Match and the bulk actions take the row away, the next open one moves up, and the banner offers **Undo**. An action that can't be undone, such as Move to invoices or Disconnect from OneDrive, asks first.
+- **Select many at once.** Every list row has a tick box, and the bar above the list acts on the ticked rows, or on the whole list up to 500.
+- **Keyboard on a computer.** `j` and `k` move between rows, `x` ticks one, `Enter` opens it, `a` approves a receipt, `u` undoes, `/` searches, and `?` lists them all.
+
+### Install it on your phone or computer
+
+The app installs as its own window with its own icon, and needs no app store.
+
+- **iPhone or iPad (Safari):** open the app, tap Share, then Add to Home Screen.
+- **Mac (Safari):** File, then Add to Dock.
+- **Android or desktop Chrome and Edge:** open the app, then use the menu's Install app (or Add to Home screen).
+
+The installed app still needs a connection: offline it only shows a "You're offline" page, and it keeps nothing on the device. On Android, you can also share receipt PDFs and photos to the installed app from other apps. They open on the Add page, and nothing is uploaded until you choose what they are and press Add.
 
 ## Marketing site
 

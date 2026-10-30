@@ -6,19 +6,24 @@ sidebar:
   label: Bank CSV import
 ---
 
-The import reads an XLSX, CSV or PDF statement of booked payments. There are presets for some layouts, other layouts are read automatically, and a column mapper remains as a last resort. It has been tested with Holvi exports so far. A mapping says which column holds which value. A mapping can be saved as a layout and is offered again for files with the same column names.
+The import reads an XLSX, CSV or PDF statement of booked payments. There are presets for some layouts, other layouts are read automatically, and a column mapper remains as a last resort. It has been tested with Holvi exports so far. A mapping says which column holds which value. A layout the app works out, or that you set in the column editor, is saved on a successful import and used again for files with the same column names.
 
 ## Flow
 
 | Step | Page | Request | Writes |
 | --- | --- | --- | --- |
-| 1. Choose file | **Import a bank statement** (`/import`) | `POST /imports/csv` | Nothing |
-| 2. Check | **Check the file** | `POST /imports/csv/preview` (button **Check again**) | Nothing |
-| 3. Import | | `POST /imports/csv/confirm` (button **Import N payments**) | R2 original, D1 import and bank rows |
+| Import | **Import a bank statement** (`/import`), one file field and **Import statement** | `POST /import` | R2 original, D1 import and bank rows |
+| Which account (only when unclear) | The same page, asking **Which account is this?** | `POST /import` with `account` | As above |
+| Column editor (only when needed) | `/imports/csv` | `POST /imports/csv/preview` (button **Check again**), then `POST /imports/csv/confirm` (button **Import N payments**) | Nothing until the confirm |
+| Import anyway | `/import/anyway` | `POST /import/anyway` | Extra payments, as a second import of the same file |
 
-Preview reads the whole file and shows up to 50 rows and up to 100 row problems. Any row problem blocks the import. A preview is valid for 30 minutes and is signed; changing the mapping, the account or a decision after the preview needs a new preview. After import the browser goes to **Bank** for the month of the first row.
+The account is, first hit: the one chosen on the question, the only account, the account whose bank the layout names, a new account named for that bank when there is none, else the question. The layout is, first hit: a layout saved for these column names, the built-in layout for them, the model's proposal when it reads the whole file, else the column editor. The editor also opens when rows have errors, the stated totals do not add up, or the delimiter or a slash date order is ambiguous. A file that is not UTF-8 is read as Windows-1252.
 
-## Step 1 fields
+In the editor, the preview reads the whole file and shows up to 50 rows and up to 100 row problems. Any row problem blocks the import. A preview is valid for 30 minutes and is signed. After import the browser goes to **Bank** for the month of the first row, where the banner offers **Undo** for the whole import.
+
+## Column editor fields
+
+The editor shows these with the file it was given.
 
 | Label | Field | Values |
 | --- | --- | --- |
@@ -30,7 +35,7 @@ Preview reads the whole file and shows up to 50 rows and up to 100 row problems.
 | Currency | `account_currency` | New account only. One of the ten supported currencies. |
 | Text encoding | `encoding` | **Detect BOM or UTF-8** (`auto`), UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252 / ISO-8859-1 |
 
-A new account is created only when the import is confirmed.
+A new account is created only when the import is confirmed. The editor's **Text encoding** sits under **File options**.
 
 ## Mapping fields
 
@@ -95,14 +100,9 @@ With **Sometimes**, a date may be followed by `T` or a space and `HH:MM`, option
 | If a payment was already imported | `collision` | **Ask me** (empty), **Skip the ones already imported** (`keep_existing`), **Import them as extra payments** (`additional`) |
 | I checked the account. Similar payments in my other accounts are separate payments. | `acknowledge_other_account` | Tick |
 
-### Save this layout for next time
+### Saved layouts
 
-| Label | Field | Rules |
-| --- | --- | --- |
-| Bank | `preset_bank` | 1 to 100 characters |
-| Layout name | `preset_name` | 1 to 100 characters, unique per bank. Optional; empty saves nothing. |
-
-A saved layout is stored with a fingerprint of the normalised column names and is offered for files whose column names give the same fingerprint. A failure to save the layout does not undo the import.
+There is no form for this. A layout the model proposed or you set in the editor is saved when the import succeeds, with a fingerprint of the normalised column names, and is used for files whose column names give the same fingerprint, the account's bank first. Built-in and saved layouts are not saved again. A failure to save the layout does not undo the import.
 
 ## Accepted formats
 
@@ -154,7 +154,7 @@ A PDF statement is turned into a CSV on upload, with the statement's printed bal
 - **Holvi** (`EUR - ACCOUNT STATEMENT`, columns `Booking date`, `Payment information`, `Transaction no.`, `Amount EUR`) is read by its layout, with no model request. Each payment becomes a row of the Holvi statement layout: the booking date, the signed amount, the other party from the payment information (an IBAN line left out), the payment type, the `Message` and `Reference` parts, the `Currency and amount` line of a card payment abroad, and the `Filing ID` as the transaction ID. The `BALANCE` lines and the `TOTAL NUMBER OF DEPOSITS` and `WITHDRAWALS` lines are the stated figures. A line in no known place stops the read instead of being skipped.
 - **Other layouts** are cut into one block per payment: a line that starts with a date, up to the next one. Lines printed in the same place on most pages, such as page headers and footers, are left out, and labelled opening and closing balance and total lines are read as stated figures. Workers AI (Clairic) reads the date, amount, currency, other party, description, reference and transaction ID of each block, 20 blocks per request and up to 4 requests at a time, at most 1,000 blocks. Each value is then checked against the block's own text: the amount must be printed in it, the date must be a reading of its leading date, and text values must appear in it. A value that fails, or that Clairic is not sure of, is left blank, so the row is listed as a problem.
 
-The PDF is read once, on the first **Check the file**. **Check again** and **Import** use the CSV it became, which is also what is stored as the original. With `AI_MODE` `mock`, other layouts are read by a fixed local reader instead.
+The PDF is read once, on upload. **Check again** and **Import** use the CSV it became, which is also what is stored as the original. With `AI_MODE` `mock`, other layouts are read by a fixed local reader instead.
 
 ### Column name aliases (Holvi layout)
 
@@ -198,9 +198,9 @@ Shown in the preview as "Row N, field: message (code)".
 | Same file bytes, another account | Refused with HTTP 409. |
 | Row with a transaction ID already stored in this account with the same facts | Skipped. |
 | Row with a transaction ID already stored in this account with different facts | Import refused with HTTP 409. |
-| Row without a transaction ID equal to one from another file in the same account | You choose: skip it (`keep_existing`) or import it as an extra payment (`additional`). |
+| Row without a transaction ID equal to one from another file in the same account | Skipped and counted; the banner offers **Import anyway**, which adds them as extra payments. In the editor, **If a payment was already imported** chooses (`keep_existing` or `additional`). |
 | Equal rows without a transaction ID inside one file | Kept as separate payments. |
-| Same date and amount, or same transaction ID, in another account | Needs the account tick. Rows are never merged across accounts. |
+| Same date and amount, or same transaction ID, in another account | Imported and counted in the banner. In the editor it needs the account tick. Rows are never merged across accounts. |
 
 A row's identity is a hash of the account and either the transaction ID or its facts: booking date, amount, currency, normalised merchant, reference, original amount and original currency, plus a count of equal rows before it in the file.
 

@@ -1,74 +1,49 @@
 ---
 title: Import a bank CSV
-description: Check a bank statement CSV before anything is saved, map its columns once, and import it into a bank account.
+description: Import a bank statement in one step. The app finds the account and the columns, and asks only when it can't.
 sidebar:
   order: 12
   label: Import a bank CSV
 ---
 
-Use this guide to bring a bank statement into the app so each payment out can be checked for a receipt. Nuits Receipts imports XLSX, CSV and PDF statements exactly as your bank gives them: there are presets for some layouts, other layouts are read automatically, and a column mapper remains for files neither can read. It has been tested with Holvi exports so far. Nothing is saved until you confirm the preview.
+Use this guide to bring a bank statement into the app so each payment out can be checked for a receipt. Nuits Receipts imports XLSX, CSV and PDF statements exactly as your bank gives them: there are presets for some layouts, other layouts are read automatically, and a column mapper remains for files neither can read. It has been tested with Holvi exports so far. Choose the file and press Import: the app finds the account and the columns itself, skips what you imported before, and asks only when it cannot tell.
 
 ## Prerequisites
 
 - An XLSX, CSV or PDF statement of booked transactions from your bank, at most 2 MiB and 5,000 rows. A PDF needs a text layer (not a scan) and at most 400 pages. No pending transactions.
-- Optional: a bank account set up under **Settings** > **Bank accounts**. You can also create one during the import.
+- Optional: a bank account under **Settings** > **Bank**. Without one, the import creates an account named for the bank it recognises, or asks.
 
-![The Check the file page with a recognised layout, the payments read from the file and the Import button](../../../assets/screenshots/import-preview.png)
+![The Import a bank statement page, with one file field and the Import statement button](../../../assets/screenshots/import-preview.png)
 
 ## Import a statement
 
 <Steps>
   <Step title="Open the import page">
 
-Select **Import statement** on **Bank** (at the bottom, once a statement is in) or on **Home** while the **Match** row says "No statement". The page is called **Import a bank statement**.
+Select **Import statement** on **Bank** or on **Home** while the **Match** row says "No statement". The page is called **Import a bank statement**.
 
   </Step>
-  <Step title="Choose the file and the account">
+  <Step title="Choose the file and import">
 
-Under **Bank statement (XLSX, CSV or PDF)**, choose the file as downloaded. There is no need to convert it or remove the lines above the column names. Pick the account in **Which account is this?** and keep **Import into** on **The account chosen here**.
+Under **Bank statement (XLSX, CSV or PDF)**, choose the file as downloaded. There is no need to convert it or remove the lines above the column names. Select **Import statement**.
 
-For a new account, set **Import into** to **A new account (fill in below)** and fill in **Account name**, **Bank** and **Currency** under **Only for a new account**. The account is created only when you import.
-
-If accented letters come out wrong later, open **File options** and pick the **Text encoding** your bank uses. Then select **Check the file**.
+The app picks the account: the only one you have, or the one whose bank the layout names. It picks the layout: one saved for these column names, a built-in one such as Holvi, or one it works out from the file. A layout it works out is saved, so the next file from that bank imports the same way.
 
   </Step>
-  <Step title="Read the preview">
+  <Step title="Answer the question, if it asks one">
 
-The **Check the file** page names the layout if it recognised one (for example "We recognised a Holvi export."), or says "Columns read automatically." for a layout it worked out itself. It counts the payments and their date range, and shows the net total per currency. If the file states its own totals or opening and closing balances, as Holvi statements do, a count, sum or balance that differs is listed as a problem. Up to 50 rows are shown; the whole file is checked.
+If the app cannot tell which account the file belongs to, it asks **Which account is this?** once. Pick the account and select **Import statement** again. It remembers the answer for that bank.
 
-Compare the count, dates and net total with your bank. Money out must show as negative amounts.
-
-  </Step>
-  <Step title="Fix the mapping if needed">
-
-If the page lists problems, or the columns look wrong, open **The columns look wrong? Adjust how we read the file**. Choose a layout under **Layout**, or **Custom mapping**, and set the columns, date format, decimal mark and how amounts are shown. If the column names are not on the first row, set **Which row has the column names?** (0 is the first row). Use **Rows to skip at the end** for a footer.
-
-Select **Check again** after every change. A row with an error blocks the whole import, and each message names the row and field.
-
-  </Step>
-  <Step title="Answer the questions it asks">
-
-- For dates written with slashes, tick **The day and month order above is right for dates written with slashes.**
-- If payments without a bank ID look the same as ones from another file, choose under **If a payment was already imported**. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
-- If similar payments exist in your other accounts, check the account and tick **I checked the account. Similar payments in my other accounts are separate payments.**
-
-Then select **Check again**.
-
-  </Step>
-  <Step title="Import">
-
-With no problems left, the page shows **Import into** and the account name. To reuse this mapping for files with the same columns, open **Save this layout for next time** and fill in **Layout name**. Select **Import N payments** (for example **Import 42 payments**).
-
-The preview is valid for 30 minutes. If it expires, start again from the import page.
+If it cannot read the columns, or the rows have errors, the totals the file prints do not add up, or the date order is unclear, the column editor opens instead. Open **The columns look wrong? Adjust how we read the file**, set the layout or the columns, date format and decimal mark, and select **Check again** after each change. A row with an error blocks the whole import, and each message names the row and field. Then select **Import N payments**. Every field is described in [Bank CSV import](/reference/bank-csv-import/).
 
   </Step>
 </Steps>
 
 ## Check that it worked
 
-You land on **Bank** for the month of the first row, with a banner such as "Added 42 payments. Paid out: 36 matched, 4 not a purchase, 2 missing." The line at the top reads, for example, "42 out, 36 matched, 4 not a purchase, 2 missing". When the import marked payments **Not a purchase**, the banner offers **Undo not a purchase**. **Statements (N)**, at the bottom of **Bank**, lists the import with its row count.
+You land on **Bank** for the month of the first row, with a banner such as "Added 42 payments. Paid out: 36 matched, 4 not a purchase, 2 missing." and **Undo**, which removes the whole import so the same file can be imported afresh. Undo refuses, and removes nothing, once you have matched one of its payments by hand or marked one Not a purchase. The line at the top reads, for example, "42 out, 36 matched, 4 not a purchase, 2 missing".
 
-Importing the same file into the same account again changes nothing: the banner says "You imported this file before, so nothing changed." and no payment is added twice. The same file cannot be imported into a different account.
+Payments you imported before are skipped, and the banner says "Skipped N already imported." When some of them had no bank ID, so they could be separate payments with the same facts, it offers **Import anyway**, which adds them as extra payments. Importing the same file into the same account again changes nothing: the banner says "You imported this file before, so nothing changed." A payment that looks like one in another of your accounts is imported, and the banner counts it.
 
 Next: [Match payments and receipts](/how-to/match-payments-and-receipts/).
 

@@ -1,9 +1,10 @@
 {
-  "base": "http://127.0.0.1:8811",
-  "total": 2,
+  "base": "http://127.0.0.1:8842",
+  "total": 3,
   "budget": 0,
   "byRule": {
-    "font-size": 2
+    "font-size": 2,
+    "text-contrast": 1
   },
   "unfinished": 0,
   "groups": [
@@ -26,6 +27,16 @@
         "/ @ 1440x900"
       ],
       "count": 1
+    },
+    {
+      "rule": "text-contrast",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(3) > details:nth-of-type(1) > div:nth-of-type(1) > dl:nth-of-type(1) > div:nth-of-type(6) > dd:nth-of-type(1)",
+      "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined because it partially overlaps other elements.",
+      "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+      "where": [
+        "/help @ 390x844"
+      ],
+      "count": 1
     }
   ],
   "pages": [
@@ -40,7 +51,7 @@
           "actual": "13.5px",
           "expected": "one of 18px",
           "fix": "Use a configured size for this text role.",
-          "documentUrl": "http://127.0.0.1:8811/",
+          "documentUrl": "http://127.0.0.1:8842/",
           "framePath": "main"
         }
       ]
@@ -88,7 +99,20 @@
     {
       "path": "/help",
       "viewport": "390x844",
-      "findings": []
+      "findings": [
+        {
+          "rule": "text-contrast",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(3) > details:nth-of-type(1) > div:nth-of-type(1) > dl:nth-of-type(1) > div:nth-of-type(6) > dd:nth-of-type(1)",
+          "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined because it partially overlaps other elements.",
+          "actual": "contrast could not be measured: Element's background color could not be determined because it partially overlaps other elements",
+          "expected": "text contrast of at least 4.5:1",
+          "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+          "status": "unresolved",
+          "requiredContrastRatio": 4.5,
+          "documentUrl": "http://127.0.0.1:8842/help",
+          "framePath": "main"
+        }
+      ]
     },
     {
       "path": "/",
@@ -101,7 +125,7 @@
           "actual": "13px",
           "expected": "one of 18px",
           "fix": "Use a configured size for this text role.",
-          "documentUrl": "http://127.0.0.1:8811/",
+          "documentUrl": "http://127.0.0.1:8842/",
           "framePath": "main"
         }
       ]
