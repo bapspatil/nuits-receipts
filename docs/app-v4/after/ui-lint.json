@@ -1,0 +1,155 @@
+{
+  "base": "http://127.0.0.1:8811",
+  "total": 2,
+  "budget": 0,
+  "byRule": {
+    "font-size": 2
+  },
+  "unfinished": 0,
+  "groups": [
+    {
+      "rule": "font-size",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+      "message": "Expected one of 18px. Found 13.5px.",
+      "fix": "Use a configured size for this text role.",
+      "where": [
+        "/ @ 390x844"
+      ],
+      "count": 1
+    },
+    {
+      "rule": "font-size",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+      "message": "Expected one of 18px. Found 13px.",
+      "fix": "Use a configured size for this text role.",
+      "where": [
+        "/ @ 1440x900"
+      ],
+      "count": 1
+    }
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "font-size",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected one of 18px. Found 13.5px.",
+          "actual": "13.5px",
+          "expected": "one of 18px",
+          "fix": "Use a configured size for this text role.",
+          "documentUrl": "http://127.0.0.1:8811/",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/receipts?view=todo",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=all",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=all&kind=sales",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/payments",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/payments?view=todo",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/settings",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/import",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/add",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/help",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/",
+      "viewport": "1440x900",
+      "findings": [
+        {
+          "rule": "font-size",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected one of 18px. Found 13px.",
+          "actual": "13px",
+          "expected": "one of 18px",
+          "fix": "Use a configured size for this text role.",
+          "documentUrl": "http://127.0.0.1:8811/",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/receipts?view=todo",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=all",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=all&kind=sales",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/payments",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/payments?view=todo",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/settings",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/import",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/add",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/help",
+      "viewport": "1440x900",
+      "findings": []
+    }
+  ]
+}
