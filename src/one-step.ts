@@ -26,7 +26,7 @@ import {
   transactionIds,
   transactionsById,
 } from './banking';
-import { ariaFor, errorLine, escape, page, pageHead } from './ui';
+import { ariaFor, BACK_BANK, errorLine, escape, page, pageHead } from './ui';
 import {
   encodedBytes,
   hidden,
@@ -130,7 +130,7 @@ function accountQuestion(env: Env, bytes: Uint8Array, accounts: Account[]): Prom
     `<div class="card"><form action="/import" method="post" enctype="multipart/form-data">${hidden('csv', encodedBytes(bytes))}<h2>Which account is this?</h2><p class="small">We could not tell from the file. We will remember the columns, so you are asked this only once per bank.</p><div class="fields"><label>Account<select name="account" id="f-account"${ariaFor('import', 'account')}>${options}</select>${errorLine('import', 'account')}</label></div>${errorLine('import', '')}${button('importStmt', { tone: 'primary' })}</form></div>`,
     200,
     env,
-    { detail: 'Which account is this?', head: pageHead('Which account is this?') },
+    { detail: 'Which account is this?', head: pageHead('Which account is this?', '', BACK_BANK) },
   );
 }
 
@@ -222,7 +222,7 @@ export function anywayPage(env: Env, params: URLSearchParams): Promise<Response>
     `<div class="card"><form action="/import/anyway" method="post"><h2>Import anyway</h2><p>${n} ${n === 1 ? 'payment was' : 'payments were'} skipped because ${n === 1 ? 'it looks' : 'they look'} like ${n === 1 ? 'one' : 'ones'} you already imported. If ${n === 1 ? 'it is' : 'they are'} really separate payments, add ${n === 1 ? 'it' : 'them'} as extra payments.</p>${hidden('import', imp)}${button('importAnyway', { tone: 'primary' })} ${buttonLink('cancel', '/payments')}</form></div>`,
     200,
     env,
-    { detail: 'Import anyway', head: pageHead('Import anyway') },
+    { detail: 'Import anyway', head: pageHead('Import anyway', '', BACK_BANK) },
   );
 }
 

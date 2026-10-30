@@ -723,9 +723,14 @@ export const SPECULATION_RULES = JSON.stringify({
 });
 
 // The page header: the title and at most one action. No kicker, no subtitle. HTML in.
-export function pageHead(title: string, aside = ''): string {
-  return `<div class="head"><h1>${title}</h1>${aside}</div>`;
+// back: where a screen without a tab goes back to. The installed app has no browser back or address
+// bar, so such a screen names its way out: its list, or Home.
+export function pageHead(title: string, aside = '', back?: { href: string; label: string }): string {
+  const crumb = back ? `<div class="crumbs"><a href="${escape(back.href)}">\u2039 ${escape(back.label)}</a></div>` : '';
+  return `${crumb}<div class="head"><h1>${title}</h1>${aside}</div>`;
 }
+export const BACK_HOME = { href: '/', label: 'Home' };
+export const BACK_BANK = { href: '/payments', label: 'Bank' };
 // The header of a month screen: the month is the h1, between its neighbours.
 export function monthHead(path: string, selected: string, aside = ''): string {
   return `<div class="head">${monthSwitcher(path, selected)}${aside}</div>`;

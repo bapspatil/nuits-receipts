@@ -114,6 +114,8 @@ import {
   chosenReceipt,
   errorId,
   VIEW_TRANSITION_CSS,
+  BACK_BANK,
+  BACK_HOME,
   errorLine,
   fieldId,
   matchError,
@@ -1156,9 +1158,11 @@ async function sendStep(
   const drive = conn?.folder_item_id ? conn : null;
   const upload = drive && !empty ? await progress(env, drive, selected, chosen) : null;
   const folder = escape(drive?.folder_name ?? '');
-  const csv = buttonLink('csv', `/export.csv?month=${selected}`);
+  // A file is a plain same-origin link that says it is a download, so an installed app, which has
+  // no address bar, saves it instead of trying to show it.
+  const csv = buttonLink('csv', `/export.csv?month=${selected}`, { attrs: ' download' });
   const zip = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
-    buttonLink('zip', `/month/package.zip?${query(selected, o)}`, { label: text, tone });
+    buttonLink('zip', `/month/package.zip?${query(selected, o)}`, { label: text, tone, attrs: ' download' });
   const uploadForm = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
     `<form action="/month/onedrive-upload" method="post">${optionFields(selected, o)}${button('oneDrive', { label: text, tone })}</form>`;
   const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}${button('sent', { label: `Mark ${monthName(selected, false)} as sent` })}</form>`;
@@ -1237,6 +1241,7 @@ async function sendStep(
   const undated = plan.undated
     ? `<label class="check"><input type="checkbox" name="undated" value="1">Add ${plural(plan.undated, 'undated receipt')}</label>`
     : '';
+  // A GET form, not a link, because it carries the undated choice; the response is an attachment either way.
   const anyway = `<form action="/month/package.zip" method="get">${hidden('month', selected)}${hidden('anyway', 1)}${undated}${button('downloadAnyway')}</form>${
     upload && upload.pending.length ? uploadForm({ anyway: true }, 'Upload anyway') : ''
   }`;
@@ -1500,13 +1505,13 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
 
 // ---------- Help ----------
 export async function helpPage(env: Env): Promise<Response> {
-  return page('help', helpBody(), 200, env, { head: pageHead('Help') });
+  return page('help', helpBody(), 200, env, { head: pageHead('Help', '', BACK_HOME) });
 }
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
   return page('import', `<div class="card">${await importForm()}</div>`, 200, env, {
     detail: 'Import a bank statement',
-    head: pageHead('Import a bank statement'),
+    head: pageHead('Import a bank statement', '', BACK_BANK),
   });
 }

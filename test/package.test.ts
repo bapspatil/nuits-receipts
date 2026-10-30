@@ -273,7 +273,7 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   html = await (await request('/?month=2026-10')).text();
   expect(html).toContain('<b>Send</b><span>Ready</span>');
   expect(html).toMatch(
-    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10"><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP \(\d+ KB\)<\/span><\/a>/,
+    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10" download><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP \(\d+ KB\)<\/span><\/a>/,
   );
   expect(html).toContain('<span>Mark October as sent</span></button>');
   expect(html).toContain('<ul class="manifest" aria-label="Files in the package"><li>receipts-2026-10/</li>');

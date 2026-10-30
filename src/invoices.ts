@@ -220,7 +220,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           .map((r) => `<a href="${escape(receiptUrl(r.id, here))}">${escape(invoiceName(r))}</a>`)
           .join(', ')}</p>`
       : ''
-  }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`)}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
+  }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`, { attrs: ' download' })}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
   const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
@@ -305,7 +305,13 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
   }<script src="/assets/add.js" defer></script>`;
   return page('add', body, 200, env, {
     detail: 'Add',
-    head: pageHead('Add receipts or invoices'),
+    head: pageHead(
+      'Add receipts or invoices',
+      '',
+      kind === 'sales'
+        ? { href: '/receipts?view=all&kind=sales', label: 'Invoices' }
+        : { href: '/receipts?view=todo', label: 'Receipts' },
+    ),
   });
 }
 // Progressive enhancement for /add: drag and drop, one request per file and

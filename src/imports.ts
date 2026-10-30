@@ -26,7 +26,7 @@ import {
   savePreset,
   type ParsedImport,
 } from './banking';
-import { ariaFor, day, errorLine, escape, input, page, pageHead, select, stepWord } from './ui';
+import { ariaFor, BACK_BANK, day, errorLine, escape, input, page, pageHead, select, stepWord } from './ui';
 import { failureFor, kept } from './request';
 import { withDone } from './events';
 import { button } from './actions';
@@ -505,7 +505,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${unmapped ? editor : `${table}${exclusions}${confirm}${editor}`}</form>`;
   return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
     detail: 'Check the file',
-    head: pageHead('Check the file'),
+    head: pageHead('Check the file', '', BACK_BANK),
   });
 }
 // A statement that states its own totals must add up to them before it is imported.

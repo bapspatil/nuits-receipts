@@ -864,6 +864,9 @@ const INLINE_CSP =
 // Where an error page's back link goes: the same-origin page that sent the
 // request, without the base path (the rewriter adds it back), else home.
 function backLink(request: Request, base: string): string {
+  // Microsoft sends the person back to the callback from another origin, so there is no referrer
+  // to return to. The installed app has no back button; Settings is where the flow began.
+  if (new URL(request.url).pathname.endsWith('/settings/onedrive/callback')) return '/settings#onedrive';
   try {
     const referer = new URL(request.headers.get('Referer') ?? '');
     if (referer.origin !== new URL(request.url).origin) return '/';
