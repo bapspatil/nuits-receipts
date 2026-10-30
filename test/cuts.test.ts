@@ -3,7 +3,8 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { hash } from '../src/domain';
 import { importBankCsv, parsePreset } from '../src/banking';
-import { idFrom, request, uploadPdf } from './helpers';
+import worker from '../src/index';
+import { authorization, htmlForm, idFrom, request, uploadPdf } from './helpers';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 
@@ -126,4 +127,97 @@ test('Home has no "N dated" link; the Check step already leads to the list', asy
   const home = await (await request('/?month=2026-09')).text();
   expect(home).not.toContain('class="dated"');
   expect(home).not.toMatch(/\d+ receipts? dated/);
+});
+
+// One part (the default General) or several, on an app with an empty settings table.
+const ONE_PART = { ...env, PRODUCTS_JSON: '[{"id":"general","label":"General"}]', DEFAULT_PRODUCT: 'general' };
+const THREE_PARTS = {
+  ...env,
+  PRODUCTS_JSON: '[{"id":"general","label":"General"},{"id":"web","label":"Website"},{"id":"host","label":"Hosting"}]',
+  DEFAULT_PRODUCT: 'general',
+};
+function requestWith(config: typeof env, path: string, form?: FormData) {
+  return worker.fetch(
+    new Request('http://localhost' + path, {
+      method: form ? 'POST' : 'GET',
+      body: form,
+      headers: { Authorization: authorization, Origin: 'http://localhost' },
+    }),
+    config,
+  );
+}
+async function flaggedReceipt(reasons: string[], product = 'general') {
+  const id = 'c'.repeat(64);
+  await env.DB.prepare(
+    `INSERT INTO receipts (id,original_key,filename,media_type,source,received_at,status,kind,vendor,issue_date,currency,total_minor,net_minor,vat_minor,product,review_reasons_json)
+     VALUES (?,?,'c.pdf','application/pdf','upload','2026-09-20T10:00:00Z','needs_review','expense','Vendor C','2026-09-20','EUR',1000,1000,0,?,?)`,
+  )
+    .bind(id, `receipts/${id}`, product, JSON.stringify(reasons))
+    .run();
+  return id;
+}
+
+test('Part is hidden on the receipt page while there is one part, and shown with two', async () => {
+  const id = await flaggedReceipt(['missing_vat_rate', 'uncertain_product', 'classification_failed']);
+  const one = await (await requestWith(ONE_PART, `/receipts/${id}`)).text();
+  expect(one).not.toContain('for="f-product"');
+  expect(one).not.toContain('<select name="product"');
+  expect(one).toContain('<input type="hidden" name="product" value="general">');
+  expect(one).not.toContain('Which part of the business?');
+  expect(one).not.toMatch(/>Part</);
+  expect(one).toContain('name="expense_type"');
+  const many = await (await requestWith(THREE_PARTS, `/receipts/${id}`)).text();
+  expect(many).toContain('<select name="product"');
+  expect(many).toContain('Which part of the business?');
+  expect(many).toMatch(/>Part</);
+});
+
+test('a one-part receipt still saves with its Part and approves', async () => {
+  const id = await flaggedReceipt(['missing_vat_rate']);
+  const row = (await env.DB.prepare('SELECT revision FROM receipts WHERE id=?')
+    .bind(id)
+    .first<{ revision: number }>())!;
+  const page = await (await requestWith(ONE_PART, `/receipts/${id}`)).text();
+  const form = htmlForm(page, `/receipts/${id}`);
+  form.set('revision', String(row.revision));
+  form.set('action', 'approve');
+  expect((await requestWith(ONE_PART, `/receipts/${id}`, form)).status).toBe(303);
+  expect(await env.DB.prepare('SELECT status,product FROM receipts WHERE id=?').bind(id).first()).toMatchObject({
+    status: 'ready',
+    product: 'general',
+  });
+});
+
+test('Home shows By part only with two or more parts', async () => {
+  await env.DB.prepare(
+    `INSERT INTO receipts (id,original_key,filename,media_type,source,received_at,status,kind,vendor,issue_date,currency,total_minor,net_minor,vat_minor,vat_rate_bps,product,expense_type,review_reasons_json)
+     VALUES (?,?,'d.pdf','application/pdf','upload','2026-09-20T10:00:00Z','ready','expense','Vendor D','2026-09-20','EUR',1000,1000,0,0,'general','infra','[]')`,
+  )
+    .bind('d'.repeat(64), `receipts/${'d'.repeat(64)}`)
+    .run();
+  expect(await (await requestWith(THREE_PARTS, '/?month=2026-09')).text()).toContain('<summary>By part</summary>');
+  expect(await (await requestWith(ONE_PART, '/?month=2026-09')).text()).not.toContain('By part');
+});
+
+test('Settings hides Parts and Default part with one part, and Add a part makes a second', async () => {
+  const one = await (await requestWith(ONE_PART, '/settings')).text();
+  expect(one).not.toContain('Parts of the business');
+  expect(one).not.toContain('Default part');
+  expect(one).toContain('<label for="part-new">Add a part</label>');
+  expect(one).not.toMatch(/\d+ parts?</);
+  const form = htmlForm(one, '/settings/setup');
+  expect(form.getAll('product_id')).toEqual(['general']);
+  form.set('group', 'business');
+  form.set('product_new', 'Consulting');
+  expect((await requestWith(ONE_PART, '/settings/setup', form)).status).toBe(303);
+  const stored = await env.DB.prepare("SELECT value_json FROM settings WHERE key='PRODUCTS_JSON'").first<{
+    value_json: string;
+  }>();
+  expect(JSON.parse(JSON.parse(stored!.value_json) as string)).toEqual([
+    { id: 'general', label: 'General' },
+    { id: 'Consulting', label: 'Consulting' },
+  ]);
+  const two = await (await requestWith(ONE_PART, '/settings')).text();
+  expect(two).toContain('Parts of the business');
+  expect(two).toContain('Default part');
 });

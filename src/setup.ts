@@ -1,7 +1,7 @@
 // Settings > Setup: the editable form over src/settings.ts, its save and
 // reset handlers. Field names are the setting keys themselves.
 import type { Env } from './env';
-import { config, ConfigError, parseConfig, TUNING_VARS } from './config';
+import { config, ConfigError, hasParts, parseConfig, TUNING_VARS } from './config';
 import { EXPONENTS, InputError, requireInput, type Tuning } from './domain';
 import {
   applied,
@@ -221,6 +221,8 @@ function control(env: Env, field: Field): string {
     case 'number':
       return `<input name="${name}" value="${escape(value)}" type="number" inputmode="decimal" min="${field.min}" max="${field.max}" step="${field.step}" ${attrs}>`;
     case 'products':
+      if (!hasParts(env))
+        return `${settings.products.map((p) => `<input type="hidden" name="product_id" value="${escape(p.id)}"><input type="hidden" name="product_label" value="${escape(p.label)}">`).join('')}<input id="part-new" name="product_new" placeholder="For example Consulting" maxlength="100" value="${escape(kept(scope, 'product_new', ''))}"${ariaFor(scope, 'product_new')}>`;
       return `<ul class="plain parts" role="group" aria-labelledby="${name}-label">${settings.products
         .map(
           (p) =>
@@ -252,9 +254,11 @@ function fieldRow(env: Env, field: Field): string {
     key = field.key,
     label = escape(field.label);
   const name =
-    field.kind === 'products'
-      ? `<span class="flabel" id="${key}-label">${label}</span>`
-      : `<label for="f-${key}">${label}</label>`;
+    field.kind !== 'products'
+      ? `<label for="f-${key}">${label}</label>`
+      : hasParts(env)
+        ? `<span class="flabel" id="${key}-label">${label}</span>`
+        : '<label for="part-new">Add a part</label>';
   const bad = invalid
     ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'value set when deployed' : 'built-in default'} is used. ${resetButton(field, 'Clear it')}</p>`
     : '';
@@ -276,7 +280,9 @@ function resetForms(env: Env, fields: readonly Field[]): string {
 }
 // Allowed senders are edited row by row in Senders, so Email leaves the list out.
 function groupForm(env: Env, group: (typeof GROUPS)[number], card: boolean): string {
-  const fields = FIELDS.filter((f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS');
+  const fields = FIELDS.filter(
+    (f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS' && (hasParts(env) || f.key !== 'DEFAULT_PRODUCT'),
+  );
   return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}">${errorLine(scopeOf(group.id), '')}<input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
 }
 const AUDIT_LABEL = new Map(FIELDS.map((f) => [f.key as string, f.label]));

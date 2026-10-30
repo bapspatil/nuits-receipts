@@ -346,6 +346,9 @@ const isTodoReason = (code: string): boolean => !(OPTIONAL_REASONS as readonly s
 export function hasTodoReason(codes: readonly string[]): boolean {
   return codes.some(isTodoReason);
 }
+export function todoReasons(codes: readonly string[]): string[] {
+  return codes.filter(isTodoReason);
+}
 export function optionalReasons(codes: readonly string[]): string[] {
   return codes.filter((code) => !isTodoReason(code));
 }

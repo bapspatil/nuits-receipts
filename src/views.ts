@@ -14,7 +14,7 @@ import {
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
-import { config, MAX_ALLOWED_SENDERS } from './config';
+import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
@@ -61,6 +61,8 @@ import {
   needsReviewSql,
   optionalReasons,
   reasonCodes,
+  todoReasons,
+  type Flag,
   type FlagField,
 } from './flags';
 import {
@@ -124,7 +126,7 @@ export async function reviewQueue(env: Env): Promise<Receipt[]> {
   ).results;
 }
 function firstFlag(r: Receipt): string {
-  const code = reasonCodes(r.review_reasons_json)[0];
+  const code = todoReasons(reasonCodes(r.review_reasons_json))[0];
   return code ? flagFor(code).title.replace(/\.$/, '') : 'Needs a look';
 }
 // The first problem as one word, for lists. The full question is its tooltip.
@@ -140,7 +142,7 @@ const REASON_WORDS: Record<string, string> = {
   Other: 'Check',
 };
 function reasonWord(r: Receipt): string {
-  const cards = flagCards(reasonCodes(r.review_reasons_json));
+  const cards = flagCards(todoReasons(reasonCodes(r.review_reasons_json)));
   const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
   return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
 }
@@ -402,7 +404,9 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const gone = !!r.discarded_at;
   const needs = needsReview(r),
     reading = r.status === 'pending' || r.status === 'processing';
-  const cards = needs ? flagCards(codes) : [];
+  const parts = hasParts(env);
+  const aboutPartOnly = (flag: Flag) => flag.fields.length > 0 && flag.fields.every((f) => f === 'product');
+  const cards = needs ? flagCards(codes).filter(({ flag }) => parts || !aboutPartOnly(flag)) : [];
   const unverified = codes.includes('sender_unverified');
   const placed = new Set<string>();
   const money_ = (k: 'net' | 'vat' | 'total') => money(r[`${k}_minor`], r.currency ?? 'EUR');
@@ -563,7 +567,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     .sort((a, b) => Number(isRequired(b.flag)) - Number(isRequired(a.flag)))
     .map(({ flag }, i) => {
       const id = `flag-${i + 1}`;
-      const names = flag.fields.filter((f) => !placed.has(f));
+      const names = flag.fields.filter((f) => !placed.has(f) && (parts || f !== 'product'));
       const tier: Tier = isRequired(flag) ? 'req' : 'opt';
       const body = bodyOf(flag, r);
       const extra =
@@ -620,8 +624,11 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     : '';
   const rest = fieldOrder.filter((f) => !placed.has(f)).map(rows);
   const filing = (sales ? (['product'] as const) : (['product', 'expense_type'] as const))
-    .filter((f) => !placed.has(f))
+    .filter((f) => !placed.has(f) && (parts || f !== 'product'))
     .map(rows);
+  const keptPart = parts
+    ? ''
+    : hidden('product', config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct);
   const due = rows('due_date');
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
@@ -649,6 +656,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const quiet = needs
     ? ''
     : flagCards(optionalReasons(codes))
+        .filter(({ flag }) => parts || !aboutPartOnly(flag))
         .map(({ flag }) => flag.title)
         .join(' ');
   const quietNote = quiet ? `<p class="meta quiet">Not needed to approve: ${escape(quiet)}</p>` : '';
@@ -656,7 +664,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const verb = needs || reading ? 'approve' : 'save';
   // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
   const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
     <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}</form>`;
   const matches = sales
@@ -1193,20 +1201,21 @@ async function sendStep(
     ? `<details><summary>In the ZIP</summary><div class="body"><ul class="manifest" aria-label="Files in the package"><li>${escape(plan.folder)}/</li><li>00-index-${selected}.csv</li>${plan.files.some((f) => f.receipt.kind === 'sales') ? `<li>00-sales-index-${selected}.csv</li>` : ''}${s.missing.length ? `<li>00-missing-receipts-${selected}.csv</li>` : ''}${shown.map((f) => `<li>${escape(f.path)}</li>`).join('')}${plan.files.length > shown.length ? `<li class="more">… ${plan.files.length - shown.length} more</li>` : ''}</ul><p class="small">${plural(plan.files.length, 'file')}${sized ? `, ${size(bytes)}` : ''}</p></div></details>`
     : '';
   const rowsByKey = [...s.matrix].filter(([, v]) => v !== 0n);
-  const parts = rowsByKey.length
-    ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
-        .map(([key, v]) => {
-          const [product = '', type = ''] = key.split('\u0000');
-          return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
-        })
-        .join(
-          '',
-        )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
-    : '';
+  const byPart =
+    rowsByKey.length && hasParts(env)
+      ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
+          .map(([key, v]) => {
+            const [product = '', type = ''] = key.split('\u0000');
+            return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
+          })
+          .join(
+            '',
+          )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
+      : '';
   const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
-    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${parts}</div>`;
+    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${byPart}</div>`;
 
   if (changed) {
     const what = [
@@ -1252,7 +1261,7 @@ async function sendStep(
   }`;
   return {
     status: 'Not ready',
-    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${line}${didSend}${manifest}${parts}</div></details>`,
+    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${line}${didSend}${manifest}${byPart}</div></details>`,
   };
 }
 
@@ -1263,7 +1272,7 @@ function ruleFields(
     Pick<Rule, 'vendor_contains' | 'context_contains' | 'bank_alias' | 'product' | 'expense_type' | 'priority'>
   > = {},
 ): string {
-  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"' })}${productSelect(env, 'product', rule.product ?? config(env).defaultProduct, 'Part')}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"' })}</div>`;
+  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"' })}${hasParts(env) ? productSelect(env, 'product', rule.product ?? config(env).defaultProduct, 'Part') : `<input type="hidden" name="product" value="${escape(config(env).defaultProduct)}">`}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"' })}</div>`;
 }
 
 // ---------- Bank: import ----------
@@ -1420,19 +1429,18 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
         ? `<ul class="plain rowlist rules">${rules.results
             .map(
               (rule) =>
-                `<li><details><summary>${escape(rule.vendor_contains)} → ${escape(productLabel(env, rule.product))}, ${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule)}<div class="btns"><button class="btn secondary">Save</button><button class="linkbtn" formaction="/rules/${rule.id}/delete">Delete</button></div></form></div></details></li>`,
+                `<li><details><summary>${escape(rule.vendor_contains)} → ${hasParts(env) ? `${escape(productLabel(env, rule.product))}, ` : ''}${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule)}<div class="btns"><button class="btn secondary">Save</button><button class="linkbtn" formaction="/rules/${rule.id}/delete">Delete</button></div></form></div></details></li>`,
             )
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
     }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}<button class="btn secondary">Add</button></form></div></details>`,
     opened === 'rules',
   );
-  const parts = settings.products.length;
   const body = [
     sect(
       'setup-business',
       'Business',
-      `${escape(settings.sellerNames[0] ?? settings.appName)}, ${plural(parts, 'part')}`,
+      `${escape(settings.sellerNames[0] ?? settings.appName)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
       setup.business,
       opens('business'),
     ),
