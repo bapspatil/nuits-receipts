@@ -12,18 +12,22 @@ const kebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 // Every layer is a flat name -> value map. A semantic value names a primitive
 // colour; a component value names a semantic token or a primitive, else it is
 // a literal. Unknown names stay literal, so "44px" and calc() pass through.
+// A colour with `over` is a measurement only (glass composited over a backdrop), never a variable.
+// A literal may name a colour in braces, `rgb({ink950}/.1)`, and gets its channels.
 export function render(tokens) {
-  const colors = tokens.color;
+  const colors = Object.fromEntries(Object.entries(tokens.color).filter(([, v]) => !v.over));
   const semantic = tokens.semantic;
   const rgb = (name) => {
     const n = parseInt(colors[name].hex.slice(1), 16);
     return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
   };
+  const fill = (value) => value.replace(/\{(\w+)\}/g, (_, name) => rgb(name));
   const ref = (value) => {
     if (value in semantic) return `var(--${kebab(value)})`;
     if (value in colors) return `var(--${kebab(value)})`;
-    return value;
+    return fill(value);
   };
+  const { tint, alpha } = tokens.glass;
   const group = (title, entries) => `/* ${title} */${entries.map(([k, v]) => `--${k}:${v};`).join('')}`;
   const primitives = [
     ...Object.entries(colors).map(([k, v]) => [kebab(k), v.hex]),
@@ -31,11 +35,11 @@ export function render(tokens) {
     ...Object.entries(tokens.text).map(([k, v]) => [`text-${k}`, v]),
     ...Object.entries(tokens.space).map(([k, v]) => [`space-${k}`, v]),
     ...Object.entries(tokens.radius).map(([k, v]) => [`radius-${k}`, v]),
-    ...Object.entries(tokens.shadow).map(([k, v]) => [`shadow-${k}`, v.replace(/\{(\w+)\}/g, (_, name) => rgb(name))]),
+    ...Object.entries(tokens.shadow).map(([k, v]) => [`shadow-${k}`, fill(v)]),
   ];
-  const roles = Object.entries(semantic).map(([k, v]) => [k, ref(v)]);
+  const roles = [...Object.entries(semantic).map(([k, v]) => [k, ref(v)]), ['glass', `rgb(${rgb(tint)}/${alpha})`]];
   const components = Object.entries(tokens.component).map(([k, v]) => [k, ref(v)]);
-  const phone = Object.entries(tokens.phone ?? {});
+  const phone = Object.entries(tokens.phone ?? {}).map(([k, v]) => [k, ref(v)]);
   const small = phone.length ? `@media(max-width:720px){:root{${phone.map(([k, v]) => `--${k}:${v};`).join('')}}}` : '';
   const css = `:root{${group('primitives', primitives)}${group('semantic', roles)}${group('component', components)}}${small}`;
   const palette = Object.fromEntries(Object.entries(colors).map(([k, v]) => [k, v.hex]));
