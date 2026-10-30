@@ -221,9 +221,11 @@ test('all=1 takes the list filter, never more than the cap', async () => {
     ).bind(id(1000 + i), `receipts/${id(1000 + i)}`),
   );
   await env.DB.batch(many);
-  const over = await bulk({ op: 'discard', all: '1', list: 'receipts', view: 'all' });
-  expect(over.status).toBe(400);
-  expect(await over.text()).toContain('Up to 500 at a time. Narrow the filter.');
+  // Over the cap: the first 500 in the list's order (newest first), as the bar offers.
+  const over = await json({ op: 'discard', all: '1', list: 'receipts', view: 'all' });
+  expect(await over.json()).toMatchObject({ n: BULK_CAP });
+  expect((await row(1000 + BULK_CAP))!.discarded_at).toBeTruthy();
+  expect((await row(1000))!.discarded_at).toBeNull();
 });
 
 test('all=1 on To do acts on the To do rows only', async () => {

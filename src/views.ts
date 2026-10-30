@@ -64,6 +64,7 @@ import {
   listParams,
   listUrl,
   nextOpen,
+  openCount,
   openPlace,
   openRows,
   RECEIPTS_TODO,
@@ -268,8 +269,10 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
 export async function reviewPage(env: Env, state: ListState): Promise<Response> {
   // Rows a bank line points at: Discard asks to remove the match too.
   const known = matchedIds(env);
-  const [all, held, reading, merges, matched] = await Promise.all([
-    reviewQueue(env, state),
+  // The true count, however many render: the list shows the first upto of a set capped at BULK_CAP.
+  const [rows, { total, also: undated }, held, reading, merges, matched] = await Promise.all([
+    openRows<Receipt>(env, LIST_DEFS.receipts!, state, state.upto),
+    openCount(env, LIST_DEFS.receipts!, state, 'r.issue_date IS NULL'),
     heldMail(env),
     env.DB.prepare(
       "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
@@ -277,8 +280,6 @@ export async function reviewPage(env: Env, state: ListState): Promise<Response> 
     mergePlan(env, known),
     known,
   ]);
-  const rows = all.slice(0, state.upto);
-  const undated = all.filter((r) => r.issue_date === null).length;
   const mergeable = merges.length;
   const merge = mergeable
     ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
@@ -287,7 +288,7 @@ export async function reviewPage(env: Env, state: ListState): Promise<Response> 
     form: 'bulk-review',
     action: '/receipts/bulk',
     noun: ['receipt', 'receipts'],
-    total: all.length,
+    total,
     scope: listParams(state),
     actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
   };
@@ -301,11 +302,12 @@ export async function reviewPage(env: Env, state: ListState): Promise<Response> 
       return `<li data-row="${r.id}" id="row-${r.id}">${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="${escape(receiptUrl(r.id, state))}">${name}</a>${amt}${why}${discardControl(r.id, { list: fields, matched: matched.has(r.id), name: receiptName(r) })}</li>`;
     })
     .join('');
+  const shown = Math.min(total, BULK_CAP);
   const more =
-    all.length > rows.length
-      ? `<p><a class="btn secondary" href="${escape(listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }))}">Show ${Math.min(all.length - rows.length, BANK_UPTO)} more</a></p>`
+    shown > rows.length
+      ? `<p><a class="btn secondary" href="${escape(listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }))}">Show ${Math.min(shown - rows.length, BANK_UPTO)} more</a></p>`
       : '';
-  const list = `<div data-list="receipts-todo" data-total="${all.length}"${rows.length ? ` data-bulk-list="${bulk.form}"` : ''}>${
+  const list = `<div data-list="receipts-todo" data-total="${total}"${rows.length ? ` data-bulk-list="${bulk.form}"` : ''}>${
     rows.length
       ? `${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul>`
       : held.length
@@ -319,8 +321,8 @@ export async function reviewPage(env: Env, state: ListState): Promise<Response> 
     env,
     {
       head: pageHead(
-        all.length
-          ? `${all.length} to check${undated ? `, ${undated} undated` : ''}`
+        total
+          ? `${total} to check${undated ? `, ${undated} undated` : ''}`
           : held.length
             ? `${plural(held.length, 'email')} to allow`
             : 'All checked',

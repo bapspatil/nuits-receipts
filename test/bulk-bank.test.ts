@@ -65,7 +65,7 @@ test('ids, ops, scope and caps are checked at the door', async () => {
   expect(await refused.json()).toEqual({ error: expect.any(String) });
 });
 
-test('all=1 over the cap is refused, and the bar counts the whole month, not the page', async () => {
+test('all=1 over the cap takes the first 500, and the bar counts the whole month, not the page', async () => {
   await statement('a;2026-08-01;-1,00;EUR;Fake Seed Shop;x\n');
   const seed = await tx('Fake Seed Shop');
   await env.DB.batch(
@@ -75,15 +75,19 @@ test('all=1 over the cap is refused, and the bar counts the whole month, not the
       ).bind(hex(5000 + i), seed.account_key, seed.import_id, `Fake Row ${i}`),
     ),
   );
-  const over = await json({ month: '2026-08', view: 'todo', op: 'exempt', all: '1' });
-  expect(over.status).toBe(400);
-  expect(await over.json()).toEqual({ error: 'Up to 500 at a time. Narrow the filter.' });
-  expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_required=0').first('n')).toBe(0);
   const page = await (await request('/payments?month=2026-08&view=todo')).text();
   expect(page).toContain(`data-total="${BULK_CAP + 1}"`);
+  expect(page).toContain(`Select the first ${BULK_CAP} payments`);
   // To do renders its first 50 rows.
   expect([...page.matchAll(/form="bulk-payments"/g)]).toHaveLength(50);
   expect(page).toContain(`50 of ${BULK_CAP + 1} to do`);
+  const over = await json({ month: '2026-08', view: 'todo', op: 'exempt', all: '1' });
+  expect(await over.json()).toMatchObject({ n: BULK_CAP });
+  // The first 500 in Bank's order: the seed row, then by id; the last one is left.
+  const left = await env.DB.prepare(
+    "SELECT t.id FROM bank_transactions t WHERE receipt_required=1 AND substr(booking_date,1,7)='2026-08'",
+  ).all<{ id: string }>();
+  expect(left.results.map((r) => r.id)).toEqual([hex(5000 + BULK_CAP - 1)]);
 });
 
 test('Not a purchase leaves a matched payment alone; Needs receipt undoes it; a second run changes nothing', async () => {

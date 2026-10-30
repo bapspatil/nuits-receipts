@@ -287,6 +287,21 @@ export async function openRows<T>(env: Env, def: ListDef, state: ListState, limi
       .all<T>()
   ).results;
 }
+// How many rows are open, uncapped, and how many of them also meet also (SQL over the alias).
+export async function openCount(
+  env: Env,
+  def: ListDef,
+  state: ListState,
+  also = '0',
+): Promise<{ total: number; also: number }> {
+  const where = def.where(state);
+  const row = await env.DB.prepare(
+    `SELECT count(*) total,total(${also}) also FROM ${def.from} WHERE ${def.open} AND ${where.sql}`,
+  )
+    .bind(...where.binds)
+    .first<{ total: number; also: number }>();
+  return { total: row?.total ?? 0, also: row?.also ?? 0 };
+}
 // The return after an action: the list it came from, at its next open row when it has one. The
 // cursor is cursorFor on the same state, read before the write.
 export async function landing(env: Env, state: ListState, cursor: Cursor | null, done: Done): Promise<string> {

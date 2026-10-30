@@ -11,6 +11,61 @@ function post(path: string, fields: Record<string, string | string[]>) {
   for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one);
   return request(path, { method: 'POST', body });
 }
+// n copies of one row under new ids; fresh names the other unique columns, which get random values.
+async function clone(table: string, id: string, n: number, fresh: string) {
+  const cols = (await env.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>()).results
+    .map((c) => c.name)
+    .filter((c) => c !== 'id' && c !== fresh);
+  const one = env.DB.prepare(
+    `INSERT INTO ${table} (id,${fresh},${cols.join(',')}) SELECT lower(hex(randomblob(32))),hex(randomblob(16)),${cols.join(',')} FROM ${table} WHERE id=?`,
+  ).bind(id);
+  const all = Array.from({ length: n }, () => one);
+  for (let i = 0; i < all.length; i += 50) await env.DB.batch(all.slice(i, i + 50));
+}
+const attr = (html: string, tag: RegExp, name: string) =>
+  html.match(tag)?.[0].match(new RegExp(`${name}="([^"]*)"`))?.[1];
+
+test('B: over 500 open rows, totals are true and select-all takes exactly the first 500 in list order', async () => {
+  const b = await seedBusyMonth();
+  const last = b.todo[b.todo.length - 1]!;
+  await clone('receipts', last, 520, 'original_key');
+  const open = (
+    await env.DB.prepare(
+      "SELECT id FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY issue_date IS NOT NULL,coalesce(issue_date,''),received_at,id",
+    ).all<{ id: string }>()
+  ).results
+    .map((r) => r.id)
+    .filter((id) => b.todo.includes(id) || !b.needsReview.includes(id));
+  expect(open.length).toBe(b.todo.length + 520);
+  const html = await get('/receipts?view=todo');
+  expect(attr(html, /<div data-list="receipts-todo"[^>]*>/, 'data-total')).toBe(String(open.length));
+  expect(attr(html, /<form id="bulk-review"[^>]*>/, 'data-total')).toBe(String(open.length));
+  expect(html).toContain('>Select the first 500 receipts</button>');
+  expect(html).toContain(`<h1>${open.length} to check`);
+  expect([...html.matchAll(/data-row="/g)].length).toBe(50);
+  const page = await get(`/receipts/${open[0]}?from=todo`);
+  expect(page).toContain(`<span class="prog">1 of ${open.length} to check</span>`);
+
+  const res = await post('/receipts/bulk', { op: 'discard', list: 'receipts', view: 'todo', upto: '50', all: '1' });
+  expect(res.status).toBe(303);
+  expect(locationOf(res)).toMatch(new RegExp(`done=discarded&n=500&.*#row-${open[500]}$`));
+  const gone = (await env.DB.prepare('SELECT id FROM receipts WHERE discarded_at IS NOT NULL').all<{ id: string }>())
+    .results;
+  expect(gone.map((r) => r.id).sort()).toEqual(open.slice(0, 500).sort());
+});
+
+test('B: Bank follows the same rule', async () => {
+  const b = await seedBusyMonth();
+  await clone('bank_transactions', b.missing[0]!, 520, 'external_id');
+  const html = await get(`/payments?month=${b.month}&view=todo`);
+  const total = Number(attr(html, /<div data-list="bank-todo"[^>]*>/, 'data-total'));
+  expect(total).toBeGreaterThan(500);
+  expect(attr(html, /<form id="bulk-payments"[^>]*>/, 'data-total')).toBe(String(total));
+  expect(html).toContain('>Select the first 500 payments</button>');
+  const res = await post('/payments/bulk', { op: 'exempt', view: 'todo', month: b.month, upto: '50', all: '1' });
+  expect(res.status).toBe(303);
+  expect(locationOf(res)).toMatch(/done=notPurchaseMany&n=500/);
+});
 
 test('J: a long search answers with the list, not a crash', async () => {
   const b = await seedBusyMonth();

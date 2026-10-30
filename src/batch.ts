@@ -194,15 +194,17 @@ function receiptList(form: FormData): ListState {
     ? postedState(form, 'invoices', (show) => invoiceShow(show) === show)
     : postedState(form, 'receipts', (show) => Object.hasOwn(SHOW, show));
 }
-// Every row of a list's filter, the way its page picks them. Refused over the cap.
+// The rows of a list's filter, the way its page picks and orders them: the first BULK_CAP, as the
+// bar's "Select the first 500" offers.
 async function allOf(env: Env, s: ListState): Promise<string[]> {
-  if (s.key === 'invoices') return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.map((r) => r.id);
+  if (s.key === 'invoices')
+    return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.slice(0, BULK_CAP).map((r) => r.id);
   if (s.view === 'todo')
-    return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP + 1)).map((r) => r.id);
+    return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP)).map((r) => r.id);
   return filterIds(
     env,
     parseQuery(new URLSearchParams({ show: s.show ?? '', month: s.month ?? '', q: s.q })),
-    BULK_CAP + 1,
+    BULK_CAP,
   );
 }
 const RECEIPTS: Endpoint = {
@@ -274,7 +276,7 @@ const PAYMENTS: Endpoint = {
   id: rowId,
   all: async (env, form) => {
     const { month, view } = bankScope(form);
-    return (await viewRows(env, month!, view, BULK_CAP + 1)).map((t) => t.id);
+    return (await viewRows(env, month!, view, BULK_CAP)).map((t) => t.id);
   },
   to: bankScope,
 };
