@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Warm paper: Nuits Receipts v4 mockup</title>
+<style>
+@font-face{font-family:"Bricolage";src:url("../../../site/public/fonts/bricolage.woff2") format("woff2");font-weight:600 800;font-display:swap}
+@font-face{font-family:"Instrument Sans";src:url("../../../site/public/fonts/instrument-sans.woff2") format("woff2");font-weight:400 700;font-display:swap}
+@font-face{font-family:"DM Mono";src:url("fonts/dm-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"DM Mono";src:url("fonts/dm-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-display:swap}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:#C9CCCF}
+p,h1,h2,h3,dl,dd,figure{margin:0}
+ul{list-style:none;margin:0;padding:0}
+a{color:inherit}
+button,input{font:inherit;color:inherit}
+[hidden]{display:none !important}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.i{width:var(--icon,1.125em);height:var(--icon,1.125em);flex:none}
+.mockbar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 24px;padding:10px 20px;font:13px/1.4 ui-monospace,Menlo,monospace;background:#16191C;color:#E8EAEC}
+.mockbar a{color:#FFFFFF;margin-right:14px}
+.inner .mockbar{display:none}
+.mocklabel{font:600 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;padding:28px 20px 12px;color:#22272B;background:#C9CCCF}
+.mocknote{margin:0;padding:10px 16px;text-align:center;font:12px/1.4 ui-monospace,Menlo,monospace;color:#3D4247;background:repeating-linear-gradient(-45deg,#E4E6E8 0 6px,#EDEFF0 6px 12px)}
+.phoneframe{display:grid;place-items:center;min-height:100vh;background:#16191C;padding:24px}
+.phoneframe iframe{width:390px;height:844px;border:0;border-radius:44px;background:#FFF}
+.app{display:grid;min-height:880px;position:relative;isolation:isolate}
+main{min-width:0;display:flex;flex-direction:column}
+.pagehead{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
+.headacts{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;white-space:nowrap;cursor:pointer;text-decoration:none}
+.iconbtn{display:inline-grid;place-items:center;width:44px;height:44px;text-decoration:none}
+.seg{display:inline-flex}
+.seg a{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.chip{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.badge{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;--icon:14px}
+.banner{display:flex;align-items:center;gap:12px}
+.banner p{flex:1}
+.listtools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.selall{display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+.tally{margin-left:auto}
+.row{display:grid;align-items:center;column-gap:16px;position:relative}
+.row .pick{grid-area:pick}.row .date{grid-area:date}.row .body{grid-area:body;min-width:0}.row .badge{grid-area:badge;justify-self:start}.row .amt{grid-area:amt;justify-self:end}.row .acts{grid-area:acts;display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.row .title{text-decoration:none;display:block;min-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.likely{display:flex;gap:8px;align-items:flex-start;grid-area:likely;justify-self:start;max-width:40rem}
+.input::placeholder{color:var(--muted);opacity:1}
+.likely .i{margin-top:2px}
+.listfoot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.bulkbar{position:sticky;display:flex;align-items:center;gap:8px;z-index:5}
+.bulkbar p{margin-right:auto}
+.reviewhead .stepper,.month{display:inline-flex;align-items:center}
+.reviewhead .stepper{margin-left:auto}
+.back{display:inline-flex;align-items:center;gap:4px;text-decoration:none;flex-basis:100%}
+.split{display:grid;gap:24px;align-items:start}
+.doc{display:flex;flex-direction:column;align-items:center;gap:16px}
+.slip{width:min(100%,300px);background:#FFFFFF;color:#2A2A2A;font:12.5px/1.55 ui-monospace,Menlo,monospace;padding:22px 20px 30px;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/12px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/12px 100%;box-shadow:0 1px 3px rgb(0 0 0 / .15)}
+.slip hr{border:0;border-top:1px dashed #9A9A9A;margin:8px 0}
+.slip .s-h{text-align:center;font-weight:700}
+.slip .s-c{text-align:center}
+.slip .s-l{display:flex;justify-content:space-between;gap:12px}
+.slip .s-t{font-weight:700}
+.slip .smudge{filter:blur(.6px)}
+.fields{display:flex;flex-direction:column;gap:20px;min-width:0}
+.field{display:grid;gap:6px}
+.inwrap{position:relative}
+.inwrap .input{width:100%;padding-right:52px}
+.inwrap .unit{position:absolute;right:14px;top:50%;translate:0 -50%;pointer-events:none}
+.hint{display:flex;gap:6px;align-items:flex-start}
+.hint .i{--icon:16px;margin-top:2px}
+.grouphead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.read dl{display:grid}
+.rf{display:grid;grid-template-columns:minmax(8rem,40%) 1fr;gap:12px}
+.actionbar{position:sticky;bottom:0;display:flex;align-items:center;gap:8px;z-index:4}
+.actionbar .pos{margin-right:auto}
+.ab-acts{display:flex;gap:8px;align-items:center}
+.specimen{padding:24px 20px 48px;display:grid;gap:16px}
+.sp-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.sp-input .input{width:16rem}
+.iconkey{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:8px 16px}
+.iconkey li{display:flex;align-items:center;gap:10px}
+.row.is-leaving{overflow:hidden;pointer-events:none}
+@media (min-width:880px){
+  .row{grid-template-columns:24px 4.5rem minmax(0,1fr) 8.5rem 7.5rem var(--acts,13.5rem);grid-template-areas:"pick date body badge amt acts"}
+  [data-list=bank]{--acts:20.5rem}
+  [data-list=bank] .row{grid-template-areas:"pick date body badge amt acts" "pick date likely likely likely acts"}
+  .colhead{display:grid;grid-template-columns:24px 4.5rem minmax(0,1fr) 8.5rem 7.5rem var(--acts,13.5rem);column-gap:16px}
+  [data-screen=bank] .colhead{--acts:20.5rem}
+  .colhead .r{text-align:right}
+  .split{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}
+  .doc{position:sticky;top:16px}
+  .bulkbar{bottom:20px;align-self:center}
+}
+@media (max-width:879px){
+  .app{grid-template-rows:1fr auto}
+  .appnav{order:2;position:sticky;bottom:0;z-index:6}
+  .appnav .brand{display:none !important}
+  .appnav ul{display:grid;grid-template-columns:repeat(4,1fr)}
+  .appnav a{flex-direction:column;justify-content:center;position:relative}
+  .appnav .count{position:absolute;top:4px;left:calc(50% + 6px)}
+  .pagehead h1{flex-basis:100%}
+  .headacts{margin-left:0;width:100%}
+  .headacts .btn{flex:1}
+  .colhead{display:none}
+  .row{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"pick body amt" "pick badge date" "acts acts acts";row-gap:6px}
+  .row .date{justify-self:end}
+  [data-list=bank] .row{grid-template-areas:"pick body amt" "pick badge date" ". likely likely" "acts acts acts"}
+  .row .acts{justify-content:flex-start;margin-top:4px;flex-wrap:nowrap;padding-left:36px}
+  .tally{margin-left:0;flex-basis:100%}
+  .bulkbar{bottom:calc(var(--tabbar) + 10px)}
+  .reviewhead .stepper{margin-left:auto}
+  .doc .slip{max-height:330px;overflow:hidden;-webkit-mask:linear-gradient(#000 80%,#0000);mask:linear-gradient(#000 80%,#0000)}
+  .actionbar{bottom:var(--tabbar)}
+  .actionbar .pos{display:none}
+  .ab-acts{width:100%}
+  .ab-acts .btn{flex:1 1 0;min-width:0}
+  .ab-acts .btn.primary{flex:1.6 1 0}
+  .rf{grid-template-columns:1fr auto;text-align:left}
+  .rf dd{text-align:right}
+}
+
+:root{
+  --page:#F3EDE2;--sheet:#FBF8F2;--sunken:#E6DDCC;--ink:#211C16;--muted:#5E5446;--rule:#D8CCB8;--rule-strong:#857861;
+  --accent:#0D3A36;--accent-hover:#072522;--accent-tint:#DCE6DF;--on-accent:#FBF8F2;--field:#FFFDF8;
+  --success:#2E6A3C;--success-bg:#E2ECD9;--warn:#87470A;--warn-bg:#F6E3C1;--info:#2D4E73;--info-bg:#E1E7EC;--danger:#A12820;--danger-bg:#F5DCD5;
+  --bar:rgb(251 248 242 / 0.92);
+  --font:"Instrument Sans",system-ui,sans-serif;--display:"Bricolage","Arial Narrow",system-ui,sans-serif;--num:"DM Mono",ui-monospace,Menlo,monospace;
+  --r:6px;--tabbar:calc(62px + env(safe-area-inset-bottom));
+  --t-body:15px;--t-meta:12.5px;--t-title:36px;
+}
+@media (max-width:879px){:root{--t-body:16px;--t-meta:13px;--t-title:30px}}
+.app{background:var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");color:var(--ink);font:400 var(--t-body)/1.45 var(--font)}
+.amt,.date,.n,.count,.tally,.pos,.listfoot,.stepper,.unit,.badge,.chip,.colhead,.month p,.likely,.input[inputmode=decimal]{font-family:var(--num)}
+.amt{font-weight:500;letter-spacing:-.01em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* top bar on desktop, tab bar on phone */
+.appnav{background:var(--bar);border-bottom:1px solid var(--rule)}
+.appnav .brand{font:800 20px/1 var(--display);text-decoration:none;letter-spacing:-.01em;color:var(--ink)}
+.appnav a{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted)}
+.appnav a .i{--icon:18px}
+.appnav [aria-current]{color:var(--accent);font-weight:600}
+.count{display:inline-grid;place-items:center;min-width:24px;height:20px;padding:0 6px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-size:11.5px;font-weight:500}
+@media (min-width:880px){
+  .app{grid-template-rows:auto 1fr}
+  .appnav{display:flex;align-items:center;gap:40px;padding:0 max(32px,calc((100% - 1120px)/2));height:60px;position:sticky;top:0;z-index:6;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .appnav ul{display:flex;gap:4px;height:100%}
+  .appnav a{height:100%;padding:0 12px;font-size:15px;box-shadow:inset 0 -2px 0 transparent}
+  .appnav [aria-current]{box-shadow:inset 0 -3px 0 var(--accent)}
+  main{padding:32px max(32px,calc((100% - 1120px)/2)) 48px;gap:18px}
+}
+@media (max-width:879px){
+  .appnav{border-top:1px solid var(--rule-strong);border-bottom:0;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .appnav a{height:62px;gap:3px;font-size:11.5px;font-weight:500}
+  .appnav a .i{--icon:22px}
+  .appnav [aria-current]{box-shadow:inset 0 3px 0 var(--accent)}
+  .appnav .count{height:17px;min-width:20px;font-size:10.5px}
+  main{padding:18px 16px 24px;gap:14px}
+}
+
+h1{font:800 var(--t-title)/1 var(--display);letter-spacing:-.015em}
+h2{font:600 11px/1.2 var(--num);text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+
+/* controls: five shapes */
+.btn{min-height:40px;padding:0 16px;border-radius:var(--r);font-size:14.5px;font-weight:600;border:1px solid transparent;--icon:17px}
+.btn.sm{min-height:34px;padding:0 11px;font-size:13.5px;--icon:16px}
+.btn.primary{background:var(--accent);color:var(--on-accent);box-shadow:inset 0 -2px 0 rgb(0 0 0 / .28)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.secondary{background:var(--field);color:var(--ink);border-color:var(--rule-strong);box-shadow:0 1px 0 var(--rule-strong)}
+.btn.secondary .i{color:var(--accent)}
+.btn.secondary:hover{background:var(--sheet);border-color:var(--ink)}
+.btn.ghost{background:transparent;color:var(--accent);padding-inline:8px}
+.btn.ghost span{text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px}
+.btn.ghost:hover span{text-decoration-color:currentColor}
+.btn.danger{background:var(--danger);color:var(--on-accent);box-shadow:inset 0 -2px 0 rgb(0 0 0 / .25)}
+.seg{gap:2px;border-bottom:1px solid var(--rule-strong)}
+.seg a{padding:8px 14px 9px;font-size:15px;font-weight:500;color:var(--muted);min-height:40px;box-shadow:inset 0 -3px 0 transparent}
+.seg [aria-current]{color:var(--ink);font-weight:600;box-shadow:inset 0 -3px 0 var(--accent)}
+.seg .n{font-size:12.5px}
+.chip{min-height:34px;padding:0 12px;border-radius:999px;border:1px dashed var(--rule-strong);background:transparent;font-size:12.5px;--icon:14px}
+.input{min-height:46px;padding:0 14px;border:1px solid var(--rule-strong);border-bottom:2px solid var(--ink);border-radius:4px 4px 0 0;background:var(--field);font-size:16px;font-weight:500}
+.input:focus{outline:0;border-bottom-color:var(--accent);box-shadow:0 2px 0 var(--accent)}
+.pick{width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer}
+
+.badge{padding:3px 8px;border-radius:3px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;border:1px solid}
+.badge.warn{background:var(--warn-bg);color:var(--warn);border-color:#87470A55}
+.badge.info{background:var(--info-bg);color:var(--info);border-color:#2D4E7355}
+.banner{background:var(--success-bg);color:var(--success);border-left:3px solid var(--success);padding:6px 6px 6px 14px;font-weight:600;--icon:19px}
+.banner.err{background:var(--danger-bg);color:var(--danger);border-color:var(--danger);padding:10px 14px}
+.banner .btn.ghost{color:var(--success)}
+.selall{font-size:14px}
+.tally{font-size:12.5px;color:var(--muted)}
+
+/* the ledger */
+.colhead{margin-bottom:-18px;padding:0 16px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-bottom:3px double var(--ink)}
+.rows{background:var(--sheet);border:1px solid var(--rule);border-top:0;box-shadow:0 1px 0 var(--rule),0 3px 0 -1px var(--sheet),0 4px 0 -1px var(--rule)}
+.row{padding:12px 16px;min-height:62px;border-top:1px solid var(--rule)}
+.row:first-child{border-top:0}
+.row.is-picked{background:var(--accent-tint);box-shadow:inset 3px 0 0 var(--accent)}
+.row .title{font-weight:600;color:var(--ink)}
+.row .meta{font-size:13.5px;color:var(--muted)}
+.row .meta .kind{font-family:var(--num);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-right:6px}
+.row .date{font-size:13px;color:var(--muted)}
+.row .amt{font-size:15.5px}
+.amt .cur{font-size:.72em;color:var(--muted);letter-spacing:.04em}
+.likely{margin-top:6px;padding:7px 10px;font-size:12.5px;background:var(--page);border:1px dashed var(--rule-strong);--icon:15px}
+.likely b{font-weight:500;color:var(--accent)}
+.likely .i{color:var(--accent)}
+.likely .why{color:var(--muted)}
+.lede{color:var(--muted)}
+.lede b{color:var(--ink);font-family:var(--num);font-weight:500}
+.listfoot{color:var(--muted)}
+.listfoot b{color:var(--ink);font-weight:500}
+.month{gap:2px}
+.month p{font-size:14px;min-width:9.5em;text-align:center}
+.iconbtn{color:var(--accent);border-radius:var(--r)}
+.iconbtn:hover{background:var(--sunken)}
+.bankhead h1{margin-right:8px}
+
+.bulkbar{background:var(--accent-hover);color:var(--on-accent);padding:10px 10px 10px 18px;border-radius:var(--r);box-shadow:0 10px 24px rgb(33 28 22 / .25);font-family:var(--num)}
+.bulkbar b{font-weight:500}
+.btn.onbar-primary{background:var(--on-accent);color:var(--accent);font-family:var(--font)}
+.btn.onbar{background:transparent;color:var(--on-accent);border-color:rgb(251 248 242 / 0.55);font-family:var(--font)}
+.bulkbar :focus-visible{outline-color:var(--on-accent)}
+@media (min-width:880px){.bulkbar{min-width:28rem}}
+
+/* review */
+.back{color:var(--accent);font-weight:600;font-size:14px}
+.stepper{color:var(--muted);font-size:14px}
+.stepper b{color:var(--ink);font-weight:500}
+.reviewhead{padding-bottom:16px;border-bottom:3px double var(--ink)}
+.doc{background:var(--sunken) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");padding:28px 16px 16px;border:1px solid var(--rule)}
+.slip{font-family:var(--num);color:#2A2520;background:#FFFEFB}
+.group{display:grid;gap:16px}
+.group.need{background:var(--sheet);border:1px solid var(--rule);border-left:3px solid var(--warn);padding:16px 18px}
+.group.need h2{color:var(--warn)}
+.field label{font-weight:600}
+.hint{font-size:13.5px;color:var(--warn)}
+.hint.quiet{color:var(--muted)}
+.unit{color:var(--muted);font-size:12px}
+.read{padding:0 2px}
+.rf{padding:9px 0;border-top:1px dotted var(--rule-strong)}
+.rf dt{color:var(--muted);font-size:14px}
+.rf dd{font-weight:500}
+.actionbar{background:var(--bar);border-top:3px double var(--ink);padding:10px 0;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.actionbar .pos{color:var(--muted);font-size:14px}
+.actionbar .pos b{color:var(--ink);font-weight:500}
+@media (max-width:879px){
+  .actionbar{margin:0 -16px;padding:8px 12px;border-top-width:1px;border-top-style:solid;border-color:var(--rule-strong)}
+  .ab-acts{gap:6px}
+  .ab-acts .btn{padding:0 6px;font-size:13.5px}
+  .ab-acts .btn.ghost{padding:0 4px}
+  .row .acts .btn.sm{min-height:38px}
+  .rows{margin:0 -16px;border-inline:0}
+  .row{padding:12px 16px}
+}
+
+.specimen{background:var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");color:var(--ink);font:400 15px/1.45 var(--font)}
+.iconkey li{font-size:14px}
+.iconkey .i{color:var(--accent)}
+
+@media (prefers-reduced-motion:no-preference){
+  .row.is-leaving{animation:p-strike .2s ease-out forwards,row-collapse .2s .26s cubic-bezier(.2,0,0,1) forwards}
+  @keyframes row-collapse{from{max-height:var(--h)}to{max-height:0;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0;border-width:0;opacity:0}}
+  .banner{animation:banner-in .24s ease-out both}
+  @keyframes banner-in{from{opacity:0;transform:translateY(-6px)}}
+  .btn,.seg a,.chip,.row{transition:background-color .15s,color .15s,border-color .15s,box-shadow .15s}
+}
+@media (prefers-reduced-motion:no-preference){
+  .row.is-leaving::after{content:"";position:absolute;left:52px;right:16px;top:50%;border-top:2px solid var(--accent);transform-origin:left;animation:p-line .2s ease-out forwards}
+  @keyframes p-line{from{transform:scaleX(0)}}
+  @keyframes p-strike{to{background:var(--accent-tint)}}
+}
+
+</style>
+</head>
+<body>
+<svg hidden xmlns="http://www.w3.org/2000/svg"><!-- Lucide icons, ISC licence, lucide-static 1.65.0 --><symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></symbol><symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol><symbol id="i-undo-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></symbol><symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol><symbol id="i-unlink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71" /><path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71" /><line x1="8" x2="8" y1="2" y2="5" /><line x1="2" x2="5" y1="8" y2="8" /><line x1="16" x2="16" y1="19" y2="22" /><line x1="19" x2="22" y1="16" y2="16" /></symbol><symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M4.929 4.929 19.07 19.071" /></symbol><symbol id="i-file-question-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /><path d="M12 17h.01" /><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3" /></symbol><symbol id="i-scan-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><path d="M7 8h8" /><path d="M7 12h10" /><path d="M7 16h6" /></symbol><symbol id="i-folder-input" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1" /><path d="M2 13h10" /><path d="m9 16 3-3-3-3" /></symbol><symbol id="i-banknote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></symbol><symbol id="i-mail-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /><path d="m16 19 2 2 4-4" /></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="m17 8-5-5-5 5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></symbol><symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /><path d="M14 11v6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol><symbol id="i-external-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></symbol><symbol id="i-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4" /><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></symbol><symbol id="i-user-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" x2="22" y1="8" y2="13" /><line x1="22" x2="17" y1="8" y2="13" /></symbol><symbol id="i-skip-forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4v16" /><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol><symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></symbol><symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></symbol><symbol id="i-chevrons-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 6 5 5 5-5" /><path d="m7 13 5 5 5-5" /></symbol><symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></symbol><symbol id="i-list-checks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /><path d="M13 12h8" /><path d="M13 19h8" /><path d="m3 17 2 2 4-4" /><path d="m3 7 2 2 4-4" /></symbol><symbol id="i-circle-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></symbol><symbol id="i-loader-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></symbol><symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /><rect x="2" y="4" width="20" height="16" rx="2" /></symbol><symbol id="i-calendar-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 14v2.2l1.6 1" /><path d="M16 2v3" /><path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /><path d="M3 9h5.859" /><path d="M8 2v3" /><circle cx="16" cy="16" r="6" /></symbol><symbol id="i-circle-dashed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.1 2.182a10 10 0 0 1 3.8 0" /><path d="M13.9 21.818a10 10 0 0 1-3.8 0" /><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7" /><path d="M2.182 13.9a10 10 0 0 1 0-3.8" /><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69" /><path d="M21.818 10.1a10 10 0 0 1 0 3.8" /><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" /><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7" /></symbol><symbol id="i-circle-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 9-5.5 5.5L8 12" /></symbol><symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol><symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7" /><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></symbol><symbol id="i-landmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 18v-7" /><path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z" /><path d="M14 18v-7" /><path d="M18 18v-7" /><path d="M3 22h18" /><path d="M6 18v-7" /></symbol><symbol id="i-sliders-horizontal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3" /><path d="M12 19H3" /><path d="M14 3v4" /><path d="M16 17v4" /><path d="M21 12h-9" /><path d="M21 19h-5" /><path d="M21 5h-7" /><path d="M8 10v4" /><path d="M8 12H3" /></symbol><symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></symbol><symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></symbol><symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></symbol></svg>
+<div class="mockbar">
+  <p><b>Warm paper</b> mockup, UX v4. Static, busy September 2026.</p>
+  <p class="mb-links"><a href="?">Desktop</a> <a href="?phone">Phone, 390 px</a> <a href="native.html">Native app direction</a></p>
+</div>
+<section class="screen" id="s-receipts" aria-label="1. Receipts, To do"><p class="mocklabel">1. Receipts, To do</p>
+<div class="app" data-screen="receipts">
+<nav class="appnav" aria-label="Main">
+  <a class="brand" href="#">Nuits Receipts</a>
+  <ul><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="lbl">Home</span></a></li><li><a href="#" aria-current="page"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span class="lbl">Receipts</span><span class="count">132<span class="vh"> to do</span></span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-landmark"/></svg><span class="lbl">Bank</span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-sliders-horizontal"/></svg><span class="lbl">Settings</span></a></li></ul>
+</nav>
+<main>
+  <header class="pagehead">
+    <h1>Receipts</h1>
+    <div class="seg" role="group" aria-label="View">
+  <a href="#" aria-current="page">To do <span class="n">132</span></a><a href="#">All</a>
+</div>
+    <div class="headacts"><button type="button" class="btn primary" data-act="start"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-list-checks"/></svg><span>Start checking (124)</span></button></div>
+  </header>
+  <div class="banner" role="status"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-check"/></svg><p>Approved 14 receipts.</p><button type="button" class="btn ghost sm" data-act="undo"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-undo-2"/></svg><span>Undo</span></button></div>
+  <div class="listtools">
+    <label class="selall"><input class="pick" type="checkbox" aria-label="Select all 132"><span>Select all</span></label>
+    <button type="button" class="chip" aria-haspopup="listbox"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-calendar-clock"/></svg><span>Any month</span><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
+    <p class="tally">124 receipts, 5 new senders, 3 overdue invoices</p>
+  </div>
+  <div class="colhead" aria-hidden="true"><span></span><span>Date</span><span>Item</span><span>Status</span><span class="r">Amount</span><span></span></div>
+  <ul class="rows" data-list="receipts">
+    <li class="row is-picked" id="row-r1">
+  <input class="pick" type="checkbox" aria-label="Select" checked data-row="r1">
+  <span class="date">18 Sep</span>
+  <div class="body"><a class="title" href="#">Verkkokauppa.com</a><p class="meta"><span class="kind">Receipt</span> Total unsure</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 89.90</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row is-picked" id="row-r2">
+  <input class="pick" type="checkbox" aria-label="Select" checked data-row="r2">
+  <span class="date">17 Sep</span>
+  <div class="body"><a class="title" href="#">K-Citymarket Ruoholahti</a><p class="meta"><span class="kind">Receipt</span> VAT missing</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 64.32</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-m1">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="m1">
+  <span class="date">17 Sep</span>
+  <div class="body"><a class="title" href="#">noreply@hsl.fi</a><p class="meta"><span class="kind">Held mail</span> Email from a sender you have not allowed. 1 attachment.</p></div>
+  <span class="badge info"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-mail"/></svg>New sender</span>
+  <span class="amt none" aria-hidden="true"></span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="allow"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user-check"/></svg><span>Allow</span></button><button type="button" class="btn ghost sm" data-act="ignore"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user-x"/></svg><span>Ignore</span></button></div>
+</li>
+<li class="row is-picked" id="row-r3">
+  <input class="pick" type="checkbox" aria-label="Select" checked data-row="r3">
+  <span class="date">16 Sep</span>
+  <div class="body"><a class="title" href="#">Neste Espoo Kehä III</a><p class="meta"><span class="kind">Receipt</span> Date unclear</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 72.18</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-i1">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="i1">
+  <span class="date">31 Aug</span>
+  <div class="body"><a class="title" href="#">Kahvila Pohjoinen Oy</a><p class="meta"><span class="kind">Sales invoice</span> Invoice 2026-041. Due 14 Sep, 16 days late.</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-calendar-clock"/></svg>Overdue</span>
+  <span class="amt"><span class="cur">EUR</span> 1,240.00</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="paid"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-banknote"/></svg><span>Mark paid</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row" id="row-r4">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="r4">
+  <span class="date">15 Sep</span>
+  <div class="body"><a class="title" href="#">Adobe Systems Software Ireland</a><p class="meta"><span class="kind">Receipt</span> Currency unclear</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 71.99</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-r5">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="r5">
+  <span class="date">14 Sep</span>
+  <div class="body"><a class="title" href="#">Scan 14 Sep.pdf</a><p class="meta"><span class="kind">Receipt</span> Uploaded. Reading the text.</p></div>
+  <span class="badge info"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-loader-circle"/></svg>Reading</span>
+  <span class="amt none" aria-hidden="true"></span>
+  <div class="acts"><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-r6">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="r6">
+  <span class="date">12 Sep</span>
+  <div class="body"><a class="title" href="#">VR Matkalippu Helsinki to Turku</a><p class="meta"><span class="kind">Receipt</span> Seller missing</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 38.60</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-r7">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="r7">
+  <span class="date">11 Sep</span>
+  <div class="body"><a class="title" href="#">Elisa Oyj</a><p class="meta"><span class="kind">Receipt</span> VAT missing</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 29.90</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+<li class="row" id="row-r8">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="r8">
+  <span class="date">9 Sep</span>
+  <div class="body"><a class="title" href="#">Puuilo Vantaa</a><p class="meta"><span class="kind">Receipt</span> Total unsure</p></div>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+  <span class="amt"><span class="cur">EUR</span> 112.45</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn ghost sm" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button></div>
+</li>
+  </ul>
+  <p class="mocknote">40 more rows like these</p>
+  <footer class="listfoot"><p><b>50</b> of 132 to do</p><button type="button" class="btn secondary" data-act="showMore"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevrons-down"/></svg><span>Show 50 more</span></button></footer>
+  <div class="bulkbar" role="region" aria-label="Selected">
+    <p><b>3</b> selected</p>
+    <button type="button" class="btn onbar-primary" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn onbar" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button>
+  </div>
+</main>
+</div>
+</section>
+<section class="screen" id="s-review" aria-label="2. Receipt review"><p class="mocklabel">2. Receipt review</p>
+<div class="app" data-screen="review">
+<nav class="appnav" aria-label="Main">
+  <a class="brand" href="#">Nuits Receipts</a>
+  <ul><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="lbl">Home</span></a></li><li><a href="#" aria-current="page"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span class="lbl">Receipts</span><span class="count">132<span class="vh"> to do</span></span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-landmark"/></svg><span class="lbl">Bank</span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-sliders-horizontal"/></svg><span class="lbl">Settings</span></a></li></ul>
+</nav>
+<main>
+  <header class="pagehead reviewhead">
+    <a class="back" href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg><span>To do</span></a>
+    <h1>Verkkokauppa.com</h1>
+    <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span>
+    <div class="stepper"><a class="iconbtn" href="#" aria-label="Previous" title="Previous"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg></a><p><b>3</b> of 124</p><a class="iconbtn" href="#" aria-label="Next" title="Next"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-right"/></svg></a></div>
+  </header>
+  <div class="split">
+    <figure class="doc" aria-label="Receipt image">
+  <div class="slip">
+    <p class="s-h">VERKKOKAUPPA.COM OYJ</p>
+    <p class="s-c">Tyynenmerenkatu 11, 00220 Helsinki<br>Y-tunnus 1510466-2</p>
+    <p class="s-c">18.09.2026 14:32 &nbsp; Kassa 07</p>
+    <hr>
+    <p class="s-l"><span>Näyttövarsi Ergotron LX</span><span>89,90</span></p>
+    <p class="s-l"><span>1 kpl</span><span></span></p>
+    <hr>
+    <p class="s-l s-t"><span>YHTEENSÄ EUR</span><span class="smudge">89,90</span></p>
+    <p class="s-l"><span>ALV 25,5 %</span><span class="smudge">18,27</span></p>
+    <p class="s-l"><span>Veroton</span><span>71,63</span></p>
+    <hr>
+    <p class="s-c">Kortti **** 4417 &nbsp; Hyväksytty</p>
+    <p class="s-c">Kuitti 1048-77213</p>
+    <p class="s-c">KIITOS KÄYNNISTÄ</p>
+  </div>
+  <figcaption><button type="button" class="btn secondary sm" data-act="original"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-external-link"/></svg><span>Open original</span></button></figcaption>
+</figure>
+    <form class="fields" onsubmit="return false">
+      <section class="group need">
+        <h2>2 fields to fill</h2>
+        <div class="field">
+          <label for="f-total">Total</label>
+          <div class="inwrap"><input id="f-total" class="input" inputmode="decimal" value="89.90" aria-describedby="h-total"><span class="unit">EUR</span></div>
+          <p class="hint" id="h-total"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Read as 89.90 or 39.90. Check the receipt.</p>
+        </div>
+        <div class="field">
+          <label for="f-vat">VAT amount</label>
+          <div class="inwrap"><input id="f-vat" class="input" inputmode="decimal" placeholder="0.00" aria-describedby="h-vat"><span class="unit">EUR</span></div>
+          <p class="hint quiet" id="h-vat">Enter 0 if the receipt has no VAT.</p>
+        </div>
+      </section>
+      <section class="group read">
+        <div class="grouphead"><h2>Read from the receipt</h2><button type="button" class="btn ghost sm" data-act="edit"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg><span>Edit</span></button></div>
+        <dl>
+          <div class="rf"><dt>Seller</dt><dd>Verkkokauppa.com Oyj</dd></div>
+          <div class="rf"><dt>Date</dt><dd>18 Sep 2026</dd></div>
+          <div class="rf"><dt>Before VAT</dt><dd><span class="amt"><span class="cur">EUR</span> 71.63</span></dd></div>
+          <div class="rf"><dt>VAT rate</dt><dd>25.5 %</dd></div>
+          <div class="rf"><dt>Receipt number</dt><dd>1048-77213</dd></div>
+          <div class="rf"><dt>Kind</dt><dd>Equipment</dd></div>
+        </dl>
+      </section>
+      <div class="actionbar">
+        <p class="pos"><b>3</b> of 124</p>
+        <div class="ab-acts"><button type="button" class="btn ghost" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button><button type="button" class="btn ghost" data-act="discard"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></button><button type="button" class="btn secondary" data-act="skip"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-skip-forward"/></svg><span>Skip</span></button><button type="button" class="btn primary" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button></div>
+      </div>
+    </form>
+  </div>
+</main>
+</div>
+</section>
+<section class="screen" id="s-bank" aria-label="3. Bank, To do"><p class="mocklabel">3. Bank, To do</p>
+<div class="app" data-screen="bank">
+<nav class="appnav" aria-label="Main">
+  <a class="brand" href="#">Nuits Receipts</a>
+  <ul><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="lbl">Home</span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span class="lbl">Receipts</span><span class="count">132<span class="vh"> to do</span></span></a></li><li><a href="#" aria-current="page"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-landmark"/></svg><span class="lbl">Bank</span></a></li><li><a href="#"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-sliders-horizontal"/></svg><span class="lbl">Settings</span></a></li></ul>
+</nav>
+<main>
+  <header class="pagehead bankhead">
+    <h1>Bank</h1>
+    <div class="month"><a class="iconbtn" href="#" aria-label="August 2026" title="August 2026"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg></a><p>September 2026</p><a class="iconbtn" href="#" aria-label="October 2026" title="October 2026"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-right"/></svg></a></div>
+    <div class="seg" role="group" aria-label="View">
+  <a href="#" aria-current="page">To do <span class="n">23</span></a><a href="#">All</a>
+</div>
+    <div class="headacts"><button type="button" class="btn secondary" data-act="importStmt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-import"/></svg><span>Import statement</span></button><button type="button" class="btn primary" data-act="matchAll"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match all (8)</span></button></div>
+  </header>
+  <p class="lede"><b>23</b> payments need a receipt. <b>8</b> have a likely one.</p>
+  <div class="colhead" aria-hidden="true"><span></span><span>Date</span><span>Paid to</span><span>Status</span><span class="r">Amount</span><span></span></div>
+  <ul class="rows" data-list="bank">
+    <li class="row has-likely" id="row-b1">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b1">
+  <span class="date">3 Sep</span>
+  <div class="body"><span class="title">K-MARKET KALLIO HELSINKI</span><p class="meta">Card 4417</p></div>
+  <p class="likely"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span><b>Likely receipt:</b> K-Market Kallio, 3 Sep, EUR 23.45. <span class="why">Same amount and date.</span></span></p>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -23.45</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row" id="row-b2">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b2">
+  <span class="date">5 Sep</span>
+  <div class="body"><span class="title">ZOOM.US 888-799-9666</span><p class="meta">Card 4417</p></div>
+  
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -15.99</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row has-likely" id="row-b3">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b3">
+  <span class="date">8 Sep</span>
+  <div class="body"><span class="title">ELISA OYJ</span><p class="meta">E-invoice</p></div>
+  <p class="likely"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span><b>Likely receipt:</b> Elisa Oyj, 11 Sep, EUR 29.90. <span class="why">Same amount, 3 days apart.</span></span></p>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -29.90</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row" id="row-b4">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b4">
+  <span class="date">10 Sep</span>
+  <div class="body"><span class="title">MOBILEPAY ANTTI VIRTANEN</span><p class="meta">Transfer</p></div>
+  
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -40.00</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row has-likely" id="row-b5">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b5">
+  <span class="date">12 Sep</span>
+  <div class="body"><span class="title">GOOGLE *WORKSPACE</span><p class="meta">Card 4417</p></div>
+  <p class="likely"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span><b>Likely receipt:</b> Google Workspace, 1 Sep, EUR 13.80. <span class="why">Same amount and seller.</span></span></p>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -13.80</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row" id="row-b6">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b6">
+  <span class="date">15 Sep</span>
+  <div class="body"><span class="title">RAVINTOLA SAVOY</span><p class="meta">Card 4417</p></div>
+  
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -186.40</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row has-likely" id="row-b7">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b7">
+  <span class="date">19 Sep</span>
+  <div class="body"><span class="title">POSTI OY</span><p class="meta">Card 4417</p></div>
+  <p class="likely"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span><b>Likely receipt:</b> Posti, 19 Sep, EUR 9.90. <span class="why">Same amount and date.</span></span></p>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -9.90</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+<li class="row has-likely" id="row-b8">
+  <input class="pick" type="checkbox" aria-label="Select" data-row="b8">
+  <span class="date">22 Sep</span>
+  <div class="body"><span class="title">CLAS OHLSON KAMPPI</span><p class="meta">Card 4417</p></div>
+  <p class="likely"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-receipt"/></svg><span><b>Likely receipt:</b> Clas Ohlson, 22 Sep, EUR 54.95. <span class="why">Same amount and date.</span></span></p>
+  <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span>
+  <span class="amt"><span class="cur">EUR</span> -54.95</span>
+  <div class="acts"><button type="button" class="btn secondary sm" data-act="match"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></button><button type="button" class="btn ghost sm" data-act="exempt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></button><button type="button" class="btn ghost sm" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button></div>
+</li>
+  </ul>
+  <p class="mocknote">15 more rows like these</p>
+  <footer class="listfoot"><p><b>23</b> of 23 to do</p></footer>
+</main>
+</div>
+</section>
+<section class="screen" id="s-specimen" aria-label="Controls"><p class="mocklabel">4. Controls, statuses and icons</p><div class="specimen">
+  <h2>Controls</h2>
+  <div class="sp-row">
+    <div class="seg" role="group" aria-label="Segmented control">
+  <a href="#" aria-current="page">To do <span class="n">132</span></a><a href="#">All</a>
+</div>
+    <button type="button" class="chip"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-calendar-clock"/></svg><span>Any month</span><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
+    <label class="sp-input"><span class="vh">Text input</span><input class="input" value="Kahvila Pohjoinen"></label>
+  </div>
+  <div class="sp-row">
+    <button type="button" class="btn primary" data-act="approve"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></button><button type="button" class="btn secondary" data-act="skip"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-skip-forward"/></svg><span>Skip</span></button><button type="button" class="btn ghost" data-act="more"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></button><button type="button" class="btn danger" data-act="delete"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-trash-2"/></svg><span>Delete forever</span></button>
+  </div>
+  <div class="sp-row">
+    <span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg>Needs you</span><span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-dashed"/></svg>Missing</span><span class="badge warn"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-calendar-clock"/></svg>Overdue</span><span class="badge info"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-loader-circle"/></svg>Reading</span><span class="badge info"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-mail"/></svg>New sender</span>
+    <div class="banner err" role="alert"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-circle-alert"/></svg><p>That file is not a CSV.</p></div>
+  </div>
+  <h2>One icon per action</h2>
+  <ul class="iconkey"><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span>Approve</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg><span>Discard</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-undo-2"/></svg><span>Undo</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-link"/></svg><span>Match</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-unlink"/></svg><span>Unmatch</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ban"/></svg><span>Not a purchase</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-file-question-mark"/></svg><span>Needs a receipt</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-scan-text"/></svg><span>Read again</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder-input"/></svg><span>Move to invoices</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-banknote"/></svg><span>Mark paid</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span>Download ZIP</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-mail-check"/></svg><span>Mark as sent</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg><span>Upload</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-import"/></svg><span>Import statement</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-trash-2"/></svg><span>Delete</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-external-link"/></svg><span>Open original</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user-check"/></svg><span>Allow</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user-x"/></svg><span>Ignore</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-skip-forward"/></svg><span>Skip</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ellipsis"/></svg><span>More</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg><span>Edit</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span>Search</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-list-checks"/></svg><span>Start checking</span></li><li><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chevrons-down"/></svg><span>Show more</span></li></ul>
+</div></section>
+<script>
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+const VERB = { approve: 'Approved', discard: 'Discarded', match: 'Matched', exempt: 'Marked not a purchase:', allow: 'Allowed', paid: 'Marked paid:' };
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.row .btn');
+  if (!b || !VERB[b.dataset.act]) return;
+  const row = b.closest('.row');
+  const name = row.querySelector('.title').textContent;
+  const banner = row.closest('main').querySelector('.banner p');
+  if (banner) banner.textContent = VERB[b.dataset.act] + ' ' + name + '.';
+  const next = row.nextElementSibling;
+  const done = () => { row.remove(); next?.querySelector('.title')?.focus(); };
+  if (reduce.matches) return done();
+  row.style.setProperty('--h', row.offsetHeight + 'px');
+  row.classList.add('is-leaving');
+  row.addEventListener('animationend', (ev) => { if (ev.animationName === 'row-collapse') done(); });
+});
+document.addEventListener('change', (e) => {
+  if (!e.target.matches('.row .pick')) return;
+  const row = e.target.closest('.row');
+  row.classList.toggle('is-picked', e.target.checked);
+  const main = row.closest('main');
+  const bar = main.querySelector('.bulkbar b');
+  if (bar) bar.textContent = main.querySelectorAll('.row .pick:checked').length;
+});
+const u = new URL(location.href);
+if (u.searchParams.has('phone')) {
+  const wrap = document.createElement('div');
+  wrap.className = 'phoneframe';
+  const f = document.createElement('iframe');
+  f.title = 'Phone width';
+  f.src = location.pathname + '?inner';
+  wrap.append(f);
+  document.body.replaceChildren(wrap);
+}
+if (u.searchParams.has('inner')) document.documentElement.classList.add('inner');
+</script>
+</body>
+</html>
