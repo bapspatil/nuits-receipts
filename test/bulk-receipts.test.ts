@@ -222,23 +222,17 @@ test('all=1 takes the list filter, never more than the cap', async () => {
   expect(await over.text()).toContain('Up to 500 at a time. Narrow the filter.');
 });
 
-test('all=1 on Review follows the reason filter', async () => {
+test('all=1 on Review acts on the To do rows only', async () => {
   await receipt(1, { status: 'needs_review' });
   await receipt(2, { status: 'needs_review' });
-  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["sender_unverified"]' WHERE id=?`).bind(id(2)).run();
-  const res = await json({
-    op: 'discard',
-    reason: 'personal',
-    all: '1',
-    list: 'review',
-    filter: 'sender',
-    back: '/review?reason=sender',
-  });
-  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/review\?reason=sender&done=/) });
-  expect((await row(2))!.discarded_at).toBeTruthy();
-  expect((await row(1))!.discarded_at).toBeNull();
-  expect((await row(2))!.discard_reason).toBe('personal');
-  expect((await json({ op: 'discard', all: '1', list: 'review', filter: 'nope' })).status).toBe(400);
+  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_total"]' WHERE id=?`).bind(id(1)).run();
+  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_invoice_number"]' WHERE id=?`)
+    .bind(id(2))
+    .run();
+  const res = await json({ op: 'discard', all: '1', list: 'review', back: '/review' });
+  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/review\?done=/) });
+  expect((await row(1))!.discarded_at).toBeTruthy();
+  expect((await row(2))!.discarded_at).toBeNull();
 });
 
 test('back goes only to a list in this app', async () => {
@@ -306,9 +300,8 @@ test('chunk totals of done and skipped add up, within bounds', async () => {
       expect((await bulk({ op: 'restore', id: id(1), [key]: bad })).status, `${key}=${bad}`).toBe(400);
 });
 
-test('names from the object prototype are not filters or reasons', async () => {
+test('names from the object prototype are not reasons or shows', async () => {
   await receipt(1, { status: 'needs_review' });
-  expect((await json({ op: 'discard', all: '1', list: 'review', filter: 'constructor' })).status).toBe(400);
   expect((await json({ op: 'discard', id: id(1), reason: 'toString' })).status).toBe(400);
   expect((await row(1))!.discarded_at).toBeNull();
   for (const path of ['/review?reason=constructor', '/receipts?show=toString'])

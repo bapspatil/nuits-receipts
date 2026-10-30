@@ -329,16 +329,50 @@ export function bodyOf(flag: Flag, r: Receipt): string {
   return typeof flag.body === 'string' ? flag.body : flag.body(r);
 }
 
-// Review queue filters (links on /review). 'All' is the default.
-export const REVIEW_FILTERS = {
-  info: { label: 'Missing info', groups: ['Seller', 'Date', 'Details', 'Filing', 'Duplicate'] },
-  amount: { label: 'Check the amount', groups: ['Amounts', 'Euro amount'] },
-  sender: { label: 'Email not verified', groups: [] },
-} as const satisfies Record<string, { label: string; groups: readonly FlagGroup[] }>;
-export type ReviewFilter = keyof typeof REVIEW_FILTERS;
+// Reasons that never put a receipt in To do: Approve doesn't need them, so they stay on the
+// receipt as a quiet note. Every other code does, including the ones with no field to fix (a
+// negative amount, a missing euro amount, an unverified sender) and a probable duplicate,
+// because each would otherwise reach the export unchecked.
+export const OPTIONAL_REASONS = [
+  'missing_invoice_number',
+  'missing_vat_rate',
+  'uncertain_vat_rate',
+  'uncertain_product',
+  'uncertain_expense_type',
+  'classification_failed',
+  'rule_conflict',
+] as const;
+const isTodoReason = (code: string): boolean => !(OPTIONAL_REASONS as readonly string[]).includes(code);
 
-export function matchesFilter(codes: readonly string[], filter: ReviewFilter): boolean {
-  if (filter === 'sender') return codes.includes('sender_unverified');
-  const groups: readonly FlagGroup[] = REVIEW_FILTERS[filter].groups;
-  return codes.some((c) => groups.includes(flagFor(c).group));
+export function hasTodoReason(codes: readonly string[]): boolean {
+  return codes.some(isTodoReason);
+}
+export function optionalReasons(codes: readonly string[]): string[] {
+  return codes.filter((code) => !isTodoReason(code));
+}
+
+type Flagged = { status: string; review_reasons_json: string };
+// A flagged receipt is in To do while a required reason is open. One flagged only for optional
+// reasons, from before they stopped counting, is as good as ready.
+export function needsReview(r: Flagged): boolean {
+  if (r.status !== 'needs_review') return false;
+  const codes = reasonCodes(r.review_reasons_json);
+  return !codes.length || hasTodoReason(codes);
+}
+export function isReady(r: Flagged): boolean {
+  return r.status === 'ready' || (r.status === 'needs_review' && !needsReview(r));
+}
+
+// The same two questions for SQL, over the receipts table or an alias of it.
+const OPTIONAL_LIST = OPTIONAL_REASONS.map((c) => `'${c}'`).join(',');
+function todoReasonSql(p: string): string {
+  return `(json_array_length(${p}review_reasons_json)=0 OR EXISTS(SELECT 1 FROM json_each(${p}review_reasons_json) WHERE value NOT IN (${OPTIONAL_LIST})))`;
+}
+export function needsReviewSql(alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  return `(${p}status='needs_review' AND ${todoReasonSql(p)})`;
+}
+export function readySql(alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  return `(${p}status='ready' OR (${p}status='needs_review' AND NOT ${todoReasonSql(p)}))`;
 }

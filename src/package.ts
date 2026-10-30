@@ -4,6 +4,7 @@
 // the same files under the same names.
 import { makeZip, predictLength } from 'client-zip';
 import { hash, money, requireInput, type Receipt } from './domain';
+import { isReady } from './flags';
 import { eurValues } from './banking';
 import type { Env } from './env';
 import { config } from './config';
@@ -150,7 +151,7 @@ export function placement(r: Receipt, options: Pick<PackageOptions, 'anyway' | '
   if (r.media_type === 'message/rfc822')
     return options.anyway && (r.issue_date || options.undated) ? CHECK_FOLDER : null;
   if (!r.issue_date) return options.undated ? CHECK_FOLDER : null;
-  if (r.status === 'ready') return r.kind === 'sales' ? SALES_FOLDER : MAIN_FOLDER;
+  if (isReady(r)) return r.kind === 'sales' ? SALES_FOLDER : MAIN_FOLDER;
   return options.anyway ? CHECK_FOLDER : null;
 }
 

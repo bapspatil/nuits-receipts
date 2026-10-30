@@ -6,6 +6,7 @@ import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
+import { isReady, needsReview, needsReviewSql } from './flags';
 import { STATUS, STEP, matchStatus, type StepState } from './status';
 import { failureFor, kept, requestState } from './request';
 
@@ -78,7 +79,7 @@ async function countNav(env: Env): Promise<Counts> {
     const [[review, missing], held] = await Promise.all([
       env.DB.batch<{ n: number }>([
         env.DB.prepare(
-          "SELECT count(*) n FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+          `SELECT count(*) n FROM receipts WHERE ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
         ),
         env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
       ]),
@@ -829,8 +830,11 @@ export function monthSwitcher(path: string, selected: string): string {
   return `<div class="months" role="group" aria-label="Month">${link(prev, `<span aria-hidden="true">‹</span>${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}<span aria-hidden="true">›</span>`)}</div>`;
 }
 // A stamp only when the receipt needs you; quiet text otherwise, nothing when ready.
-export function stamp(receipt: Pick<Receipt, 'status'>, match: 'automatic' | 'manual' | null = null): string {
-  if (receipt.status === 'needs_review') return `<span class="stamp needs">${STATUS.needs}</span>`;
+export function stamp(
+  receipt: Pick<Receipt, 'status' | 'review_reasons_json'>,
+  match: 'automatic' | 'manual' | null = null,
+): string {
+  if (needsReview(receipt)) return `<span class="stamp needs">${STATUS.needs}</span>`;
   if (receipt.status === 'pending' || receipt.status === 'processing') return tag(STATUS.reading);
   return match ? tag(matchStatus(match), true, match === 'automatic') : '';
 }
@@ -907,7 +911,7 @@ export function exportRow(r: Receipt, eur: EurValue, origin: string): unknown[] 
     r.id,
     `${origin}/originals/${r.id}`,
     eur.transaction,
-    r.status !== 'ready',
+    !isReady(r),
     csvCell(r.review_reasons_json),
     eur.source,
     eur.rateDate,
@@ -962,7 +966,7 @@ export function salesRow(r: Receipt, eur: EurValue, origin: string): unknown[] {
     eur.transaction,
     r.id,
     `${origin}/originals/${r.id}`,
-    r.status !== 'ready',
+    !isReady(r),
     csvCell(r.review_reasons_json),
     eur.source,
   ];

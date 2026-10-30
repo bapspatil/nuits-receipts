@@ -697,16 +697,10 @@ test('filter chips show only when they filter something', async () => {
     .bind(second.id)
     .run();
   expect(chips(await (await request('/review')).text())).toEqual([]);
-  // A filtered view keeps its chips, so the way back to All shows. Both miss info (equal
-  // to All, hidden); one has an amount to check; the current filter stays even when empty.
-  expect(chips(await (await request('/review?reason=sender')).text())).toEqual([
-    'All (2)',
-    'Check the amount (1)',
-    'Email not verified (0)',
-  ]);
-  // Six or more: chips that filter something.
+  // Review has no reason chips at any length, and an old ?reason= link just shows the queue.
   for (let i = 2; i < 6; i++) await flaggedImage(i);
-  expect(chips(await (await request('/review')).text())).toEqual(['All (6)', 'Check the amount (5)']);
+  expect(chips(await (await request('/review')).text())).toEqual([]);
+  expect(chips(await (await request('/review?reason=sender')).text())).toEqual([]);
   expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
     'All (3)',
     'Missing (1)',
@@ -876,16 +870,14 @@ test('required flags are red; an optional one is neutral, labelled, and never in
     /<li class="flag opt">[\s\S]*?for="f-vat_rate">VAT %<\/label><span class="meta">Optional<\/span>/,
   );
   expect(html).not.toMatch(/id="f-vat_rate"[^>]*aria-invalid/);
-  // Only a receipt number is missing: that is optional, so nothing is invalid.
+  // Only a receipt number is missing: that is optional, so the receipt is not in To do and says so quietly.
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_invoice_number"]' WHERE id=?`)
     .bind(flagged.id)
     .run();
   const optional = await (await request(`/receipts/${flagged.id}`)).text();
-  expect(optional).toMatch(
-    /<li class="flag opt">[\s\S]*?What is the receipt number\?<\/label><span class="meta">Optional<\/span>/,
-  );
+  expect(optional).toContain('<p class="meta quiet">Not needed to approve: What is the receipt number?</p>');
   expect(optional).not.toContain('aria-invalid="true"');
-  expect(optional).not.toContain('class="flag req"');
+  expect(optional).not.toContain('class="flag ');
 });
 
 test('a refused approve marks only the field that failed', async () => {

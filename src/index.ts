@@ -28,8 +28,8 @@ import {
   reviewPage,
   settingsPage,
 } from './views';
-import { REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { FONT_FILES } from './fonts';
+import { isReady, needsReview } from './flags';
 import { clearBankReview, matchable, reconcile, SET_REQUIRED_SQL, undoExemptions, type Transaction } from './banking';
 import { candidatesFor, fits, linkMatch, matchLikely, resolvePick, unlinkMatches, unmatchLikely } from './match';
 import { signer, type Signer } from './signing';
@@ -227,10 +227,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
   if (read && path === '/more') return moved('/settings');
-  if (request.method === 'GET' && path === '/review') {
-    const reason = url.searchParams.get('reason') ?? '';
-    return reviewPage(env, Object.hasOwn(REVIEW_FILTERS, reason) ? (reason as ReviewFilter) : null, url.searchParams);
-  }
+  if (request.method === 'GET' && path === '/review') return reviewPage(env, url.searchParams);
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
     const ids = receiptIds(form.getAll('id'));
@@ -431,14 +428,13 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     await correctReceipt(env, id, form);
     const after = await getReceipt(env, id);
     // Approve and Skip move on through the queue; the last one lands on Review.
-    if (before.status === 'needs_review' && (action === 'approve' || action === 'skip')) {
+    if (needsReview(before) && (action === 'approve' || action === 'skip')) {
       if (action === 'approve' && !next)
         return redirect(withDone('approvedLast', '/review', await afterLastReview(env, after.issue_date)));
       return redirect(withDone(action === 'approve' ? 'approved' : 'skipped', next ? `/receipts/${next}` : '/review'));
     }
     // Saving a ready receipt checks it again; new flags send it back to Review.
-    if (before.status === 'ready' && after.status === 'needs_review')
-      return redirect(withDone('movedBack', `/receipts/${id}`));
+    if (isReady(before) && needsReview(after)) return redirect(withDone('movedBack', `/receipts/${id}`));
     return redirect(withDone('saved', `/receipts/${id}`));
   }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);

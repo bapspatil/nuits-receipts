@@ -5,7 +5,7 @@ import { creditFit, eurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
-import { flagFor, reasonCodes } from './flags';
+import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import {
   amount,
@@ -52,7 +52,7 @@ export function paidOn(r: SalesRow): string | null {
 // Review blocks "month ready"; unpaid does not (it is shown, not required).
 export function salesStatus(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays, now = iso()): SalesStatus {
   if (r.status === 'pending' || r.status === 'processing') return 'reading';
-  if (r.status === 'needs_review' && r.review_reasons_json !== '["missing_eur"]') return 'review';
+  if (needsReview(r) && r.review_reasons_json !== '["missing_eur"]') return 'review';
   if (paidOn(r)) return 'paid';
   const due = dueOn(r, terms);
   return due && due < now ? 'overdue' : 'unpaid';
@@ -86,7 +86,7 @@ export async function salesRows(env: Env, where: string, ...binds: unknown[]): P
 }
 // Open invoices past their due date, across all months.
 export async function overdueInvoices(env: Env): Promise<SalesRow[]> {
-  const open = await salesRows(env, "r.status<>'needs_review' AND r.paid_outside_on IS NULL");
+  const open = await salesRows(env, `NOT ${needsReviewSql('r')} AND r.paid_outside_on IS NULL`);
   return open.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === 'overdue');
 }
 
@@ -239,7 +239,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
       'Paid',
       `<div class="match"><p><strong>${escape(day(r.paid_outside_on))}</strong> ${escape(r.paid_outside_note)}</p>${paidForm}</div>`,
     );
-  if (r.status !== 'ready' && r.review_reasons_json !== '["missing_eur"]')
+  if (!isReady(r) && r.review_reasons_json !== '["missing_eur"]')
     return box('Payment', '<p class="small">Approve it first.</p>');
   const credits = (
     await env.DB.prepare(

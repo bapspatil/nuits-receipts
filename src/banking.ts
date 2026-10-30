@@ -1,4 +1,5 @@
 import type { Env } from './env';
+import { isReady, readySql } from './flags';
 import { config } from './config';
 import { parseCsv, inspectCsv, headerFingerprint, originalFromText, validateMapping, type CsvMapping } from './csv';
 import { holviMapping, aliases, type BankPreset } from './presets';
@@ -447,12 +448,9 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
 // receipt's flags, and correcting the receipt works the match out again.
 export function matchable(receipt: Receipt): boolean {
   if (receipt.kind !== 'sales') return receipt.status === 'ready' || receipt.status === 'needs_review';
-  return (
-    receipt.status === 'ready' ||
-    (receipt.status === 'needs_review' && receipt.review_reasons_json === '["missing_eur"]')
-  );
+  return isReady(receipt) || (receipt.status === 'needs_review' && receipt.review_reasons_json === '["missing_eur"]');
 }
-export const MATCHABLE_SQL = `(kind='expense' AND status IN ('ready','needs_review') OR status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]'))`;
+export const MATCHABLE_SQL = `(kind='expense' AND status IN ('ready','needs_review') OR ${readySql()} OR (status='needs_review' AND review_reasons_json='["missing_eur"]'))`;
 function samePaymentFacts(receipt: Receipt, transaction: Transaction, tuning: Tuning): boolean {
   return (
     receipt.total_minor !== null &&
@@ -691,7 +689,7 @@ export function creditFit(r: Receipt, t: Transaction, tuning: Tuning = DEFAULT_T
   if (amount || converted || reference) return 'suggested';
   return null;
 }
-const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
+const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (${readySql()} OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
 export const unmatchedCredits =
   "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.receipt_id IS NULL AND t.amount_minor>0 AND t.receipt_required=1 AND NOT EXISTS (SELECT 1 FROM internal_transfers p WHERE p.credit_id=t.id OR p.debit_id=t.id)";
 export async function openSales(env: Env): Promise<Receipt[]> {

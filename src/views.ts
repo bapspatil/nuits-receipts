@@ -56,11 +56,12 @@ import {
   flagCards,
   flagFor,
   isRequired,
-  matchesFilter,
+  isReady,
+  needsReview,
+  needsReviewSql,
+  optionalReasons,
   reasonCodes,
-  REVIEW_FILTERS,
   type FlagField,
-  type ReviewFilter,
 } from './flags';
 import {
   amount,
@@ -118,7 +119,7 @@ const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, i
 export async function reviewQueue(env: Env): Promise<Receipt[]> {
   return (
     await env.DB.prepare(
-      `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
+      `SELECT * FROM receipts WHERE ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
     ).all<Receipt>()
   ).results;
 }
@@ -175,7 +176,7 @@ async function monthState(env: Env, selected: string) {
     // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
     // while any is left (a month already sent stays closed).
     env.DB.prepare(
-      "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
+      `SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND ${needsReviewSql()}`,
     )
       .first<number>('n')
       .then((n) => n ?? 0),
@@ -194,7 +195,7 @@ async function monthState(env: Env, selected: string) {
     }
     total += BigInt(eur.minor);
     if (eur.source === 'ecb') estimated += BigInt(eur.minor);
-    if (r.status !== 'ready') unchecked += BigInt(eur.minor);
+    if (!isReady(r)) unchecked += BigInt(eur.minor);
     const key = r.product + '\u0000' + r.expense_type;
     matrix.set(key, (matrix.get(key) ?? 0n) + BigInt(eur.minor));
   });
@@ -203,7 +204,7 @@ async function monthState(env: Env, selected: string) {
   let invoiced = 0n;
   for (const eur of all.slice(rows.length)) invoiced += BigInt(eur.minor ?? 0);
   const isReading = (r: Receipt) => r.status === 'pending' || r.status === 'processing';
-  const flagged = [...rows, ...sales].filter((r) => r.status === 'needs_review');
+  const flagged = [...rows, ...sales].filter(needsReview);
   const reading = [...rows, ...sales].filter(isReading);
   const docs = rows.length + sales.length;
   const sent = !!send.last && !send.changed && docs > 0;
@@ -225,7 +226,7 @@ async function monthState(env: Env, selected: string) {
     noEur,
     flagged,
     reading,
-    ready: rows.filter((r) => r.status !== 'needs_review' && !isReading(r)).length,
+    ready: rows.filter((r) => !needsReview(r) && !isReading(r)).length,
     out,
     missing,
     matched: out.filter((t) => t.receipt_id),
@@ -243,11 +244,7 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
 }
 
 // ---------- Review queue ----------
-export async function reviewPage(
-  env: Env,
-  filter: ReviewFilter | null,
-  params = new URLSearchParams(),
-): Promise<Response> {
+export async function reviewPage(env: Env, params = new URLSearchParams()): Promise<Response> {
   // Rows a bank line points at: Discard asks to remove the match too.
   const known = matchedIds(env);
   const [all, held, reading, merges, matched] = await Promise.all([
@@ -259,30 +256,20 @@ export async function reviewPage(
     mergePlan(env, known),
     known,
   ]);
-  const rows = filter ? all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter)) : all;
+  const rows = all;
   const undated = all.filter((r) => r.issue_date === null).length;
   const mergeable = merges.length;
   const merge = mergeable
     ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
     : '';
-  const chips = chipRow('Filter', [
-    { href: '/review', label: 'All', count: all.length, current: !filter },
-    ...(Object.keys(REVIEW_FILTERS) as ReviewFilter[]).map((k) => ({
-      href: `/review?reason=${k}`,
-      label: REVIEW_FILTERS[k].label,
-      count: all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), k)).length,
-      current: k === filter,
-    })),
-  ]);
   const selecting = params.get('select') === '1';
-  const here = filter ? `/review?reason=${filter}` : '/review';
+  const here = '/review';
   const bulk: BulkList = {
     form: 'bulk-review',
     action: '/receipts/bulk',
     noun: ['receipt', 'receipts'],
     total: rows.length,
-    // filter, not reason: the discard chips post reason.
-    scope: { list: 'review', ...(filter ? { filter } : {}), back: here },
+    scope: { list: 'review', back: here },
     actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
   };
   // Row 1 is the next to check: its name is the screen's one primary.
@@ -295,15 +282,13 @@ export async function reviewPage(
     })
     .join('');
   const list = rows.length
-    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}${filter ? '&' : '?'}select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
-    : all.length
-      ? emptyState('Nothing in this filter.', `<a class="btn primary" href="/review">Show all ${all.length}</a>`)
-      : held.length
-        ? ''
-        : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
+    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
+    : held.length
+      ? ''
+      : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'review',
-    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length, selecting)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length, selecting)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -416,7 +401,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   ).results;
   const codes = reasonCodes(r.review_reasons_json);
   const gone = !!r.discarded_at;
-  const needs = r.status === 'needs_review',
+  const needs = needsReview(r),
     reading = r.status === 'pending' || r.status === 'processing';
   const cards = needs ? flagCards(codes) : [];
   const unverified = codes.includes('sender_unverified');
@@ -649,7 +634,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
       html: `<input name="approval_reason" value="${escape(kept(RECEIPT, 'approval_reason', 'Checked against the original'))}" type="text" id="f-approval_reason"${ariaFor(RECEIPT, 'approval_reason')}>`,
     },
   )}</div></details>`;
-  const ready = r.status === 'ready';
+  const ready = isReady(r);
   const linkedRow = await env.DB.prepare('SELECT match_method FROM bank_transactions WHERE receipt_id=? LIMIT 1')
     .bind(r.id)
     .first<{ match_method: 'automatic' | 'manual' | null }>();
@@ -663,11 +648,17 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const summary = ready
     ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>Payment</dt><dd>${sales ? status : linkedRow ? matchStatus(linkedRow.match_method) : 'Not matched yet'}</dd></div></dl>`
     : '';
+  const quiet = needs
+    ? ''
+    : flagCards(optionalReasons(codes))
+        .map(({ flag }) => flag.title)
+        .join(' ');
+  const quietNote = quiet ? `<p class="meta quiet">Not needed to approve: ${escape(quiet)}</p>` : '';
   const fold = ready ? 'Edit' : needs ? 'Other fields' : 'All fields';
   const verb = needs || reading ? 'approve' : 'save';
   // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
   const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
     <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}</form>`;
   const matches = sales
@@ -742,7 +733,7 @@ async function monthCounts(env: Env, month: string) {
       `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
     ).bind(month),
     env.DB.prepare(
-      "SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE r.status='needs_review' AND substr(t.booking_date,1,7)=?",
+      `SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE ${needsReviewSql('r')} AND substr(t.booking_date,1,7)=?`,
     ).bind(month),
   ]);
   const n = (sums?.results[0] ?? {}) as Record<string, number>;
@@ -1084,7 +1075,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const alert = overdue.length
     ? `<a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'invoice')} overdue ›</a>`
     : unverified
-      ? `<a href="/review?reason=sender">${plural(unverified, 'email')} not verified ›</a>`
+      ? `<a href="/review">${plural(unverified, 'email')} not verified ›</a>`
       : '';
   const undated = s.undated;
   const short = monthName(selected, false);

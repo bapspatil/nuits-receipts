@@ -4,6 +4,7 @@ import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
+import { needsReview, needsReviewSql, readySql } from './flags';
 import { restoreForm } from './discard';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, SENDER_ACTIONS, type BulkList } from './bulk';
 import { invoiceName } from './invoices';
@@ -59,18 +60,19 @@ export type AllRow = {
   issue_date: string | null;
   sender: string | null;
   subject: string | null;
+  review_reasons_json: string;
 };
 const WHERE: Record<Show, string> = {
-  ready: "type='receipt' AND status='ready' AND duplicate_of IS NULL AND discarded_at IS NULL",
-  needs: "type='receipt' AND status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+  ready: `type='receipt' AND ${readySql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
+  needs: `type='receipt' AND ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
   reading: "type='receipt' AND status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
   duplicate: "type='receipt' AND duplicate_of IS NOT NULL AND discarded_at IS NULL",
   discarded: "type='receipt' AND discarded_at IS NOT NULL",
   sales: "type='receipt' AND kind='sales' AND discarded_at IS NULL",
   unknown: "type='mail'",
 };
-const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject FROM receipts`;
-const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject FROM inbound_mail WHERE state='held'`;
+const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject,review_reasons_json FROM receipts`;
+const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject,'[]' FROM inbound_mail WHERE state='held'`;
 
 export type AllQuery = { show: Show | null; month: string | null; q: string; offset: number };
 
@@ -144,7 +146,7 @@ export function chipOf(row: AllRow): { label: string; css: string } {
     return { label: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : 'Discarded', css: 'muted' };
   if (row.duplicate_of) return { label: 'Duplicate', css: 'muted' };
   if (row.status === 'pending' || row.status === 'processing') return { label: STATUS.reading, css: 'muted' };
-  if (row.status === 'needs_review') return { label: STATUS.needs, css: 'needs' };
+  if (needsReview(row)) return { label: STATUS.needs, css: 'needs' };
   return { label: STATUS.ready, css: 'ready' };
 }
 function rowName(row: AllRow): string {

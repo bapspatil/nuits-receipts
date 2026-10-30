@@ -29,7 +29,6 @@ import {
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
 import { backPath, withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { matchesFilter, reasonCodes, REVIEW_FILTERS, type ReviewFilter } from './flags';
 import { reviewQueue } from './views';
 import { filterIds, parseQuery } from './all';
 import { invoiceRows, invoiceShow } from './invoices';
@@ -179,14 +178,7 @@ const OPS: Record<ReceiptOp, Op> = {
 
 // Every row of a list's filter, the way its page picks them. Refused over the cap.
 const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
-  review: async (env, form) => {
-    const filter = text(form, 'filter');
-    requireInput(!filter || Object.hasOwn(REVIEW_FILTERS, filter), 'Invalid filter', 400);
-    const rows = await reviewQueue(env);
-    return (
-      filter ? rows.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter as ReviewFilter)) : rows
-    ).map((r) => r.id);
-  },
+  review: async (env) => (await reviewQueue(env)).map((r) => r.id),
   receipts: (env, form) => {
     const params = new URLSearchParams();
     for (const key of ['show', 'month', 'q']) if (text(form, key)) params.set(key, text(form, key));

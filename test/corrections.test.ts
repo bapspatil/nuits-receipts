@@ -210,7 +210,7 @@ test('rules apply to future receipts and conflicting priorities require review',
     "INSERT INTO vendor_rules(vendor_contains,priority,product,expense_type) VALUES ('Sample Cloud',10,'hosting','infra')",
   ).run();
   const conflict = await processReceipt(env, original.id, { retry: true });
-  expect(conflict.status).toBe('needs_review');
+  expect(conflict.status).toBe('ready');
   expect(conflict.review_reasons_json).toContain('rule_conflict');
 });
 

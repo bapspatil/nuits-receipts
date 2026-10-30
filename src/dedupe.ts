@@ -7,6 +7,7 @@
 import type { Env } from './env';
 import { normalize, type Receipt } from './domain';
 import { reconcile } from './banking';
+import { hasTodoReason } from './flags';
 import { chargeKey, documentScore } from './matcher';
 
 const SETTLED = "status IN ('ready','needs_review') AND media_type<>'message/rfc822'";
@@ -90,7 +91,7 @@ export async function clearDuplicateFlag(env: Env, id: string): Promise<void> {
   await env.DB.prepare(
     "UPDATE receipts SET review_reasons_json=?,status=CASE WHEN ?=0 AND status='needs_review' THEN 'ready' ELSE status END,revision=revision+1 WHERE id=? AND revision=?",
   )
-    .bind(JSON.stringify(left), left.length, r.id, r.revision)
+    .bind(JSON.stringify(left), hasTodoReason(left) ? 1 : 0, r.id, r.revision)
     .run();
 }
 
