@@ -28,7 +28,11 @@ The snapshot lives in the `undo_log` table (`migrations/0011_undo_log.sql`, `sch
 
 The same-batch rule: an undoable write goes through `withUndo(env, { at, op, ids }, writes)`, which runs one `DB.batch` with the snapshot before the writes and the after-state seal at the end. The log and the change commit together or not at all, and rows the writes left alone are dropped from the log. Each call also prunes entries older than a day; the Undo link itself lives 15 minutes.
 
-`undo(env, at, op)` restores in one batch and forgets the action. It skips a row that changed again since (by `revision` on receipts, by the restored columns elsewhere), never brings back a row deleted since, and links a payment back to its receipt only while that receipt is live and unmatched. Undo restores `revision` too, so a month sent before the action reads as sent again.
+`undo(env, at, op)` restores in one batch and forgets the action. It skips a row that changed again since (by `revision` on receipts, by the restored columns elsewhere), never brings back a row deleted since, and links a payment back to its receipt only while that receipt is live and unmatched. Undo restores `revision` too, so a month sent before the action reads as sent again. It returns the ids it put back. Undoing an approval first takes off any automatic match made after it, since that match rested on the approved facts. Settings (`op: 'settings'`) go back with an audit row each, so the history shows the Undo and an older Settings tab is refused on save.
+
+Every Undo posts to `POST /undo` with `at`, `op` and the list state of the page the banner is on (`events.ts` `onList`). It lands on the first row it brought back: the receipt page for receipts when the banner was on one, Bank for payments, Settings for rules and settings. Its own banner (`undone`) says what came back and offers no Undo.
+
+Which actions are undoable: Approve (single and bulk), Discard (with the match it removed), Mark paid and Not paid, Not a purchase and Needs a receipt, Match, Match all, Remove match, Delete rule, and a Settings save that removes a sender or a part. Read again and Move run in chunks and call the model, so they have no Undo; Move, held-mail Ignore and OneDrive Disconnect lose data and ask first instead. The own-account transfer keeps its own Undo route.
 
 ## Data rules
 
