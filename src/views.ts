@@ -20,7 +20,8 @@ import { importForm } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts } from './setup';
+import { FIELD, type SettingKey } from './settings';
+import { saveBar, setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, ignoredSenders, reasonAllows, reasonWords } from './inbound';
@@ -113,10 +114,13 @@ import {
   chosenReceipt,
   errorId,
   VIEW_TRANSITION_CSS,
+  BACK_BANK,
+  BACK_HOME,
   errorLine,
+  fieldId,
   matchError,
 } from './ui';
-import { failureFor, kept } from './request';
+import { failureFor, kept, requestState } from './request';
 import { row, rowList } from './row';
 import { STATUS } from './status';
 import { ACTIONS, button, buttonLink, buttonSummary, statusMark, type ActionKey, type Tone } from './actions';
@@ -589,7 +593,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const due = rows('due_date');
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
-  const heading = reading ? STATUS.reading.word : needs ? `${cards.length} to check` : '';
+  const heading = reading ? STATUS.reading.word : needs ? `${plural(cards.length, 'field')} to fill` : '';
   const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
     {
       id: 'f-approval_reason',
@@ -638,8 +642,17 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
       : '';
   const always = sales
     ? ''
-    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}${button('save', { label: 'Save rule' })}</form></div></details>`;
-  const extras = `<details class="more">${buttonSummary('more')}<div class="body"><form action="/receipts/${r.id}/retry" method="post">${own}${button('reread')}</form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
+    : `<details${failureFor(RECEIPT_RULE) ? ' open' : ''}><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type }, failureFor(RECEIPT_RULE) ? RECEIPT_RULE : '')}${button('save', { label: 'Save rule' })}</form></div></details>`;
+  // Two groups: what you can do with the file, and what you can change about the receipt's status
+  // and filing. Discard stays on the bar, one click with Undo.
+  const group = (name: string, inner: string) =>
+    inner ? `<div class="mgrp" role="group" aria-label="${name}"><p class="mh">${name}</p>${inner}</div>` : '';
+  const documentGroup = group(
+    'The document',
+    `<form action="/receipts/${r.id}/retry" method="post">${own}${button('reread')}</form><p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>`,
+  );
+  const statusGroup = group('This receipt', `${move}${always}`);
+  const extras = `<details class="more"${failureFor(RECEIPT_RULE) ? ' open' : ''}>${buttonSummary('more')}<div class="body">${documentGroup}${statusGroup}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
   const open = `<p>${buttonLink('original', `/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}`)}</p>`;
@@ -897,7 +910,7 @@ export async function payments(
         );
         if (sides.length)
           extra.push(
-            `<form action="/transfers" method="post" class="transfer">${fields}<input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required>${button('ownTransfer')}</form>`,
+            `<form action="/transfers" method="post" class="transfer">${fields}<input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required value="${escape(kept(transferScope(t.id), 'reason', ''))}"${ariaFor(transferScope(t.id), 'reason')}>${button('ownTransfer')}${errorLine(transferScope(t.id))}</form>`,
           );
       }
       // No bulk action applies to a transfer side.
@@ -1145,9 +1158,11 @@ async function sendStep(
   const drive = conn?.folder_item_id ? conn : null;
   const upload = drive && !empty ? await progress(env, drive, selected, chosen) : null;
   const folder = escape(drive?.folder_name ?? '');
-  const csv = buttonLink('csv', `/export.csv?month=${selected}`);
+  // A file is a plain same-origin link that says it is a download, so an installed app, which has
+  // no address bar, saves it instead of trying to show it.
+  const csv = buttonLink('csv', `/export.csv?month=${selected}`, { attrs: ' download' });
   const zip = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
-    buttonLink('zip', `/month/package.zip?${query(selected, o)}`, { label: text, tone });
+    buttonLink('zip', `/month/package.zip?${query(selected, o)}`, { label: text, tone, attrs: ' download' });
   const uploadForm = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
     `<form action="/month/onedrive-upload" method="post">${optionFields(selected, o)}${button('oneDrive', { label: text, tone })}</form>`;
   const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}${button('sent', { label: `Mark ${monthName(selected, false)} as sent` })}</form>`;
@@ -1226,6 +1241,7 @@ async function sendStep(
   const undated = plan.undated
     ? `<label class="check"><input type="checkbox" name="undated" value="1">Add ${plural(plan.undated, 'undated receipt')}</label>`
     : '';
+  // A GET form, not a link, because it carries the undated choice; the response is an attachment either way.
   const anyway = `<form action="/month/package.zip" method="get">${hidden('month', selected)}${hidden('anyway', 1)}${undated}${button('downloadAnyway')}</form>${
     upload && upload.pending.length ? uploadForm({ anyway: true }, 'Upload anyway') : ''
   }`;
@@ -1241,8 +1257,12 @@ function ruleFields(
   rule: Partial<
     Pick<Rule, 'vendor_contains' | 'context_contains' | 'bank_alias' | 'product' | 'expense_type' | 'priority'>
   > = {},
+  // The form's name when it was the one refused (rule:new, rule:<id>, rule:receipt), so what was
+  // typed comes back and the message sits at the field. Forms that were not refused stay plain.
+  scope = '',
 ): string {
-  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"' })}${hasParts(env) ? productSelect(env, 'product', rule.product ?? config(env).defaultProduct, 'Part') : `<input type="hidden" name="product" value="${escape(config(env).defaultProduct)}">`}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"' })}</div>`;
+  const own = (name: string) => (scope ? { scope, id: fieldId(scope, name) } : {});
+  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"', ...own('vendor_contains') })}${hasParts(env) ? productSelect(env, 'product', kept(scope, 'product', rule.product ?? config(env).defaultProduct), 'Part') : `<input type="hidden" name="product" value="${escape(config(env).defaultProduct)}">`}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind', scope, scope ? fieldId(scope, 'expense_type') : '')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"', ...own('context_contains') })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"', ...own('bank_alias') })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"', ...own('priority') })}</div>${scope ? errorLine(scope, '') : ''}`;
 }
 
 // ---------- Bank: import ----------
@@ -1259,51 +1279,67 @@ async function importLink(env: Env): Promise<string> {
 function sect(id: string, title: string, summary: string, body: string, open = false): string {
   return `<details class="sect"${open ? ' open' : ''}><summary><h2>${title}</h2>${summary ? `<span class="sum">${summary}</span>` : ''}</summary><div class="body" id="${id}">${body}</div></details>`;
 }
+// A part of a section with its own heading and anchor. Links from banners and Undo still name it.
+function sub(id: string, title: string, body: string): string {
+  return `<div class="sectpart" id="${id}"><h3>${title}</h3>${body}</div>`;
+}
+// Which of the five sections holds a part, by the anchor it goes by.
+const SECTION_OF: Record<string, string> = {
+  'setup-business': 'business',
+  rules: 'business',
+  'setup-email': 'email',
+  senders: 'email',
+  mail: 'email',
+  accounts: 'bank',
+  'setup-accountant': 'sending',
+  onedrive: 'sending',
+  'setup-review': 'advanced',
+  'setup-integrations': 'advanced',
+  'setup-deploy': 'advanced',
+  'setup-history': 'advanced',
+  about: 'advanced',
+};
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
-async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<string> {
+async function oneDrivePart(env: Env, origin: string): Promise<string> {
   const settings = config(env);
   const docs = settings.sourceRepository
     ? `<a href="${escape(settings.sourceRepository)}/blob/main/docs/ENVIRONMENT.md#onedrive-upload-optional">docs/ENVIRONMENT.md</a>`
     : '<code>docs/ENVIRONMENT.md</code>';
   if (!settings.oneDrive)
     return settings.oneDriveIncomplete
-      ? sect(
+      ? sub(
           'onedrive',
           'OneDrive',
-          'Not set up',
           `<p class="warning"><code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing. See ${docs}.</p>`,
-          open,
         )
       : '';
   const conn = await connection(env);
   const tech = `<details class="tech"><summary>Redirect URI for Microsoft Entra</summary><div class="body"><p>Microsoft sends you back to this app after you sign in. Add this address to your Microsoft Entra app, under Authentication, as a Web redirect URI.</p><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
-    return sect(
+    return sub(
       'onedrive',
       'OneDrive',
-      'Not connected',
       `<p class="cta">${buttonLink('connect', '/settings/onedrive/connect')}</p>${tech}`,
-      open,
     );
-  const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"' })}</div>${button('save', { label: 'Use folder' })}</form>`;
+  const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true, scope: FOLDER_SCOPE })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"', scope: FOLDER_SCOPE })}</div>${errorLine(FOLDER_SCOPE, '')}${button('save', { label: 'Use folder' })}</form>`;
   const folder = conn.folder_item_id
     ? `<a href="${escape(conn.folder_web_url ?? '')}"><strong>${escape(conn.folder_name)}</strong></a>`
     : '<span class="warning">Not chosen</span>';
-  return sect(
+  return sub(
     'onedrive',
     'OneDrive',
-    escape(conn.account_email ?? conn.account_name),
     `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
-      conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
+      conn.folder_item_id
+        ? `<details class="why"${failureFor(FOLDER_SCOPE) ? ' open' : ''}><summary>Change folder</summary>${folderForm}</details>`
+        : folderForm
     }<details class="cta">${buttonSummary('disconnect')}<div class="body"><form action="/settings/onedrive/disconnect" method="post"><p class="ask">Delete this app's sign-in to your Microsoft account? Uploads stop until you connect again.</p>${button('disconnect')}</form></div></details>${tech}`,
-    open,
   );
 }
 
 // Settings > Email senders: who is read automatically, who is ignored, and the
 // mail we didn't keep, as one list.
-async function sendersPart(env: Env, open: boolean): Promise<string> {
+async function sendersPart(env: Env): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const [ignored, log] = await Promise.all([ignoredSenders(env), mailLog(env)]);
   const list = (
@@ -1342,8 +1378,8 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
       )}`
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
-  const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address">${button('add', { attrs: full ? ' disabled' : '' })}</form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  return sect('senders', 'Email senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}${log}`, open);
+  const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address" id="f-address" value="${escape(kept(NEW_SENDER, 'address', ''))}"${ariaFor(NEW_SENDER, 'address')}>${button('add', { attrs: full ? ' disabled' : '' })}${errorLine(NEW_SENDER)}</form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
+  return sub('senders', 'Email senders', `${approved}${add}${ignoredList}${log}`);
 }
 
 // Mail we didn't keep: what reached the app and was not read, from the log that
@@ -1371,77 +1407,96 @@ async function mailLog(env: Env): Promise<string> {
   return `<h3 id="mail">Mail we didn't keep</h3>${body}`;
 }
 
+// The OneDrive folder form.
+export const FOLDER_SCOPE = 'onedrive:folder';
+// The form that adds an allowed sender in Settings.
+export const NEW_SENDER = 'sender:new';
+// An account's rename form.
+export const renameScope = (id: string) => `rename:${id}`;
+// The own-account transfer form on a payment, as a failure scope names it.
+export const transferScope = (tx: string) => `transfer:${tx}`;
+// The forms that add a vendor rule in Settings and on a receipt, as failure scopes name them.
+export const NEW_RULE = 'rule:new';
+export const RECEIPT_RULE = 'rule:receipt';
 // The form that adds a bank account in Settings, as a failure scope names it.
 export const NEW_ACCOUNT = 'account:new';
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
   const open = params.get('open');
-  const opened = feedback(params)?.section ?? (open === 'senders' ? open : '');
+  const anchor = feedback(params)?.section ?? (open === 'senders' ? open : '');
+  // A refused form opens the section it is in, so the message is on screen.
+  const refused = requestState.getStore()?.failure;
+  const refusedIn = refused?.scope.startsWith('setup')
+    ? SECTION_OF[`setup-${FIELD.get(refused.field as SettingKey)?.group ?? 'business'}`]
+    : refused
+      ? ({ rule: 'business', sender: 'email', account: 'bank', rename: 'bank', onedrive: 'sending' } as const)[
+          refused.scope.split(':')[0] as 'rule'
+        ]
+      : undefined;
+  const opened = new Set([SECTION_OF[anchor], params.has('routing') ? 'email' : '', refusedIn]);
   // The sections don't depend on each other, so they all load at once.
   const [oneDrive, setup, accounts, rules, senders] = await Promise.all([
-    oneDrivePart(env, opened === 'onedrive', origin),
-    setupParts(env, params, opened),
+    oneDrivePart(env, origin),
+    setupParts(env, params),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
-    sendersPart(env, opened === 'senders'),
+    sendersPart(env),
   ]);
-  const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
-  const accountsPart = sect(
+  const accountsPart = sub(
     'accounts',
     'Bank accounts',
-    String(accounts.length),
     `${
       accounts.length
         ? rowList(
-            accounts.map((a, i) =>
+            accounts.map((a) =>
               row({
                 title: escape(a.label),
                 meta: `${escape(a.bank_name) || 'No bank'} · ${escape(a.default_currency)}`,
-                actions: `<form class="inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="acct-${i}">New name for ${escape(a.label)}</label><input id="acct-${i}" name="label" value="${escape(a.label)}">${button('edit', { label: 'Rename', attrs: ` aria-label="Rename ${escape(a.label)}"` })}</form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}`,
+                actions: `<form class="inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="${fieldId(renameScope(a.id), 'label')}">New name for ${escape(a.label)}</label><input id="${fieldId(renameScope(a.id), 'label')}" name="label" value="${escape(kept(renameScope(a.id), 'label', a.label))}"${ariaFor(renameScope(a.id), 'label')}>${button('edit', { label: 'Rename', attrs: ` aria-label="Rename ${escape(a.label)}"` })}${errorLine(renameScope(a.id))}</form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}`,
               }),
             ),
           )
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
     }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div>${button('add')}</form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>`,
-    opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
   );
-  const rulesPart = sect(
+  const rulesPart = sub(
     'rules',
     'Vendor rules',
-    String(rules.results.length),
     `${
       rules.results.length
         ? `<ul class="list rules">${rules.results
-            .map(
-              (rule) =>
-                `<li><details><summary>${escape(rule.vendor_contains)} → ${hasParts(env) ? `${escape(productLabel(env, rule.product))}, ` : ''}${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule)}<div class="btns">${button('save')}${button('remove', { attrs: ` formaction="/rules/${rule.id}/delete"` })}</div></form></div></details></li>`,
-            )
+            .map((rule) => {
+              const scope = `rule:${rule.id}`;
+              return `<li><details${failureFor(scope) ? ' open' : ''}><summary>${escape(rule.vendor_contains)} → ${hasParts(env) ? `${escape(productLabel(env, rule.product))}, ` : ''}${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule, failureFor(scope) ? scope : '')}<div class="btns">${button('save')}${button('remove', { attrs: ` formaction="/rules/${rule.id}/delete"` })}</div></form></div></details></li>`;
+            })
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
-    }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}${button('add')}</form></div></details>`,
-    opened === 'rules',
+    }<details class="add"${rules.results.length && !failureFor(NEW_RULE) ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env, {}, failureFor(NEW_RULE) ? NEW_RULE : '')}${button('add')}</form></div></details>`,
   );
+  const names = settings.sellerNames[0] ?? settings.appName;
+  const section = (id: string, title: string, summary: string, inner: string) =>
+    sect(id, title, summary, inner, opened.has(id));
   const body = [
-    sect(
-      'setup-business',
+    section(
+      'business',
       'Business',
-      `${escape(settings.sellerNames[0] ?? settings.appName)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
-      setup.business,
-      opens('business'),
+      `${escape(names)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
+      `${setup.business}${rulesPart}`,
     ),
-    sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    senders,
-    accountsPart,
-    rulesPart,
-    sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
-    oneDrive,
-    sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
-    sect('about', 'About', '', aboutBody(env)),
+    section(
+      'email',
+      'Email',
+      `${escape(settings.receiptAddress || 'Off')}, ${settings.allowedSenders.size} allowed`,
+      `${setup.email}${senders}`,
+    ),
+    section('bank', 'Bank', plural(accounts.length, 'account'), accountsPart),
+    section('sending', 'Sending', escape(settings.accountantLabel), `${setup.sending}${oneDrive}`),
+    section('advanced', 'Advanced', '', `${setup.advanced}${sub('about', 'About', aboutBody(env))}`),
   ].join('');
   return page(
     'settings',
-    `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
+    `<div class="settings">${setup.form}${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p>${saveBar()}</div>`,
     200,
     env,
     { head: pageHead('Settings', signOutLink(env)) },
@@ -1450,13 +1505,13 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
 
 // ---------- Help ----------
 export async function helpPage(env: Env): Promise<Response> {
-  return page('help', helpBody(), 200, env, { head: pageHead('Help') });
+  return page('help', helpBody(), 200, env, { head: pageHead('Help', '', BACK_HOME) });
 }
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
   return page('import', `<div class="card">${await importForm()}</div>`, 200, env, {
     detail: 'Import a bank statement',
-    head: pageHead('Import a bank statement'),
+    head: pageHead('Import a bank statement', '', BACK_BANK),
   });
 }

@@ -8,41 +8,14 @@ import { kindFor } from '../src/receipts';
 import { applied, layer, SETTING_VALUE_LIMIT, sourceOf, withSettings, type Row } from '../src/settings';
 import { DATA_LINE } from '../src/ui';
 import type { Env } from '../src/env';
-import { htmlForm, locationOf, request, signed } from './helpers';
+import { formById, htmlForm, locationOf, request, signed } from './helpers';
 
 const page = async () => (await request('/settings')).text();
-const decode = (s: string) =>
-  s
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-// Like a browser: every field of the group's form, repeated names included.
-function groupForm(html: string, group: string): FormData {
-  const start = html.indexOf(`id="setup-${group}"`),
-    block = html.slice(html.indexOf('<form', start), html.indexOf('</form>', start));
-  const form = new FormData();
-  const attr = (tag: string, name: string) => {
-    const m = tag.match(new RegExp(`\\b${name}="([^"]*)"`));
-    return m ? decode(m[1]!) : null;
-  };
-  for (const [tag] of block.matchAll(/<input\b[^>]*>/g)) {
-    const name = attr(tag, 'name');
-    if (!name || (attr(tag, 'type') === 'checkbox' && !/\bchecked\b/.test(tag))) continue;
-    form.append(name, attr(tag, 'value') ?? '');
-  }
-  for (const m of block.matchAll(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/g))
-    form.append(attr(m[1]!, 'name')!, decode(m[2]!));
-  for (const m of block.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/g)) {
-    const options = [...m[2]!.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g)];
-    const picked = options.find((o) => /\bselected\b/.test(o[1]!)) ?? options[0]!;
-    form.append(attr(m[1]!, 'name')!, attr(picked[1]!, 'value') ?? decode(picked[2]!));
-  }
-  return form;
-}
-async function save(fields: Record<string, string | string[]>, group: string, origin = 'http://localhost') {
-  const form = groupForm(await page(), group);
+// The page's one form, as a browser would send it.
+const settingsForm = (html: string) => formById(html, 'settings-form');
+// A field edited, then the page's one Save. The second argument only says which section the field is in.
+async function save(fields: Record<string, string | string[]>, _section = '', origin = 'http://localhost') {
+  const form = settingsForm(await page());
   for (const [key, value] of Object.entries(fields)) {
     form.delete(key);
     for (const v of Array.isArray(value) ? value : [value]) form.append(key, v);
@@ -72,9 +45,9 @@ test('with nothing saved, every value comes from the deploy or the default', asy
   expect(sourceOf(layered, 'INVOICES_ADDRESS')).toBe('deploy');
   const html = await page();
   expect(html).toContain('<summary><h2>Business</h2>');
-  expect(html).toContain('<summary><h2>Email</h2><span class="sum">receipts@example.com</span></summary>');
-  expect(html).toContain('<summary><h2>Export</h2>');
-  expect(html).toContain('<summary>Review &amp; matching</summary>');
+  expect(html).toContain('<summary><h2>Email</h2><span class="sum">receipts@example.com, ');
+  expect(html).toContain('<summary><h2>Sending</h2>');
+  expect(html).toContain('<h3 id="setup-review">Review &amp; matching</h3>');
   // A field is its label and control; the help is a tooltip, with no source badge.
   expect(html).toContain('<div class="sl"><label for="f-INVOICES_ADDRESS">Invoice address</label></div>');
   expect(html).toMatch(
@@ -89,7 +62,7 @@ test('with nothing saved, every value comes from the deploy or the default', asy
 });
 
 test('a saved value wins over the deploy value, is audited, and Reset goes back', async () => {
-  const response = await save({ APP_NAME: 'Example Books', ACCOUNTANT_LABEL: 'ignored: other group' }, 'business');
+  const response = await save({ APP_NAME: 'Example Books' }, 'business');
   expect(response.status).toBe(303);
   expect(locationOf(response)).toBe('/settings?done=settingsSaved&group=business#setup-business');
   expect(await rows()).toEqual([{ key: 'APP_NAME', value_json: '"Example Books"', updated_by: 'password' }]);
@@ -107,7 +80,7 @@ test('a saved value wins over the deploy value, is audited, and Reset goes back'
   await save({}, 'business');
   expect(await audit()).toHaveLength(1);
 
-  const form = groupForm(html, 'business');
+  const form = settingsForm(html);
   form.set('reset', 'APP_NAME');
   const reset = await request('/settings/setup/reset', { method: 'POST', body: form });
   expect(reset.status).toBe(303);
@@ -121,16 +94,12 @@ test('a saved value wins over the deploy value, is audited, and Reset goes back'
   expect(await page()).not.toContain('form="reset-APP_NAME"');
 });
 
-test('Reset posts its own small form, so Enter in a field still means Save', async () => {
+test('Reset posts its own small form, and Enter in a field still means Save', async () => {
   await save({ APP_NAME: 'Example Books' }, 'business');
   const html = await page();
-  const start = html.indexOf('id="setup-business"'),
-    form = html.slice(html.indexOf('<form', start), html.indexOf('</form>', start));
-  // Enter submits with the form's first own submit button; form="…" buttons
-  // belong to another form.
-  const own = [...form.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]).filter((b) => !/\bform="/.test(b));
-  expect(own[0]).toBe('<button class="btn secondary">');
-  expect(form).toContain(
+  // The page's one form is empty: its controls name it by id, so Enter submits it with the Save in the bar.
+  expect(html).toContain('<form id="settings-form" action="/settings/setup" method="post" novalidate></form>');
+  expect(html).toContain(
     '<button class="btn ghost" form="reset-APP_NAME" name="reset" value="APP_NAME" aria-label="Reset ',
   );
   const reset = html.match(
@@ -149,25 +118,35 @@ test('Reset posts its own small form, so Enter in a field still means Save', asy
   ).toContain('App name is back to the value set when deployed.');
 });
 
-test('the page is one fold per section, one Save per group and history tucked away', async () => {
+test('the page is five sections and one Save, with history tucked away', async () => {
   await save({ APP_NAME: 'Example Books' }, 'business');
   const html = await page();
   const targets = [
     ...html.matchAll(
-      /<details class="sect"[^>]*><summary><h2>[^<]+<\/h2>(?:<span class="sum">[^<]*<\/span>)?<\/summary><div class="body" id="([a-z-]+)">/g,
+      /<details class="sect"[^>]*><summary><h2>([^<]+)<\/h2>(?:<span class="sum">[^<]*<\/span>)?<\/summary><div class="body" id="([a-z-]+)">/g,
     ),
-  ].map((m) => m[1]);
+  ].map((m) => [m[1], m[2]]);
   expect(targets).toEqual([
+    ['Business', 'business'],
+    ['Email', 'email'],
+    ['Bank', 'bank'],
+    ['Sending', 'sending'],
+    ['Advanced', 'advanced'],
+  ]);
+  // The parts of a section keep the anchors that banners and Undo name.
+  for (const id of [
     'setup-business',
+    'rules',
     'setup-email',
     'senders',
+    'mail',
     'accounts',
-    'rules',
     'setup-accountant',
-    ...(config(env).oneDrive ? ['onedrive'] : []),
-    'advanced',
+    'setup-review',
+    'setup-integrations',
     'about',
-  ]);
+  ])
+    expect(html, id).toMatch(new RegExp(`id="${id}"`));
   // Everything starts folded; no side nav, no source legend.
   expect(html).not.toContain('<details class="sect" open>');
   expect(html).not.toContain('class="snav"');
@@ -179,32 +158,64 @@ test('the page is one fold per section, one Save per group and history tucked aw
   expect(html).toContain(
     '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>',
   );
-  // Every group form has exactly one button of its own: Save.
-  const forms = [...html.matchAll(/<form action="\/settings\/setup" method="post"[^>]*>([\s\S]*?)<\/form>/g)];
-  expect(forms).toHaveLength(5);
-  for (const [, body] of forms) {
-    const own = [...body!.matchAll(/<button\b([^>]*)>(?:<svg.*?<\/svg>)?<span>([^<]*)/g)].filter(
-      ([, attrs]) => !/\bform="/.test(attrs!),
-    );
-    expect(own.map(([, , text]) => text)).toEqual(['Save']);
-  }
+  // One form and one Save for the page: the form holds no controls of its own, and every setup
+  // control names it. No control says which "group" it is in, since there are none.
+  expect(html.match(/<form id="settings-form"/g)).toHaveLength(1);
+  expect(html.match(/<form [^>]*action="\/settings\/setup"/g)).toHaveLength(1);
+  expect(html).not.toContain('name="group"');
+  const saves = [...html.matchAll(/<button\b([^>]*)><svg[^>]*><use href="#i-save"\/><\/svg><span>Save<\/span>/g)];
+  // A rule's own Save is that row's form; the page's setup fields have the one.
+  expect(saves.filter(([, attrs]) => attrs!.includes('form="settings-form"'))).toHaveLength(1);
+  const mine = formById(html, 'settings-form');
+  expect([...mine.keys()]).toEqual(
+    expect.arrayContaining([
+      'revision',
+      'APP_NAME',
+      'RECEIPT_ADDRESS',
+      'ACCOUNTANT_LABEL',
+      'MATCH_DAYS_AFTER',
+      'SOURCE_REPOSITORY',
+    ]),
+  );
   // Deploy-only values and history start collapsed.
   expect(html).toContain('<details class="group" id="setup-deploy"><summary>Set when deployed</summary>');
   expect(html).toContain('<details class="group" id="setup-history"><summary>Change history (1)</summary>');
-  // Allowed senders are edited in Senders only, not as a second list in Email.
+  // Allowed senders are edited in Email's list only, not as a second box.
   expect(html).not.toContain('name="ALLOWED_SENDER_EMAILS"');
   // Address fields keep their confirm box, shown by CSS only once the value differs.
   expect(html).toMatch(
-    /<form action="\/settings\/setup" method="post" class="setup-form" novalidate><input type="hidden" name="group" value="email">/,
+    /id="f-RECEIPT_ADDRESS" form="settings-form" title="[^"]+" pattern="receipts@example\\\.com" required/,
   );
-  expect(html).toMatch(/id="f-RECEIPT_ADDRESS" title="[^"]+" pattern="receipts@example\\\.com" required/);
   expect(html).toMatch(/id="f-FORWARD_COPY_TO"[^>]*>.*?name="confirm_FORWARD_COPY_TO" value="yes"/);
-  expect(html).toContain('.setup-form .frow:has(:invalid) .confirm{display:flex}');
+  expect(html).toContain('.settings .frow:has(:invalid) .confirm{display:flex}');
   expect(html).not.toContain('<details class="why"><summary>Why');
+  // There is no script for it to warn about leaving: one Save has nothing to lose to another.
+  expect(html).not.toContain('/assets/settings.js');
+  expect((await request('/assets/settings.js')).status).toBe(404);
+});
+
+test('one Save writes every section that changed, audited and named in the banner', async () => {
+  const response = await save({
+    APP_NAME: 'Example Books',
+    ACCOUNTANT_LABEL: 'Example Accounting',
+    MATCH_DAYS_AFTER: '60',
+  });
+  expect(response.status).toBe(303);
+  expect(locationOf(response)).toBe('/settings?done=settingsSaved&group=all&section=setup-business#setup-business');
+  expect((await rows()).map((r) => r.key)).toEqual(['ACCOUNTANT_LABEL', 'APP_NAME', 'MATCH_DAYS_AFTER']);
+  const banner = await (
+    await request(await signed('/settings?done=settingsSaved&group=all&section=setup-business'))
+  ).text();
+  expect(banner).toContain('Saved your settings.');
+  expect(banner).toMatch(/<details class="sect" open><summary><h2>Business<\/h2>/);
+  // Saving again with nothing changed writes nothing and says so.
+  const same = await save({});
+  expect(locationOf(same)).toBe('/settings?done=settingsSame');
+  expect(await audit()).toHaveLength(3);
 });
 
 test('About carries the full notice, the licence and the trademark lines', async () => {
-  const about = (await page()).match(/<div class="body" id="about">([\s\S]*?)<\/div><\/details>/)![1]!;
+  const about = (await page()).match(/<div class="sectpart" id="about">([\s\S]*?)<\/div><\/div><\/details>/)![1]!;
   expect(about).toContain(DATA_LINE.replace("'", '&#39;'));
   expect(DATA_LINE).toBe("Runs in your own Cloudflare account. Nuits doesn't receive or store your data.");
   expect(about).toContain('<strong>No warranty. Not financial, tax or accounting advice.</strong>');
@@ -346,7 +357,7 @@ test('a changed invoice address shows the routing checklist and keeps the old on
 
 test('a stale form gets 409 and a cross-origin post 403', async () => {
   const html = await page();
-  const form = groupForm(html, 'business');
+  const form = settingsForm(html);
   await save({ APP_NAME: 'First tab' }, 'business');
   form.set('APP_NAME', 'Second tab');
   const stale = await request('/settings/setup', { method: 'POST', body: form });
@@ -412,8 +423,9 @@ test('advanced thresholds are bounded and change matching', async () => {
   expect(tuning).toEqual({ ...DEFAULT_TUNING, matchDaysAfter: 90, minFieldConfidence: 0.8 });
   expect(withinWindow('2026-01-01', '2026-03-01')).toBe(false);
   expect(withinWindow('2026-01-01', '2026-03-01', tuning)).toBe(true);
-  // The Advanced fold opens when something in it was changed.
-  expect(await page()).toMatch(/<details class="group" id="setup-review" open>/);
+  // The Advanced section opens when a save landed in it.
+  const landed = await (await request(await signed('/settings?done=settingsSaved&group=review'))).text();
+  expect(landed).toMatch(/<details class="sect" open><summary><h2>Advanced<\/h2>/);
   // Leaving a number empty goes back to the deploy value or default.
   await save({ MATCH_DAYS_AFTER: '' }, 'review');
   expect(config(await withSettings(env)).tuning.matchDaysAfter).toBe(45);
@@ -487,4 +499,40 @@ test('more than 75 allowed senders are refused with a clear message', async () =
   expect(response.status).toBe(422);
   expect(await response.text()).toContain('at most 75 email addresses');
   expect((await rows()).some((r) => r.key === 'ALLOWED_SENDER_EMAILS')).toBe(false);
+});
+
+test('Undo of a removed sender puts it back and lands on the Email section', async () => {
+  const before = [...config(env).allowedSenders];
+  expect(before.length).toBeGreaterThan(1);
+  const gone = before[0]!;
+  const removed = await request('/senders/remove', {
+    method: 'POST',
+    body: new URLSearchParams({ address: gone, back: 'settings' }),
+  });
+  expect(removed.status).toBe(303);
+  expect([...config(await withSettings(env)).allowedSenders]).not.toContain(gone);
+  const landed = await (await request(removed.headers.get('Location')!)).text();
+  expect(landed).toContain('<details class="sect" open><summary><h2>Email</h2>');
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undone)).toMatch(/^\/settings\?done=undone&op=settings&n=\d+&section=senders#senders$/);
+  expect([...config(await withSettings(env)).allowedSenders].sort()).toEqual([...before].sort());
+  const after = await (await request(undone.headers.get('Location')!)).text();
+  expect(after).toContain('<details class="sect" open><summary><h2>Email</h2>');
+});
+
+test('Undo of a Save that changed two sections and removed a part restores every key it wrote', async () => {
+  await env.DB.prepare(
+    "INSERT INTO settings VALUES ('ACCOUNTANT_LABEL','\"Old Accounting\"','2026-10-22T10:00:00.000Z','x')",
+  ).run();
+  const ok = await save({ APP_NAME: 'Example Books', ACCOUNTANT_LABEL: 'New Accounting', product_remove: 'website' });
+  expect(ok.status).toBe(303);
+  expect(locationOf(ok)).toBe('/settings?done=settingsSaved&group=all&section=setup-business&removed=1#setup-business');
+  const landed = await (await request(ok.headers.get('Location')!)).text();
+  expect(landed).toContain('Saved your settings. Removed 1 part.');
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undone)).toMatch(/section=setup-business#setup-business$/);
+  const back = config(await withSettings(env));
+  expect(back.appName).toBe(config(env).appName);
+  expect(back.accountantLabel).toBe('Old Accounting');
+  expect(back.products.map((p) => p.id)).toContain('website');
 });

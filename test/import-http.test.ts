@@ -290,3 +290,21 @@ test('a single matching built-in layout is shown as the chosen preset', async ()
   expect(html).toContain('name="current_preset" value="builtin-holvi"');
   expect(html).not.toContain('Several presets match');
 });
+
+test('a refused confirmation shows the preview again, in place, with the reason at the top', async () => {
+  const before = await inventory();
+  const body = confirmForm(await (await preview()).text());
+  body.set('preview_token', 'f'.repeat(64));
+  const refused = await confirm(body);
+  expect(refused.status).toBe(409);
+  const html = await refused.text();
+  expect(html).toContain('Nothing was saved.');
+  expect(html).toContain('The settings changed since you checked the file. Check it again.');
+  expect(html).not.toContain("That didn't work");
+  // A fresh preview, with a token that works.
+  const again = confirmForm(html);
+  expect(again.get('preview_token')).toMatch(/^[a-f0-9]{64}$/);
+  expect(again.get('preview_token')).not.toBe('f'.repeat(64));
+  expect(await inventory()).toEqual(before);
+  expect((await confirm(again)).status).toBe(303);
+});

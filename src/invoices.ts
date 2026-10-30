@@ -1,7 +1,7 @@
 // Sales invoices you sent: the Invoices list, payment status, the receipt
 // page's money-in matching, and the Add page (several files, either kind).
 import { DEFAULT_TUNING, money, type Receipt } from './domain';
-import { creditFit, eurValues, type Transaction } from './banking';
+import { creditFit, monthEurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
@@ -26,6 +26,8 @@ import {
   receiptsTabs,
   shortDay,
   matchError,
+  errorLine,
+  ariaFor,
 } from './ui';
 import { button, buttonLink, statusMark } from './actions';
 import { row, rowList } from './row';
@@ -105,22 +107,38 @@ export const invoiceShow = (value: unknown): Show => (Object.keys(SHOWS) as Show
 export async function invoiceRows(env: Env, selected: string, show: Show) {
   // Unpaid and overdue span every month: an old invoice is still owed.
   const across = show === 'unpaid' || show === 'overdue';
-  const month = await salesRows(env, 'substr(r.issue_date,1,7)=?', selected);
-  const open = across ? await salesRows(env, 'r.issue_date IS NOT NULL') : month;
+  const [month, open] = await Promise.all([
+    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
+    across ? salesRows(env, 'r.issue_date IS NOT NULL') : null,
+  ]);
+  return { across, month, open: open ?? month, ...chosen(env, show, across, month, open ?? month) };
+}
+function chosen(env: Env, show: Show, across: boolean, month: SalesRow[], open: SalesRow[]) {
   const base = across ? open : month;
   const shown =
     show === 'all' ? base : base.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === show);
-  return { across, month, open, base, shown };
+  return { base, shown };
 }
 export async function invoicesPage(env: Env, selected: string, params: URLSearchParams): Promise<Response> {
   const settings = config(env);
   const show = invoiceShow(params.get('show'));
-  const { across, month, open, base, shown } = await invoiceRows(env, selected, show);
-  const undated = await salesRows(env, 'r.issue_date IS NULL');
+  const across = show === 'unpaid' || show === 'overdue';
+  // One round: every query the page needs starts together, so it waits on D1 once.
+  const [month, acrossRows, undated, overdueAll, switcher, tabs, eurOf] = await Promise.all([
+    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
+    across ? salesRows(env, 'r.issue_date IS NOT NULL') : null,
+    salesRows(env, 'r.issue_date IS NULL'),
+    across ? [] : overdueInvoices(env),
+    receiptsSwitch(env, selected, 'all'),
+    tabCounts(env, selected),
+    monthEurValues(env, selected),
+  ]);
+  const open = acrossRows ?? month;
+  const { base, shown } = chosen(env, show, across, month, open);
   let invoiced = 0n,
     received = 0n,
     noEur = 0;
-  const eurs = await eurValues(env, month);
+  const eurs = eurOf(month);
   for (const [i, r] of month.entries()) {
     const eur = eurs[i]!;
     if (eur.minor === null) {
@@ -201,8 +219,9 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
             }`,
         addButton('invoices', true),
       );
-  const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const [switcher, tabs] = await Promise.all([receiptsSwitch(env, selected, 'all'), tabCounts(env, selected)]);
+  // Older: overdue invoices dated in other months. By id, since the two queries return their own objects.
+  const inMonth = new Set(month.map((r) => r.id));
+  const overdue = overdueAll.filter((r) => !inMonth.has(r.id));
   const body = `${switcher}${receiptsTabs(tabs, 'invoices', selected)}${
     month.length
       ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`
@@ -218,7 +237,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           .map((r) => `<a href="${escape(receiptUrl(r.id, here))}">${escape(invoiceName(r))}</a>`)
           .join(', ')}</p>`
       : ''
-  }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`)}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
+  }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`, { attrs: ' download' })}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
   const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
@@ -234,6 +253,8 @@ function firstFlag(r: Receipt): string {
 type Credit = Transaction & { account_name: string; bank_name: string };
 // The money-in box: the matched payment, or credits that may be this invoice. fields: the receipt
 // page's list (receiptFields), which every form here posts so its return keeps it.
+// The paid form on an invoice's page, as a failure scope names it.
+export const PAID_SCOPE = 'paid';
 export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise<string> {
   const back = `<input type="hidden" name="return_to" value="/receipts/${r.id}">${fields}`;
   const box = (title: string, body: string) =>
@@ -250,7 +271,7 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
         `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}">${back}${button('unmatch', { attrs: ' name="action" value="unlink"' })}</form></div>`,
       );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div>${r.paid_outside_on ? button('save') : button('paid')}</form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}${button('unpaid')}</form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on', { scope: PAID_SCOPE })}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout', scope: PAID_SCOPE })}</div>${errorLine(PAID_SCOPE, '')}${r.paid_outside_on ? button('save') : button('paid')}</form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}${button('unpaid')}</form>` : ''}`;
   if (r.paid_outside_on)
     return box(
       'Paid',
@@ -285,6 +306,8 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
 
 // ---------- Add page ----------
 export const MAX_UPLOAD_FILES = 10;
+// The Add form, as a failure scope names it.
+export const ADD_SCOPE = 'add';
 export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
   const settings = config(env);
   const kind = params.get('kind') === 'sales' ? 'sales' : 'expense';
@@ -294,12 +317,18 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
     settings.receiptAddress ? `receipts to <code>${escape(settings.receiptAddress)}</code>` : '',
     settings.invoicesAddress ? `invoices you sent to <code>${escape(settings.invoicesAddress)}</code>` : '',
   ].filter(Boolean);
-  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
+  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" id="f-file"${ariaFor(ADD_SCOPE, 'file')}></label>${errorLine(ADD_SCOPE)}<p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
   }<script src="/assets/add.js" defer></script>`;
   return page('add', body, 200, env, {
     detail: 'Add',
-    head: pageHead('Add receipts or invoices'),
+    head: pageHead(
+      'Add receipts or invoices',
+      '',
+      kind === 'sales'
+        ? { href: '/receipts?view=all&kind=sales', label: 'Invoices' }
+        : { href: '/receipts?view=todo', label: 'Receipts' },
+    ),
   });
 }
 // Progressive enhancement for /add: drag and drop, one request per file and

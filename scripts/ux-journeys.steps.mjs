@@ -62,7 +62,7 @@ export const journeys = [
       );
       await rec.click(page.locator('main .setup a', { hasText: /accountant/i }));
       await rec.fill(page.locator('[name=ACCOUNTANT_LABEL]'), 'Example Accounting Oy');
-      await rec.click(page.locator('form:has([name=ACCOUNTANT_LABEL]) button.btn'));
+      await rec.click(page.locator('.sbar button.btn'));
       rec.note(`Saved: ${(await page.locator('main [role=status]').first().innerText()).trim()}`);
     },
   },
@@ -224,21 +224,18 @@ async function unsettleBank(page, base) {
     await open(merchant, 'Unmatch');
 }
 
-// Settings runs one same-origin script under its own policy. The audit contexts bypass CSP, so
-// this check runs in the main context, where the policy applies: saving one group while another
-// has unsaved edits asks first.
+// Settings is one form with one Save: an edit in one section and one in another go out together,
+// so there is nothing to warn about. Typing in two sections and saving once keeps both.
 async function unsavedCheck(page, base) {
   await page.goto(base + '/settings#f-ACCOUNTANT_LABEL');
   await page.locator('[name=ACCOUNTANT_LABEL]').fill('Unsaved Accounting Oy');
-  await page.locator('details.sect:has(> .body#setup-business) > summary').click();
-  let said = '';
-  page.once('dialog', (dialog) => {
-    said = dialog.message();
-    void dialog.dismiss();
-  });
-  await page.locator('#setup-business button.btn').click();
-  if (!said.includes('not saved')) throw new Error('Settings did not warn about unsaved changes in another group');
-  console.log('settings: saving one group warns about unsaved changes in another');
+  const saves = await page.locator('main button.btn.primary, main .sbar button.btn').count();
+  if (saves !== 1) throw new Error(`Settings should have one Save, found ${saves}`);
+  await page.locator('.sbar button.btn').click();
+  await page.waitForLoadState('load');
+  if ((await page.locator('[name=ACCOUNTANT_LABEL]').inputValue()) !== 'Unsaved Accounting Oy')
+    throw new Error('Settings did not keep the edit after the one Save');
+  console.log('settings: one Save keeps the edit');
 }
 
 // Put the accountant back to unset, so Home shows the setup checklist with one step left.

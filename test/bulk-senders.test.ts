@@ -162,7 +162,7 @@ test('Settings removes allowed senders in one write and stops ignoring others', 
   expect(await allowedWrites()).toBe(1);
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('Removed 2 senders. 1 skipped.');
-  expect(page).toMatch(/<details class="sect" open><summary><h2>Email senders<\/h2>/);
+  expect(page).toMatch(/<details class="sect" open><summary><h2>Email<\/h2>/);
   expect(await (await json({ op: 'remove', id: 'sender@example.net', back: 'settings' })).json()).toMatchObject({
     n: 0,
     skipped: 1,
@@ -207,11 +207,11 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   expect(review).not.toContain('/assets/bulk.js');
 
   const settings = await (await request('/settings?open=senders')).text();
-  expect(settings).toMatch(/<details class="sect" open><summary><h2>Email senders<\/h2>/);
+  expect(settings).toMatch(/<details class="sect" open><summary><h2>Email<\/h2>/);
   expect(settings).toContain('<input type="checkbox" name="id" value="owner@example.com" form="bulk-allowed">');
   expect(settings).toContain('<input type="checkbox" name="id" value="a@fake.example" form="bulk-ignored">');
   expect(settings).toContain(buttonSummary('remove'));
   expect(settings).toContain(button('unignore', { attrs: ' name="op" value="unignore"' }));
-  expect(settings).toContain('<script src="/assets/settings.js" defer></script>');
+  expect(settings).not.toContain('/assets/settings.js');
   expect([...settings.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
 });

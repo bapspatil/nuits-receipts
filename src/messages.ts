@@ -232,7 +232,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   // setup
   'Invalid parts of the business': 'Something went wrong with the list of parts. Reload the page and try again.',
   'Keep at least one part of the business': 'Keep at least one part of the business.',
-  'Unknown settings group': 'Reload the page and try again.',
   'Reload the page and try again': 'Reload the page and try again.',
   'Unknown setting': "We don't know that setting. Reload the page and try again.",
 

@@ -279,6 +279,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:500 var(
 .setup{margin:0 0 var(--space-5)}.setup h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-3);margin:0 0 var(--space-2)}.setup h2 span{font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}
 .setup .steps{display:block;margin-bottom:var(--space-2);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-lg)}
 .setup .steps>.step,.setup .steps>.step.now{border:0;border-radius:0;box-shadow:none;background:none}
+.setup details.finished{background:none;border:0;margin:0 0 var(--space-2)}.setup details.finished>summary{display:flex;align-items:center;min-height:44px;padding:0 var(--space-1);font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}.setup details.finished[open]>summary{margin-bottom:var(--space-1)}
 .setup .steps>.step+.step{border-top:1px solid var(--border)}
 .setup .steps .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .setup .steps a{grid-template-columns:16px minmax(0,1fr) auto;row-gap:0;align-items:center;padding:var(--space-2) var(--space-4)}
@@ -327,6 +328,7 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .sbar>details{border:0;background:none;margin:0;border-radius:0}
 .sbar>details>summary{font-size:var(--text-sm);font-weight:600;display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);list-style:none;color:var(--text-muted)}
 .sbar>details>summary::-webkit-details-marker{display:none}
+.mgrp{display:grid;gap:var(--space-2);padding:var(--space-2) 0}.mgrp+.mgrp{border-top:1px solid var(--border)}.mgrp p{margin:0}.mgrp .mh{font:600 var(--text-xs)/1.4 var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
 .sbar>details>.body{position:absolute;left:0;right:0;bottom:100%;max-height:60vh;overflow:auto;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
 .fix{padding-bottom:var(--space-4)}
 html:has(.sbar){scroll-padding-bottom:7rem}
@@ -360,7 +362,7 @@ details.sect>summary h2{margin:0}
 details.sect>summary .sum{color:var(--text-muted);font-weight:400;font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere}
 details.sect>.body{padding:var(--space-2) var(--space-4) var(--space-5);border-top:1px solid var(--border);scroll-margin-top:72px}
 details.sect>.body>.banner,details.sect>.body>.warning,details.sect>.body>.alert{margin:0 0 var(--space-3)}
-@supports selector(:has(a)){.setup-form .confirm{display:none}.setup-form .frow:has(:invalid) .confirm{display:flex}}
+@supports selector(:has(a)){.settings .confirm{display:none}.settings .frow:has(:invalid) .confirm{display:flex}}
 .rules>li>details{background:none;border:0;border-radius:0;margin:0}.rules summary{font-weight:600;padding:var(--space-2) 0}
 .add-row{margin:var(--space-3) 0}
 .frow{display:grid;grid-template-columns:minmax(0,14rem) minmax(0,1fr);gap:var(--space-2) var(--space-5);padding:var(--space-3) 0;border-bottom:1px solid var(--border);align-items:start}
@@ -371,7 +373,8 @@ details.sect>.body>.banner,details.sect>.body>.warning,details.sect>.body>.alert
 .sc>p{margin:0;max-width:64ch}
 .inline-edit{display:flex;gap:var(--space-2);align-items:center;margin:0}
 .inline-edit input{flex:1;min-width:0}
-.setup-form textarea{resize:vertical;min-height:64px}
+.settings textarea{resize:vertical;min-height:64px}
+.sectpart,.setup-rows+h3{margin-top:var(--space-5)}
 .frow.bad input,.frow.bad textarea,.frow.bad select{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
 .meta{font-size:var(--text-sm);color:var(--text-muted);line-height:1.5}
 .meta code{font-size:var(--text-xs);padding:1px var(--space-1)}
@@ -454,7 +457,7 @@ nav.tabs{display:none}
 html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}
 .sbar{position:sticky;bottom:var(--tabbar-height);margin-top:var(--space-3);margin-bottom:0}
 body{padding-bottom:var(--tabbar-height)}
-body.p-reviewItem{padding-bottom:0}body.p-reviewItem .sbar{bottom:calc(var(--space-2) + env(safe-area-inset-bottom))}
+body.p-reviewItem{padding-bottom:0}body.p-reviewItem .sbar{bottom:calc(var(--kb,0px) + var(--space-2) + env(safe-area-inset-bottom))}body.p-receipt .sbar{bottom:max(var(--kb,0px),var(--tabbar-height))}
 header.top{display:none}
 nav.main,.sign-out{display:none}
 nav.tabs{display:block;position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;border-radius:32px;padding:0 var(--space-1)}
@@ -597,6 +600,9 @@ export function signOutLink(env: Env): string {
 // ---------- A refused form, shown in place ----------
 // The id of the message for the form (scope) that was refused.
 export const errorId = (scope: string) => `e-${scope.replace(/[^a-z0-9]+/gi, '-')}`;
+// The id of a control in a form that shares its control names with others on the page (one rule
+// form per rule), so the id carries the form's scope.
+export const fieldId = (scope: string, name: string) => `f-${scope.replace(/[^a-z0-9]+/gi, '-')}-${name}`;
 // aria on a control, when the refusal named it: invalid, and described by the message.
 export function ariaFor(scope: string, name: string): string {
   return failureFor(scope)?.field === name ? ` aria-invalid="true" aria-describedby="${errorId(scope)}"` : '';
@@ -658,6 +664,18 @@ export const rowAttrs = (id: string) =>
 
 // Once per page however many bulk lists it has: the script binds every bar it finds.
 const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
+// On a phone the keyboard covers the bottom of the page, and with it the bar that holds Approve.
+// The script writes the keyboard's height to --kb, and the bar sits above it.
+const KEYBOARD_SCRIPT = '<script src="/assets/keyboard.js" defer></script>';
+export const KEYBOARD_JS = `(() => {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const set = () => document.documentElement.style.setProperty('--kb', Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop)) + 'px');
+  vv.addEventListener('resize', set);
+  vv.addEventListener('scroll', set);
+  set();
+})();
+`;
 export async function page(
   view: PageKey,
   body: string,
@@ -677,7 +695,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {
@@ -705,9 +723,14 @@ export const SPECULATION_RULES = JSON.stringify({
 });
 
 // The page header: the title and at most one action. No kicker, no subtitle. HTML in.
-export function pageHead(title: string, aside = ''): string {
-  return `<div class="head"><h1>${title}</h1>${aside}</div>`;
+// back: where a screen without a tab goes back to. The installed app has no browser back or address
+// bar, so such a screen names its way out: its list, or Home.
+export function pageHead(title: string, aside = '', back?: { href: string; label: string }): string {
+  const crumb = back ? `<div class="crumbs"><a href="${escape(back.href)}">\u2039 ${escape(back.label)}</a></div>` : '';
+  return `${crumb}<div class="head"><h1>${title}</h1>${aside}</div>`;
 }
+export const BACK_HOME = { href: '/', label: 'Home' };
+export const BACK_BANK = { href: '/payments', label: 'Bank' };
 // The header of a month screen: the month is the h1, between its neighbours.
 export function monthHead(path: string, selected: string, aside = ''): string {
   return `<div class="head">${monthSwitcher(path, selected)}${aside}</div>`;
@@ -766,10 +789,11 @@ export function input(
     attrs = '',
     wide = false,
     scope = '',
-  }: { hint?: string; attrs?: string; wide?: boolean; scope?: string } = {},
+    id = '',
+  }: { hint?: string; attrs?: string; wide?: boolean; scope?: string; id?: string } = {},
 ): string {
   const shown = scope ? kept(scope, name, value) : value;
-  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  const tied = scope ? ` id="${escape(id || `f-${name}`)}"${ariaFor(scope, name)}` : '';
   return `<label${wide ? ' class="wide"' : ''}>${escape(label)}${hint ? ` <span class="hint">${escape(hint)}</span>` : ''}<input name="${escape(name)}" value="${escape(shown)}" type="${escape(type)}"${tied}${attrs}>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 export function select(
@@ -778,9 +802,10 @@ export function select(
   current: unknown = '',
   label = name.replaceAll('_', ' '),
   scope = '',
+  id = '',
 ): string {
   const shown = scope ? kept(scope, name, current) : current;
-  const tied = scope ? ` id="f-${escape(name)}"${ariaFor(scope, name)}` : '';
+  const tied = scope ? ` id="${escape(id || `f-${name}`)}"${ariaFor(scope, name)}` : '';
   return `<label>${escape(label)}<select name="${escape(name)}"${tied}>${values.map((v) => `<option${v === shown ? ' selected' : ''}>${escape(v)}</option>`).join('')}</select>${scope ? errorLine(scope, name) : ''}</label>`;
 }
 // Configured products, plus the current value when it is no longer configured,

@@ -196,7 +196,7 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
   expect((await at('/app/settings/onedrive/connect', {}, {}, plain)).status).toBe(404);
   const half = { ...plain, MS_CLIENT_ID: CLIENT_ID } as Env;
   const note = await (await at('/app/settings', {}, {}, half)).text();
-  expect(note).toContain('<h2>OneDrive</h2><span class="sum">Not set up</span>');
+  expect(note).toContain('<div class="sectpart" id="onedrive"><h3>OneDrive</h3><p class="warning">');
   expect(note).toContain('<code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing.');
   expect(note).not.toContain('onedrive/connect');
   expect(ms.calls).toHaveLength(0);
@@ -206,10 +206,9 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
   const settings = await (await at('/app/settings')).text();
   expect(settings).toContain(buttonLink('connect', '/app/settings/onedrive/connect'));
   expect(settings).toContain(`${ORIGIN}/app/settings/onedrive/callback`);
-  expect(settings).toContain(
-    '<h2>OneDrive</h2><span class="sum">Not connected</span></summary><div class="body" id="onedrive">',
-  );
-  expect(settings.match(/class="[^"]*\bbtn primary\b/g)).toBeNull();
+  expect(settings).toContain('<div class="sectpart" id="onedrive"><h3>OneDrive</h3><p class="cta">');
+  // The page's one Save is its only filled button; Connect is not.
+  expect(settings.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
 
   const start = await at('/app/settings/onedrive/connect');
   expect(start.status).toBe(303);
@@ -286,9 +285,7 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
   expect(after).toContain('Microsoft account connected.');
   expect(after).toContain('<dd>Synthetic Owner (owner@example.com)</dd>');
   // The section the callback returns to is open, its summary names the account.
-  expect(after).toContain(
-    '<details class="sect" open><summary><h2>OneDrive</h2><span class="sum">owner@example.com</span>',
-  );
+  expect(after).toContain('<details class="sect" open><summary><h2>Sending</h2>');
   expect(after).toContain('action="/app/settings/onedrive/folder"');
 });
 
@@ -309,7 +306,12 @@ test('a folder link resolves through /shares, and other folders and failures are
   ms.shares = Response.json({ id: 'f', name: 'invoice.pdf', file: {}, parentReference: { driveId: 'd' } });
   const file = await post('/app/settings/onedrive/folder', { folder_link: link });
   expect(file.status).toBe(422);
-  expect(await file.text()).toContain('That link opens a file, not a folder.');
+  // Refused in place: Settings again, the link still in its box, the message beside it.
+  const refusedHtml = await file.text();
+  expect(refusedHtml).toContain('That link opens a file, not a folder.');
+  expect(refusedHtml).toContain('<h1>Settings</h1>');
+  expect(refusedHtml).toMatch(/id="f-folder_link" aria-invalid="true" aria-describedby="e-onedrive-folder"/);
+  expect(refusedHtml).toContain(`value="${link}"`);
 
   // Another organisation: /shares fails, "Shared with me" finds it by name.
   ms.shares = Response.json({ error: { code: 'itemNotFound' } }, { status: 404 });

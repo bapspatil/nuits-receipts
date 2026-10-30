@@ -15,6 +15,8 @@ import {
   FAVICON_SVG,
   GRAIN_SVG,
   errorId,
+  KEYBOARD_JS,
+  fieldId,
   errorPage,
   exportCsv,
   exportSalesCsv,
@@ -24,7 +26,7 @@ import {
 } from './ui';
 import { BULK_CAP, BULK_JS } from './bulk';
 import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
-import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
+import { ADD_JS, ADD_SCOPE, addPage, invoicesPage, MAX_UPLOAD_FILES, PAID_SCOPE } from './invoices';
 import {
   afterLastReview,
   home,
@@ -32,8 +34,14 @@ import {
   payments,
   previewable,
   helpPage,
+  FOLDER_SCOPE,
   NEW_ACCOUNT,
+  NEW_RULE,
+  NEW_SENDER,
   receiptPage,
+  RECEIPT_RULE,
+  renameScope,
+  transferScope,
   firstToFill,
   settingsPage,
 } from './views';
@@ -44,7 +52,7 @@ import { candidatesFor, fits, linkMatch, matchLikely, receiptName, resolvePick, 
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
-import { anywayPage, importAnyway, importOneStep } from './one-step';
+import { anywayPage, importAnyway, importOneStep, questionAgain } from './one-step';
 import type { Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
@@ -53,7 +61,7 @@ import { approveSender, ignoreSender, removeApproved, senderAddress, unignoreSen
 import { allReceiptsPage, todoPage } from './all';
 import { discardReceipts, receiptIds, restoreReceipts } from './discard';
 import { parseUndo, undo, undoAt, withUndo, type UndoAt, type UndoOp } from './undo';
-import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
+import { resetSetting, saveSetup, SETUP_SCOPE } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
 import { withDone, type EventKey } from './events';
@@ -165,10 +173,18 @@ function ruleFrom(env: Env, form: FormData): [string, string | null, string | nu
   requireInput(
     normalize(vendor) && vendor.length <= 200 && (!context || context.length <= 200) && (!alias || alias.length <= 200),
     'Invalid vendor rule',
+    422,
+    normalize(vendor) && vendor.length <= 200
+      ? context && context.length > 200
+        ? 'context_contains'
+        : 'bank_alias'
+      : 'vendor_contains',
   );
   requireInput(
     isProduct(env, product) && EXPENSE_TYPES.some((t) => t === expense) && Number.isSafeInteger(priority),
     'Invalid rule category or priority',
+    422,
+    'priority',
   );
   return [vendor, context, alias, product, expense, priority];
 }
@@ -398,12 +414,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return new Response(ADD_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
-  if (request.method === 'GET' && path === '/assets/bulk.js')
-    return new Response(BULK_JS, {
+  if (request.method === 'GET' && path === '/assets/keyboard.js')
+    return new Response(KEYBOARD_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
-  if (request.method === 'GET' && path === '/assets/settings.js')
-    return new Response(SETTINGS_JS, {
+  if (request.method === 'GET' && path === '/assets/bulk.js')
+    return new Response(BULK_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/export-sales.csv')
@@ -848,6 +864,9 @@ const INLINE_CSP =
 // Where an error page's back link goes: the same-origin page that sent the
 // request, without the base path (the rewriter adds it back), else home.
 function backLink(request: Request, base: string): string {
+  // Microsoft sends the person back to the callback from another origin, so there is no referrer
+  // to return to. The installed app has no back button; Settings is where the flow began.
+  if (new URL(request.url).pathname.endsWith('/settings/onedrive/callback')) return '/settings#onedrive';
   try {
     const referer = new URL(request.headers.get('Referer') ?? '');
     if (referer.origin !== new URL(request.url).origin) return '/';
@@ -884,51 +903,83 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
   });
   try {
     let shown: Promise<Response> | null = null;
-    const receipt = url.pathname.match(/^\/receipts\/([a-f0-9]{64})$/);
-    if (receipt?.[1] && error.status === 422)
-      shown = requestState.run(refused('receipt'), async () =>
-        receiptPage(env, await getReceipt(env, receipt[1]!), form),
-      );
-    else if (url.pathname === '/matches') {
-      const tx = String(form.get('transaction_id') ?? '');
+    const path = url.pathname;
+    const match = (re: RegExp) => re.exec(path)?.[1];
+    const show = (
+      scope: string,
+      field: string | undefined,
+      target: string | undefined,
+      render: () => Promise<Response>,
+    ) => {
+      error.field ??= field;
+      shown = requestState.run(refused(scope, target ?? (error.field ? `f-${error.field}` : undefined)), render);
+    };
+    const settings = () => settingsPage(env, new URLSearchParams(), url.origin + base);
+    // The month a payment is booked in, for the Bank page that holds its form.
+    const bankFor = async (tx: string) => {
       const row = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
         .bind(tx)
         .first<{ booking_date: string }>();
+      return row
+        ? () =>
+            payments(
+              env,
+              month(row.booking_date.slice(0, 7)),
+              new URLSearchParams({ month: row.booking_date.slice(0, 7), view: 'all' }),
+            )
+        : null;
+    };
+    const receipt = match(/^\/receipts\/([a-f0-9]{64})$/);
+    const paid = match(/^\/receipts\/([a-f0-9]{64})\/paid$/);
+    const ruleId = match(/^\/rules\/(\d{1,15})$/);
+    const accountId = match(/^\/accounts\/([^/]+)$/);
+    const ruleBack = /^\/receipts\/([a-f0-9]{64})$/.exec(String(form.get('return_to') ?? ''))?.[1];
+    if (receipt && error.status === 422)
+      show('receipt', undefined, undefined, async () => receiptPage(env, await getReceipt(env, receipt), form));
+    else if (path === '/matches') {
+      const tx = String(form.get('transaction_id') ?? '');
       const scope = `match:${tx}`;
       const back = String(form.get('on_error') || form.get('return_to') || '');
       const onReceipt = /^\/receipts\/([a-f0-9]{64})$/.exec(back);
-      if (row)
-        shown = requestState.run(
-          refused(scope, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope)),
-          async () =>
-            onReceipt
-              ? receiptPage(env, await getReceipt(env, onReceipt[1]!), form)
-              : payments(
-                  env,
-                  month(row.booking_date.slice(0, 7)),
-                  new URLSearchParams({ month: row.booking_date.slice(0, 7), view: 'all' }),
-                ),
+      const bank = await bankFor(tx);
+      if (bank)
+        show(scope, undefined, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope), async () =>
+          onReceipt ? receiptPage(env, await getReceipt(env, onReceipt[1]!), form) : bank(),
         );
-    } else if (['/imports/csv', '/import'].includes(url.pathname) && form.get('file') instanceof File)
-      shown = requestState.run(refused('import'), () => importPage(env));
-    else if (url.pathname === '/settings/setup' && error.status === 422)
-      shown = requestState.run(
-        refused(`setup:${String(form.get('group') ?? '')}`, error.field === 'product_new' ? 'part-new' : undefined),
-        () => settingsPage(env, new URLSearchParams(), url.origin + base),
+    } else if (path === '/transfers') {
+      const debit = String(form.get('debit_id') ?? '');
+      const bank = await bankFor(debit);
+      if (bank) show(transferScope(debit), undefined, errorId(transferScope(debit)), bank);
+    } else if (['/imports/csv', '/import'].includes(path) && form.get('file') instanceof File)
+      show('import', undefined, undefined, () => importPage(env));
+    else if (path === '/import' && form.has('csv')) {
+      error.field = 'account';
+      show('import', 'account', undefined, () => questionAgain(env, form));
+    } else if (path === '/imports/csv/confirm') show('import', undefined, undefined, () => importPreview(env, form));
+    else if (path === '/upload')
+      show(ADD_SCOPE, 'file', undefined, () =>
+        addPage(env, new URLSearchParams({ kind: String(form.get('kind') ?? '') })),
       );
-    else if (url.pathname === '/accounts')
-      shown = requestState.run(refused(NEW_ACCOUNT, 'f-label'), () =>
-        settingsPage(env, new URLSearchParams(), url.origin + base),
+    else if (paid && !form.has('view'))
+      show(PAID_SCOPE, 'paid_outside_on', undefined, async () => receiptPage(env, await getReceipt(env, paid), form));
+    else if (path === '/rules' || ruleId) {
+      const scope = ruleId ? `rule:${ruleId}` : ruleBack ? RECEIPT_RULE : NEW_RULE;
+      show(scope, 'vendor_contains', fieldId(scope, error.field ?? 'vendor_contains'), async () =>
+        ruleBack && !ruleId ? receiptPage(env, await getReceipt(env, ruleBack), form) : settings(),
       );
-    else if (url.pathname === '/settings/setup/reset') {
-      const group = FIELD.get(String(form.get('reset') ?? '') as SettingKey)?.group;
-      if (group)
-        shown = requestState.run(refused(`setup:${group}`), () =>
-          settingsPage(env, new URLSearchParams(), url.origin + base),
-        );
-    }
+    } else if (path === '/settings/setup' && error.status === 422)
+      show(SETUP_SCOPE, undefined, error.field === 'product_new' ? 'part-new' : undefined, settings);
+    else if (path === '/accounts') show(NEW_ACCOUNT, 'label', 'f-label', settings);
+    else if (accountId) {
+      const scope = renameScope(decodeURIComponent(accountId));
+      show(scope, 'label', fieldId(scope, 'label'), settings);
+    } else if (path === '/senders/approve' && ['settings', 'mail'].includes(String(form.get('back'))))
+      show(form.get('back') === 'settings' ? NEW_SENDER : 'sender:mail', 'address', 'f-address', settings);
+    else if (path === '/settings/onedrive/folder') show(FOLDER_SCOPE, 'folder_link', undefined, settings);
+    else if (path === '/settings/setup/reset' && FIELD.has(String(form.get('reset') ?? '') as SettingKey))
+      show(SETUP_SCOPE, undefined, undefined, settings);
     if (!shown) return null;
-    const response = await shown;
+    const response = await (shown as Promise<Response>);
     return base ? rebase(response, base) : response;
   } catch {
     return null;

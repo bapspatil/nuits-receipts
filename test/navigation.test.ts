@@ -102,7 +102,7 @@ test('the Send step downloads first, then asks whether it was sent', async () =>
   await env.DB.prepare('UPDATE bank_transactions SET receipt_id=(SELECT id FROM receipts LIMIT 1)').run();
   const html = await home('/?month=2020-03');
   expect(html).toMatch(
-    /<a class="btn primary" href="\/month\/package.zip\?month=2020-03"><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP/,
+    /<a class="btn primary" href="\/month\/package.zip\?month=2020-03" download><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP/,
   );
   expect(html).toContain('<h3>Did you send it?</h3>');
   expect(html).toContain('<span>Mark March as sent</span></button>');
