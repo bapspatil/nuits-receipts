@@ -322,6 +322,26 @@ export const ADD_JS = `(() => {
     if (ev.dataTransfer && ev.dataTransfer.files.length) { input.files = ev.dataTransfer.files; list(); }
   });
   input.addEventListener('change', list);
+  // Files shared from another app were stashed by the service worker. They are only put in the
+  // form here: nothing is sent until the owner chooses what they are and presses Add.
+  if (location.search.includes('shared=1') && window.caches && window.DataTransfer) {
+    caches.open('nuits-share').then(async (cache) => {
+      const keys = await cache.keys();
+      const files = [];
+      for (const key of keys) {
+        const res = await cache.match(key);
+        if (!res) continue;
+        files.push(new File([await res.blob()], decodeURIComponent(res.headers.get('X-Name') || 'shared'), { type: res.headers.get('Content-Type') || '' }));
+      }
+      await caches.delete('nuits-share');
+      if (!files.length) return;
+      const data = new DataTransfer();
+      files.forEach((f) => data.items.add(f));
+      input.files = data.files;
+      list();
+      status.textContent = files.length + ' shared ' + (files.length === 1 ? 'file' : 'files') + ' ready. Choose what they are, then press Add.';
+    }).catch(() => {});
+  }
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const files = Array.from(input.files);
