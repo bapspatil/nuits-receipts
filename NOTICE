@@ -8,3 +8,11 @@ The app bundles two fonts in src/fonts.ts, each under the SIL Open Font License 
 (https://openfontlicense.org): Bricolage Grotesque (Copyright 2022 The Bricolage
 Grotesque Project Authors) and Instrument Sans (Copyright 2022 The Instrument Sans
 Project Authors). The fonts are not covered by the Apache License.
+
+The app draws its icons from Lucide (lucide-static 1.65.0, https://lucide.dev), ISC
+License, Copyright (c) 2026 Lucide Icons and Contributors. Permission to use, copy,
+modify, and/or distribute the icons for any purpose with or without fee is granted,
+provided this copyright notice and permission notice appear in all copies. The icons
+are provided "as is", without warranty. Some Lucide icons derive from Feather (MIT
+License, Copyright (c) 2013-present Cole Bemis). The icons are not covered by the
+Apache License.
