@@ -28,7 +28,7 @@ Selection: a row's checkbox is `input[name=id]` inside it, the select-all-on-pag
 | Receipts To do (default) | `/receipts?view=todo&month=&upto=` |
 | Receipts All | `/receipts?view=all&month=&q=&before=` |
 | Bank | `/payments?month=M&view=todo\|all&upto=` |
-| Receipt page | `/receipts/<id>?from=todo&month=` (`from=all` from the All list) |
+| Receipt page | `/receipts/<id>?from=todo&month=` (`from=all&month=&q=` from the All list, so a search survives the way back) |
 
 `month` filters on the booking month for Bank. In Receipts To do it keeps receipts dated in that month plus every undated one (`substr(issue_date,1,7)=M OR issue_date IS NULL`), because an undated receipt belongs to no month yet and Home counts it with every month ("3 to check, plus 2 undated"). In Receipts All it keeps today's browse rule, `substr(coalesce(issue_date,received_at),1,7)=M`. Empty parameters are omitted.
 
@@ -40,13 +40,15 @@ Open in Receipts To do: `status='needs_review'`, not a duplicate, not discarded.
 
 ## Actions
 
-The list state travels in the form, under the names the list URL uses. Bank rows and the bulk bars post `view`, `month` and `upto`. Receipt rows and bars on the list post `view`, `month` and `upto`. The receipt page posts `from` and `month`, copied from its own URL.
+The list state travels in the form, under the names the list URL uses. Bank rows and the bulk bars post `view`, `month` and `upto`. Receipt rows and bars on the list post `view`, `month` and `upto`. Every form on the receipt page posts `from`, `month` and (from All) `q`, copied from its own URL, and its action returns to that page or list under them.
+
+A bulk bar posts the list's whole state, including `list` and `view`. A bulk post whose state is missing or invalid answers `400` with "This page is out of date", never a guessed list. Select-all acts on the list's filter: all of it up to 500 rows, else the first 500 in the list's order, which the bar offers as "Select the first 500". `data-total` is always the true count.
 
 Every single-row and bulk action answers `303`. The `Location` is built by one function, `listUrl`:
 
 - It is the list the action came from: same path, `view`, `month` and `upto`. It never carries `offset`, and it adds the signed `done=` event.
 - When an open row remains it ends in `#row-<nextOpenId>`, otherwise it has no fragment.
-- `nextOpenId` is computed after the save: the first open row after the acted-on row in the list's order, else the first open row. For a bulk action the acted-on row is the first selected row in list order.
+- `nextOpenId` is computed after the save: the first open row after the place the acted-on row held before the save (a date typed while approving does not move it), else the first open row. For a bulk action the acted-on row is the first selected row in list order. An Undo or Restore lands on the first row it brought back.
 - On the receipt page, Approve answers with `/receipts/<nextOpenId>?from=…&month=…` using that same rule, and the list URL when no open row remains. Skip uses the first open row after the current one only, with no wrap, and answers with the list URL when there is none.
 - A base-path install prefixes the path; the query and fragment are unchanged.
 

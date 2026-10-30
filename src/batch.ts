@@ -13,18 +13,7 @@ import {
   type Receipt,
   type Rule,
 } from './domain';
-import {
-  BANK_VIEWS,
-  bankPath,
-  bankUpto,
-  cacheFx,
-  clearBankReview,
-  nextOpenPayment,
-  reconcile,
-  SET_REQUIRED_SQL,
-  viewRows,
-  type BankView,
-} from './banking';
+import { cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, viewRows } from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
 import { discardReceipts, restoreReceipts } from './discard';
@@ -38,10 +27,20 @@ import {
   unignoreSenders,
 } from './inbound';
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
-import { backPath, withDone, type EventKey } from './events';
+import { withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { reviewQueue } from './views';
-import { filterIds, parseQuery } from './all';
+import { filterIds, parseQuery, SHOW } from './all';
+import {
+  cursorFor,
+  landing,
+  LIST_DEFS,
+  listUrl,
+  openRows,
+  parseReturn,
+  postedState,
+  RECEIPTS_TODO,
+  type ListState,
+} from './worklist';
 import { invoiceRows, invoiceShow } from './invoices';
 import { month } from './ui';
 
@@ -56,14 +55,12 @@ type Op = {
   run: (env: Env, ids: string[], form: FormData, back: string, caller: Caller) => Promise<Done>;
 };
 // One bulk route: its ops, the shape of its ids, every row of the list's
-// filter for all=1 (refused without), and the list it lands on.
+// filter for all=1 (refused without), and the list it lands on, or a fixed place that isn't a list.
 type Endpoint = {
   ops: Record<string, Op>;
   id: (value: string) => string;
   all?: (env: Env, form: FormData) => Promise<string[]>;
-  back: (form: FormData) => string;
-  // The open row to land on after the save, as #row-<id>.
-  next?: (env: Env, form: FormData, ids: string[]) => Promise<string | null>;
+  to: (form: FormData) => ListState | string;
 };
 export type BulkResult = { location: string; n: number; skipped: number };
 const ROW_ID = /^[a-f0-9]{64}$/;
@@ -189,41 +186,40 @@ const OPS: Record<ReceiptOp, Op> = {
   },
 };
 
-// Every row of a list's filter, the way its page picks them. Refused over the cap.
-const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
-  review: async (env) => (await reviewQueue(env)).map((r) => r.id),
-  receipts: (env, form) => {
-    const params = new URLSearchParams();
-    for (const key of ['show', 'month', 'q']) if (text(form, key)) params.set(key, text(form, key));
-    return filterIds(env, parseQuery(params), BULK_CAP + 1);
-  },
-  invoices: async (env, form) =>
-    (await invoiceRows(env, month(text(form, 'month') || null), invoiceShow(form.get('show')))).shown.map((r) => r.id),
-};
-const HOME: Record<string, string> = { review: '/review', receipts: '/receipts', invoices: '/invoices' };
+// The list a receipt bar posts from, Receipts or Invoices, with its whole state.
+function receiptList(form: FormData): ListState {
+  const list = text(form, 'list');
+  requireInput(list === 'receipts' || list === 'invoices', 'This page is out of date. Reload it and try again.', 400);
+  return list === 'invoices'
+    ? postedState(form, 'invoices', (show) => invoiceShow(show) === show)
+    : postedState(form, 'receipts', (show) => Object.hasOwn(SHOW, show));
+}
+// The rows of a list's filter, the way its page picks and orders them: the first BULK_CAP, as the
+// bar's "Select the first 500" offers.
+async function allOf(env: Env, s: ListState): Promise<string[]> {
+  if (s.key === 'invoices')
+    return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.slice(0, BULK_CAP).map((r) => r.id);
+  if (s.view === 'todo')
+    return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP)).map((r) => r.id);
+  return filterIds(
+    env,
+    parseQuery(new URLSearchParams({ show: s.show ?? '', month: s.month ?? '', q: s.q })),
+    BULK_CAP,
+  );
+}
 const RECEIPTS: Endpoint = {
   ops: OPS,
   id: rowId,
-  all: (env, form) => {
-    const list = text(form, 'list');
-    requireInput(Object.hasOwn(LISTS, list), 'Invalid list', 400);
-    return LISTS[list]!(env, form);
-  },
-  back: (form) => backPath(form.get('back'), HOME[text(form, 'list')] ?? '/receipts'),
+  all: (env, form) => allOf(env, receiptList(form)),
+  to: receiptList,
 };
 
 // ---------- Bank ----------
 // The month, view and rows shown that the bar was drawn for.
-function bankScope(form: FormData): { month: string; view: BankView; upto: number } {
-  const month = text(form, 'month'),
-    view = text(form, 'view');
-  requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
-  requireInput(
-    BANK_VIEWS.some((v) => v === view),
-    'Invalid filter',
-    400,
-  );
-  return { month, view: view as BankView, upto: bankUpto(text(form, 'upto'), BULK_CAP) };
+function bankScope(form: FormData): ListState {
+  const state = postedState(form, 'bank', () => false);
+  requireInput(state.month, 'This page is out of date. Reload it and try again.', 400);
+  return state;
 }
 // Not a purchase (0) and Needs receipt (1): only money out that is not that already. A matched
 // row is left alone, since SET_REQUIRED_SQL would drop its match without a word.
@@ -244,7 +240,7 @@ const PAYMENT_OPS: Record<PaymentOp, Op> = {
   // one time on all of them, so the banner's Undo finds them.
   match: {
     run: async (env, ids, form) => {
-      const { month } = bankScope(form);
+      const month = bankScope(form).month!;
       const tuning = config(env).tuning;
       const [open, receipts, rules] = await Promise.all([
         viewRows(env, month, 'todo', BULK_CAP),
@@ -280,17 +276,12 @@ const PAYMENTS: Endpoint = {
   id: rowId,
   all: async (env, form) => {
     const { month, view } = bankScope(form);
-    return (await viewRows(env, month, view, BULK_CAP + 1)).map((t) => t.id);
+    return (await viewRows(env, month!, view, BULK_CAP)).map((t) => t.id);
   },
-  back: (form) => {
-    const { month, view, upto } = bankScope(form);
-    return bankPath(month, view, upto);
-  },
-  next: (env, form, ids) => nextOpenPayment(env, bankScope(form).month, ids),
+  to: bankScope,
 };
 
 // ---------- Unknown senders and Settings > Senders ----------
-const BACK_TO: Record<string, string> = { settings: '/settings#senders', receipts: '/receipts' };
 // Settings opens its Senders section for the mail events too.
 const from = (back: string) => ({ from: back.startsWith('/settings') ? 'settings' : null });
 const SENDER_OPS: Record<SenderOp, Op> = {
@@ -344,7 +335,11 @@ const SENDERS: Endpoint = {
     requireInput(/^[0-9a-f-]{36}$/.test(value), 'Invalid email', 400);
     return value;
   },
-  back: (form) => BACK_TO[text(form, 'back')] ?? '/review',
+  // Settings, or the list the held mail is on. No row anchor: the mail sits above the list's rows.
+  to: (form) =>
+    text(form, 'back') === 'settings'
+      ? '/settings#senders'
+      : (parseReturn(text(form, 'back')) ?? listUrl(RECEIPTS_TODO)),
 };
 
 // The checked ids: at least one, at most max, each of the list's shape.
@@ -378,17 +373,18 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
   } else ids = bulkIds(form.getAll('id'), max, op.id ?? endpoint.id);
   const before = progress(form, 'done_before'),
     skippedBefore = progress(form, 'skipped_before');
-  const back = endpoint.back(form);
+  const to = endpoint.to(form);
+  const back = typeof to === 'string' ? to : listUrl(to);
+  const cursor = typeof to === 'string' ? null : await cursorFor(env, to, ids);
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
     skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
-  const next = await endpoint.next?.(env, form, ids);
+  const params = { n, ...done.params, skipped: skipped || null };
   return {
-    location: withDone(done.event, next ? `${back}#row-${next}` : back, {
-      n,
-      ...done.params,
-      skipped: skipped || null,
-    }),
+    location:
+      typeof to === 'string'
+        ? withDone(done.event, to, params)
+        : await landing(env, to, cursor, { event: done.event, params }),
     n,
     skipped,
   };

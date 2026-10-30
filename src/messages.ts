@@ -109,7 +109,7 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   // batch
   'Invalid action': "That action isn't available here. Reload the page and try again.",
   'Invalid list': "We couldn't tell which list this was. Reload the page and try again.",
-  'Invalid filter': "That filter isn't available. Reload the page and try again.",
+  'This page is out of date. Reload it and try again.': 'This page is out of date. Reload it and try again.',
   'Invalid progress': 'Something went wrong part way through. Reload the page and try again.',
   'Nothing matches the filter.': 'Nothing matches the filter any more. Reload the page.',
   'Choose where to move them': 'Choose Sales invoices or Receipts.',

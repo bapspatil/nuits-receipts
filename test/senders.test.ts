@@ -161,7 +161,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a2@amazonses.com>', subject: 'Second' }, 'vendor: Other Shop'));
   const response = await post('/senders/approve', { address: 'Notifications@Link.com' });
   expect(response.status).toBe(303);
-  expect(locationOf(response)).toBe('/review?done=mailAllowed&n=2');
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailAllowed&n=2');
   expect(await receipts()).toBe(2);
   expect(await held()).toHaveLength(0);
   const saved = await env.DB.prepare("SELECT value_json FROM settings WHERE key='ALLOWED_SENDER_EMAILS'").first<string>(
@@ -208,7 +208,7 @@ test('Ignore sender deletes their waiting mail and keeps none of it later', asyn
   await deliver(mail({ id: '<a2@amazonses.com>' }));
   expect((await env.ORIGINALS.list()).objects.length).toBeGreaterThan(0);
   const response = await post('/senders/ignore', { address: 'notifications@link.com' });
-  expect(locationOf(response)).toBe('/review?done=mailIgnored&n=2');
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailIgnored&n=2');
   expect(await held()).toHaveLength(0);
   expect((await env.ORIGINALS.list()).objects).toHaveLength(0);
   await deliver(mail({ id: '<a3@amazonses.com>' }));
@@ -230,7 +230,7 @@ test('Delete removes one email; Remove takes a sender off the list', async () =>
   await deliver(mail({ id: '<a2@amazonses.com>' }, 'different body'));
   const [first] = await held();
   const response = await post('/senders/delete', { id: String(first!.id) });
-  expect(locationOf(response)).toBe('/review?done=mailDeleted');
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailDeleted');
   expect(await held()).toHaveLength(1);
   expect(await env.ORIGINALS.get(String(first!.email_key))).toBeNull();
   expect((await post('/senders/delete', { id: String(first!.id) })).status).toBe(404);
@@ -288,15 +288,15 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
 
   const html = await (await request('/receipts')).text();
   expect(html).toContain('<h1>Receipts</h1>');
-  expect(html).toContain(`href="/receipts/${needs}"`);
+  expect(html).toContain(`href="/receipts/${needs}?from=all"`);
   expect(html).toContain('<span class="stamp needs">Needs you</span> 30 Aug');
   // Rows show the document date only; held mail is Review's, with no mail log here.
   expect(html).not.toContain('Received ');
   expect(html).not.toContain('Recent mail');
   const september = await (await request('/receipts?month=2026-09')).text();
   expect(september).toContain('<h1>September 2026</h1>');
-  expect(september).toContain(`href="/receipts/${ready}"`);
-  expect(september).not.toContain(`href="/receipts/${needs}"`);
+  expect(september).toContain(`href="/receipts/${ready}?from=all&amp;month=2026-09"`);
+  expect(september).not.toContain(`href="/receipts/${needs}?`);
   expect(html.indexOf(`/receipts/${dup}`)).toBeLessThan(html.indexOf(`/receipts/${ready}`));
   expect((await request('/receipts?month=2026-13')).status).toBe(422);
 
@@ -306,9 +306,9 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
   const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
   expect(second).toContain('Newer');
-  expect([...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(
-    4,
-  );
+  expect([
+    ...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g),
+  ]).toHaveLength(4);
 });
 
 test('Receipts empty states: one line and one action', async () => {

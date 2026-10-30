@@ -59,6 +59,23 @@ import { TREATMENT_LABELS } from './sales';
 import { VAT_TREATMENTS } from './domain';
 import { connection, progress, redirectUri, type Connection } from './onedrive';
 import {
+  LIST_DEFS,
+  listFields,
+  listParams,
+  listUrl,
+  nextOpen,
+  openCount,
+  openPlace,
+  openRows,
+  RECEIPTS_TODO,
+  receiptFields,
+  receiptState,
+  receiptUrl,
+  standing,
+  type ListState,
+  type Params,
+} from './worklist';
+import {
   bodyOf,
   flagCards,
   flagFor,
@@ -123,13 +140,8 @@ export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
   return INLINE_IMAGES.includes(r.media_type);
 }
 
-const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, id';
-export async function reviewQueue(env: Env): Promise<Receipt[]> {
-  return (
-    await env.DB.prepare(
-      `SELECT * FROM receipts WHERE ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
-    ).all<Receipt>()
-  ).results;
+export function reviewQueue(env: Env, state: ListState = RECEIPTS_TODO): Promise<Receipt[]> {
+  return openRows<Receipt>(env, LIST_DEFS.receipts!, state, BULK_CAP);
 }
 function firstFlag(r: Receipt): string {
   const code = todoReasons(reasonCodes(r.review_reasons_json))[0];
@@ -252,11 +264,15 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
 }
 
 // ---------- Review queue ----------
-export async function reviewPage(env: Env): Promise<Response> {
+// /review, and /receipts?view=todo&month=M until Receipts gets its own To do: the open receipts under
+// the list's month, the first upto of them shown.
+export async function reviewPage(env: Env, state: ListState): Promise<Response> {
   // Rows a bank line points at: Discard asks to remove the match too.
   const known = matchedIds(env);
-  const [all, held, reading, merges, matched] = await Promise.all([
-    reviewQueue(env),
+  // The true count, however many render: the list shows the first upto of a set capped at BULK_CAP.
+  const [rows, { total, also: undated }, held, reading, merges, matched] = await Promise.all([
+    openRows<Receipt>(env, LIST_DEFS.receipts!, state, state.upto),
+    openCount(env, LIST_DEFS.receipts!, state, 'r.issue_date IS NULL'),
     heldMail(env),
     env.DB.prepare(
       "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
@@ -264,44 +280,49 @@ export async function reviewPage(env: Env): Promise<Response> {
     mergePlan(env, known),
     known,
   ]);
-  const rows = all;
-  const undated = all.filter((r) => r.issue_date === null).length;
   const mergeable = merges.length;
   const merge = mergeable
-    ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
+    ? `<form class="merge" action="/review/merge" method="post">${listFields(state)}<button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
     : '';
-  const here = '/review';
   const bulk: BulkList = {
     form: 'bulk-review',
     action: '/receipts/bulk',
     noun: ['receipt', 'receipts'],
-    total: rows.length,
-    scope: { list: 'review', back: here },
+    total,
+    scope: listParams(state),
     actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
   };
+  const fields = listFields(state);
   // Row 1 is the next to check: its name is the screen's one primary.
   const items = rows
     .map((r, i) => {
       const name = escape(receiptName(r));
       const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
       const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      return `<li>${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
+      return `<li data-row="${r.id}" id="row-${r.id}">${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="${escape(receiptUrl(r.id, state))}">${name}</a>${amt}${why}${discardControl(r.id, { list: fields, matched: matched.has(r.id), name: receiptName(r) })}</li>`;
     })
     .join('');
-  const list = rows.length
-    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
-    : held.length
-      ? ''
-      : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
+  const shown = Math.min(total, BULK_CAP);
+  const more =
+    shown > rows.length
+      ? `<p><a class="btn secondary" href="${escape(listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }))}">Show ${Math.min(shown - rows.length, BANK_UPTO)} more</a></p>`
+      : '';
+  const list = `<div data-list="receipts-todo" data-total="${total}"${rows.length ? ` data-bulk-list="${bulk.form}"` : ''}>${
+    rows.length
+      ? `${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul>`
+      : held.length
+        ? ''
+        : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>')
+  }</div>${rows.length ? `${bulkBar(bulk)}${more}` : ''}`;
   return page(
     'review',
-    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, listUrl(state), !rows.length)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
       head: pageHead(
-        all.length
-          ? `${all.length} to check${undated ? `, ${undated} undated` : ''}`
+        total
+          ? `${total} to check${undated ? `, ${undated} undated` : ''}`
           : held.length
             ? `${plural(held.length, 'email')} to allow`
             : 'All checked',
@@ -355,29 +376,49 @@ function eurLine(eur: EurValue): string {
   return `EUR ${money(eur.minor)}, ${EUR_SOURCE[eur.source] ?? escape(eur.source)}${eur.rateDate ? ` ${day(eur.rateDate)}` : ''}.`;
 }
 
-// The review queue around one receipt: its place, and the one to open after it.
-export async function queueAround(
-  env: Env,
-  id: string,
-): Promise<{ position: number; total: number; next: string | null }> {
-  const queue = (await reviewQueue(env)).map((q) => q.id);
-  const position = queue.indexOf(id);
-  const next = (position >= 0 ? queue[position + 1] : undefined) ?? queue.find((q) => q !== id) ?? null;
-  return { position, total: queue.length, next };
-}
-
 // The failure scope of the receipt form.
 const RECEIPT = 'receipt';
-export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
+// params: the list it was opened from (?from=todo&month=M), so its count, Next and Skip use that filter.
+export async function receiptPage(env: Env, r: Receipt, params: Params): Promise<Response> {
   const sales = r.kind === 'sales';
-  const eur = await eurValue(env, r);
-  const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100').all<Rule>())
-    .results;
-  const candidateRows = (
-    await env.DB.prepare(
+  const list = receiptState(params, needsReview(r) && !r.discarded_at);
+  const todo = { ...list, view: 'todo' } as const;
+  // Every form on the page posts the list it was opened from, so its return keeps it.
+  const own = receiptFields(list);
+  // Every query the page needs, in one round. The sales payment box waits only on the euro value.
+  const eurQuery = eurValue(env, r);
+  const [eur, rules, candidateRows, place, next, duplicates, files, linked, shown, salesBox] = await Promise.all([
+    eurQuery,
+    env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100')
+      .all<Rule>()
+      .then((q) => q.results),
+    env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IS NULL AND t.receipt_required=1 AND t.amount_minor<0",
-    ).all<Payment>()
-  ).results;
+    )
+      .all<Payment>()
+      .then((q) => q.results),
+    openPlace(env, LIST_DEFS.receipts!, todo, r.id),
+    nextOpen(env, LIST_DEFS.receipts!, todo, standing(LIST_DEFS.receipts!, r.id), { wrap: true }),
+    env.DB.prepare(
+      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
+    )
+      .bind(r.id, r.vendor ?? '', r.total_minor ?? -1, r.duplicate_of ?? '')
+      .all<Receipt>()
+      .then((q) => q.results),
+    // Other files of the same charge (the receipt PDF next to the invoice PDF).
+    env.DB.prepare('SELECT id,filename FROM receipts WHERE duplicate_of=? ORDER BY received_at,id LIMIT 20')
+      .bind(r.id)
+      .all<{ id: string; filename: string }>()
+      .then((q) => q.results),
+    env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
+      .bind(r.id)
+      .first()
+      .then((row) => !!row),
+    // The original as text when it isn't an image; its number format is echoed in the hints.
+    previewable(r) ? null : readableText(env, r),
+    sales ? eurQuery.then((e) => paymentBox(env, { ...r, paid_bank_on: e.transaction ? 'linked' : null }, own)) : '',
+  ]);
+  const { position, total } = place;
   const suggestions =
     eur.transaction || sales
       ? []
@@ -391,21 +432,6 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
               a.account_key.localeCompare(b.account_key) ||
               a.id.localeCompare(b.id),
           );
-  const { position, total, next } = await queueAround(env, r.id);
-  const duplicates = (
-    await env.DB.prepare(
-      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
-    )
-      .bind(r.id, r.vendor ?? '', r.total_minor ?? -1, r.duplicate_of ?? '')
-      .all<Receipt>()
-  ).results;
-
-  // Other files of the same charge (the receipt PDF next to the invoice PDF).
-  const files = (
-    await env.DB.prepare('SELECT id,filename FROM receipts WHERE duplicate_of=? ORDER BY received_at,id LIMIT 20')
-      .bind(r.id)
-      .all<{ id: string; filename: string }>()
-  ).results;
   const codes = reasonCodes(r.review_reasons_json);
   const gone = !!r.discarded_at;
   const needs = needsReview(r),
@@ -430,8 +456,6 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     client_country: r.client_country,
     reference_number: r.reference_number,
   };
-  // The original as text when it isn't an image; its number format is echoed in the hints.
-  const shown = previewable(r) ? null : await readableText(env, r);
   const comma = decimalComma(shown);
   const eg = (n: string) => (comma ? n.replace('.', ',') : n);
   // A value is the reader's while the person hasn't saved the form: a save keeps every field as typed.
@@ -647,9 +671,6 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     },
   )}</div></details>`;
   const ready = isReady(r);
-  const linked = !!(await env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
-    .bind(r.id)
-    .first());
   const status = gone
     ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
     : sales
@@ -670,28 +691,28 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   const verb = needs || reading ? 'approve' : 'save';
   // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
   const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${own}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
     <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}</form>`;
   const matches = sales
-    ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
+    ? salesBox
     : suggestions.length
       ? `<section aria-labelledby="match-h" class="matchs"><h2 id="match-h">Payment?</h2>${suggestions
           .map((t) => {
             // Only a pair that isn't an exact fit asks for the exception, and says why.
             const facts = pairFacts(r, t, rules, config(env).tuning);
-            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">Match</button></form>${matchError(t.id)}`;
+            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">Match</button></form>${matchError(t.id)}`;
           })
           .join('')}</section>`
       : '';
   const move =
     sales || config(env).invoicesAddress
-      ? `<form action="/receipts/${r.id}/kind" method="post">${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
+      ? `<form action="/receipts/${r.id}/kind" method="post">${own}${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
       : '';
   const always = sales
     ? ''
-    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
-  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
+    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
+  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post">${own}<button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
   const open = `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
@@ -707,22 +728,20 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
   const back = gone
     ? '<a href="/receipts?show=discarded">‹ Discarded</a>'
-    : needs
-      ? '<a href="/review">‹ Review</a>'
-      : sales
-        ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
-        : '<a href="/receipts">‹ Receipts</a>';
-  const nextLink = !gone && !needs && next ? `<a href="/receipts/${next}">Next to check ›</a>` : '';
+    : sales && !needs
+      ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
+      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'Review' : 'Receipts'}</a>`;
+  const nextLink = !gone && !needs && next ? `<a href="${escape(receiptUrl(next, todo))}">Next to check ›</a>` : '';
   const skip =
     needs && next && next !== r.id
       ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
       : '';
-  const discard = discardControl(r.id, { back: needs ? 'queue' : '/receipts', matched: linked, revision: r.revision });
-  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true)}</section>`;
+  const discard = discardControl(r.id, { list: own, matched: linked, revision: r.revision });
+  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true, own)}</section>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const verbLabel = verb === 'save' ? 'Save' : sales ? 'Approve invoice' : 'Approve receipt';
   // One bar on every width: where you are, the quiet actions, and the one primary.
-  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
+  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="${escape(receiptUrl(r.id, list))}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
     `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>`,
@@ -843,14 +862,17 @@ export async function payments(
   const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
   const firstMissing = open[0]?.id;
   const shown = view === 'todo' ? rows.slice(0, upto) : rows;
+  const here: ListState = { ...RECEIPTS_TODO, key: 'bank', view, month: selected, upto };
   const bar: BulkList = {
     form: 'bulk-payments',
     action: '/payments/bulk',
     noun: ['payment', 'payments'],
     total: views[view],
-    scope: { month: selected, view, upto: String(upto) },
+    scope: listParams(here),
     actions: [...PAYMENT_ACTIONS],
   };
+  // Every row form posts the list it is on, so its return keeps the view and lands on the next row.
+  const fields = listFields(here);
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
@@ -866,12 +888,12 @@ export async function payments(
     ]
       .filter(Boolean)
       .join(' ');
-    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn ${primary ? 'primary' : 'secondary'}" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn ${primary ? 'primary' : 'secondary'}" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">Match</button></form>`;
   };
   // The search box: type a seller, a date or an amount, or pick from the list.
   const picker = (t: Payment, listId: string, noun: string, primary = false) => {
     const typed = chosenReceipt(t.id);
-    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn ${primary ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="pmatch">${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn ${primary ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`;
   };
   // A likely pair first, with the search box left to More; no pair, the search box alone.
   const matchControls = (
@@ -907,12 +929,12 @@ export async function payments(
             : `Transfer from ${escape(pair.debit_account_name)}`,
         );
         extra.push(
-          `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
+          `<form action="/transfers/${pair.debit_id}/undo" method="post">${fields}<button class="linkbtn">Undo transfer</button></form>`,
         );
       } else if (t.receipt_id) {
         status = `${tag(STATUS.matched, true)} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>${counts.reviewing.has(t.receipt_id) ? ` <a class="stamp needs" href="/receipts/${t.receipt_id}">${STATUS.needs}</a>` : ''}`;
         extra.push(
-          `<form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
+          `<form action="/matches" method="post">${fields}<input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
         );
       } else if (t.amount_minor >= 0) {
         status = tag('Money in');
@@ -926,7 +948,7 @@ export async function payments(
         const by = t.exempt_by && t.exempt_by !== 'owner' ? EXEMPT_LABELS[t.exempt_by] : '';
         status = `${tag(STATUS.notPurchase)}${by ? ` <span class="tag">${by}</span>` : ''}`;
         extra.push(
-          `<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
+          `<form action="/payments/${t.id}" method="post">${fields}<button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
         );
       } else {
         const first = t.id === firstMissing;
@@ -939,7 +961,7 @@ export async function payments(
           droppedRecently && !likely
             ? `<p class="small"><a href="/settings?open=mail#mail">Check mail we didn't keep</a></p>`
             : '';
-        controls = `<div class="fixrow">${found.main}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
+        controls = `<div class="fixrow">${found.main}<form action="/payments/${t.id}" method="post">${fields}<button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
         if (found.rest) extra.push(found.rest);
         extra.push('<p><a href="/add">Add a receipt</a></p>');
         const sides = credits.filter(
@@ -947,7 +969,7 @@ export async function payments(
         );
         if (sides.length)
           extra.push(
-            `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
+            `<form action="/transfers" method="post" class="transfer">${fields}<input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
       // No bulk action applies to a transfer side.
@@ -959,7 +981,7 @@ export async function payments(
   const lists = `${items.includes('list="pick-receipts"') ? `<datalist id="pick-receipts">${datalistOptions(receipts)}</datalist>` : ''}${items.includes('list="pick-invoices"') ? `<datalist id="pick-invoices">${datalistOptions(invoices)}</datalist>` : ''}`;
   // What Match all will accept, pair by pair with its reason, before it is pressed.
   const matchAll = bulk.length
-    ? `<form action="/matches/bulk" method="post" class="matchall"><input type="hidden" name="month" value="${selected}"><details open><summary>Will match ${plural(bulk.length, 'payment')}</summary><ul>${bulk
+    ? `<form action="/matches/bulk" method="post" class="matchall">${fields}<details open><summary>Will match ${plural(bulk.length, 'payment')}</summary><ul>${bulk
         .map(
           ({ t, r, facts }) =>
             `<li>${escape(t.merchant)}, ${day(t.booking_date, false)}, ${amount(t.amount_minor, t.currency)} to ${escape(receiptName(r))}<span>${escape(whyLikely(facts))}</span></li>`,

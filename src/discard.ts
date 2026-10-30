@@ -77,31 +77,33 @@ export async function restoreReceipts(env: Env, ids: readonly string[]): Promise
     .run();
   return result.meta.changes ?? 0;
 }
-// Undo: everything discarded in one action shares its timestamp.
-export async function restoreBatch(env: Env, at: string): Promise<number> {
+// Undo: everything discarded in one action shares its timestamp. Returns the rows it brought back.
+export async function restoreBatch(env: Env, at: string): Promise<string[]> {
   requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Invalid undo', 400);
   const result = await env.DB.prepare(
-    'UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at=?',
+    'UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at=? RETURNING id',
   )
     .bind(at)
-    .run();
-  return result.meta.changes ?? 0;
+    .all<{ id: string }>();
+  return result.results.map((r) => r.id);
 }
 
 // ---------- UI ----------
 // One click discards. A receipt a bank line points at asks first, because its match goes too.
+// list: the hidden fields of the list or receipt page it is on, which the return keeps.
 export function discardControl(
   id: string | null,
-  o: { back: string; matched?: boolean; revision?: number; name?: string },
+  o: { list: string; matched?: boolean; revision?: number; name?: string },
 ): string {
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
-  const fields = `${id ? hidden('id', id) : ''}${hidden('back', o.back)}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
+  const fields = `${id ? hidden('id', id) : ''}${o.list}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
   const aria = o.name ? ` aria-label="Discard ${escape(o.name)}"` : '';
   if (!o.matched)
     return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;
   return `<details class="discard"><summary${aria}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}<p class="ask">Remove match?</p><button class="btn secondary">Remove and discard</button></form></div></details>`;
 }
 
-export function restoreForm(id: string, back: string, primary = false): string {
-  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}"><button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
+// fields: on a receipt page, the list it was opened from (receiptFields), which Restore keeps.
+export function restoreForm(id: string, back: string, primary = false, fields = ''): string {
+  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}">${fields}<button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
 }

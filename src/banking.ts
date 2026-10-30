@@ -598,15 +598,15 @@ export async function exemptByClef(env: Env, importId: string): Promise<number> 
   );
 }
 // Undo for the automatic marks of one import: the rows need a receipt again,
-// and the choice is the owner's from now on.
-export async function undoExemptions(env: Env, importId: string): Promise<number> {
+// and the choice is the owner's from now on. Returns the payments it changed.
+export async function undoExemptions(env: Env, importId: string): Promise<string[]> {
   const result = await env.DB.prepare(
-    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO}`,
+    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO} RETURNING id`,
   )
     .bind(importId)
-    .run();
+    .all<{ id: string }>();
   await reconcile(env);
-  return result.meta.changes;
+  return result.results.map((r) => r.id);
 }
 // Statements imported before the original amount was read from Holvi's
 // "Currency and amount: USD 10.46" line get it now, once. Rows of a pending
@@ -909,13 +909,13 @@ export const SET_REQUIRED_SQL =
 // row. Counts, rows, select-all and Match all read the same predicate, month-wide.
 export const BANK_VIEWS = ['todo', 'all'] as const;
 export type BankView = (typeof BANK_VIEWS)[number];
-const VIEW_SQL: Record<BankView, string> = {
+export const VIEW_SQL: Record<BankView, string> = {
   todo: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
   all: '1',
 };
 const IN_MONTH =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
-const BANK_ORDER = 't.booking_date,t.account_key,t.id';
+export const BANK_ORDER = 't.booking_date,t.account_key,t.id';
 // To do renders its first upto rows, and Show more raises it; there is no offset.
 export const BANK_UPTO = 50;
 export function bankUpto(value: string | null, cap: number): number {
@@ -943,12 +943,4 @@ export async function viewRows(env: Env, month: string, view: BankView, limit?: 
       .bind(month, limit ?? -1)
       .all<BankRow>()
   ).results;
-}
-// After a save: the first open payment after the first of ids in Bank's order, else the first open one.
-export async function nextOpenPayment(env: Env, month: string, ids: readonly string[]): Promise<string | null> {
-  return env.DB.prepare(
-    `SELECT t.id ${IN_MONTH} AND ${VIEW_SQL.todo} ORDER BY (${BANK_ORDER})>(SELECT booking_date,account_key,id FROM bank_transactions WHERE id IN (SELECT value FROM json_each(?)) ORDER BY booking_date,account_key,id LIMIT 1) DESC,${BANK_ORDER} LIMIT 1`,
-  )
-    .bind(month, JSON.stringify(ids))
-    .first<string>('id');
 }

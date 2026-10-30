@@ -39,7 +39,15 @@ function post(path: string, fields: Record<string, string | string[]>) {
 const bankState = { view: 'todo', month: MONTH, upto: '50' };
 const bulkBank = (op: string, ids: string[]) => post('/payments/bulk', { ...bankState, op, id: ids });
 const bulkApprove = (ids: string[], more: Record<string, string> = {}) =>
-  post('/receipts/bulk', { op: 'approve', approval_reason: 'Checked', view: 'todo', upto: '50', id: ids, ...more });
+  post('/receipts/bulk', {
+    op: 'approve',
+    approval_reason: 'Checked',
+    list: 'receipts',
+    view: 'todo',
+    upto: '50',
+    id: ids,
+    ...more,
+  });
 
 // Receipts To do ids in order, optionally cut to one month, as the app lists them.
 async function todoIds(b: Busy, month?: string): Promise<string[]> {
@@ -141,7 +149,7 @@ test.fails('inv3 (Receipts): the bulk total equals the rendered to do count', as
 });
 
 // Today: Location is /payments?month=M with no view and no row fragment.
-test.fails('inv4: a single Not a purchase keeps the view and ends at the next open row', async () => {
+test('inv4: a single Not a purchase keeps the view and ends at the next open row', async () => {
   const b = await seedBusyMonth();
   const response = await post(`/payments/${b.missing[3]}`, { receipt_required: '0', ...bankState });
   expect(response.status).toBe(303);
@@ -153,33 +161,34 @@ test.fails('inv4: a single Not a purchase keeps the view and ends at the next op
   expect(to.hash).toBe(`#row-${b.missing[4]}`);
 });
 
-test.fails(
-  'inv5: Approve from To do lands on the next open item of the same month filter, after the save',
-  async () => {
-    const b = await seedBusyMonth();
-    const [first, , last] = b.earlier as [string, string, string];
-    const month = b.earlierMonth;
-    const before = await todoIds(b, month);
-    expect(before).toEqual(b.earlier);
-    // Without the month filter the next one is a different receipt, so a stale or global next shows.
-    const global = await todoIds(b);
-    expect(global[global.indexOf(last) + 1]).not.toBe(first);
-    const response = await post(`/receipts/${last}`, await formFor(last, 'approve', { from: 'todo', month }));
-    expect(response.status).toBe(303);
-    expect(await env.DB.prepare('SELECT status FROM receipts WHERE id=?').bind(last).first<string>('status')).toBe(
-      'ready',
-    );
-    const after = await todoIds(b, month);
-    const next = nextAfter(before, after, last, true);
-    expect(next).toBe(first);
-    const to = toUrl(response);
-    expect(to.pathname).toBe(`/receipts/${next}`);
-    expect(to.searchParams.get('from')).toBe('todo');
-    expect(to.searchParams.get('month')).toBe(month);
-  },
-);
+test('inv5: Approve from To do lands on the next open item of the same month filter, after the save', async () => {
+  const b = await seedBusyMonth();
+  const last = b.earlier[2]!;
+  const month = b.earlierMonth;
+  const before = await todoIds(b, month);
+  // The month's To do: the undated receipts first, then the month's own. Approve on the last
+  // one wraps to the first of that list.
+  expect(before.slice(-3)).toEqual(b.earlier);
+  expect(before.slice(0, -3).every((id) => b.undated.includes(id))).toBe(true);
+  const first = before[0]!;
+  // Without the month filter the next one is a different receipt, so a stale or global next shows.
+  const global = await todoIds(b);
+  expect(global[global.indexOf(last) + 1]).not.toBe(first);
+  const response = await post(`/receipts/${last}`, await formFor(last, 'approve', { from: 'todo', month }));
+  expect(response.status).toBe(303);
+  expect(await env.DB.prepare('SELECT status FROM receipts WHERE id=?').bind(last).first<string>('status')).toBe(
+    'ready',
+  );
+  const after = await todoIds(b, month);
+  const next = nextAfter(before, after, last, true);
+  expect(next).toBe(first);
+  const to = toUrl(response);
+  expect(to.pathname).toBe(`/receipts/${next}`);
+  expect(to.searchParams.get('from')).toBe('todo');
+  expect(to.searchParams.get('month')).toBe(month);
+});
 
-test.fails('inv6: Skip on the last item ends on the list', async () => {
+test('inv6: Skip on the last item ends on the list', async () => {
   const b = await seedBusyMonth();
   const last = b.earlier[2]!;
   const month = b.earlierMonth;
@@ -194,7 +203,7 @@ test.fails('inv6: Skip on the last item ends on the list', async () => {
   );
 });
 
-test.fails('inv7: Discard from a month-filtered To do keeps the month', async () => {
+test('inv7: Discard from a month-filtered To do keeps the month', async () => {
   const b = await seedBusyMonth();
   const [, middle, last] = b.earlier as [string, string, string];
   const response = await post('/discard', { id: middle, view: 'todo', month: b.earlierMonth, upto: '50' });
@@ -235,8 +244,8 @@ test.fails('inv8: Undo after a bulk approve brings every row back into To do', a
   expect(list(await get('/receipts?view=todo')).rows).toEqual(expect.arrayContaining(ids));
 });
 
-// Today: no data-list yet; the stable-order check needs the To do lists.
-test.fails('inv9: a resolved id never renders in To do and the order is stable', async () => {
+// Receipts To do is still the Review queue (PR 6 builds its page), under the same order and filter.
+test('inv9: a resolved id never renders in To do and the order is stable', async () => {
   const b = await seedBusyMonth();
   const approved = b.todoApprovable.slice(0, 4);
   const exempted = b.missing.slice(0, 5);

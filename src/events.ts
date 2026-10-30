@@ -74,28 +74,6 @@ const NEXT_STEP: Record<
     link: (m) => ({ href: `/?month=${m}#send`, label: `Open ${monthWord(m)}` }),
   },
 };
-// The lists a discard, restore or bulk form may send you back to, with the
-// query each one keeps. The path is one of these, so it never leaves the app.
-const BACK_QUERY: Record<string, readonly string[]> = {
-  '/review': ['reason'],
-  '/receipts': ['show', 'month', 'q', 'offset'],
-  '/invoices': ['month', 'show'],
-};
-export function backPath(value: unknown, fallback = '/review'): string {
-  const text = String(value ?? '');
-  if (/^\/receipts\/[a-f0-9]{64}$/.test(text)) return text;
-  if (!text.startsWith('/') || text.length > 300) return fallback;
-  const url = new URL(text, 'http://app.invalid');
-  const keys = BACK_QUERY[url.pathname];
-  if (url.origin !== 'http://app.invalid' || !keys) return fallback;
-  const query = new URLSearchParams();
-  for (const key of keys) {
-    const one = url.searchParams.get(key);
-    if (one) query.set(key, one.slice(0, 100));
-  }
-  const search = query.toString();
-  return search ? `${url.pathname}?${search}` : url.pathname;
-}
 // A receipt page that Match and Remove match send you back to.
 const returnTo = (p: URLSearchParams) => {
   const back = p.get('back') ?? '';
@@ -188,7 +166,8 @@ export const EVENTS = {
     undo: (p) => {
       const at = p.get('at') ?? '',
         back = p.get('back') ?? '';
-      return !none(p) && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && backPath(back, '') === back
+      // Restore checks back again; the list it names is rebuilt there, never followed as sent.
+      return !none(p) && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && /^\/(?!\/)/.test(back) && back.length <= 300
         ? { action: '/restore', fields: { at, back } }
         : null;
     },
@@ -438,6 +417,18 @@ export type Feedback = {
   undo: Undo | null;
   section: string | null;
 };
+// An Undo returns to the list it was offered on: the page's list state rides along in its form,
+// under the names the list URL uses (from, on a receipt page), unless the Undo sets them itself.
+const LIST_PARAMS = ['view', 'from', 'month', 'upto', 'show', 'q'] as const;
+function onList(undo: Undo | null, params: URLSearchParams): Undo | null {
+  if (!undo) return null;
+  const fields = { ...undo.fields };
+  for (const key of LIST_PARAMS) {
+    const value = params.get(key);
+    if (value && !(key in fields)) fields[key] = value.slice(0, 100);
+  }
+  return { ...undo, fields };
+}
 // What the query asks the page to say, if it names an event with a message.
 export function feedback(params: URLSearchParams): Feedback | null {
   const key = params.get('done');
@@ -449,7 +440,7 @@ export function feedback(params: URLSearchParams): Feedback | null {
     event: key,
     text,
     link: def.link?.(params) ?? null,
-    undo: def.undo?.(params) ?? null,
+    undo: onList(def.undo?.(params) ?? null, params),
     section: def.section?.(params) ?? null,
   };
 }

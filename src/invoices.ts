@@ -7,6 +7,7 @@ import { config } from './config';
 import { STATUS } from './status';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
+import { listParams, RECEIPTS_TODO } from './worklist';
 import {
   amount,
   day,
@@ -160,13 +161,18 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
   };
-  const here = `/invoices?month=${selected}${show === 'all' ? '' : `&show=${show}`}`;
   const bulk: BulkList = {
     form: 'bulk-invoices',
     action: '/receipts/bulk',
     noun: ['invoice', 'invoices'],
     total: shown.length,
-    scope: { list: 'invoices', month: selected, ...(show === 'all' ? {} : { show }), back: here },
+    scope: listParams({
+      ...RECEIPTS_TODO,
+      key: 'invoices',
+      view: 'all',
+      month: selected,
+      show: show === 'all' ? null : show,
+    }),
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length
@@ -216,8 +222,10 @@ function firstFlag(r: Receipt): string {
 
 // ---------- On the invoice page ----------
 type Credit = Transaction & { account_name: string; bank_name: string };
-// The money-in box: the matched payment, or credits that may be this invoice.
-export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
+// The money-in box: the matched payment, or credits that may be this invoice. fields: the receipt
+// page's list (receiptFields), which every form here posts so its return keeps it.
+export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise<string> {
+  const back = `<input type="hidden" name="return_to" value="/receipts/${r.id}">${fields}`;
   const box = (title: string, body: string) =>
     `<section aria-labelledby="pay-h" class="matchs"><h2 id="pay-h">${title}</h2>${body}</section>`;
   if (r.paid_bank_on) {
@@ -229,10 +237,10 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
     if (t)
       return box(
         'Paid',
-        `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form></div>`,
+        `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}">${back}<button class="linkbtn" name="action" value="unlink">Remove match</button></form></div>`,
       );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post"><div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post"><button class="linkbtn">Not paid</button></form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}<button class="linkbtn">Not paid</button></form>` : ''}`;
   if (r.paid_outside_on)
     return box(
       'Paid',
@@ -255,7 +263,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
             .slice(0, 5)
             .map(
               (t) =>
-                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}"><button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${back}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
             )
             .join('')
         : due

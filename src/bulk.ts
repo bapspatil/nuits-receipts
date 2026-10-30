@@ -138,11 +138,12 @@ export function bulkBar(list: BulkList): string {
     .join('');
   const shown = list.actions.slice(0, 3).map(actionHtml).join('');
   const more = list.actions.slice(3);
-  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p>${
-    list.total <= BULK_CAP
-      ? `<button type="button" class="linkbtn" data-bulk-all hidden>Select all ${list.total} ${escape(list.noun[list.total === 1 ? 0 : 1])}</button>`
-      : ''
-  }<button type="reset" class="linkbtn">Clear</button><div class="bulkacts">${shown}${
+  // Select all acts on the list's first BULK_CAP rows in its order, as the server resolves all=1.
+  const all = Math.min(list.total, BULK_CAP);
+  const noun = escape(list.noun[all === 1 ? 0 : 1]);
+  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-all="${all}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p><button type="button" class="linkbtn" data-bulk-all hidden>${
+    all < list.total ? `Select the first ${all} ${noun}` : `Select all ${all} ${noun}`
+  }</button><button type="reset" class="linkbtn">Clear</button><div class="bulkacts">${shown}${
     more.length
       ? `<details class="bulkmore"><summary class="btn">More</summary><div class="body">${more.map(actionHtml).join('')}</div></details>`
       : ''
@@ -228,6 +229,7 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const boxes = Array.from(document.querySelectorAll('input[form="' + id + '"][name=id]'));
     if (!wrap || !boxes.length) return;
     const total = Number(form.dataset.total) || boxes.length;
+    const allCount = Number(form.dataset.all) || total;
     const noun = (form.dataset.noun || '|').split('|');
     const count = form.querySelector('[data-bulk-count]');
     const status = form.querySelector('[data-bulk-status]');
@@ -252,10 +254,10 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const render = () => {
       const on = new Set(state.picked);
       boxes.forEach((b) => { b.checked = on.has(b.value); });
-      const n = state.all ? total : on.size;
+      const n = state.all ? allCount : on.size;
       form.dataset.count = String(n);
       wrap.dataset.count = String(n);
-      count.textContent = state.all ? 'All ' + n + ' selected' : n + ' selected';
+      count.textContent = state.all ? (allCount < total ? 'First ' : 'All ') + n + ' selected' : n + ' selected';
       allInput.value = state.all ? '1' : '';
       if (page) {
         page.checked = on.size === boxes.length;
@@ -263,7 +265,7 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
       }
       if (allButton) allButton.hidden = state.all || total <= boxes.length || on.size < boxes.length;
       limited.forEach((b) => {
-        const why = capped(state.all, total, Number(b.dataset.max));
+        const why = capped(state.all, allCount, Number(b.dataset.max));
         b.disabled = !!why;
         if (why) {
           b.setAttribute('aria-disabled', 'true');

@@ -189,7 +189,10 @@ test('the bar and row checks are real form controls that work without the script
   );
   expect(bar).toContain('<button name="op" value="reread" class="btn" data-max="10">Read again</button>');
   expect(bar).toMatch(/<details class="bulkmore"><summary class="btn">More<\/summary>.*value="restore"/);
-  expect(bulkBar({ ...list, total: BULK_CAP + 1 })).not.toContain('data-bulk-all');
+  expect(bulkBar({ ...list, total: BULK_CAP + 1 })).toContain(`data-all="${BULK_CAP}"`);
+  expect(bulkBar({ ...list, total: BULK_CAP + 1 })).toContain(
+    `data-bulk-all hidden>Select the first ${BULK_CAP} receipts</button>`,
+  );
   const tools = bulkTools(list, 25);
   expect(tools).toContain('<label class="pick" hidden><input type="checkbox" data-bulk-page>');
   expect(tools).not.toContain('select=1');

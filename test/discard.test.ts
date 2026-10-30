@@ -51,10 +51,10 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["vendor_missing"]' WHERE id=?`).bind(id(2)).run();
   expect(await (await request('/review')).text()).toContain('Discard');
 
-  const res = await post('/discard', { id: [id(1), id(2)], back: '/review' });
+  const res = await post('/discard', { id: [id(1), id(2)], view: 'todo' });
   expect(res.status).toBe(303);
   const location = res.headers.get('Location')!;
-  expect(location).toMatch(/^\/review\?done=discarded&n=2&at=/);
+  expect(location).toMatch(/^\/receipts\?view=todo&done=discarded&n=2&at=/);
   const discarded = (await row(1))!;
   expect(discarded.discarded_at).toBeTruthy();
   expect(discarded.discard_reason).toBeNull();
@@ -79,8 +79,8 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(page).not.toContain('action="/discard"');
 
   const at = new URL(location, 'http://localhost').searchParams.get('at')!;
-  const undo = await post('/restore', { at, back: '/review' });
-  expect(locationOf(undo)).toBe('/review?done=restored&n=2');
+  const undo = await post('/restore', { at, back: '/receipts?view=todo' });
+  expect(locationOf(undo)).toMatch(/^\/receipts\?view=todo&done=restored&n=2#row-/);
   expect((await row(1))!.discarded_at).toBeNull();
   expect((await monthRows(env, '2026-10')).map((r) => r.id)).toEqual([id(1), id(2)]);
   expect(await (await request('/receipts?show=discarded')).text()).toContain('Nothing discarded.');
@@ -148,16 +148,16 @@ test('Discard is one click with no reason; a matched receipt still asks about it
   expect(page).not.toContain('Remove match?');
 });
 
-test('from the queue, discard moves on to the next receipt like Skip', async () => {
+test('from a receipt opened from To do, discard moves on to the next receipt like Approve', async () => {
   for (const n of [1, 2]) {
     await receipt(n, { status: 'needs_review' });
     await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["vendor_missing"]' WHERE id=?`).bind(id(n)).run();
   }
   const r = (await row(1))!;
-  const res = await post('/discard', { id: id(1), revision: String(r.revision), back: 'queue' });
-  expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${id(2)}\\?done=discarded&n=1&`));
-  const last = await post('/discard', { id: id(2), back: 'queue' });
-  expect(locationOf(last)).toMatch(/^\/review\?done=discarded&n=1&/);
+  const res = await post('/discard', { id: id(1), revision: String(r.revision), from: 'todo' });
+  expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${id(2)}\\?from=todo&done=discarded&n=1&`));
+  const last = await post('/discard', { id: id(2), from: 'todo' });
+  expect(locationOf(last)).toMatch(/^\/receipts\?view=todo&done=discarded&n=1&/);
 });
 
 test('the same file sent again stays discarded', async () => {

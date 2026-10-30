@@ -274,7 +274,7 @@ test('an import marks non-purchases by rule, an owner choice sticks, and Undo br
     method: 'POST',
     body: new URLSearchParams({ month: '2026-09' }),
   });
-  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=2$/);
+  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=2(#row-[0-9a-f]{64})?$/);
   expect(await row('Verohallinto')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
   expect(await row('ATM 01234 FAKE STREET')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
 });
@@ -343,7 +343,7 @@ test('a delivery mark shows its label, Undo brings it back, and an owner choice 
     method: 'POST',
     body: new URLSearchParams({ month: '2026-09' }),
   });
-  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=1$/);
+  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=1(#row-[0-9a-f]{64})?$/);
   expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
   await reconcile(env);
   expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
