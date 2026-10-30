@@ -51,12 +51,11 @@ axe: 0 violations on all 40 screens (20 pages at 1440 and 390), including the bu
 
 ## ui-lint (ui-lint.json)
 
-5 findings in 4 groups over 20 page checks (10 pages, 2 viewports), down from 86 over 22 in the baseline. `/review` is gone, which removes the 81 findings it held.
+3 findings in 3 groups over 20 page checks (10 pages, 2 viewports), down from 86 over 22 in the baseline. `/review` is gone, which removes the 81 findings it held.
 
 | Rule | Count | Where |
 | --- | --- | --- |
 | `font-size` | 2 | `.setup h2 span` on Home, at both widths. In the baseline too. |
-| `content-inset` | 2 | Home's `details.finished` fold of done setup steps (PR 12, `src/checklist.ts:101`): its `summary` sits 4 px from the panel edge, at both widths. |
-| `text-contrast` | 1 | `/help` at 390, a `dd` in a fold of the third section: "could not be measured" because the element overlaps another. Not a measured failure. |
+| `text-contrast` | 1 | `/help` at 390, a `dd` in a fold of the third section: "could not be measured" because the element overlaps another. Not a measured failure, so it stays. |
 
-[look.md](look.md) recorded 2 findings after PR 11. The 3 new ones arrived with PRs 12 and 13 and are left open for a follow-up.
+The first run on this branch also found Home's `details.finished` fold summary 4 px from the panel edge (`content-inset`, both widths). Its padding is now `var(--space-2)`, 8 px, and the rerun above has no `content-inset` finding. [look.md](look.md) recorded 2 findings after PR 11; the one new finding since is the unmeasurable `/help` reading.
