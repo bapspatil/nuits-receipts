@@ -5,6 +5,7 @@ import { feedback } from '../src/events';
 import { matchAllLabel } from '../src/match';
 import { STATUS } from '../src/status';
 import { confirmationForm, htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { statusMark } from '../src/actions';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 const rowOf = (html: string, merchant: string) =>
@@ -41,7 +42,7 @@ test('a likely pair is compared in words, with one Match button and no exception
   const row = rowOf(html, 'Sample Cloud Lantern Oy');
   expect(row).toContain(`<strong id="lk-${a}">Likely: Sample Cloud Lantern Oy, 4 Sep, EUR 125.50</strong>`);
   for (const word of ['Name', 'Date', 'Amount', '1 day apart', 'Same']) expect(row, word).toContain(word);
-  expect(row).toContain('>Match</button>');
+  expect(row).toContain('<span>Match</span></button>');
   expect(row).not.toContain('confirm_exception');
   expect(html).not.toContain('Not exact, still this');
   expect(html).not.toContain('Receipt ID');
@@ -77,7 +78,7 @@ test('Match all matches the pairs that still fit, says so once, and its Undo tak
   expect(rows.results[0]).toMatchObject({ receipt_id: id, match_method: 'manual' });
   expect(rows.results[1]).toMatchObject({ receipt_id: null });
   // A by-you match says so in words.
-  expect(await bank()).toContain('<span class="tag ok">Matched</span>');
+  expect(await bank()).toContain(statusMark('matched'));
   const undo = await post('/undo', htmlForm(page, '/undo'));
   expect(undo.status).toBe(303);
   expect(await (await request(undo.headers.get('Location')!)).text()).toContain('Match undone for 1 payment.');
@@ -129,7 +130,7 @@ test('a receipt still in Review is matched, and the payment says the receipt nee
   expect(row).toContain('Matched');
   expect(row).not.toContain('Matched automatically');
   expect(row).not.toContain('tag ok auto');
-  expect(row).toContain(`<a class="stamp needs" href="/receipts/${id}">Needs you</a>`);
+  expect(row).toContain(statusMark('needs', { href: `/receipts/${id}` }));
   expect(row).not.toContain('Missing');
   expect(await bank()).toContain('1 out, 1 matched, 0 not a purchase, <span>0 missing</span>, 1 needs you');
   // A real gap next to it still says Missing.
@@ -139,7 +140,7 @@ test('a receipt still in Review is matched, and the payment says the receipt nee
     collision: 'keep_existing',
   });
   const both = await bank();
-  expect(rowOf(both, 'Nothing Like It Oy')).toContain('<span class="stamp missing">Missing</span>');
+  expect(rowOf(both, 'Nothing Like It Oy')).toContain(statusMark('missing'));
   expect(both).toContain('2 out, 1 matched, 0 not a purchase, <span class="red">1 missing</span>, 1 needs you');
   expect(both).toContain('>To do (1)<');
   // Approving it keeps the match and the stamp goes.
@@ -204,13 +205,19 @@ test('an import banner counts the payments matched for you and links to them', a
 });
 
 test('one registry holds the words for a state', () => {
-  expect(Object.values(STATUS)).toEqual([
+  expect(Object.values(STATUS).map((s) => s.word)).toEqual([
     'Needs you',
     'Reading',
+    'New sender',
+    'Overdue',
+    'Missing',
     'Ready',
     'Matched',
-    'Missing',
     'Not a purchase',
     'Sent',
+    'Discarded',
+    'Duplicate',
+    'Paid',
+    'Unpaid',
   ]);
 });

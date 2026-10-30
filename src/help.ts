@@ -4,7 +4,7 @@
 // test/help.test.ts holds both to that.
 import type { Receipt } from './domain';
 import { bodyOf, FLAGS, type Flag, type FlagGroup } from './flags';
-import { STATUS } from './status';
+import { STATUS, type StatusKey } from './status';
 import { escape } from './ui';
 
 export type HelpEntry = {
@@ -20,14 +20,20 @@ export type HelpSection = {
   groups: { title?: string; entries: HelpEntry[] }[];
 };
 
-const STATUS_HELP: Record<keyof typeof STATUS, string> = {
+const STATUS_HELP: Record<StatusKey, string> = {
   needs: "A receipt we couldn't finish reading, or one that needs a fact from you. Open Receipts To do to fix it.",
   reading: 'We are reading the file. It usually takes under a minute.',
+  newSender: "Mail from an address you haven't allowed yet. Allow the sender to read it, or ignore it.",
+  overdue: 'A sales invoice that is past its due date and not marked paid.',
   ready: 'Checked and complete. Nothing is left to do for it.',
   matched: 'This payment is linked to its receipt. You can remove the match.',
   missing: 'A payment out of your account that has no receipt yet.',
   notPurchase: "A payment that isn't a purchase, such as a transfer between your own accounts. It needs no receipt.",
   sent: 'You marked the month as sent to your accountant.',
+  discarded: 'A receipt you removed from your lists. Restore it from Receipts, under All, then Discarded.',
+  duplicate: 'A second copy of a receipt that is already here. Merge duplicates folds them into one.',
+  paid: 'A sales invoice you marked paid, or whose payment was found on a bank statement.',
+  unpaid: 'A sales invoice that is not paid yet and not past its due date.',
 };
 
 const GLOSSARY: readonly HelpEntry[] = [
@@ -101,9 +107,9 @@ export function helpSections(): HelpSection[] {
       lede: 'The same word means the same thing on Home, Receipts, Bank and each receipt.',
       groups: [
         {
-          entries: (Object.keys(STATUS) as (keyof typeof STATUS)[]).map((key) => ({
+          entries: (Object.keys(STATUS) as StatusKey[]).map((key) => ({
             ids: [`status-${key}`],
-            term: STATUS[key],
+            term: STATUS[key].word,
             text: STATUS_HELP[key],
           })),
         },

@@ -9,6 +9,7 @@ import { allRows, PAGE_SIZE } from '../src/all';
 import { MAX_ALLOWED_SENDERS } from '../src/config';
 import type { Env } from '../src/env';
 import { authorization, locationOf, request, signed } from './helpers';
+import { button, buttonLink, statusMark } from '../src/actions';
 
 // What Cloudflare prepends to a mail service's message: DMARC passes for the
 // From domain while the envelope is a per-message bounce address.
@@ -109,9 +110,9 @@ test('an unknown sender is held with its facts, never read, and only the domain 
   const html = await (await request('/receipts?view=todo')).text();
   expect(html).toContain('notifications@link.com');
   expect(html).toContain('Your receipt from Example');
-  expect(html).toContain('<button class="btn secondary" aria-label="Allow notifications@link.com">Allow</button>');
+  expect(html).toContain(button('allow', { attrs: ' aria-label="Allow notifications@link.com"' }));
   expect(html).toMatch(
-    /<details class="more"><summary aria-label="Ignore notifications@link.com">Ignore<\/summary><div class="body"><form method="post" action="\/senders\/ignore">[\s\S]*?Ignore and delete<\/button>/,
+    /<details class="more"><summary class="btn ghost" aria-label="Ignore notifications@link.com">[\s\S]*?<\/summary><div class="body"><form method="post" action="\/senders\/ignore">[\s\S]*?<span>Ignore and delete<\/span><\/button>/,
   );
   expect(html).not.toContain('Delete email');
   expect(html).toMatch(/Receipts <span class="count">1/);
@@ -285,7 +286,7 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h1>Receipts</h1>');
   expect(html).toContain(`href="/receipts/${needs}?from=all"`);
-  expect(html).toContain('<span class="stamp needs">Needs you</span> 30 Aug');
+  expect(html).toContain(`${statusMark('needs')} 30 Aug`);
   // Rows show the document date only; held mail is Review's, with no mail log here.
   expect(html).not.toContain('Received ');
   expect(html).not.toContain('Recent mail');
@@ -300,7 +301,9 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   for (let i = 10; i < 10 + PAGE_SIZE; i++) await receipt(i, `2026-08-01T00:00:${String(i % 60).padStart(2, '0')}Z`);
   const first = await (await request('/receipts?view=all')).text();
   expect(first).not.toContain('offset=');
-  const older = first.match(/<a class="btn secondary" href="(\/receipts\?view=all&amp;before=[^"]+)">Older<\/a>/)?.[1];
+  const older = first.match(
+    /<a class="btn secondary" href="(\/receipts\?view=all&amp;before=[^"]+)"><svg[^>]*><use href="#i-chevrons-right"\/><\/svg><span>Older<\/span><\/a>/,
+  )?.[1];
   expect(older).toBeDefined();
   const second = await (await request(older!.replaceAll('&amp;', '&'))).text();
   expect(second).toContain('Newest');
@@ -318,6 +321,6 @@ test('Receipts empty states: one line and one action', async () => {
   );
   const search = await (await request('/receipts?q=xyz')).text();
   expect(search).toContain(
-    '<h2>Nothing matches &#8220;xyz&#8221;.</h2><a class="btn primary" href="/receipts?view=all">Clear search</a>',
+    `<h2>Nothing matches &#8220;xyz&#8221;.</h2>${buttonLink('clearSearch', '/receipts?view=all', { tone: 'primary' })}`,
   );
 });

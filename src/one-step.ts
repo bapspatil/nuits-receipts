@@ -37,6 +37,7 @@ import {
   totalsProblems,
 } from './imports';
 import { undoAt } from './undo';
+import { button, buttonLink } from './actions';
 
 type Layout = { mapping: CsvMapping; bank: string; kept: boolean };
 // UTF-8 or the file's BOM first; bytes that are not text in either read as Windows-1252, which is
@@ -121,7 +122,7 @@ function accountQuestion(env: Env, bytes: Uint8Array, accounts: Account[]): Prom
     .join('');
   return page(
     'import',
-    `<div class="card"><form action="/import" method="post" enctype="multipart/form-data">${hidden('csv', encodedBytes(bytes))}<h2>Which account is this?</h2><p class="small">We could not tell from the file. We will remember the columns, so you are asked this only once per bank.</p><div class="fields"><label>Account<select name="account" id="f-account">${options}</select></label></div><button class="btn primary">Import</button></form></div>`,
+    `<div class="card"><form action="/import" method="post" enctype="multipart/form-data">${hidden('csv', encodedBytes(bytes))}<h2>Which account is this?</h2><p class="small">We could not tell from the file. We will remember the columns, so you are asked this only once per bank.</p><div class="fields"><label>Account<select name="account" id="f-account">${options}</select></label></div>${button('importStmt', { tone: 'primary' })}</form></div>`,
     200,
     env,
     { detail: 'Which account is this?', head: pageHead('Which account is this?') },
@@ -213,7 +214,7 @@ export function anywayPage(env: Env, params: URLSearchParams): Promise<Response>
   requireInput(/^[a-f0-9]{64}$/.test(imp) && Number.isSafeInteger(n) && n > 0, 'Import not found', 404);
   return page(
     'import',
-    `<div class="card"><form action="/import/anyway" method="post"><h2>Import anyway</h2><p>${n} ${n === 1 ? 'payment was' : 'payments were'} skipped because ${n === 1 ? 'it looks' : 'they look'} like ${n === 1 ? 'one' : 'ones'} you already imported. If ${n === 1 ? 'it is' : 'they are'} really separate payments, add ${n === 1 ? 'it' : 'them'} as extra payments.</p>${hidden('import', imp)}<button class="btn primary">Import anyway</button> <a class="btn secondary" href="/payments">Cancel</a></form></div>`,
+    `<div class="card"><form action="/import/anyway" method="post"><h2>Import anyway</h2><p>${n} ${n === 1 ? 'payment was' : 'payments were'} skipped because ${n === 1 ? 'it looks' : 'they look'} like ${n === 1 ? 'one' : 'ones'} you already imported. If ${n === 1 ? 'it is' : 'they are'} really separate payments, add ${n === 1 ? 'it' : 'them'} as extra payments.</p>${hidden('import', imp)}${button('importAnyway', { tone: 'primary' })} ${buttonLink('cancel', '/payments')}</form></div>`,
     200,
     env,
     { detail: 'Import anyway', head: pageHead('Import anyway') },

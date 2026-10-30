@@ -45,8 +45,8 @@ test('B: over 500 open rows, totals are true and select-all takes exactly the fi
   const html = await get('/receipts?view=todo');
   expect(attr(html, /<div data-list="receipts-todo"[^>]*>/, 'data-total')).toBe(String(open.length));
   expect(attr(html, /<form id="bulk-todo"[^>]*>/, 'data-total')).toBe(String(open.length));
-  expect(html).toContain('>Select the first 500 receipts</button>');
-  expect(html).toContain(`Start checking (${open.length})</a>`);
+  expect(html).toContain('<span>Select the first 500 receipts</span></button>');
+  expect(html).toContain(`<span>Start checking (${open.length})</span></a>`);
   expect(html).toContain(`<p class="listhead">50 of ${open.length} to do</p>`);
   expect([...html.matchAll(/data-row="/g)].length).toBe(50);
   const page = await get(`/receipts/${open[0]}?from=todo`);
@@ -67,7 +67,7 @@ test('B: Bank follows the same rule', async () => {
   const total = Number(attr(html, /<div data-list="bank-todo"[^>]*>/, 'data-total'));
   expect(total).toBeGreaterThan(500);
   expect(attr(html, /<form id="bulk-payments"[^>]*>/, 'data-total')).toBe(String(total));
-  expect(html).toContain('>Select the first 500 payments</button>');
+  expect(html).toContain('<span>Select the first 500 payments</span></button>');
   const res = await post('/payments/bulk', { op: 'exempt', view: 'todo', month: b.month, upto: '50', all: '1' });
   expect(res.status).toBe(303);
   expect(locationOf(res)).toMatch(/done=notPurchaseMany&n=500/);

@@ -5,6 +5,7 @@ import { hash } from '../src/domain';
 import { importBankCsv, parsePreset } from '../src/banking';
 import worker from '../src/index';
 import { authorization, htmlForm, idFrom, request, uploadPdf } from './helpers';
+import { buttonLink, statusMark } from '../src/actions';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 
@@ -82,10 +83,10 @@ test('automatic and manual matches both say Matched, with no Auto chip', async (
     new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link', confirm_exception: 'yes' }),
   );
   const bank = await (await request('/payments?month=2026-09&view=all')).text();
-  expect(bank).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${id}">Receipt</a>`);
+  expect(bank).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${id}">Receipt</a>`);
   await env.DB.prepare("UPDATE bank_transactions SET match_method='automatic'").run();
   const auto = await (await request('/payments?month=2026-09&view=all')).text();
-  expect(auto).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${id}">Receipt</a>`);
+  expect(auto).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${id}">Receipt</a>`);
   for (const html of [bank, auto, await (await request(`/receipts/${id}`)).text()]) {
     expect(html).not.toMatch(/Matched (automatically|by you)/);
     expect(html).not.toContain('tag ok auto');
@@ -96,7 +97,7 @@ test('Bank has no Statements history, only the Import statement button', async (
   await seedMismatch();
   const html = await (await request('/payments?month=2026-09&view=all')).text();
   expect(html).not.toContain('Statements (');
-  expect(html).toContain('<a class="btn secondary" href="/import">Import statement</a>');
+  expect(html).toContain(buttonLink('importStmt', '/import'));
 });
 
 test('the receipt page has no Technical details fold', async () => {

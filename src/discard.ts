@@ -6,6 +6,7 @@
 import type { Env } from './env';
 import { requireInput } from './domain';
 import { reconcile } from './banking';
+import { button } from './actions';
 import { escape } from './ui';
 import { undoAt, withUndo, type UndoAt } from './undo';
 
@@ -81,10 +82,10 @@ export function discardControl(id: string | null, o: { list: string; revision?: 
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
   const fields = `${id ? hidden('id', id) : ''}${o.list}${o.revision === undefined ? '' : hidden('revision', o.revision)}`;
   const aria = o.name ? ` aria-label="Discard ${escape(o.name)}"` : '';
-  return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;
+  return `<form method="post" action="/discard" class="discard">${fields}${button('discard', { attrs: aria })}</form>`;
 }
 
 // fields: on a receipt page, the list it was opened from (receiptFields), which Restore keeps.
 export function restoreForm(id: string, back: string, primary = false, fields = ''): string {
-  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}">${fields}<button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
+  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}">${fields}${button('restore', { tone: primary ? 'primary' : 'ghost' })}</form>`;
 }

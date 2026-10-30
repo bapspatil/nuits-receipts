@@ -2,7 +2,8 @@
 // receipts to check and overdue sales invoices. All is the archive, newest first.
 import type { Env } from './env';
 import { config } from './config';
-import { STATUS } from './status';
+import { STATUS, type StatusKey } from './status';
+import { button, buttonLink, buttonSummary, statusMark } from './actions';
 import { DISCARD_REASONS, type DiscardReason, type Receipt, requireInput } from './domain';
 import { flagCards, flagFor, needsReview, needsReviewSql, readySql, reasonCodes, todoReasons } from './flags';
 import { restoreForm } from './discard';
@@ -46,13 +47,13 @@ import {
 
 export const PAGE_SIZE = 50;
 export const SHOW = {
-  ready: STATUS.ready,
-  needs: STATUS.needs,
-  reading: STATUS.reading,
-  duplicate: 'Duplicate',
-  discarded: 'Discarded',
+  ready: STATUS.ready.word,
+  needs: STATUS.needs.word,
+  reading: STATUS.reading.word,
+  duplicate: STATUS.duplicate.word,
+  discarded: STATUS.discarded.word,
   sales: 'Sales invoices',
-  unknown: 'Unknown sender',
+  unknown: STATUS.newSender.word,
 } as const;
 export type Show = keyof typeof SHOW;
 // Only the exceptions are chips. Ready is the default, Sales has its own
@@ -163,14 +164,15 @@ export async function filterIds(env: Env, query: Omit<AllQuery, 'before'>, limit
   ).results.map((r) => r.id);
 }
 
-export function chipOf(row: AllRow): { label: string; css: string } {
-  if (row.type === 'mail') return { label: 'Unknown sender', css: 'needs' };
+// The state a row shows: a status key, and for a discard the reason that goes with it.
+export function chipOf(row: AllRow): { key: StatusKey; after?: string } {
+  if (row.type === 'mail') return { key: 'newSender' };
   if (row.discarded_at)
-    return { label: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : 'Discarded', css: 'muted' };
-  if (row.duplicate_of) return { label: 'Duplicate', css: 'muted' };
-  if (row.status === 'pending' || row.status === 'processing') return { label: STATUS.reading, css: 'muted' };
-  if (needsReview(row)) return { label: STATUS.needs, css: 'needs' };
-  return { label: STATUS.ready, css: 'ready' };
+    return { key: 'discarded', after: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : '' };
+  if (row.duplicate_of) return { key: 'duplicate' };
+  if (row.status === 'pending' || row.status === 'processing') return { key: 'reading' };
+  if (needsReview(row)) return { key: 'needs' };
+  return { key: 'ready' };
 }
 function rowName(row: AllRow): string {
   if (row.type === 'mail') return row.sender ?? 'Unknown sender';
@@ -237,7 +239,7 @@ function firstFlag(r: Receipt): string {
 function heldRow(m: MailRow, back: string): string {
   const who = escape(m.sender);
   const fields = `<input type="hidden" name="address" value="${who}"><input type="hidden" name="back" value="${escape(back)}">`;
-  return `<li id="mail-${escape(m.id)}"><p class="who"><b>${who}</b></p><p class="subj">${m.subject ? escape(m.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns"><form method="post" action="/senders/approve">${fields}<button class="btn secondary" aria-label="Allow ${who}">Allow</button></form><details class="more"><summary aria-label="Ignore ${who}">Ignore</summary><div class="body"><form method="post" action="/senders/ignore">${fields}<p class="ask">Delete the waiting mail from ${who}, and only log what they send later?</p><button class="btn secondary">Ignore and delete</button></form></div></details></div></li>`;
+  return `<li id="mail-${escape(m.id)}"><p class="who"><b>${who}</b></p><p class="subj">${m.subject ? escape(m.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns"><form method="post" action="/senders/approve">${fields}${button('allow', { attrs: ` aria-label="Allow ${who}"` })}</form><details class="more">${buttonSummary('ignore', { attrs: ` aria-label="Ignore ${who}"` })}<div class="body"><form method="post" action="/senders/ignore">${fields}<p class="ask">Delete the waiting mail from ${who}, and only log what they send later?</p>${button('ignore', { label: 'Ignore and delete' })}</form></div></details></div></li>`;
 }
 
 // Receipts To do: the held mail, then the open rows of the list in its order, the first upto of
@@ -273,7 +275,7 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
       const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
       const invoice = sales ? `${tag('Invoice')} ` : '';
       const note = overdue
-        ? `<span class="ok">${invoice}<span class="stamp missing">Overdue</span> ${escape(shortDay(dueOn(r, terms) ?? r.issue_date!))}</span><details class="more"><summary aria-label="Mark ${escape(name)} paid">Mark paid</summary><div class="body"><form method="post" action="/receipts/${r.id}/paid">${fields}<label>Paid on<input type="date" name="paid_outside_on" value="${iso()}" required></label><label>How<input name="paid_outside_note" maxlength="300" required placeholder="Stripe payout 14 Oct"></label><button class="btn secondary">Mark paid</button></form></div></details>`
+        ? `<span class="ok">${invoice}${statusMark('overdue', { after: escape(shortDay(dueOn(r, terms) ?? r.issue_date!)) })}</span><details class="more">${buttonSummary('paid', { attrs: ` aria-label="Mark ${escape(name)} paid"` })}<div class="body"><form method="post" action="/receipts/${r.id}/paid">${fields}<label>Paid on<input type="date" name="paid_outside_on" value="${iso()}" required></label><label>How<input name="paid_outside_note" maxlength="300" required placeholder="Stripe payout 14 Oct"></label>${button('paid')}</form></div></details>`
         : `<span class="why" title="${escape(firstFlag(r))}">${invoice}${escape(reasonWord(r))}</span>`;
       return `<li data-row="${r.id}" id="row-${r.id}"${rowAttrs(r.id)}>${bulkCheck(bulk, r.id, name)}<a href="${escape(receiptUrl(r.id, state))}">${escape(name)}</a>${amt}${note}</li>`;
     })
@@ -282,7 +284,7 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
   const left = total - rows.length;
   const more =
     left > 0 && state.upto < BULK_CAP
-      ? `<p><a class="btn secondary" href="${escape(listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }))}">Show ${Math.min(left, BANK_UPTO)} more</a></p>`
+      ? `<p>${buttonLink('showMore', listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }), { label: `Show ${Math.min(left, BANK_UPTO)} more` })}</p>`
       : '';
   const mail = held.length
     ? `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${heldTotal})</h2><ul class="list">${held.map((m) => heldRow(m, listUrl(state))).join('')}</ul></section>`
@@ -294,11 +296,11 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
         ? ''
         : emptyState(
             'Nothing to do.',
-            `<a class="btn primary" href="${escape(listUrl({ ...state, view: 'all' }))}">See receipts</a>`,
+            buttonLink('seeReceipts', listUrl({ ...state, view: 'all' }), { tone: 'primary' }),
           )
   }</div>${rows.length ? `${bulkBar(bulk)}${more}` : ''}`;
   const merge = merges.length
-    ? `<div class="tools"><form class="merge" action="/receipts/merge" method="post">${fields}<button class="btn secondary">Merge ${plural(merges.length, 'duplicate')}</button></form></div>`
+    ? `<div class="tools"><form class="merge" action="/receipts/merge" method="post">${fields}${button('mergeDup', { label: `Merge ${plural(merges.length, 'duplicate')}` })}</form></div>`
     : '';
   const month = state.month
     ? `<p class="small">${escape(monthName(state.month))} and undated only. <a href="${escape(listUrl({ ...state, month: null }))}">Every month</a></p>`
@@ -309,7 +311,7 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
     : '';
   // The one primary: the first open row, which Approve then walks on from.
   const start = rows[0]
-    ? `<a class="btn primary" href="${escape(receiptUrl(rows[0].id, state))}">Start checking (${total})</a>`
+    ? buttonLink('start', receiptUrl(rows[0].id, state), { label: `Start checking (${total})` })
     : '';
   return page(
     'receipts',
@@ -347,7 +349,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
   const chips = chipList
     ? `<details class="filters"${query.show && (CHIPS as readonly string[]).includes(query.show) ? ' open' : ''}><summary>More filters</summary><div class="body">${chipList}</div></details>`
     : '';
-  const find = `<form class="find" method="get" action="/receipts" role="search"><input type="hidden" name="view" value="all"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
+  const find = `<form class="find" method="get" action="/receipts" role="search"><input type="hidden" name="view" value="all"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100">${button('search')}${query.q ? buttonLink('clearSearch', path(query, { q: '' }), { tone: 'ghost', label: 'Clear' }) : ''}</form>`;
   // The list as actions return to it: the filter and search, never the page.
   const state: ListState = { ...RECEIPTS_TODO, view: 'all', show: query.show, month: query.month, q: query.q };
   const bulk: BulkList = {
@@ -371,11 +373,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
       const chip = chipOf(r);
       const href = escape(r.type === 'mail' ? `${listUrl(RECEIPTS_TODO)}#mail-${r.id}` : receiptUrl(r.id, state));
       const status =
-        chip.css === 'needs'
-          ? `<span class="stamp needs">${chip.label}</span> `
-          : chip.css === 'muted'
-            ? `${tag(chip.label)} `
-            : '';
+        chip.key === 'ready' ? '' : `${statusMark(chip.key, { after: chip.after ? escape(chip.after) : undefined })} `;
       const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
       return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.status === 'pending' || r.status === 'processing' ? `<a class="refresh" href="${escape(listUrl(state))}">Refresh</a>` : ''}${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}</li>`;
     })
@@ -383,7 +381,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
   const last = shown[shown.length - 1];
   const pages =
     query.before || more
-      ? `<nav class="btns" aria-label="Pages">${query.before ? `<a class="btn secondary" href="${link(query, { before: null })}">Newest</a>` : ''}${more && last ? `<a class="btn secondary" href="${link(query, { before: { at: last.received_at, id: last.id } })}">Older</a>` : ''}</nav>`
+      ? `<nav class="btns" aria-label="Pages">${query.before ? buttonLink('newest', path(query, { before: null })) : ''}${more && last ? buttonLink('older', path(query, { before: { at: last.received_at, id: last.id } })) : ''}</nav>`
       : '';
   const all = listUrl({ ...state, show: null, q: '', month: null });
   const list = shown.length
@@ -391,12 +389,12 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
     : query.q
       ? emptyState(
           `Nothing matches &#8220;${escape(query.q)}&#8221;.`,
-          `<a class="btn primary" href="${link(query, { q: '' })}">Clear search</a>`,
+          buttonLink('clearSearch', path(query, { q: '' }), { tone: 'primary' }),
         )
       : query.show === 'discarded'
-        ? emptyState('Nothing discarded.', `<a class="btn primary" href="${escape(all)}">Show all</a>`)
+        ? emptyState('Nothing discarded.', buttonLink('showAll', all, { tone: 'primary' }))
         : filtered || query.before
-          ? emptyState('Nothing here.', `<a class="btn primary" href="${escape(all)}">Show all</a>`)
+          ? emptyState('Nothing here.', buttonLink('showAll', all, { tone: 'primary' }))
           : query.month
             ? emptyState(`Nothing dated ${escape(monthName(query.month, false))}.`, addButton('all', true))
             : emptyState(

@@ -7,6 +7,7 @@ import { importBankCsv, parsePreset } from '../src/banking';
 import { BULK_CAP } from '../src/bulk';
 import type { Receipt } from '../src/domain';
 import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 type Seed = { status?: string; kind?: string; vendor?: string; net?: number | null; month?: string; client?: string };
@@ -279,13 +280,13 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   const all = await (await request('/receipts?view=all&month=2026-10')).text();
   expect(all).toContain(`value="${id(2)}" form="bulk-receipts"`);
   expect(all).toContain('data-total="2"');
-  expect(all).toContain('<button name="op" value="retry" class="btn" data-max="10">Read again</button>');
+  expect(all).toContain(button('reread', { attrs: ' name="op" value="retry" data-max="10"' }));
   expect(all).not.toContain('value="restore"');
   const discarded = await (await request('/receipts?show=discarded')).text();
   expect(discarded).not.toContain('<form id="bulk-');
   await bulk({ op: 'discard', id: id(2) });
   const after = await (await request('/receipts?show=discarded')).text();
-  expect(after).toContain('<button name="op" value="restore" class="btn">Restore</button>');
+  expect(after).toContain(button('restore', { attrs: ' name="op" value="restore"' }));
   expect(after).not.toContain('value="discard"');
 
   const invoices = await (await request('/receipts?view=all&kind=sales&month=2026-10')).text();

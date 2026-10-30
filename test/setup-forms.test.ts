@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { request } from './helpers';
+import { button } from '../src/actions';
 
 test('the import form is a file and Import, with or without a bank account', async () => {
   for (const accounts of [1, 0]) {
@@ -8,7 +9,7 @@ test('the import form is a file and Import, with or without a bank account', asy
     const html = await (await request('/import')).text();
     expect(html).toContain('<form action="/import" method="post" enctype="multipart/form-data">');
     expect(html).toContain('type="file" name="file"');
-    expect(html).toContain('<button class="btn primary">Import</button>');
+    expect(html).toContain(button('importStmt', { tone: 'primary' }));
     expect(html).not.toContain('name="account');
   }
 });

@@ -33,6 +33,7 @@ import { ariaFor, day, errorLine, escape } from './ui';
 import { failureFor, kept } from './request';
 import { withDone } from './events';
 import { undoAt } from './undo';
+import { button } from './actions';
 
 const tuningField = (key: SettingKey) =>
   (Object.entries(TUNING_VARS).find(([, v]) => v.name === key)?.[0] ?? null) as keyof Tuning | null;
@@ -245,7 +246,7 @@ function control(env: Env, field: Field): string {
 // Reset submits a small form of its own (resetForms), so Enter in a field
 // still submits Save rather than the first Reset in the group.
 function resetButton(field: Field, text: string): string {
-  return `<button class="linkbtn" form="reset-${field.key}" name="reset" value="${field.key}">${text}<span class="vh"> ${escape(field.label)}</span></button>`;
+  return `${button(text === 'Reset' ? 'reset' : 'clear', { label: text, attrs: ` form="reset-${field.key}" name="reset" value="${field.key}" aria-label="${text} ${escape(field.label)}"` })}`;
 }
 // Where a value in force came from, in plain words.
 const SOURCE_WORDS: Record<Source, string> = {
@@ -290,7 +291,7 @@ function groupForm(env: Env, group: (typeof GROUPS)[number], card: boolean): str
   const fields = FIELDS.filter(
     (f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS' && (hasParts(env) || f.key !== 'DEFAULT_PRODUCT'),
   );
-  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}">${errorLine(scopeOf(group.id), '')}<input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
+  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}">${errorLine(scopeOf(group.id), '')}<input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save">${button('save')}</div></form>${resetForms(env, fields)}`;
 }
 const AUDIT_LABEL = new Map(FIELDS.map((f) => [f.key as string, f.label]));
 function auditValue(json: string | null, key: string): string {

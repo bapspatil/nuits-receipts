@@ -4,7 +4,6 @@ import { DEFAULT_TUNING, money, type Receipt } from './domain';
 import { creditFit, eurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
-import { STATUS } from './status';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import { listParams, listUrl, RECEIPTS_TODO, receiptUrl, type ListState } from './worklist';
@@ -26,9 +25,9 @@ import {
   plural,
   receiptsTabs,
   shortDay,
-  tag,
   matchError,
 } from './ui';
+import { button, buttonLink, statusMark } from './actions';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
 export type SalesStatus = 'reading' | 'review' | 'paid' | 'overdue' | 'unpaid';
@@ -62,15 +61,15 @@ export function salesStatus(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays
 export function salesStamp(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays): string {
   switch (salesStatus(r, terms)) {
     case 'reading':
-      return tag(STATUS.reading);
+      return statusMark('reading');
     case 'review':
-      return `<span class="stamp needs">${STATUS.needs}</span>`;
+      return statusMark('needs');
     case 'paid':
-      return tag('Paid', true);
+      return statusMark('paid');
     case 'overdue':
-      return '<span class="stamp missing">Overdue</span>';
+      return statusMark('overdue');
     default:
-      return tag('Unpaid');
+      return statusMark('unpaid');
   }
 }
 export function invoiceName(r: Pick<Receipt, 'client' | 'invoice_number'>): string {
@@ -159,13 +158,13 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     const paid = paidOn(r);
     switch (salesStatus(r, config(env).tuning.paymentTermsDays)) {
       case 'reading':
-        return tag(STATUS.reading);
+        return statusMark('reading');
       case 'review':
-        return `<span class="stamp needs" title="${escape(firstFlag(r))}">${STATUS.needs}</span>`;
+        return statusMark('needs', { title: firstFlag(r) });
       case 'paid':
-        return tag(`Paid ${escape(shortDay(paid!))}`, true);
+        return statusMark('paid', { after: escape(shortDay(paid!)) });
       case 'overdue':
-        return `<span class="stamp missing">Overdue</span> ${escape(shortDay(due!))}`;
+        return statusMark('overdue', { after: escape(shortDay(due!)) });
       default:
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
@@ -212,7 +211,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           .map((r) => `<a href="${escape(receiptUrl(r.id, here))}">${escape(invoiceName(r))}</a>`)
           .join(', ')}</p>`
       : ''
-  }${month.length ? `<div class="csv"><a class="btn secondary" href="/export-sales.csv?month=${selected}">CSV</a><p class="small">${EXPORT_LINE}</p></div>` : ''}`;
+  }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`)}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
   const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
@@ -241,10 +240,10 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
     if (t)
       return box(
         'Paid',
-        `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}">${back}<button class="linkbtn" name="action" value="unlink">Remove match</button></form></div>`,
+        `<div class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}</p><form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}">${back}${button('unmatch', { attrs: ' name="action" value="unlink"' })}</form></div>`,
       );
   }
-  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div><button class="btn secondary">${r.paid_outside_on ? 'Save' : 'Mark paid'}</button></form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}<button class="linkbtn">Not paid</button></form>` : ''}`;
+  const paidForm = `<form action="/receipts/${r.id}/paid" method="post">${fields}<div class="fields">${input('paid_outside_on', r.paid_outside_on, 'date', 'Paid on')}${input('paid_outside_note', r.paid_outside_note, 'text', 'How', { hint: 'For example Stripe payout' })}</div>${r.paid_outside_on ? button('save') : button('paid')}</form>${r.paid_outside_on ? `<form action="/receipts/${r.id}/paid" method="post">${fields}${button('unpaid')}</form>` : ''}`;
   if (r.paid_outside_on)
     return box(
       'Paid',
@@ -267,7 +266,7 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
             .slice(0, 5)
             .map(
               (t) =>
-                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${back}<button class="btn secondary" name="action" value="link">Match</button></form>${matchError(t.id)}`,
+                `<form action="/matches" method="post" class="match"><p><strong>${amount(t.amount_minor, t.currency)}</strong> from ${escape(t.merchant)}, ${day(t.booking_date, false)}${t.reference ? ` <span class="hint">${escape(t.reference)}</span>` : ''}</p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${back}${button('match', { attrs: ' name="action" value="link"' })}</form>${matchError(t.id)}`,
             )
             .join('')
         : due
@@ -288,7 +287,7 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
     settings.receiptAddress ? `receipts to <code>${escape(settings.receiptAddress)}</code>` : '',
     settings.invoicesAddress ? `invoices you sent to <code>${escape(settings.invoicesAddress)}</code>` : '',
   ].filter(Boolean);
-  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p><button type="submit" class="btn primary">Add files</button></p></form>${
+  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp"></label><p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
   }<script src="/assets/add.js" defer></script>`;
   return page('add', body, 200, env, {

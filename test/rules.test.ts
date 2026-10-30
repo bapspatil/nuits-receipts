@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, expect, test } from 'vitest';
 import { getReceipt } from '../src/receipts';
 import { htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 const rule = (fields: Record<string, string> = {}) =>
   new URLSearchParams({
@@ -64,7 +65,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   const edit = htmlForm(html, `/rules/${id}`);
   expect(edit.get('vendor_contains')).toBe('Sample Cloud');
   expect(edit.get('product')).toBe('hosting');
-  expect(html).toContain(`<button class="linkbtn" formaction="/rules/${id}/delete">Delete</button>`);
+  expect(html).toContain(button('remove', { attrs: ` formaction="/rules/${id}/delete"` }));
   // Priority 0 is not shown.
   expect(html).toMatch(/<summary>Fake Shop → [^<·]+<\/summary>/);
 
