@@ -1,12 +1,13 @@
 // Discard: set a receipt aside without deleting it. A discarded row keeps its
 // files in R2 and its fields, but LIVE (domain.ts) leaves it out of Review,
-// totals, exports, the month package, dedupe and bank matching. Restore undoes
-// it. A row a bank line points at is discarded only with unmatch, which
-// removes the match in the same batch.
+// totals, exports, the month package, dedupe and bank matching. Restore brings
+// one back; the banner's Undo (src/undo.ts) brings back the whole action. A
+// matched receipt loses its match in the same batch, and Undo puts it back.
 import type { Env } from './env';
 import { requireInput } from './domain';
 import { reconcile } from './banking';
 import { escape } from './ui';
+import { undoAt, withUndo, type UndoAt } from './undo';
 
 export const MAX_BULK = 100;
 const ID = /^[a-f0-9]{64}$/;
@@ -23,15 +24,13 @@ export function receiptIds(values: readonly unknown[], max = MAX_BULK): string[]
   return ids;
 }
 
-export type DiscardOptions = { unmatch?: boolean; revision?: number | null };
-
 // Each row is discarded on its own terms (atomic per row). Returns the
 // action's timestamp, which Undo uses, and how many rows it discarded.
 export async function discardReceipts(
   env: Env,
   ids: readonly string[],
-  o: DiscardOptions,
-): Promise<{ at: string; n: number }> {
+  o: { revision?: number | null } = {},
+): Promise<{ at: UndoAt; n: number }> {
   const rows = (
     await env.DB.prepare(
       `SELECT r.id,r.revision,r.discarded_at,EXISTS(SELECT 1 FROM bank_transactions t WHERE t.receipt_id=r.id) AS matched FROM receipts r WHERE r.id IN (SELECT value FROM json_each(?))`,
@@ -45,9 +44,7 @@ export async function discardReceipts(
     'This receipt changed. Reload and try again.',
     409,
   );
-  const matched = rows.filter((r) => r.matched);
-  requireInput(!matched.length || o.unmatch, 'Remove the match first.', 409);
-  const at = new Date().toISOString();
+  const at = undoAt();
   const todo = rows.filter((r) => !r.discarded_at);
   // The discards, then (only where one applied) the unmatches. A row that
   // changed since the read is left as it was.
@@ -64,8 +61,8 @@ export async function discardReceipts(
       ).bind(r.id, at),
     );
   if (!discards.length) return { at, n: 0 };
-  const results = await env.DB.batch([...discards, ...unmatches]);
-  if (matched.length) await reconcile(env);
+  const results = await withUndo(env, { at, op: 'discard', ids: todo.map((r) => r.id) }, [...discards, ...unmatches]);
+  if (unmatches.length) await reconcile(env);
   return { at, n: results.slice(0, discards.length).reduce((n, r) => n + (r.meta.changes ?? 0), 0) };
 }
 
@@ -77,30 +74,14 @@ export async function restoreReceipts(env: Env, ids: readonly string[]): Promise
     .run();
   return result.meta.changes ?? 0;
 }
-// Undo: everything discarded in one action shares its timestamp. Returns the rows it brought back.
-export async function restoreBatch(env: Env, at: string): Promise<string[]> {
-  requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Invalid undo', 400);
-  const result = await env.DB.prepare(
-    'UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at=? RETURNING id',
-  )
-    .bind(at)
-    .all<{ id: string }>();
-  return result.results.map((r) => r.id);
-}
-
 // ---------- UI ----------
-// One click discards. A receipt a bank line points at asks first, because its match goes too.
+// One click discards, matched or not: the banner's Undo brings back the receipt and its match.
 // list: the hidden fields of the list or receipt page it is on, which the return keeps.
-export function discardControl(
-  id: string | null,
-  o: { list: string; matched?: boolean; revision?: number; name?: string },
-): string {
+export function discardControl(id: string | null, o: { list: string; revision?: number; name?: string }): string {
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
-  const fields = `${id ? hidden('id', id) : ''}${o.list}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
+  const fields = `${id ? hidden('id', id) : ''}${o.list}${o.revision === undefined ? '' : hidden('revision', o.revision)}`;
   const aria = o.name ? ` aria-label="Discard ${escape(o.name)}"` : '';
-  if (!o.matched)
-    return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;
-  return `<details class="discard"><summary${aria}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}<p class="ask">Remove match?</p><button class="btn secondary">Remove and discard</button></form></div></details>`;
+  return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;
 }
 
 // fields: on a receipt page, the list it was opened from (receiptFields), which Restore keeps.

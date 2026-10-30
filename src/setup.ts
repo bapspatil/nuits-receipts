@@ -32,6 +32,7 @@ import { reconcile } from './banking';
 import { ariaFor, day, errorLine, escape } from './ui';
 import { failureFor, kept } from './request';
 import { withDone } from './events';
+import { undoAt } from './undo';
 
 const tuningField = (key: SettingKey) =>
   (Object.entries(TUNING_VARS).find(([, v]) => v.name === key)?.[0] ?? null) as keyof Tuning | null;
@@ -125,9 +126,10 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
       );
     throw error;
   }
+  let gone: { id: string; label: string }[] = [];
   if (changes.some((c) => c.key === 'PRODUCTS_JSON')) {
     const kept = new Set(next.products.map((p) => p.id));
-    const gone = config(env).products.filter((p) => !kept.has(p.id));
+    gone = config(env).products.filter((p) => !kept.has(p.id));
     for (const product of gone) {
       const used = await base.DB.prepare(
         'SELECT (SELECT COUNT(*) FROM receipts WHERE product=?)+(SELECT COUNT(*) FROM vendor_rules WHERE product=?) AS n',
@@ -147,10 +149,15 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
       value: JSON.stringify({ address: before, until: new Date(Date.now() + GRACE_DAYS * 86400000).toISOString() }),
       old: null,
     });
-  await saveChanges(env, changes, who, revision);
+  // A save that removes a part offers Undo, which puts back the whole save.
+  const at = gone.length ? undoAt() : undefined;
+  await saveChanges(env, changes, who, revision, at);
   await afterSave(base, changes);
   const routing = changes.some((c) => c.key === 'RECEIPT_ADDRESS' || c.key === 'INVOICES_ADDRESS');
-  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${group}`, { group });
+  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${group}`, {
+    group,
+    ...(at ? { at, op: 'settings', removed: gone.length } : {}),
+  });
 }
 export async function resetSetting(env: Env, form: FormData, who: string): Promise<string> {
   const key = String(form.get('reset') ?? '') as SettingKey,

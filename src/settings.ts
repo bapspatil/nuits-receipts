@@ -8,6 +8,7 @@
 import type { Env } from './env';
 import { parseConfig, TUNING_VARS } from './config';
 import { DEFAULT_TUNING, EXPONENTS, InputError, requireInput } from './domain';
+import { withUndo, type UndoAt } from './undo';
 
 // The CHECK on settings.value_json (schema/0004_settings.sql). The stored text
 // is the JSON-encoded value, quotes included.
@@ -522,8 +523,15 @@ export function normalizeValue(field: Field, raw: string): string {
 export type Change = { key: SettingKey | typeof PREVIOUS_INVOICES; value: string | null; old: string | null };
 // Writes changes (null value = back to deploy/default) with their audit rows
 // in one batch. The first statement fails the batch when someone else saved
-// since `revision`, so two tabs can't silently overwrite each other.
-export async function saveChanges(env: Env, changes: readonly Change[], who: string, revision: number): Promise<void> {
+// since `revision`, so two tabs can't silently overwrite each other. With at,
+// the batch also logs the keys as they were, for the banner's Undo.
+export async function saveChanges(
+  env: Env,
+  changes: readonly Change[],
+  who: string,
+  revision: number,
+  at?: UndoAt,
+): Promise<void> {
   if (!changes.length) return;
   const now = new Date().toISOString(),
     base = deployEnv(env);
@@ -563,7 +571,8 @@ export async function saveChanges(env: Env, changes: readonly Change[], who: str
       );
   }
   try {
-    await base.DB.batch(statements);
+    if (at) await withUndo(base, { at, op: 'settings', ids: changes.map((c) => c.key) }, statements);
+    else await base.DB.batch(statements);
   } catch (error) {
     if (error instanceof Error && /malformed JSON|settings changed/i.test(error.message))
       throw new InputError('Settings were changed in another tab or by someone else. Reload and try again.', 409);

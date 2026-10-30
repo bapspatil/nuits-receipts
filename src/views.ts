@@ -641,7 +641,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
     needs && next && next !== r.id
       ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
       : '';
-  const discard = discardControl(r.id, { list: own, matched: linked, revision: r.revision });
+  const discard = discardControl(r.id, { list: own, revision: r.revision });
   const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true, own)}</section>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const verbLabel = verb === 'save' ? 'Save' : sales ? 'Approve invoice' : 'Approve receipt';

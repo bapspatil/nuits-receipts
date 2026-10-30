@@ -2,14 +2,15 @@
 // own write with its snapshot in the same batch, and Undo puts every column it
 // changed back exactly, unless the row changed again since.
 import { env } from 'cloudflare:workers';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 import { arrivalMonth } from '../src/arrival';
 import { SET_REQUIRED_SQL } from '../src/banking';
 import { receiptsBulk } from '../src/batch';
 import { discardReceipts } from '../src/discard';
 import { hash, InputError } from '../src/domain';
 import { unlinkMatches } from '../src/match';
-import { parseUndo, undo, undoAt, withUndo, type UndoAction, type UndoOp } from '../src/undo';
+import { parseUndo, undo, undoAt, withUndo, type UndoAction, type UndoAt, type UndoOp } from '../src/undo';
+import { htmlForm, locationOf, request } from './helpers';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const caller = { who: 'owner', ctx: { waitUntil: () => {} } };
@@ -61,16 +62,8 @@ const rows = async (table: string, ids: readonly (string | number)[]) =>
 const logged = async () =>
   (await env.DB.prepare('SELECT op,tbl,row_id FROM undo_log ORDER BY tbl,row_id').all()).results;
 
-// Runs an app function with its first batch wrapped by withUndo, as the route
-// will once it is wired, so the test drives the app's own write.
-async function wrapped<T>(action: UndoAction, run: () => Promise<T>): Promise<T> {
-  const spy = vi.spyOn(env.DB, 'batch').mockImplementationOnce((writes) => withUndo(env, action, writes) as never);
-  try {
-    return await run();
-  } finally {
-    spy.mockRestore();
-  }
-}
+// How many rows an Undo put back.
+const undone = async (at: UndoAt, op: UndoOp) => (await undo(env, at, op)).ids.length;
 const action = (op: UndoOp, ids: readonly (string | number)[], at = undoAt()): UndoAction => ({ at, op, ids });
 
 beforeEach(async () => {
@@ -86,21 +79,22 @@ test('bulk approve of 10 receipts, then Undo puts every column back', async () =
     "INSERT INTO fx_rates VALUES ('USD','2026-10-20','2026-10-20','0.9','ecb','2026-10-20T16:00:00Z')",
   ).run();
   const before = await rows('receipts', ids);
-  const a = action('approve', ids);
   const form = new FormData();
   form.set('op', 'approve');
   form.set('approval_reason', 'Checked against the PDF');
+  for (const [k, v] of Object.entries({ list: 'receipts', view: 'todo', month: '', show: '', q: '' })) form.set(k, v);
   for (const one of ids) form.append('id', one);
-  const done = await wrapped(a, () => receiptsBulk(env, form, caller));
+  const done = await receiptsBulk(env, form, caller);
   expect(done.n).toBe(10);
+  const a = { at: new URL(done.location, 'https://x.example').searchParams.get('at') as UndoAt };
   expect((await rows('receipts', ids)).every((r) => r.status === 'ready' && r.fx_eur_minor !== null)).toBe(true);
 
-  expect(await undo(env, a.at, 'approve')).toEqual({ n: 10 });
+  expect(await undone(a.at, 'approve')).toBe(10);
   const after = await rows('receipts', ids);
   expect(after).toEqual(before);
   expect(after.every((r) => Number.isInteger(r.total_minor) && r.invoice_number === '00123')).toBe(true);
   expect(await logged()).toEqual([]);
-  expect(await undo(env, a.at, 'approve')).toEqual({ n: 0 });
+  expect(await undone(a.at, 'approve')).toBe(0);
 });
 
 test('Undo restores revision, so a month sent before the approval reads as sent again', async () => {
@@ -129,11 +123,10 @@ test('discard of a matched receipt, then Undo brings back the receipt and its ma
   await receipt(1, { status: 'ready' });
   await payment('tx1', id(1));
   const before = { r: await rows('receipts', [id(1)]), t: await rows('bank_transactions', ['tx1']) };
-  const a = action('discard', [id(1)]);
-  await wrapped(a, () => discardReceipts(env, [id(1)], { reason: 'personal', unmatch: true }));
+  const a = await discardReceipts(env, [id(1)]);
   expect((await rows('bank_transactions', ['tx1']))[0]).toMatchObject({ receipt_id: null });
 
-  expect(await undo(env, a.at, 'discard')).toEqual({ n: 1 });
+  expect(await undone(a.at, 'discard')).toBe(1);
   expect(await rows('receipts', [id(1)])).toEqual(before.r);
   expect(await rows('bank_transactions', ['tx1'])).toEqual(before.t);
 });
@@ -143,14 +136,13 @@ test('discard, then the payment is matched to another receipt: Undo restores the
   await receipt(2, { status: 'ready' });
   await payment('tx1', id(1));
   const before = await rows('receipts', [id(1)]);
-  const a = action('discard', [id(1)]);
-  await wrapped(a, () => discardReceipts(env, [id(1)], { reason: null, unmatch: true }));
+  const a = await discardReceipts(env, [id(1)]);
   await env.DB.prepare("UPDATE bank_transactions SET receipt_id=?,match_method='manual' WHERE id='tx1'")
     .bind(id(2))
     .run();
   const taken = await rows('bank_transactions', ['tx1']);
 
-  expect(await undo(env, a.at, 'discard')).toEqual({ n: 1 });
+  expect(await undone(a.at, 'discard')).toBe(1);
   expect(await rows('receipts', [id(1)])).toEqual(before);
   expect(await rows('bank_transactions', ['tx1'])).toEqual(taken);
 });
@@ -171,7 +163,7 @@ test('Not a purchase, then Undo restores receipt_required, exempt_by and the mat
     { receipt_required: 0, exempt_by: 'owner', receipt_id: null },
   ]);
 
-  expect(await undo(env, a.at, 'exempt')).toEqual({ n: 2 });
+  expect(await undone(a.at, 'exempt')).toBe(2);
   expect(await rows('bank_transactions', ['tx1', 'tx2'])).toEqual(before);
 });
 
@@ -184,7 +176,7 @@ test('Needs a receipt, then Undo puts back the rule that had exempted it', async
       `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=?`,
     ).bind(1, JSON.stringify(a.ids), 0),
   ]);
-  expect(await undo(env, a.at, 'require')).toEqual({ n: 1 });
+  expect(await undone(a.at, 'require')).toBe(1);
   expect(await rows('bank_transactions', ['tx1'])).toEqual(before);
 });
 
@@ -201,7 +193,7 @@ test('a re-link is skipped, without an error, when the receipt was matched to an
     .run();
   const now = await rows('bank_transactions', ['tx1', 'tx2']);
 
-  expect(await undo(env, a.at, 'exempt')).toEqual({ n: 0 });
+  expect(await undone(a.at, 'exempt')).toBe(0);
   expect(await rows('bank_transactions', ['tx1', 'tx2'])).toEqual(now);
 });
 
@@ -210,8 +202,8 @@ test('unmatch, then Undo links the payment to its receipt again', async () => {
   await payment('tx1', id(1));
   const before = await rows('bank_transactions', ['tx1']);
   const a = action('unmatch', ['tx1']);
-  expect(await wrapped(a, () => unlinkMatches(env, ['tx1']))).toBe(1);
-  expect(await undo(env, a.at, 'unmatch')).toEqual({ n: 1 });
+  expect(await unlinkMatches(env, ['tx1'], a.at)).toBe(1);
+  expect(await undone(a.at, 'unmatch')).toBe(1);
   expect(await rows('bank_transactions', ['tx1'])).toEqual(before);
 });
 
@@ -224,7 +216,7 @@ test('mark paid, then Undo puts back the NULLs', async () => {
       "UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE kind='sales' AND id IN (SELECT value FROM json_each(?))",
     ).bind('2026-10-25', 'Stripe payout', JSON.stringify(a.ids)),
   ]);
-  expect(await undo(env, a.at, 'paid')).toEqual({ n: 1 });
+  expect(await undone(a.at, 'paid')).toBe(1);
   expect(await rows('receipts', [id(1)])).toEqual(before);
 });
 
@@ -237,7 +229,7 @@ test('delete rule, then Undo inserts it back as it was', async () => {
   await withUndo(env, a, [env.DB.prepare('DELETE FROM vendor_rules WHERE id=?').bind(rule!.id)]);
   expect(await rows('vendor_rules', [rule!.id])).toEqual([]);
 
-  expect(await undo(env, a.at, 'deleteRule')).toEqual({ n: 1 });
+  expect(await undone(a.at, 'deleteRule')).toBe(1);
   expect(await rows('vendor_rules', [rule!.id])).toEqual(before);
 });
 
@@ -256,7 +248,7 @@ test('Undo leaves a row that changed again since, and never brings back one dele
   await env.DB.prepare('DELETE FROM receipts WHERE id=?').bind(id(2)).run();
   const edited = await rows('receipts', [id(1)]);
 
-  expect(await undo(env, a.at, 'approve')).toEqual({ n: 0 });
+  expect(await undone(a.at, 'approve')).toBe(0);
   expect(await rows('receipts', [id(1)])).toEqual(edited);
   expect(await rows('receipts', [id(2)])).toEqual([]);
 });
@@ -287,4 +279,57 @@ test('the Undo form is parsed at the boundary', () => {
   expect(parseUndo('2026-10-30T10:00:00.000Z', 'discard')).toEqual({ at: '2026-10-30T10:00:00.000Z', op: 'discard' });
   expect(() => parseUndo('2026-10-30', 'discard')).toThrow(InputError);
   expect(() => parseUndo('2026-10-30T10:00:00.000Z', 'toString')).toThrow(InputError);
+});
+
+test('Approve on a receipt page, then its Undo opens that receipt again as it was', async () => {
+  await receipt(1);
+  await receipt(2);
+  const before = await rows('receipts', [id(1)]);
+  const form = htmlForm(await (await request(`/receipts/${id(1)}?from=todo`)).text(), `/receipts/${id(1)}`);
+  form.set('action', 'approve');
+  form.set('approval_reason', 'Checked');
+  const approved = await request(`/receipts/${id(1)}`, { method: 'POST', body: form });
+  expect(locationOf(approved)).toMatch(`/receipts/${id(2)}?from=todo&done=approved&name=Vendor+1`);
+  const page = await (await request(approved.headers.get('Location')!)).text();
+  expect(page).toContain('Approved Vendor 1.');
+  const back = await request('/undo', { method: 'POST', body: htmlForm(page, '/undo') });
+  expect(locationOf(back)).toBe(`/receipts/${id(1)}?from=todo&done=undone&op=approve&n=1`);
+  expect((await rows('receipts', [id(1)]))[0]).toMatchObject({
+    status: before[0]!.status,
+    revision: before[0]!.revision,
+    manual_fields_json: before[0]!.manual_fields_json,
+  });
+});
+
+test('Undo of an approval takes off the automatic match the matcher made after it', async () => {
+  await receipt(1);
+  await payment('tx1', null);
+  const form = new FormData();
+  for (const [k, v] of Object.entries({ op: 'approve', approval_reason: 'Checked', list: 'receipts', view: 'todo' }))
+    form.set(k, v);
+  for (const k of ['month', 'show', 'q']) form.set(k, '');
+  form.set('id', id(1));
+  const done = await receiptsBulk(env, form, caller);
+  const at = new URL(done.location, 'https://x.example').searchParams.get('at') as UndoAt;
+  // As reconcile would after the approval.
+  await env.DB.prepare("UPDATE bank_transactions SET receipt_id=?,match_method='automatic',matched_at=? WHERE id='tx1'")
+    .bind(id(1), new Date(Date.parse(at) + 1).toISOString())
+    .run();
+  expect(await undone(at, 'approve')).toBe(1);
+  expect((await rows('bank_transactions', ['tx1']))[0]).toMatchObject({ receipt_id: null, match_method: null });
+});
+
+test('Remove match on Bank, then its Undo links the pair again and lands on Bank', async () => {
+  await receipt(1, { status: 'ready' });
+  await payment('tx1', id(1));
+  const before = await rows('bank_transactions', ['tx1']);
+  const removed = await request('/matches', {
+    method: 'POST',
+    body: new URLSearchParams({ transaction_id: 'tx1', action: 'unlink', view: 'all', month: '2026-10' }),
+  });
+  const page = await (await request(removed.headers.get('Location')!)).text();
+  expect(page).toContain('Removed the match for Vendor.');
+  const back = await request('/undo', { method: 'POST', body: htmlForm(page, '/undo') });
+  expect(locationOf(back)).toMatch(/^\/payments\?month=2026-10&view=all&done=undone&op=unmatch&n=1/);
+  expect(await rows('bank_transactions', ['tx1'])).toEqual(before);
 });

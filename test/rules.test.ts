@@ -99,6 +99,13 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   const deleted = await post(`/rules/${id}/delete`, new URLSearchParams());
   expect(deleted.status).toBe(303);
   expect(locationOf(deleted)).toBe('/settings?done=ruleDeleted#rules');
+  const restoredRule = await request('/undo', {
+    method: 'POST',
+    body: htmlForm(await (await request(deleted.headers.get('Location')!)).text(), '/undo'),
+  });
+  expect(locationOf(restoredRule)).toBe('/settings?done=undone&op=deleteRule&n=1&section=rules#rules');
+  expect((await rules()).map((r) => r.id)).toEqual([id, second!.id].sort((a, b) => Number(a) - Number(b)));
+  await post(`/rules/${id}/delete`, new URLSearchParams());
   expect((await rules()).map((r) => r.id)).toEqual([second!.id]);
   expect(await (await request(await signed('/settings?done=ruleDeleted'))).text()).toContain('Rule deleted.');
 });

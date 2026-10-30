@@ -332,8 +332,14 @@ test('overdue and paid outside the bank', async () => {
   form.set('upto', '50');
   const paid = await request(`/receipts/${r.id}/paid`, { method: 'POST', body: form });
   expect(paid.status).toBe(303);
-  expect(locationOf(paid)).toMatch(/^\/receipts\?view=todo&done=paid&on=2026-09-30&id=/);
+  expect(locationOf(paid)).toMatch(/^\/receipts\?view=todo&done=paid&on=2026-09-30$/);
   expect(await (await request('/receipts?view=todo')).text()).not.toContain(`data-row="${r.id}"`);
+  // Undo puts the invoice back in To do, where it lands.
+  const landed = await (await request(paid.headers.get('Location')!)).text();
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undo)).toBe(`/receipts?view=todo&done=undone&op=paid&n=1#row-${r.id}`);
+  expect((await getReceipt(env, r.id)).paid_outside_on).toBeNull();
+  expect((await request(`/receipts/${r.id}/paid`, { method: 'POST', body: form })).status).toBe(303);
   form.delete('view');
   expect(await getReceipt(env, r.id)).toMatchObject({
     paid_outside_on: '2026-09-30',

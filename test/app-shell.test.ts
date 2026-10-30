@@ -806,20 +806,21 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
     approve.set(k, v);
   approve.set('action', 'approve');
   const approved = await request(`/receipts/${second.id}`, { method: 'POST', body: approve });
-  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?from=todo&done=approved`);
+  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?from=todo&done=approved&name=Fake+Shop`);
   expect(await (await request(await signed(`/receipts/${flagged.id}?done=approved`))).text()).toContain(
     '<p class="banner" role="status">Approved.</p>',
   );
   const last = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
   last.set('action', 'approve');
-  const landing = locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }));
-  expect(landing).toBe('/receipts?view=todo&done=approvedLast&month=2026-09&step=match');
+  const lastRes = await request(`/receipts/${flagged.id}`, { method: 'POST', body: last });
+  expect(locationOf(lastRes)).toMatch(/^\/receipts\?view=todo&done=approvedLast&month=2026-09&step=match&name=/);
   // The empty Review says it is done and points at the next step, for the month the receipt belongs to.
-  const empty = await (await request(await signed(landing))).text();
+  const empty = await (await request(lastRes.headers.get('Location')!)).text();
   expect(empty).toContain(
-    '<p class="banner" role="status">Every receipt is checked. Next, match September&#39;s payments. <a href="/payments?month=2026-09&amp;view=todo">Open Bank</a></p>',
+    'Every receipt is checked. Next, match September&#39;s payments. <a href="/payments?month=2026-09&amp;view=todo">Open Bank</a>',
   );
+  expect(empty).toContain('<form method="post" action="/undo">');
 });
 
 test('a ready receipt has one Save; a new problem sends it back to Review', async () => {

@@ -106,11 +106,12 @@ test('export links point at the base path', async () => {
 });
 
 test('the feedback banner and its Undo form carry the base path', async () => {
-  const tx = 'a'.repeat(64);
   const html = await (
-    await at(await signed(`/app/receipts?view=todo&done=notPurchase&tx=${tx}&name=Acme`, '/app'))
+    await at(
+      await signed(`/app/receipts?view=todo&done=notPurchase&name=Acme&at=2026-09-03T10:00:00.000Z&op=exempt`, '/app'),
+    )
   ).text();
-  expect(html).toContain(`<form method="post" action="/app/payments/${tx}">`);
+  expect(html).toContain('<form method="post" action="/app/undo">');
   expect(html).toContain('Acme is not a purchase');
 });
 
@@ -128,18 +129,20 @@ test('every list return keeps its list and its next open row under the base path
   expect(await to(`/payments/${m0}`, { receipt_required: '0', ...bank })).toMatch(
     new RegExp(`${onBank}notPurchase&.*#row-${m1}$`),
   );
-  expect(await to('/payments/bulk', { ...bank, op: 'exempt', id: [m1, m2] })).toMatch(
-    new RegExp(`${onBank}notPurchaseMany&n=2#row-${m3}$`),
-  );
+  const exempted = await post('/payments/bulk', { ...bank, op: 'exempt', id: [m1, m2] });
+  expect(locationOf(exempted)).toMatch(new RegExp(`${onBank}notPurchaseMany&n=2#row-${m3}$`));
+  const exemptAt = new URL(exempted.headers.get('Location')!, 'http://x.example').searchParams.get('at')!;
   expect(await to('/matches/bulk', { ...bank, transaction_id: m3, receipt_id: b.earlier[0]! })).toMatch(
     new RegExp(`${onBank}matchedMany&n=0&skipped=1#row-${m4}$`),
   );
-  expect(await to('/matches/undo', { ...bank, at: '2026-09-01T00:00:00.000Z' })).toMatch(
-    new RegExp(`${onBank}unmatchedMany&n=0#row-${m3}$`),
+  // Undo lands on the first row it brought back, and on the first open row when nothing came back.
+  expect(await to('/undo', { ...bank, at: '2026-09-01T00:00:00.000Z', op: 'match' })).toMatch(
+    new RegExp(`${onBank}undone&op=match&n=0#row-${m3}$`),
   );
-  expect(await to(`/imports/${'b'.repeat(64)}/exempt/undo`, bank)).toMatch(
-    new RegExp(`${onBank}exemptUndone&n=0#row-${m3}$`),
+  expect(await to('/undo', { ...bank, at: exemptAt, op: 'exempt' })).toMatch(
+    new RegExp(`${onBank}undone&op=exempt&n=2#row-${m1}$`),
   );
+  expect((await post('/undo', { ...bank, at: exemptAt, op: 'nope' })).status).toBe(400);
   expect(await to('/matches', { ...bank, transaction_id: b.matched[0]!.id, action: 'unlink' })).toMatch(
     new RegExp(`${onBank}unmatched&.*#row-[0-9a-f]{64}$`),
   );

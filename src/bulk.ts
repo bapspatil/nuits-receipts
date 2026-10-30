@@ -163,13 +163,8 @@ export const RECEIPT_ACTIONS = {
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
-  // Undo can't bring a match back yet, so the bar still asks before it removes one.
-  discard: {
-    op: 'discard',
-    label: 'Discard',
-    tone: 'danger',
-    confirm: 'Discard these? Matched ones lose their match.',
-  },
+  // Undo brings back the receipts and their matches, so it asks nothing.
+  discard: { op: 'discard', label: 'Discard' },
   restore: { op: 'restore', label: 'Restore' },
   retry: { op: 'retry', label: 'Read again', max: AI_CAP },
   kind: (from: Kind) => ({

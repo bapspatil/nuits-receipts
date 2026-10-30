@@ -54,7 +54,7 @@ test('B: over 500 open rows, totals are true and select-all takes exactly the fi
 
   const res = await post('/receipts/bulk', { op: 'discard', list: 'receipts', view: 'todo', upto: '50', all: '1' });
   expect(res.status).toBe(303);
-  expect(locationOf(res)).toMatch(new RegExp(`done=discarded&n=500&.*#row-${open[500]}$`));
+  expect(locationOf(res)).toMatch(new RegExp(`done=discarded&n=500#row-${open[500]}$`));
   const gone = (await env.DB.prepare('SELECT id FROM receipts WHERE discarded_at IS NOT NULL').all<{ id: string }>())
     .results;
   expect(gone.map((r) => r.id).sort()).toEqual(open.slice(0, 500).sort());
@@ -132,14 +132,16 @@ test('C: Approve while typing a date moves on from where the receipt stood, not 
     await approveForm(first, { issue_date: `${month}-07`, from: 'todo', month }),
   );
   expect(await env.DB.prepare('SELECT status FROM receipts WHERE id=?').bind(first).first('status')).toBe('ready');
-  expect(locationOf(res)).toBe(`/receipts/${second}?from=todo&month=${month}&done=approved`);
+  expect(locationOf(res)).toMatch(
+    new RegExp(`^/receipts/${second}\\?from=todo&month=${month}&done=approved&name=[^&#]+$`),
+  );
 });
 
 test('F: Undo of a Discard lands on the receipt it brought back', async () => {
   const b = await seedBusyMonth();
   const month = b.earlierMonth;
   const [, e1] = b.earlier as [string, string];
-  // To do discards from its bulk bar, whose Undo restores by time.
+  // To do discards from its bulk bar, whose Undo restores through the undo log.
   const discarded = await post('/receipts/bulk', {
     op: 'discard',
     list: 'receipts',
@@ -149,8 +151,8 @@ test('F: Undo of a Discard lands on the receipt it brought back', async () => {
     id: e1,
   });
   const landed = await get(discarded.headers.get('Location')!);
-  const undone = await request('/restore', { method: 'POST', body: htmlForm(landed, '/restore') });
-  expect(locationOf(undone)).toBe(`/receipts?view=todo&month=${month}&done=restored&n=1#row-${e1}`);
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undone)).toBe(`/receipts?view=todo&month=${month}&done=undone&op=discard&n=1#row-${e1}`);
 });
 
 const openCount = async () =>
@@ -191,7 +193,7 @@ test('A: a bulk post without its full list state is refused, and select-all on A
     view: 'all',
     q: 'unique searchable',
   });
-  expect(locationOf(hit)).toMatch(/^\/receipts\?view=all&q=unique\+searchable&done=discarded&n=2&/);
+  expect(locationOf(hit)).toMatch(/^\/receipts\?view=all&q=unique\+searchable&done=discarded&n=2$/);
   const gone = await env.DB.prepare('SELECT id FROM receipts WHERE discarded_at IS NOT NULL ORDER BY id').all<{
     id: string;
   }>();
@@ -271,8 +273,11 @@ test('D: Match from a receipt page returns to that page, not to Bank', async () 
   expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${r}\\?from=all&month=${b.month}&done=matched&`));
   // Its Undo keeps the page's list too.
   const landed = await get(res.headers.get('Location')!);
-  const undo = await request('/matches', { method: 'POST', body: htmlForm(landed, '/matches') });
-  expect(locationOf(undo)).toMatch(new RegExp(`^/receipts/${r}\\?from=all&month=${b.month}&done=unmatched&`));
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undo)).toBe(`/receipts/${r}?from=all&month=${b.month}&done=undone&op=match&n=1`);
+  expect(await env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(tx).first('receipt_id')).toBe(
+    null,
+  );
 });
 
 test('H: a receipt opened from a searched All list keeps the search on the way back', async () => {
