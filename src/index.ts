@@ -41,7 +41,7 @@ import { verifyAccessJwt } from './access';
 import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
 import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
 import { allReceiptsPage } from './all';
-import { discardReason, discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
+import { discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
@@ -235,7 +235,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     // From the receipt page in the queue: land on the next one, like Skip.
     const queue = form.get('back') === 'queue' && ids.length === 1 ? (await queueAround(env, ids[0]!)).next : null;
     const { at } = await discardReceipts(env, ids, {
-      reason: discardReason(form.get('reason')),
       unmatch: form.get('unmatch') === '1',
       revision: revision === null ? null : Number(revision),
     });

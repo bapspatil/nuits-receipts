@@ -463,7 +463,9 @@ body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=
 }
 @media (max-width:879px) and (hover:hover){nav.tabs a:hover{color:var(--text)}}
 .tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}
-.list li:has(>details.discard)>.why{align-self:center}
+.list li:has(>.discard)>.why{align-self:center}
+form.discard{grid-column:2;grid-row:2;justify-self:end;margin:0}
+form.discard>.linkbtn{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);text-decoration:none}
 details.discard{grid-column:2;grid-row:2;justify-self:end;border:0;background:none;margin:0}
 details.discard>summary{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);display:flex;align-items:center;justify-content:flex-end;list-style:none}
 details.discard>summary::-webkit-details-marker{display:none}

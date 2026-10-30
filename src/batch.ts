@@ -16,7 +16,7 @@ import {
 import { BANK_SHOWS, cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
-import { discardReason, discardReceipts, restoreReceipts } from './discard';
+import { discardReceipts, restoreReceipts } from './discard';
 import {
   approveSenders,
   deleteHeldMail,
@@ -124,8 +124,8 @@ const OPS: Record<ReceiptOp, Op> = {
     },
   },
   discard: {
-    run: async (env, ids, form, back) => {
-      const { at, n } = await discardReceipts(env, ids, { reason: discardReason(form.get('reason')), unmatch: true });
+    run: async (env, ids, _form, back) => {
+      const { at, n } = await discardReceipts(env, ids, { unmatch: true });
       return { n, event: 'discarded', params: { at, back } };
     },
   },

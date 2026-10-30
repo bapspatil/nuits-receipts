@@ -118,7 +118,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Invalid selection': "Something you selected isn't there any more. Reload the page and try again.",
 
   // discard
-  'Invalid reason': 'Pick one of the reasons listed.',
   'Choose a receipt': 'Choose at least one receipt.',
   'Invalid receipt': "We couldn't find that receipt. Reload the page and try again.",
   'Receipt not found': "We couldn't find that receipt. It may have been removed.",

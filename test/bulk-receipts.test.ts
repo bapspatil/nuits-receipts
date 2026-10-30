@@ -118,13 +118,12 @@ test('discard sets the rows aside with one Undo back to the same list; restore b
   const res = await bulk({
     op: 'discard',
     id: ids(1, 2),
-    reason: 'personal',
     list: 'receipts',
     back: '/receipts?month=2026-10&q=vendor',
   });
   const location = locationOf(res);
   expect(location).toMatch(/^\/receipts\?month=2026-10&q=vendor&done=discarded&n=2&at=[^&]+&back=/);
-  expect((await row(1))!.discard_reason).toBe('personal');
+  expect((await row(1))!.discard_reason).toBeNull();
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('2 discarded.');
   expect(page).toContain('action="/restore"');
@@ -302,7 +301,6 @@ test('chunk totals of done and skipped add up, within bounds', async () => {
 
 test('names from the object prototype are not reasons or shows', async () => {
   await receipt(1, { status: 'needs_review' });
-  expect((await json({ op: 'discard', id: id(1), reason: 'toString' })).status).toBe(400);
   expect((await row(1))!.discarded_at).toBeNull();
   for (const path of ['/review?reason=constructor', '/receipts?show=toString'])
     expect((await request(path)).status, path).toBe(200);

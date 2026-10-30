@@ -4,19 +4,13 @@
 // it. A row a bank line points at is discarded only with unmatch, which
 // removes the match in the same batch.
 import type { Env } from './env';
-import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
+import { requireInput } from './domain';
 import { reconcile } from './banking';
 import { escape } from './ui';
 
 export const MAX_BULK = 100;
 const ID = /^[a-f0-9]{64}$/;
 
-export function discardReason(value: unknown): DiscardReason | null {
-  const text = String(value ?? '');
-  if (!text) return null;
-  requireInput(Object.hasOwn(DISCARD_REASONS, text), 'Invalid reason', 400);
-  return text as DiscardReason;
-}
 export function receiptIds(values: readonly unknown[], max = MAX_BULK): string[] {
   const ids = [...new Set(values.map(String))];
   requireInput(ids.length > 0, 'Choose a receipt', 400);
@@ -29,7 +23,7 @@ export function receiptIds(values: readonly unknown[], max = MAX_BULK): string[]
   return ids;
 }
 
-export type DiscardOptions = { reason: DiscardReason | null; unmatch?: boolean; revision?: number | null };
+export type DiscardOptions = { unmatch?: boolean; revision?: number | null };
 
 // Each row is discarded on its own terms (atomic per row). Returns the
 // action's timestamp, which Undo uses, and how many rows it discarded.
@@ -59,8 +53,8 @@ export async function discardReceipts(
   // changed since the read is left as it was.
   const discards = todo.map((r) =>
     env.DB.prepare(
-      'UPDATE receipts SET discarded_at=?,discard_reason=?,revision=revision+1 WHERE id=? AND revision=? AND discarded_at IS NULL',
-    ).bind(at, o.reason, r.id, r.revision),
+      'UPDATE receipts SET discarded_at=?,revision=revision+1 WHERE id=? AND revision=? AND discarded_at IS NULL',
+    ).bind(at, r.id, r.revision),
   );
   const unmatches = todo
     .filter((r) => r.matched)
@@ -95,17 +89,17 @@ export async function restoreBatch(env: Env, at: string): Promise<number> {
 }
 
 // ---------- UI ----------
-// The reason chips. Each one discards; the plain button skips the reason.
+// One click discards. A receipt a bank line points at asks first, because its match goes too.
 export function discardControl(
   id: string | null,
   o: { back: string; matched?: boolean; revision?: number; name?: string },
 ): string {
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
   const fields = `${id ? hidden('id', id) : ''}${hidden('back', o.back)}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
-  const chips = (Object.keys(DISCARD_REASONS) as DiscardReason[])
-    .map((k) => `<button class="chip" name="reason" value="${k}">${DISCARD_REASONS[k]}</button>`)
-    .join('');
-  return `<details class="discard"><summary${o.name ? ` aria-label="Discard ${escape(o.name)}"` : ''}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}${o.matched ? '<p class="ask">Remove match?</p>' : ''}<div class="reasons">${chips}<button class="btn secondary" name="reason" value="">${o.matched ? 'Remove and discard' : 'Discard'}</button></div></form></div></details>`;
+  const aria = o.name ? ` aria-label="Discard ${escape(o.name)}"` : '';
+  if (!o.matched)
+    return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;
+  return `<details class="discard"><summary${aria}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}<p class="ask">Remove match?</p><button class="btn secondary">Remove and discard</button></form></div></details>`;
 }
 
 export function restoreForm(id: string, back: string, primary = false): string {

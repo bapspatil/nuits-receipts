@@ -1,4 +1,4 @@
-import { DISCARD_REASONS, type Kind } from './domain';
+import type { Kind } from './domain';
 import { escape } from './ui';
 import { STATUS } from './status';
 
@@ -162,16 +162,7 @@ export const RECEIPT_ACTIONS = {
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
-  // Radios, not buttons: the submit button has to be the one that carries op.
-  discard: {
-    op: 'discard',
-    label: 'Discard',
-    tone: 'danger',
-    confirm: 'Discard these? Matched ones lose their match.',
-    fields: `<div class="reasons" role="group" aria-label="Reason">${Object.entries(DISCARD_REASONS)
-      .map(([k, v]) => chip('reason', k, v))
-      .join('')}</div>`,
-  },
+  discard: { op: 'discard', label: 'Discard', tone: 'danger' },
   restore: { op: 'restore', label: 'Restore' },
   retry: { op: 'retry', label: 'Read again', max: AI_CAP },
   kind: (from: Kind) => ({

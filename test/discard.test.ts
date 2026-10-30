@@ -51,13 +51,13 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["vendor_missing"]' WHERE id=?`).bind(id(2)).run();
   expect(await (await request('/review')).text()).toContain('Discard');
 
-  const res = await post('/discard', { id: [id(1), id(2)], reason: 'personal', back: '/review' });
+  const res = await post('/discard', { id: [id(1), id(2)], back: '/review' });
   expect(res.status).toBe(303);
   const location = res.headers.get('Location')!;
   expect(location).toMatch(/^\/review\?done=discarded&n=2&at=/);
   const discarded = (await row(1))!;
   expect(discarded.discarded_at).toBeTruthy();
-  expect(discarded.discard_reason).toBe('personal');
+  expect(discarded.discard_reason).toBeNull();
 
   const review = await (await request(location)).text();
   expect(review).toContain('2 discarded.');
@@ -68,6 +68,8 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(placement(discarded, { anyway: true, undated: true })).toBeNull();
   expect(await (await request('/export.csv?month=2026-10')).text()).not.toContain('Vendor 1');
   expect(await (await request('/receipts')).text()).not.toContain('Vendor 1');
+  // A reason stored before the choice went away is still shown.
+  await env.DB.prepare("UPDATE receipts SET discard_reason='personal' WHERE id=?").bind(id(1)).run();
   const list = await (await request('/receipts?show=discarded')).text();
   expect(list).toContain('Vendor 1');
   expect(list).toContain('Personal');
@@ -102,7 +104,7 @@ test('a bank-matched row needs unmatch, which removes the match in the same step
   expect(page).toContain('Remove match?');
   expect((await post('/discard', { id: id(1), back: '/receipts' })).status).toBe(409);
   expect((await row(1))!.discarded_at).toBeNull();
-  const ok = await post('/discard', { id: id(1), unmatch: '1', reason: 'other', back: '/receipts' });
+  const ok = await post('/discard', { id: id(1), unmatch: '1', back: '/receipts' });
   expect(ok.status).toBe(303);
   expect((await row(1))!.discarded_at).toBeTruthy();
   expect(
@@ -112,13 +114,36 @@ test('a bank-matched row needs unmatch, which removes the match in the same step
   expect((await post('/matches', { transaction_id: 'tx1', receipt_id: id(1), action: 'link' })).status).toBe(422);
 });
 
-test('stale revisions, bad reasons and oversized batches are refused', async () => {
+test('stale revisions and oversized batches are refused', async () => {
   await receipt(1);
   expect((await post('/discard', { id: id(1), revision: '99', back: '/review' })).status).toBe(409);
-  expect((await post('/discard', { id: id(1), reason: 'food', back: '/review' })).status).toBe(400);
   expect((await post('/discard', { id: Array.from({ length: MAX_BULK + 1 }, (_, i) => id(i + 10)) })).status).toBe(400);
   expect((await post('/discard', { id: 'not-an-id' })).status).toBe(400);
   expect((await row(1))!.discarded_at).toBeNull();
+});
+
+test('Discard is one click with no reason; a matched receipt still asks about its match', async () => {
+  await receipt(1, { status: 'needs_review' });
+  await receipt(2, { status: 'needs_review' });
+  await matchTo(2);
+  const review = await (await request('/review')).text();
+  expect(review).not.toContain('name="reason"');
+  expect(review).toMatch(
+    new RegExp(
+      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(1)}">[^]*?<button class="linkbtn" aria-label="Discard Vendor 1">Discard</button></form>`,
+    ),
+  );
+  expect(review).toMatch(
+    new RegExp(
+      `<details class="discard"><summary aria-label="Discard Vendor 2">Discard</summary>[^]*?<p class="ask">Remove match\\?</p><button class="btn secondary">Remove and discard</button>`,
+    ),
+  );
+  const bulk = review.slice(review.indexOf('class="bulkbar"'));
+  expect(bulk).toContain('<button name="op" value="discard" class="btn danger">Discard</button>');
+  expect(bulk).not.toContain('Discard these?');
+  const page = await (await request(`/receipts/${id(1)}`)).text();
+  expect(page).not.toContain('name="reason"');
+  expect(page).not.toContain('Remove match?');
 });
 
 test('from the queue, discard moves on to the next receipt like Skip', async () => {
@@ -136,7 +161,7 @@ test('from the queue, discard moves on to the next receipt like Skip', async () 
 test('the same file sent again stays discarded', async () => {
   await uploadPdf();
   const first = await env.DB.prepare('SELECT id FROM receipts').first<{ id: string }>();
-  await post('/discard', { id: first!.id, reason: 'duplicate', back: '/receipts' });
+  await post('/discard', { id: first!.id, back: '/receipts' });
   expect(await env.ORIGINALS.head(`receipts/${first!.id}`)).not.toBeNull();
   await uploadPdf();
   const rows = (await env.DB.prepare('SELECT id,discarded_at FROM receipts').all()).results;
