@@ -160,7 +160,6 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
   };
-  const selecting = params.get('select') === '1';
   const here = `/invoices?month=${selected}${show === 'all' ? '' : `&show=${show}`}`;
   const bulk: BulkList = {
     form: 'bulk-invoices',
@@ -171,7 +170,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length
-    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, shown.length, selecting, selecting ? here : `${here}&select=1`)}<ul class="list all">${shown
+    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, shown.length)}<ul class="list all">${shown
         .map(
           (r) =>
             `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,

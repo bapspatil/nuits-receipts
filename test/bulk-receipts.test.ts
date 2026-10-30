@@ -266,14 +266,11 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   // The old Select mode is gone; the per-row Discard stays.
   expect(review).not.toContain('class="bulk"');
   expect(review).toContain('action="/discard"');
-  expect(await (await request('/review?select=1')).text()).toContain(
-    '<div data-bulk-list="bulk-review" data-selecting>',
-  );
+  expect(await (await request('/review?select=1')).text()).not.toContain('data-selecting');
 
   const all = await (await request('/receipts?month=2026-10')).text();
   expect(all).toContain(`value="${id(2)}" form="bulk-receipts"`);
   expect(all).toContain('data-total="2"');
-  expect(all).toContain('href="/receipts?month=2026-10&amp;select=1" data-bulk-select');
   expect(all).toContain('<button name="op" value="retry" class="btn" data-max="10">Read again</button>');
   expect(all).not.toContain('value="restore"');
   const discarded = await (await request('/receipts?show=discarded')).text();
@@ -287,6 +284,14 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   expect(invoices).toContain(`value="${id(3)}" form="bulk-invoices"`);
   expect(invoices).toContain('name="paid_outside_on" value="');
   expect(invoices).toContain('<input type="hidden" name="list" value="invoices">');
+
+  // Select mode is gone: the boxes are always there and no list links to ?select=1.
+  for (const path of ['/review', '/receipts?month=2026-10', '/invoices?month=2026-10', '/settings?open=senders']) {
+    const html = await (await request(path)).text();
+    expect(html, path).not.toContain('select=1');
+    expect(html, path).not.toContain('data-bulk-select');
+    expect(html, path).not.toContain('data-selecting');
+  }
 });
 
 test('chunk totals of done and skipped add up, within bounds', async () => {

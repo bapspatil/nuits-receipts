@@ -227,7 +227,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
   if (read && path === '/more') return moved('/settings');
-  if (request.method === 'GET' && path === '/review') return reviewPage(env, url.searchParams);
+  if (request.method === 'GET' && path === '/review') return reviewPage(env);
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
     const ids = receiptIds(form.getAll('id'));

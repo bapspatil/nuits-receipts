@@ -504,8 +504,6 @@ html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 .bulkfield{display:flex;flex-direction:column;gap:var(--space-1);flex:1 1 14rem;font-size:var(--text-sm);font-weight:600}
 .is-pending{opacity:.5}
 @media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:calc(var(--tabbar-height) + 9rem)}}
-@media (max-width:40rem){[data-bulk-list]:not([data-selecting]) li:has(>.pick){padding-left:var(--space-4)}[data-bulk-list]:not([data-selecting]) .pick,[data-bulk-list]:not([data-selecting]):has(.pick input[name=id]:checked)+.bulkbar:not([data-count]){display:none}}
-@media not (max-width:40rem){.bulktools [data-bulk-select]{display:none}}
 .gone{margin:0 0 var(--space-4)}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;
 }

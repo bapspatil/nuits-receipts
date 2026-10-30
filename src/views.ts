@@ -244,7 +244,7 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
 }
 
 // ---------- Review queue ----------
-export async function reviewPage(env: Env, params = new URLSearchParams()): Promise<Response> {
+export async function reviewPage(env: Env): Promise<Response> {
   // Rows a bank line points at: Discard asks to remove the match too.
   const known = matchedIds(env);
   const [all, held, reading, merges, matched] = await Promise.all([
@@ -262,7 +262,6 @@ export async function reviewPage(env: Env, params = new URLSearchParams()): Prom
   const merge = mergeable
     ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
     : '';
-  const selecting = params.get('select') === '1';
   const here = '/review';
   const bulk: BulkList = {
     form: 'bulk-review',
@@ -282,13 +281,13 @@ export async function reviewPage(env: Env, params = new URLSearchParams()): Prom
     })
     .join('');
   const list = rows.length
-    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
+    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
     : held.length
       ? ''
       : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
   return page(
     'review',
-    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length, selecting)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
+    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
     200,
     env,
     {
@@ -846,8 +845,6 @@ export async function payments(
   const firstMissing = missing[0]?.id;
   const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
   const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
-  const selecting = params.get('select') === '1';
-  const here = `/payments?month=${selected}&show=${show}${offset ? `&offset=${offset}` : ''}`;
   const bar: BulkList = {
     form: 'bulk-payments',
     action: '/payments/bulk',
@@ -988,7 +985,7 @@ export async function payments(
   const body = rows.length
     ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${counts.missing ? ' class="red"' : ''}>${counts.missing} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
         open.length ? '' : await settled(env, selected)
-      }${matchAll}${shown.length ? `${picks ? `<div data-bulk-list="${bar.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bar, picks, selecting, selecting ? here : `${here}&select=1`)}${table}</div>${bulkBar(bar)}` : table}${lists}` : ''}${
+      }${matchAll}${shown.length ? `${picks ? `<div data-bulk-list="${bar.form}">${bulkTools(bar, picks)}${table}</div>${bulkBar(bar)}` : table}${lists}` : ''}${
         offset > 0 || rows.length === 100
           ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
           : ''
@@ -1335,10 +1332,9 @@ async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<st
 }
 
 // Settings > Senders: who is read automatically and who is ignored.
-async function sendersPart(env: Env, open: boolean, selecting: boolean): Promise<string> {
+async function sendersPart(env: Env, open: boolean): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const ignored = await ignoredSenders(env);
-  const here = '/settings?open=senders#senders';
   const list = (form: string, action: BulkAction, addresses: readonly string[], button: string, path: string) => {
     const bulk: BulkList = {
       form,
@@ -1348,7 +1344,7 @@ async function sendersPart(env: Env, open: boolean, selecting: boolean): Promise
       scope: { back: 'settings' },
       actions: [action],
     };
-    return `<div data-bulk-list="${form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, addresses.length, selecting, selecting ? here : '/settings?open=senders&select=1#senders')}<ul class="plain rowlist">${addresses.map((a) => row(bulk, a, path, button)).join('')}</ul></div>${bulkBar(bulk)}`;
+    return `<div data-bulk-list="${form}">${bulkTools(bulk, addresses.length)}<ul class="plain rowlist">${addresses.map((a) => row(bulk, a, path, button)).join('')}</ul></div>${bulkBar(bulk)}`;
   };
   const row = (bulk: BulkList, address: string, action: string, button: string) =>
     `<li class="srow">${bulkCheck(bulk, address, address)}<div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn" aria-label="${button} ${escape(address)}">${button}</button></form></li>`;
@@ -1402,7 +1398,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     setupParts(env, params, opened),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
-    sendersPart(env, opened === 'senders', params.get('select') === '1'),
+    sendersPart(env, opened === 'senders'),
     mailLogPart(env, opened === 'mail'),
   ]);
   const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));

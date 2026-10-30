@@ -156,12 +156,7 @@ function rowName(row: AllRow): string {
 
 // The Unknown senders block. back: where the forms return to. primary: the
 // first Allow is the screen's one primary (when nothing else is).
-export function heldSection(
-  rows: readonly MailRow[],
-  back: 'review' | 'receipts' = 'review',
-  primary = false,
-  selecting = false,
-): string {
+export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
   if (!rows.length) return '';
   const bulk: BulkList = {
     form: 'bulk-held',
@@ -171,7 +166,6 @@ export function heldSection(
     scope: { back },
     actions: [SENDER_ACTIONS.allow, SENDER_ACTIONS.ignore, SENDER_ACTIONS.delete],
   };
-  const here = `/${back}`;
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
@@ -189,7 +183,7 @@ export function heldSection(
       )}</div></li>`;
     })
     .join('');
-  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
+  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}">${bulkTools(bulk, rows.length)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
 }
 
 export function parseQuery(params: URLSearchParams, offset = 0): AllQuery {
@@ -239,7 +233,6 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     })),
   ]);
   const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
-  const selecting = params.get('select') === '1';
   const here = path(query, { offset: query.offset });
   const bulk: BulkList = {
     form: 'bulk-receipts',
@@ -278,11 +271,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     })
     .join('')}</ul>`;
   const list = shown.length
-    ? `${
-        picks
-          ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, picks, selecting, selecting ? here : `${here}${here.includes('?') ? '&' : '?'}select=1`)}${ul}</div>${bulkBar(bulk)}`
-          : ul
-      }${
+    ? `${picks ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, picks)}${ul}</div>${bulkBar(bulk)}` : ul}${
         query.offset || more
           ? `<nav class="btns" aria-label="Pages">${query.offset ? `<a class="btn secondary" href="${link(query, { offset: Math.max(0, query.offset - PAGE_SIZE) })}">Newer</a>` : ''}${more ? `<a class="btn secondary" href="${link(query, { offset: query.offset + PAGE_SIZE })}">Older</a>` : ''}</nav>`
           : ''
