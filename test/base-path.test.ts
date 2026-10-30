@@ -141,7 +141,7 @@ test('every list return keeps its list and its next open row under the base path
   expect(await to('/discard', { id: e1, from: 'todo', month })).toMatch(
     new RegExp(`^/app/receipts/[0-9a-f]{64}\\?from=todo&month=${month}&done=discarded&`),
   );
-  expect(await to('/review/merge', {})).toBe('/app/receipts?view=todo&done=merged&n=0');
+  expect(await to('/review/merge', todo)).toBe(`/app/receipts?view=todo&month=${month}&done=merged&n=0`);
   const back = `/receipts?view=todo&month=${month}`;
   expect(await to('/senders/ignore', { address: 'nobody@example.com', back })).toMatch(
     new RegExp(`${onTodo}mailIgnored`),

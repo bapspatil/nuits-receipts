@@ -282,7 +282,7 @@ export async function reviewPage(env: Env, state: ListState): Promise<Response> 
   ]);
   const mergeable = merges.length;
   const merge = mergeable
-    ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
+    ? `<form class="merge" action="/review/merge" method="post">${listFields(state)}<button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
     : '';
   const bulk: BulkList = {
     form: 'bulk-review',

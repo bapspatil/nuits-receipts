@@ -6,7 +6,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, test } from 'vitest';
 import { getReceipt, preserve, receiveEmail } from '../src/receipts';
 import { mergeDuplicates, mergePlan } from '../src/dedupe';
-import { locationOf, request, signed } from './helpers';
+import { htmlForm, locationOf, request, signed } from './helpers';
 
 const pass = 'Authentication-Results: mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass;\r\n';
 
@@ -234,7 +234,7 @@ test('Merge duplicates folds existing per-attachment rows, keeps files, and is s
   expect(review).toMatch(/Merge 2\b/);
   expect((await mergePlan(env)).length).toBe(2);
 
-  const response = await request('/review/merge', { method: 'POST' });
+  const response = await request('/review/merge', { method: 'POST', body: htmlForm(review, '/review/merge') });
   expect(response.status).toBe(303);
   expect(locationOf(response)).toContain('done=merged&n=2');
   const dup = async (id: string) => (await getReceipt(env, id)).duplicate_of;

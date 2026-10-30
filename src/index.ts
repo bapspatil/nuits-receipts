@@ -287,8 +287,11 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const cursor = before ?? (await cursorFor(env, state, ids, { at: true }));
     return redirect(await landing(env, state, cursor, { event: 'restored', params: { n } }));
   }
-  if (request.method === 'POST' && path === '/review/merge')
-    return redirect(listUrl(RECEIPTS_TODO, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));
+  if (request.method === 'POST' && path === '/review/merge') {
+    // Back to the To do it was offered on, under its month; the merged rows leave it, so no anchor.
+    const state = listState(await formData(request, 4096), RECEIPTS_TODO);
+    return redirect(listUrl(state, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));
+  }
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {

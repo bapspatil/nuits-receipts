@@ -322,3 +322,12 @@ test('E: Own transfer returns to the Bank view it was made on, at the next open 
   });
   expect(locationOf(undo)).toBe(`/payments?month=2026-09&view=all&done=transferUndone#row-${rows[0]}`);
 });
+
+test('G: Merge duplicates returns to the month-filtered To do it was offered on', async () => {
+  const b = await seedBusyMonth();
+  await clone('receipts', b.earlier[0]!, 1, 'original_key');
+  const path = `/receipts?view=todo&month=${b.earlierMonth}`;
+  const html = await get(path);
+  const res = await request('/review/merge', { method: 'POST', body: htmlForm(html, '/review/merge') });
+  expect(locationOf(res)).toBe(`${path}&done=merged&n=1`);
+});
