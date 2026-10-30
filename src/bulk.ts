@@ -345,8 +345,9 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
           body.set('done_before', String(before.n));
           body.set('skipped_before', String(before.skipped));
         }
-        const res = await fetch(form.getAttribute('action'), { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        if (res.redirected) return { url: res.url };
+        const res = await fetch(form.getAttribute('action'), { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin', redirect: 'manual' });
+        // A redirect (a lapsed sign-in) is not followed, so its page is fetched once, by the navigation.
+        if (res.type === 'opaqueredirect') return { url: location.href };
         const type = res.headers.get('Content-Type') || '';
         const json = type.indexOf('json') >= 0 ? await res.json() : null;
         if (res.ok) return json;
