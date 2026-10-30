@@ -266,10 +266,10 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   const dup = await receipt(4, '2026-10-06T10:00:00Z', { status: 'ready', duplicate_of: ready });
   await deliver(mail());
   const ids = async (query: Partial<Parameters<typeof allRows>[1]>) =>
-    (await allRows(env, { show: null, month: null, q: '', offset: 0, ...query })).map((r) => r.id);
+    (await allRows(env, { show: null, month: null, q: '', before: null, ...query })).map((r) => r.id);
   const all = await ids({});
   expect(all.slice(1)).toEqual([dup, needs, ready]);
-  expect((await allRows(env, { show: null, month: null, q: '', offset: 0 }))[0]!.type).toBe('mail');
+  expect((await allRows(env, { show: null, month: null, q: '', before: null }))[0]!.type).toBe('mail');
   expect(await ids({ show: 'ready' })).toEqual([sales, ready]);
   expect(await ids({ show: 'needs' })).toEqual([needs]);
   expect(await ids({ show: 'duplicate' })).toEqual([dup]);

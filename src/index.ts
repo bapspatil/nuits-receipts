@@ -24,7 +24,6 @@ import {
   helpPage,
   NEW_ACCOUNT,
   receiptPage,
-  reviewPage,
   settingsPage,
 } from './views';
 import { FONT_FILES } from './fonts';
@@ -38,8 +37,8 @@ import type { Receipt, Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
 import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
-import { approveSender, deleteHeld, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
-import { allReceiptsPage } from './all';
+import { approveSender, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
+import { allReceiptsPage, todoPage } from './all';
 import { discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './discard';
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
@@ -105,7 +104,7 @@ async function formData(request: Request, limit: number): Promise<FormData> {
     throw new InputError('Invalid form data', 400);
   }
 }
-// Approve, ignore, delete and the Settings > Senders list. Each form says
+// Allow, Ignore and the Settings > Email senders list. Each form says
 // where to go back to: Settings, or the list the held mail is on (Receipts To do by default).
 async function senderAction(request: Request, env: Env, path: string, who: string, ctx: Waiter): Promise<Response> {
   const form = await formData(request, 4096);
@@ -114,12 +113,7 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
   let event: EventKey, n: number | undefined;
   if (path === '/senders/approve') [event, n] = ['mailAllowed', await approveSender(env, address, who, ctx)];
   else if (path === '/senders/ignore') [event, n] = ['mailIgnored', await ignoreSender(env, address, who)];
-  else if (path === '/senders/delete') {
-    const id = String(form.get('id') ?? '');
-    requireInput(/^[0-9a-f-]{36}$/.test(id), 'Invalid email', 400);
-    await deleteHeld(env, id);
-    event = 'mailDeleted';
-  } else if (path === '/senders/remove') {
+  else if (path === '/senders/remove') {
     await removeApproved(env, address, who);
     event = 'senderRemoved';
   } else if (path === '/senders/unignore') {
@@ -206,17 +200,7 @@ function cookie(request: Request, name: string): string | null {
 }
 // Pages that always render the tab bar, so their counts can start early.
 const RECEIPT_PAGE = /^\/receipts\/[a-f0-9]{64}$/;
-const TAB_PAGES = new Set([
-  '/',
-  '/add',
-  '/help',
-  '/import',
-  '/invoices',
-  '/payments',
-  '/receipts',
-  '/review',
-  '/settings',
-]);
+const TAB_PAGES = new Set(['/', '/add', '/help', '/import', '/payments', '/receipts', '/settings']);
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
   const who = await authorized(request, env);
   if (!who)
@@ -240,18 +224,25 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     requireInput(request.headers.get('Origin') === url.origin, 'Origin does not match', 403);
   }
   if (request.method === 'POST' && path === '/upload') return uploadFiles(request, env);
-  const offset = Number(url.searchParams.get('offset') ?? 0);
-  requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page');
   if (request.method === 'GET' && path === '/')
     return home(env, url.searchParams.has('month') ? month(url.searchParams.get('month')) : null, url.searchParams);
   // Old addresses: the month close is Home now, and the phone's More menu is gone.
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
   if (read && path === '/more') return moved('/settings');
-  // Until Receipts has its own To do, /receipts?view=todo is the Review queue under the list's filter.
-  if (request.method === 'GET' && path === '/review') return reviewPage(env, RECEIPTS_TODO);
-  if (request.method === 'GET' && path === '/receipts' && url.searchParams.get('view') === 'todo')
-    return reviewPage(env, listState(url.searchParams, RECEIPTS_TODO));
+  // Review is Receipts To do now, and Invoices is the Invoices tab of Receipts All.
+  if (path === '/review' || path === '/review/merge')
+    return moved(listUrl(listState(url.searchParams, { ...RECEIPTS_TODO, view: 'todo' })));
+  if (read && path === '/invoices')
+    return moved(listUrl(listState(url.searchParams, { ...RECEIPTS_TODO, key: 'invoices', view: 'all' })));
+  if (request.method === 'GET' && path === '/receipts') {
+    const params = url.searchParams;
+    // An old Receipts link with a filter or a search, from before To do, still opens All.
+    const all = params.get('view') === 'all' || (!params.has('view') && (params.has('show') || params.has('q')));
+    if (!all) return todoPage(env, listState(params, { ...RECEIPTS_TODO, view: 'todo' }));
+    if (params.get('kind') === 'sales') return invoicesPage(env, month(params.get('month')), params);
+    return allReceiptsPage(env, params);
+  }
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
     const ids = receiptIds(form.getAll('id'));
@@ -290,7 +281,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const cursor = before ?? (await cursorFor(env, state, ids, { at: true }));
     return redirect(await landing(env, state, cursor, { event: 'restored', params: { n } }));
   }
-  if (request.method === 'POST' && path === '/review/merge') {
+  if (request.method === 'POST' && path === '/receipts/merge') {
     // Back to the To do it was offered on, under its month; the merged rows leave it, so no anchor.
     const state = listState(await formData(request, 4096), RECEIPTS_TODO);
     return redirect(listUrl(state, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));
@@ -322,7 +313,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       }),
     );
   }
-  if (request.method === 'GET' && path === '/receipts') return allReceiptsPage(env, url.searchParams, offset);
   const bulk = request.method === 'POST' ? BULK_ROUTES[path] : undefined;
   if (bulk) return bulkAction(request, env, bulk, { who, ctx });
   if (request.method === 'POST' && path.startsWith('/senders/')) return senderAction(request, env, path, who, ctx);
@@ -363,8 +353,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return new Response(SETTINGS_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
-  if (request.method === 'GET' && path === '/invoices')
-    return invoicesPage(env, month(url.searchParams.get('month')), url.searchParams);
   if (request.method === 'GET' && path === '/export-sales.csv')
     return exportSalesCsv(env, month(url.searchParams.get('month')), url.origin + base);
   if (request.method === 'GET' && path === '/favicon.svg')
@@ -450,10 +438,22 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   const paid = path.match(/^\/receipts\/([a-f0-9]{64})\/paid$/);
   if (request.method === 'POST' && paid?.[1]) {
-    const before = await getReceipt(env, paid[1]);
     const form = await formData(request, 4096);
+    // From To do (the row posts its list): the invoice leaves the list, which moves on from its place.
+    const list = form.has('view') ? listState(form, RECEIPTS_TODO) : null;
+    const [before, cursor] = await Promise.all([
+      getReceipt(env, paid[1]),
+      list ? cursorFor(env, list, [paid[1]]) : null,
+    ]);
     await markPaidOutside(env, paid[1], form);
     const on = String(form.get('paid_outside_on') ?? '').trim();
+    if (on && list)
+      return redirect(
+        await landing(env, list, cursor, {
+          event: 'paid',
+          params: { on, id: before.paid_outside_on ? null : paid[1] },
+        }),
+      );
     // Clearing the date is "Not paid". Undo of "paid" clears it again, so it is offered only
     // when nothing was recorded before.
     return redirect(

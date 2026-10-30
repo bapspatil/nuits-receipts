@@ -96,7 +96,7 @@ const PATHS: Record<ListKey, (s: ListState) => string> = {
         ? { view: 'todo', month: s.month, upto: upto(s) }
         : { view: 'all', show: s.show, month: s.month, q: s.q },
     ),
-  invoices: (s) => query('/invoices', { month: s.month, show: s.show }),
+  invoices: (s) => query('/receipts', { view: 'all', kind: 'sales', month: s.month, show: s.show }),
   bank: (s) => (s.month ? bankPath(s.month, s.view, s.upto) : query('/payments', { view: s.view, upto: upto(s) })),
 };
 const upto = (s: ListState) => (s.view === 'todo' && s.upto !== BANK_UPTO ? String(s.upto) : null);
@@ -146,13 +146,16 @@ export function receiptFields(state: ListState): string {
 export function listFrom(path: string): ListState | null {
   if (!/^\/(?!\/)/.test(path) || path.length > 300) return null;
   const url = new URL(path, 'http://app.invalid');
-  const key = (
-    { '/receipts': 'receipts', '/review': 'receipts', '/invoices': 'invoices', '/payments': 'bank' } as const
-  )[url.pathname];
+  const p = url.searchParams;
+  const sales = url.pathname === '/invoices' || (url.pathname === '/receipts' && p.get('kind') === 'sales');
+  const key = sales
+    ? 'invoices'
+    : ({ '/receipts': 'receipts', '/review': 'receipts', '/payments': 'bank' } as const)[url.pathname];
   if (url.origin !== 'http://app.invalid' || !key) return null;
-  // Receipts is All unless it says To do (Review was To do); Bank defaults to To do.
-  const todo = url.pathname === '/review' || key === 'bank' || url.searchParams.get('view') === 'todo';
-  return listState(url.searchParams, { key, view: todo ? 'todo' : 'all' });
+  // Every list defaults to To do (Review was To do), except Invoices, which lives in All, and an
+  // old Receipts link with a filter or a search, from before To do.
+  const all = sales || (key === 'receipts' && !p.has('view') && (p.has('show') || p.has('q')));
+  return listState(p, { key, view: all ? 'all' : 'todo' });
 }
 // A posted return address made safe: a receipt page as it is, a list rebuilt from its state.
 export function parseReturn(value: unknown): string | null {

@@ -7,7 +7,8 @@ import { config } from './config';
 import { STATUS } from './status';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
-import { listParams, RECEIPTS_TODO } from './worklist';
+import { listParams, listUrl, RECEIPTS_TODO, receiptUrl, type ListState } from './worklist';
+import { receiptsSwitch } from './all';
 import {
   amount,
   day,
@@ -129,6 +130,14 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     invoiced += BigInt(eur.minor);
     if (salesStatus(r, config(env).tuning.paymentTermsDays) === 'paid') received += BigInt(eur.minor);
   }
+  // Invoices is the Invoices tab of Receipts All.
+  const here: ListState = {
+    ...RECEIPTS_TODO,
+    key: 'invoices',
+    view: 'all',
+    month: selected,
+    show: show === 'all' ? null : show,
+  };
   const count = (k: Show) =>
     k === 'all'
       ? base.length
@@ -138,7 +147,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
   const chips = chipRow(
     'Show',
     (Object.keys(SHOWS) as Show[]).map((k) => ({
-      href: `/invoices?month=${selected}${k === 'all' ? '' : `&show=${k}`}`,
+      href: escape(listUrl({ ...here, show: k === 'all' ? null : k })),
       label: SHOWS[k],
       count: count(k),
       current: k === show,
@@ -166,20 +175,14 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     action: '/receipts/bulk',
     noun: ['invoice', 'invoices'],
     total: shown.length,
-    scope: listParams({
-      ...RECEIPTS_TODO,
-      key: 'invoices',
-      view: 'all',
-      month: selected,
-      show: show === 'all' ? null : show,
-    }),
+    scope: listParams(here),
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length
     ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, shown.length)}<ul class="list all">${shown
         .map(
           (r) =>
-            `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
+            `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="${escape(receiptUrl(r.id, here))}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
         )
         .join('')}</ul></div>${bulkBar(bulk)}`
     : emptyState(
@@ -193,26 +196,27 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         addButton('invoices', true),
       );
   const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const body = `${receiptsTabs(await tabCounts(env, selected), 'invoices', selected)}${
+  const [switcher, tabs] = await Promise.all([receiptsSwitch(env, selected, 'all'), tabCounts(env, selected)]);
+  const body = `${switcher}${receiptsTabs(tabs, 'invoices', selected)}${
     month.length
       ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`
       : ''
   }${
     overdue.length
-      ? `<p class="alert" role="note"><a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'older invoice')} overdue ›</a></p>`
+      ? `<p class="alert" role="note"><a href="${escape(listUrl({ ...here, show: 'overdue' }))}">${plural(overdue.length, 'older invoice')} overdue ›</a></p>`
       : ''
   }${chips}${rows}${
     undated.length && !across
       ? `<p class="small">Undated: ${undated
           .slice(0, 5)
-          .map((r) => `<a href="/receipts/${r.id}">${escape(invoiceName(r))}</a>`)
+          .map((r) => `<a href="${escape(receiptUrl(r.id, here))}">${escape(invoiceName(r))}</a>`)
           .join(', ')}</p>`
       : ''
   }${month.length ? `<div class="csv"><a class="btn secondary" href="/export-sales.csv?month=${selected}">CSV</a><p class="small">${EXPORT_LINE}</p></div>` : ''}`;
   const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
-    head: across ? pageHead(SHOWS[show], add) : monthHead('/invoices', selected, add),
+    head: across ? pageHead(SHOWS[show], add) : monthHead('/receipts?view=all&kind=sales', selected, add),
   });
 }
 function firstFlag(r: Receipt): string {

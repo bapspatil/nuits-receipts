@@ -25,7 +25,7 @@ export type RequestState = {
   form?: FormData;
   failure?: FormFailure;
   // The tab counts, started once per page request (see navCounts in ui.ts).
-  counts?: Promise<{ review: number; missing: number }>;
+  counts?: Promise<{ todo: number; missing: number }>;
 };
 
 export const requestState = new AsyncLocalStorage<RequestState>();

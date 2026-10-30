@@ -8,7 +8,6 @@ import {
   monthEurValues,
   openSales,
   BANK_UPTO,
-  BANK_VIEWS,
   bankPath,
   bankUpto,
   viewCounts,
@@ -24,9 +23,7 @@ import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
 import { setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
-import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
-import { heldSection } from './all';
-import { matchedIds, mergePlan } from './dedupe';
+import { droppedMail, hasRecentDropped, ignoredSenders, reasonAllows, reasonWords } from './inbound';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import {
@@ -35,7 +32,6 @@ import {
   bulkCheck,
   bulkTools,
   PAYMENT_ACTIONS,
-  RECEIPT_ACTIONS,
   SENDER_ACTIONS,
   type BulkAction,
   type BulkList,
@@ -64,7 +60,6 @@ import {
   listParams,
   listUrl,
   nextOpen,
-  openCount,
   openPlace,
   openRows,
   RECEIPTS_TODO,
@@ -78,14 +73,12 @@ import {
 import {
   bodyOf,
   flagCards,
-  flagFor,
   isRequired,
   isReady,
   needsReview,
   needsReviewSql,
   optionalReasons,
   reasonCodes,
-  todoReasons,
   type Flag,
   type FlagField,
 } from './flags';
@@ -113,6 +106,7 @@ import {
   stamp,
   stepWord,
   tag,
+  viewSwitch,
   uploadForm,
   ariaFor,
   chosenReceipt,
@@ -142,27 +136,6 @@ export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
 
 export function reviewQueue(env: Env, state: ListState = RECEIPTS_TODO): Promise<Receipt[]> {
   return openRows<Receipt>(env, LIST_DEFS.receipts!, state, BULK_CAP);
-}
-function firstFlag(r: Receipt): string {
-  const code = todoReasons(reasonCodes(r.review_reasons_json))[0];
-  return code ? flagFor(code).title.replace(/\.$/, '') : 'Needs a look';
-}
-// The first problem as one word, for lists. The full question is its tooltip.
-const REASON_WORDS: Record<string, string> = {
-  Seller: 'Seller',
-  Date: 'Date',
-  Amounts: 'Amount',
-  Details: 'Details',
-  'Euro amount': 'Euros',
-  Filing: 'Filing',
-  Duplicate: 'Duplicate',
-  Source: 'File',
-  Other: 'Check',
-};
-function reasonWord(r: Receipt): string {
-  const cards = flagCards(todoReasons(reasonCodes(r.review_reasons_json)));
-  const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
-  return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
 }
 function receiptOption(r: Receipt, selected = false): string {
   return `<option value="${r.id}"${selected ? ' selected' : ''}>${escape(receiptName(r))} · ${escape(day(r.issue_date)) || 'no date'} · ${amount(r.total_minor, r.currency)}</option>`;
@@ -261,74 +234,6 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
   const month = issueDate?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
   const s = await monthState(env, month);
   return { month, step: !s.imported ? 'import' : s.missing.length ? 'match' : 'send' };
-}
-
-// ---------- Review queue ----------
-// /review, and /receipts?view=todo&month=M until Receipts gets its own To do: the open receipts under
-// the list's month, the first upto of them shown.
-export async function reviewPage(env: Env, state: ListState): Promise<Response> {
-  // Rows a bank line points at: Discard asks to remove the match too.
-  const known = matchedIds(env);
-  // The true count, however many render: the list shows the first upto of a set capped at BULK_CAP.
-  const [rows, { total, also: undated }, held, reading, merges, matched] = await Promise.all([
-    openRows<Receipt>(env, LIST_DEFS.receipts!, state, state.upto),
-    openCount(env, LIST_DEFS.receipts!, state, 'r.issue_date IS NULL'),
-    heldMail(env),
-    env.DB.prepare(
-      "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
-    ).first<number>('n'),
-    mergePlan(env, known),
-    known,
-  ]);
-  const mergeable = merges.length;
-  const merge = mergeable
-    ? `<form class="merge" action="/review/merge" method="post">${listFields(state)}<button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
-    : '';
-  const bulk: BulkList = {
-    form: 'bulk-review',
-    action: '/receipts/bulk',
-    noun: ['receipt', 'receipts'],
-    total,
-    scope: listParams(state),
-    actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
-  };
-  const fields = listFields(state);
-  // Row 1 is the next to check: its name is the screen's one primary.
-  const items = rows
-    .map((r, i) => {
-      const name = escape(receiptName(r));
-      const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
-      const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      return `<li data-row="${r.id}" id="row-${r.id}">${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="${escape(receiptUrl(r.id, state))}">${name}</a>${amt}${why}${discardControl(r.id, { list: fields, matched: matched.has(r.id), name: receiptName(r) })}</li>`;
-    })
-    .join('');
-  const shown = Math.min(total, BULK_CAP);
-  const more =
-    shown > rows.length
-      ? `<p><a class="btn secondary" href="${escape(listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }))}">Show ${Math.min(shown - rows.length, BANK_UPTO)} more</a></p>`
-      : '';
-  const list = `<div data-list="receipts-todo" data-total="${total}"${rows.length ? ` data-bulk-list="${bulk.form}"` : ''}>${
-    rows.length
-      ? `${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul>`
-      : held.length
-        ? ''
-        : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>')
-  }</div>${rows.length ? `${bulkBar(bulk)}${more}` : ''}`;
-  return page(
-    'review',
-    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, listUrl(state), !rows.length)}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
-    200,
-    env,
-    {
-      head: pageHead(
-        total
-          ? `${total} to check${undated ? `, ${undated} undated` : ''}`
-          : held.length
-            ? `${plural(held.length, 'email')} to allow`
-            : 'All checked',
-      ),
-    },
-  );
 }
 
 // ---------- Receipt ----------
@@ -727,10 +632,10 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
     ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`
     : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
   const back = gone
-    ? '<a href="/receipts?show=discarded">‹ Discarded</a>'
-    : sales && !needs
-      ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
-      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'Review' : 'Receipts'}</a>`;
+    ? `<a href="${escape(listUrl({ ...list, view: 'all', show: 'discarded' }))}">‹ Discarded</a>`
+    : sales && !needs && list.view === 'all'
+      ? `<a href="${escape(listUrl({ ...list, key: 'invoices', month: r.issue_date?.slice(0, 7) ?? list.month }))}">‹ Invoices</a>`
+      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'To do' : 'Receipts'}</a>`;
   const nextLink = !gone && !needs && next ? `<a href="${escape(receiptUrl(next, todo))}">Next to check ›</a>` : '';
   const skip =
     needs && next && next !== r.id
@@ -860,7 +765,6 @@ export async function payments(
     return found.length === 1 ? found[0] : undefined;
   };
   const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
-  const firstMissing = open[0]?.id;
   const shown = view === 'todo' ? rows.slice(0, upto) : rows;
   const here: ListState = { ...RECEIPTS_TODO, key: 'bank', view, month: selected, upto };
   const bar: BulkList = {
@@ -876,7 +780,7 @@ export async function payments(
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
-  const likelyForm = (t: Payment, r: Receipt, noun: string, primary: boolean) => {
+  const likelyForm = (t: Payment, r: Receipt, noun: string) => {
     const facts = pairFacts(r, t, rules, tuning);
     const scope = `match:${t.id}`;
     const line = (label: string, bank: string, other: string, cell: Cell) =>
@@ -888,12 +792,12 @@ export async function payments(
     ]
       .filter(Boolean)
       .join(' ');
-    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn ${primary ? 'primary' : 'secondary'}" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn secondary" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">Match</button></form>`;
   };
   // The search box: type a seller, a date or an amount, or pick from the list.
-  const picker = (t: Payment, listId: string, noun: string, primary = false) => {
+  const picker = (t: Payment, listId: string, noun: string) => {
     const typed = chosenReceipt(t.id);
-    return `<form action="/matches" method="post" class="pmatch">${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn ${primary ? 'primary' : 'secondary'}" name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="pmatch">${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
   };
   // A likely pair first, with the search box left to More; no pair, the search box alone.
   const matchControls = (
@@ -902,17 +806,16 @@ export async function payments(
     listId: string,
     noun: string,
     likely: Receipt | undefined,
-    primary: boolean,
   ): { main: string; rest: string } => {
     const lower = noun.toLowerCase();
     const pair = chosenOf(t, pool) ?? likely;
     return pair
       ? {
-          main: likelyForm(t, pair, noun, primary),
+          main: likelyForm(t, pair, noun),
           rest: `<p class="hint">Pick another ${lower}</p>${picker(t, listId, noun)}`,
         }
       : {
-          main: `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'receipt'} fits.</p>${picker(t, listId, noun, primary)}`,
+          main: `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'receipt'} fits.</p>${picker(t, listId, noun)}`,
           rest: '',
         };
   };
@@ -940,7 +843,7 @@ export async function payments(
         status = tag('Money in');
         const likely = invoices.find((r) => creditFit(r, t, tuning) !== null);
         if (invoices.length && t.amount_minor > 0 && t.receipt_required) {
-          const found = matchControls(t, invoices, 'pick-invoices', 'Invoice', likely, false);
+          const found = matchControls(t, invoices, 'pick-invoices', 'Invoice', likely);
           controls = `${found.main}${matchError(t.id)}`;
           if (found.rest) extra.push(found.rest);
         }
@@ -951,11 +854,10 @@ export async function payments(
           `<form action="/payments/${t.id}" method="post">${fields}<button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
         );
       } else {
-        const first = t.id === firstMissing;
         const likely = likelyOf.get(t.id);
         status = `<span class="stamp missing">${STATUS.missing}</span>`;
         const found = receipts.length
-          ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
+          ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely)
           : { main: '<p class="none">No receipt found yet.</p>', rest: '' };
         const dropped =
           droppedRecently && !likely
@@ -995,10 +897,7 @@ export async function payments(
   const others = elsewhere.length
     ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="${bankPath(e.m, 'todo')}">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
-  const switcher = `<ul class="chips" aria-label="View">${BANK_VIEWS.map(
-    (v) =>
-      `<li><a href="${bankPath(selected, v)}" data-view="${v}" data-count="${views[v]}"${v === view ? ' aria-current="page"' : ''}>${v === 'todo' ? 'To do' : 'All'} (${views[v]})</a></li>`,
-  ).join('')}</ul>`;
+  const switcher = viewSwitch((v) => bankPath(selected, v), views, view);
   const left = views.todo - shown.length;
   const head =
     view === 'todo'
@@ -1059,7 +958,7 @@ function lacks(s: MonthState, undated = 0): string {
 // Null when nothing is left to do (the month is sent) or nothing can be sent yet.
 function nextStep(s: MonthState, selected: string): { label: string; href: string } | null {
   if (s.docs === 0) return { label: 'Add receipts', href: '/add' };
-  if (!s.done.review) return { label: 'Check receipts', href: '/review' };
+  if (!s.done.review) return { label: 'Check receipts', href: escape(listUrl({ ...RECEIPTS_TODO, month: selected })) };
   if (!s.imported) return { label: 'Import statement', href: '/import' };
   if (!s.done.match) return { label: 'Find receipts', href: bankPath(selected, 'todo') };
   return null;
@@ -1095,11 +994,13 @@ export async function home(env: Env, requested: string | null, params = new URLS
     );
   const selected = requested ?? arrival!.month;
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
+  const todo = escape(listUrl(RECEIPTS_TODO));
   const alert = overdue.length
-    ? `<a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'invoice')} overdue ›</a>`
+    ? `<a href="${todo}">${plural(overdue.length, 'invoice')} overdue ›</a>`
     : unverified
-      ? `<a href="/review">${plural(unverified, 'email')} not verified ›</a>`
+      ? `<a href="${todo}">${plural(unverified, 'email')} not verified ›</a>`
       : '';
+  const checkHref = escape(listUrl({ ...RECEIPTS_TODO, month: selected }));
   const undated = s.undated;
   const short = monthName(selected, false);
   const empty = s.docs === 0;
@@ -1114,10 +1015,17 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const check = empty
     ? row(1, 'Check', 'Nothing yet', '/add')
     : s.flagged.length
-      ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
+      ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, checkHref, true)
       : undated
-        ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'All checked', `/receipts?month=${selected}`, false, true);
+        ? row(1, 'Check', `${undated} undated`, checkHref, true)
+        : row(
+            1,
+            'Check',
+            'All checked',
+            escape(listUrl({ ...RECEIPTS_TODO, view: 'all', month: selected })),
+            false,
+            true,
+          );
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
@@ -1363,7 +1271,7 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
     `<li class="srow">${bulkCheck(bulk, address, address)}<div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn" aria-label="${button} ${escape(address)}">${button}</button></form></li>`;
   const approved = allowed.length
     ? list('bulk-allowed', SENDER_ACTIONS.remove, allowed, 'Remove', '/senders/remove')
-    : '<p class="warning">None yet. All mail waits in Review.</p>';
+    : '<p class="warning">None yet. All mail waits in To do.</p>';
   const ignoredList = ignored.length
     ? `<h3>Ignored</h3>${list(
         'bulk-ignored',
