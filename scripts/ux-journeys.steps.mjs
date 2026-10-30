@@ -96,8 +96,7 @@ export const journeys = [
       await rec.click(nav(page, '/payments'));
       await rec.click(link(page, 'Import statement'));
       await rec.upload(page.locator('input[name=file]'), file);
-      await rec.click(button(page, 'Check the file'));
-      await rec.click(page.getByRole('button', { name: /^Import \d+ payments$/ }));
+      await rec.click(button(page, 'Import'));
       rec.note(`After import: ${(await page.locator('main p.summary').first().innerText()).trim()}`);
       rec.note(
         `Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`,

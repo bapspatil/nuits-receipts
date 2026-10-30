@@ -34,6 +34,14 @@ Every Undo posts to `POST /undo` with `at`, `op` and the list state of the page 
 
 Which actions are undoable: Approve (single and bulk), Discard (with the match it removed), Mark paid and Not paid, Not a purchase and Needs a receipt, Match, Match all, Remove match, Delete rule, and a Settings save that removes a sender or a part. Read again and Move run in chunks and call the model, so they have no Undo; Move, held-mail Ignore and OneDrive Disconnect lose data and ask first instead. The own-account transfer keeps its own Undo route.
 
+## Bank import
+
+`/import` is a file field and Import (`src/one-step.ts`). It finds the account and the layout and imports, asking only when it cannot. Account, first hit: the one chosen on the account question, the only account, the account whose bank the layout names, a new account named for that bank when there is none, else the question. Layout, first hit: a layout saved for these header names (`bank_presets`, keyed by header fingerprint; the account's bank first), the built-in layout for them, the model's proposal when it reads the whole file, else the column editor (`/imports/csv`, signed preview and confirm), which also opens when the rows have errors, the printed totals do not add up, or the delimiter or a slash date order is ambiguous. A file that is not UTF-8 is read as Windows-1252.
+
+Payments already in the account (same bank ID or same facts) are skipped and counted. The banner says "Skipped N already imported" and, when some had no bank ID, offers Import anyway (`/import/anyway`), which adds those as extra payments in a second import of the same file (`importIdentity` takes a salt). A payment that looks like one in another account is imported and counted in the banner. A layout the model proposed or the owner worked out in the editor is saved on success; built-in and saved layouts are not saved again.
+
+The import's completion goes through `withUndo` as `op: 'import'` with the import id. Its Undo (`undoImport` in `src/undo.ts`) deletes the import's payments with their transfer pairs, automatic marks and match rejections, and the import itself, so the same file imports afresh. It refuses, and removes nothing, when any of its payments was since matched by hand or marked Not a purchase by the owner. The chunked `reconcile` after an import stays outside the log (it writes in chunks of 50); deleting the rows is what undoes it.
+
 ## Data rules
 
 - Every original is stored once, keyed by its SHA-256, before any processing. Retry re-reads the stored original.
