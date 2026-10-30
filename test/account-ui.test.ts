@@ -67,12 +67,8 @@ test('matches and payments show accounts and export appends two formula-safe acc
   await bank('account-a');
   const r = await receipt();
   expect((await eurValue(env, r)).source).toBe('bank');
-  const payments = await (await request('/payments?month=2026-09')).text();
-  expect(payments).toContain('=Fake Main');
-  expect(payments).toContain(
-    `<span class="tag ok auto">Matched automatically</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`,
-  );
-  expect(await (await request('/receipts/' + r.id)).text()).toContain('=Fake Main');
+  const payments = await (await request('/payments?month=2026-09&show=all')).text();
+  expect(payments).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`);
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,
   });
@@ -109,7 +105,10 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
   expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');
   expect(page.match(/<button class="linkbtn">Undo transfer<\/button>/g)).toHaveLength(2);
-  expect(page).toContain('<div class="stmts" id="imports"><details><summary>Statements (2)</summary>');
+  expect(page).toContain(
+    '<div class="stmts" id="imports"><a class="btn secondary" href="/import">Import statement</a></div>',
+  );
+  expect(page).not.toContain('Statements (2)');
   expect(page).not.toContain('stamp missing');
   expect(
     (await request('/payments/' + debit, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) }))

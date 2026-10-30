@@ -70,7 +70,7 @@ export function pairFacts(r: Receipt, t: Transaction, rules: Rule[], tuning: Tun
     exact,
     reason: exact
       ? ''
-      : `This pair isn't exact: ${clauses.join('; ') || 'it is not a close fit'}. "Match anyway" says that is fine.`,
+      : `This pair isn't exact: ${clauses.join('; ') || 'it is not a close fit'}. Matching says that is fine.`,
   };
 }
 

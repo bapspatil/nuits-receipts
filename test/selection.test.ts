@@ -190,10 +190,10 @@ test('the bar and row checks are real form controls that work without the script
   expect(bar).toContain('<button name="op" value="reread" class="btn" data-max="10">Read again</button>');
   expect(bar).toMatch(/<details class="bulkmore"><summary class="btn">More<\/summary>.*value="restore"/);
   expect(bulkBar({ ...list, total: BULK_CAP + 1 })).not.toContain('data-bulk-all');
-  const tools = bulkTools(list, 25, false, '/receipts?select=1');
+  const tools = bulkTools(list, 25);
   expect(tools).toContain('<label class="pick" hidden><input type="checkbox" data-bulk-page>');
-  expect(tools).toContain('href="/receipts?select=1" data-bulk-select>Select</a>');
-  expect(bulkTools(list, 25, true, '/receipts')).toContain('>Done</a>');
+  expect(tools).not.toContain('select=1');
+  expect(tools).not.toContain('data-bulk-select');
   const dashes = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
   for (const html of [check, bar, tools, BULK_JS]) expect(html).not.toMatch(dashes);
 });

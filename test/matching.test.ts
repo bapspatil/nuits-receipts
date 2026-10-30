@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset } from '../src/banking';
 import { feedback } from '../src/events';
 import { matchAllLabel } from '../src/match';
-import { STATUS, matchStatus } from '../src/status';
+import { STATUS } from '../src/status';
 import { confirmationForm, htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
@@ -77,7 +77,7 @@ test('Match all matches the pairs that still fit, says so once, and its Undo tak
   expect(rows.results[0]).toMatchObject({ receipt_id: id, match_method: 'manual' });
   expect(rows.results[1]).toMatchObject({ receipt_id: null });
   // A by-you match says so in words.
-  expect(await bank()).toContain('<span class="tag ok">Matched by you</span>');
+  expect(await bank()).toContain('<span class="tag ok">Matched</span>');
   const undo = await post('/matches/undo', htmlForm(page, '/matches/undo'));
   expect(undo.status).toBe(303);
   expect(await (await request(undo.headers.get('Location')!)).text()).toContain('Removed 1 match.');
@@ -126,7 +126,9 @@ test('a receipt still in Review is matched, and the payment says the receipt nee
     collision: '',
   });
   const row = rowOf(await bank(), 'Sample Cloud Lantern Oy');
-  expect(row).toContain('Matched automatically');
+  expect(row).toContain('Matched');
+  expect(row).not.toContain('Matched automatically');
+  expect(row).not.toContain('tag ok auto');
   expect(row).toContain(`<a class="stamp needs" href="/receipts/${id}">Needs you</a>`);
   expect(row).not.toContain('Missing');
   expect(await bank()).toContain('1 out, 1 matched, 0 not a purchase, <span>0 missing</span>, 1 needs you');
@@ -163,7 +165,7 @@ test('a payment with nothing like it says so, and the search box resolves a type
     new URLSearchParams({ transaction_id: tx, receipt_id: '125.50', action: 'link' }),
   );
   expect(refused.status).toBe(422);
-  expect(await refused.text()).toContain('Match anyway');
+  expect(await refused.text()).toContain('This pair isn&#39;t exact');
   const ok = new URLSearchParams({
     transaction_id: tx,
     receipt_id: '125.50',
@@ -191,12 +193,14 @@ test('an import banner counts the payments matched for you and links to them', a
   const said = feedback(new URL(location, 'https://x.example').searchParams)!;
   expect(said.text).toBe('Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.');
   expect(said.undo).toBeNull();
-  expect(said.link).toEqual({ href: '/payments?month=2026-09&show=auto', label: 'See them' });
-  // The filter lists exactly those rows.
-  const filtered = await (await request('/payments?month=2026-09&show=auto')).text();
-  expect(filtered).toContain('Sample Cloud Lantern Oy');
-  expect(filtered).not.toContain('Unrelated Shop');
-  expect(filtered).toContain('Matched automatically');
+  expect(said.link).toEqual({ href: '/payments?month=2026-09&show=matched', label: 'See them' });
+  // The filter lists exactly the matched rows, and the old ?show=auto address still opens it.
+  for (const show of ['matched', 'auto']) {
+    const filtered = await (await request(`/payments?month=2026-09&show=${show}`)).text();
+    expect(filtered).toContain('Sample Cloud Lantern Oy');
+    expect(filtered).not.toContain('Unrelated Shop');
+    expect(filtered).not.toContain('Matched automatically');
+  }
 });
 
 test('one registry holds the words for a state', () => {
@@ -204,13 +208,9 @@ test('one registry holds the words for a state', () => {
     'Needs you',
     'Reading',
     'Ready',
-    'Matched by you',
-    'Matched automatically',
+    'Matched',
     'Missing',
     'Not a purchase',
     'Sent',
   ]);
-  expect(matchStatus('automatic')).toBe('Matched automatically');
-  expect(matchStatus('manual')).toBe('Matched by you');
-  expect(matchStatus(null)).toBe('Matched by you');
 });

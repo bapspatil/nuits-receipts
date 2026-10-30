@@ -361,7 +361,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   });
   // Unpaid doesn't hold the month back...
   let month = await (await request('/?month=2026-09')).text();
-  expect(month).toContain('1 invoice dated September ›');
+  expect(month).not.toContain('dated September');
   expect(month).not.toContain('to check</span>');
   // ...an invoice that needs a look does.
   const flagged = await sales(

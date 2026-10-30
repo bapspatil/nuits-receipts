@@ -4,6 +4,7 @@ import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
 import { DISCARD_REASONS, type DiscardReason, requireInput } from './domain';
+import { needsReview, needsReviewSql, readySql } from './flags';
 import { restoreForm } from './discard';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, SENDER_ACTIONS, type BulkList } from './bulk';
 import { invoiceName } from './invoices';
@@ -59,18 +60,19 @@ export type AllRow = {
   issue_date: string | null;
   sender: string | null;
   subject: string | null;
+  review_reasons_json: string;
 };
 const WHERE: Record<Show, string> = {
-  ready: "type='receipt' AND status='ready' AND duplicate_of IS NULL AND discarded_at IS NULL",
-  needs: "type='receipt' AND status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL",
+  ready: `type='receipt' AND ${readySql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
+  needs: `type='receipt' AND ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
   reading: "type='receipt' AND status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
   duplicate: "type='receipt' AND duplicate_of IS NOT NULL AND discarded_at IS NULL",
   discarded: "type='receipt' AND discarded_at IS NOT NULL",
   sales: "type='receipt' AND kind='sales' AND discarded_at IS NULL",
   unknown: "type='mail'",
 };
-const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject FROM receipts`;
-const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject FROM inbound_mail WHERE state='held'`;
+const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject,review_reasons_json FROM receipts`;
+const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject,'[]' FROM inbound_mail WHERE state='held'`;
 
 export type AllQuery = { show: Show | null; month: string | null; q: string; offset: number };
 
@@ -144,7 +146,7 @@ export function chipOf(row: AllRow): { label: string; css: string } {
     return { label: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : 'Discarded', css: 'muted' };
   if (row.duplicate_of) return { label: 'Duplicate', css: 'muted' };
   if (row.status === 'pending' || row.status === 'processing') return { label: STATUS.reading, css: 'muted' };
-  if (row.status === 'needs_review') return { label: STATUS.needs, css: 'needs' };
+  if (needsReview(row)) return { label: STATUS.needs, css: 'needs' };
   return { label: STATUS.ready, css: 'ready' };
 }
 function rowName(row: AllRow): string {
@@ -154,12 +156,7 @@ function rowName(row: AllRow): string {
 
 // The Unknown senders block. back: where the forms return to. primary: the
 // first Allow is the screen's one primary (when nothing else is).
-export function heldSection(
-  rows: readonly MailRow[],
-  back: 'review' | 'receipts' = 'review',
-  primary = false,
-  selecting = false,
-): string {
+export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
   if (!rows.length) return '';
   const bulk: BulkList = {
     form: 'bulk-held',
@@ -169,7 +166,6 @@ export function heldSection(
     scope: { back },
     actions: [SENDER_ACTIONS.allow, SENDER_ACTIONS.ignore, SENDER_ACTIONS.delete],
   };
-  const here = `/${back}`;
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
@@ -187,7 +183,7 @@ export function heldSection(
       )}</div></li>`;
     })
     .join('');
-  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}?select=1`)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
+  return `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${rows.length})</h2><div data-bulk-list="${bulk.form}">${bulkTools(bulk, rows.length)}<ul class="list">${items}</ul></div>${bulkBar(bulk)}</section>`;
 }
 
 export function parseQuery(params: URLSearchParams, offset = 0): AllQuery {
@@ -227,7 +223,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const more = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
   const filtered = !!(query.show || query.q);
-  const chips = chipRow('Show', [
+  const chipList = chipRow('Show', [
     { href: link(query, { show: null }), label: 'All', current: !query.show },
     ...CHIPS.map((k) => ({
       href: link(query, { show: k }),
@@ -236,8 +232,10 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
       current: k === query.show,
     })),
   ]);
+  const chips = chipList
+    ? `<details class="filters"${query.show && (CHIPS as readonly string[]).includes(query.show) ? ' open' : ''}><summary>More filters</summary><div class="body">${chipList}</div></details>`
+    : '';
   const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
-  const selecting = params.get('select') === '1';
   const here = path(query, { offset: query.offset });
   const bulk: BulkList = {
     form: 'bulk-receipts',
@@ -276,11 +274,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     })
     .join('')}</ul>`;
   const list = shown.length
-    ? `${
-        picks
-          ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, picks, selecting, selecting ? here : `${here}${here.includes('?') ? '&' : '?'}select=1`)}${ul}</div>${bulkBar(bulk)}`
-          : ul
-      }${
+    ? `${picks ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, picks)}${ul}</div>${bulkBar(bulk)}` : ul}${
         query.offset || more
           ? `<nav class="btns" aria-label="Pages">${query.offset ? `<a class="btn secondary" href="${link(query, { offset: Math.max(0, query.offset - PAGE_SIZE) })}">Newer</a>` : ''}${more ? `<a class="btn secondary" href="${link(query, { offset: query.offset + PAGE_SIZE })}">Older</a>` : ''}</nav>`
           : ''

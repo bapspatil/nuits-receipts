@@ -5,7 +5,7 @@ import { creditFit, eurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { STATUS } from './status';
-import { flagFor, reasonCodes } from './flags';
+import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import {
   amount,
@@ -52,7 +52,7 @@ export function paidOn(r: SalesRow): string | null {
 // Review blocks "month ready"; unpaid does not (it is shown, not required).
 export function salesStatus(r: SalesRow, terms = DEFAULT_TUNING.paymentTermsDays, now = iso()): SalesStatus {
   if (r.status === 'pending' || r.status === 'processing') return 'reading';
-  if (r.status === 'needs_review' && r.review_reasons_json !== '["missing_eur"]') return 'review';
+  if (needsReview(r) && r.review_reasons_json !== '["missing_eur"]') return 'review';
   if (paidOn(r)) return 'paid';
   const due = dueOn(r, terms);
   return due && due < now ? 'overdue' : 'unpaid';
@@ -86,7 +86,7 @@ export async function salesRows(env: Env, where: string, ...binds: unknown[]): P
 }
 // Open invoices past their due date, across all months.
 export async function overdueInvoices(env: Env): Promise<SalesRow[]> {
-  const open = await salesRows(env, "r.status<>'needs_review' AND r.paid_outside_on IS NULL");
+  const open = await salesRows(env, `NOT ${needsReviewSql('r')} AND r.paid_outside_on IS NULL`);
   return open.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === 'overdue');
 }
 
@@ -160,7 +160,6 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
   };
-  const selecting = params.get('select') === '1';
   const here = `/invoices?month=${selected}${show === 'all' ? '' : `&show=${show}`}`;
   const bulk: BulkList = {
     form: 'bulk-invoices',
@@ -171,7 +170,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length
-    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, shown.length, selecting, selecting ? here : `${here}&select=1`)}<ul class="list all">${shown
+    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, shown.length)}<ul class="list all">${shown
         .map(
           (r) =>
             `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="/receipts/${r.id}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
@@ -239,7 +238,7 @@ export async function paymentBox(env: Env, r: SalesRow): Promise<string> {
       'Paid',
       `<div class="match"><p><strong>${escape(day(r.paid_outside_on))}</strong> ${escape(r.paid_outside_note)}</p>${paidForm}</div>`,
     );
-  if (r.status !== 'ready' && r.review_reasons_json !== '["missing_eur"]')
+  if (!isReady(r) && r.review_reasons_json !== '["missing_eur"]')
     return box('Payment', '<p class="small">Approve it first.</p>');
   const credits = (
     await env.DB.prepare(

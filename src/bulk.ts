@@ -1,4 +1,4 @@
-import { DISCARD_REASONS, type Kind } from './domain';
+import type { Kind } from './domain';
 import { escape } from './ui';
 import { STATUS } from './status';
 
@@ -114,10 +114,10 @@ export function bulkCheck(list: BulkList, id: string, name: string): string {
   return `<label class="pick"><input type="checkbox" name="id" value="${escape(id)}" form="${escape(list.form)}"><span class="vh">Select ${escape(name)}</span></label>`;
 }
 
-// `href` is the other mode's URL: ?select=1 to enter, the plain list to leave.
-export function bulkTools(list: BulkList, pageCount: number, selecting: boolean, href: string): string {
+// The select-all box for the page; the script reveals it.
+export function bulkTools(list: BulkList, pageCount: number): string {
   if (!pageCount) return '';
-  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label><a class="linkbtn" href="${escape(href)}" data-bulk-select>${selecting ? 'Done' : 'Select'}</a></div>`;
+  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label></div>`;
 }
 
 const toneClass = (tone: BulkAction['tone']) =>
@@ -162,15 +162,12 @@ export const RECEIPT_ACTIONS = {
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
-  // Radios, not buttons: the submit button has to be the one that carries op.
+  // Undo can't bring a match back yet, so the bar still asks before it removes one.
   discard: {
     op: 'discard',
     label: 'Discard',
     tone: 'danger',
     confirm: 'Discard these? Matched ones lose their match.',
-    fields: `<div class="reasons" role="group" aria-label="Reason">${Object.entries(DISCARD_REASONS)
-      .map(([k, v]) => chip('reason', k, v))
-      .join('')}</div>`,
   },
   restore: { op: 'restore', label: 'Restore' },
   retry: { op: 'retry', label: 'Read again', max: AI_CAP },
@@ -238,7 +235,6 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const allInput = form.querySelector('input[name=all]');
     const progress = form.querySelector('progress');
     const page = wrap.querySelector('[data-bulk-page]');
-    const toggle = wrap.querySelector('[data-bulk-select]');
     const rowOf = (box) => box.closest('li,tr') || box.parentElement;
     const boxIn = (el) => {
       const row = el && el.closest && el.closest('li,tr');
@@ -284,24 +280,12 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
       say('');
       render();
     };
-    const mode = (on) => {
-      if (on) wrap.dataset.selecting = '';
-      else delete wrap.dataset.selecting;
-      if (toggle) toggle.textContent = on ? 'Done' : 'Select';
-    };
     boxes.forEach((b) => b.addEventListener('click', (e) => apply({ type: 'toggle', id: b.value, range: e.shiftKey })));
     if (page) {
       page.closest('label').hidden = false;
       page.addEventListener('change', () => apply({ type: 'page', on: page.checked }));
     }
     if (allButton) allButton.addEventListener('click', () => apply({ type: 'all' }));
-    if (toggle)
-      toggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        const on = !('selecting' in wrap.dataset);
-        mode(on);
-        if (!on) apply({ type: 'clear' });
-      });
     form.addEventListener('reset', (e) => {
       e.preventDefault();
       apply({ type: 'clear' });
@@ -331,28 +315,6 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     };
     wrap.addEventListener('keydown', keys);
     form.addEventListener('keydown', keys);
-    let timer = 0;
-    let pressed = false;
-    wrap.addEventListener('touchstart', (e) => {
-      pressed = false;
-      clearTimeout(timer);
-      const box = boxIn(e.target);
-      if (!box || e.touches.length > 1) return;
-      timer = setTimeout(() => {
-        pressed = true;
-        mode(true);
-        apply({ type: 'toggle', id: box.value, range: false });
-      }, 500);
-    }, { passive: true });
-    ['touchmove', 'touchend', 'touchcancel'].forEach((t) => wrap.addEventListener(t, () => clearTimeout(timer), { passive: true }));
-    // The click that ends a long press must not also open the row or flip the box back.
-    wrap.addEventListener('click', (e) => {
-      if (!pressed) return;
-      pressed = false;
-      e.preventDefault();
-      e.stopPropagation();
-    }, true);
-    wrap.addEventListener('contextmenu', (e) => { if (pressed) e.preventDefault(); });
     const busy = (rows, on) => rows.forEach((r) => {
       r.classList.toggle('is-pending', on);
       if (on) r.setAttribute('aria-busy', 'true');

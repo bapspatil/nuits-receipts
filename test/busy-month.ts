@@ -2,7 +2,6 @@
 // The row recipe lives in scripts/busy-month.mjs so the journeys seed the same shape.
 import { env } from 'cloudflare:workers';
 import { importBankCsv, parsePreset } from '../src/banking';
-import { FLAGS, isRequired } from '../src/flags';
 import {
   busyMail,
   busyReceipts,
@@ -11,6 +10,7 @@ import {
   EARLIER,
   classifyBank,
   isComplete,
+  isTodo,
   READY,
   SALES,
   statementCsv,
@@ -80,33 +80,29 @@ export async function seedBusyMonth() {
     ).all<{ id: string }>()
   ).results.map((r) => r.id);
   const review = receipts.filter((r) => r.status === 'needs_review');
-  const reasonsOf = (r: (typeof receipts)[number]) => JSON.parse(r.review_reasons_json as string) as string[];
-  const requiredFact = (r: (typeof receipts)[number]) =>
-    reasonsOf(r).some((code) => FLAGS[code] && isRequired(FLAGS[code]));
   const inTodo = (pick: (r: (typeof receipts)[number]) => boolean) => {
     const ids = new Set(review.filter(pick).map((r) => r.id as string));
     return todoOrder.filter((id) => ids.has(id));
   };
   const reviewIds = review.map((r) => r.id as string);
   const approvable = inTodo(isComplete);
+  // A receipt flagged only for optional reasons is as good as ready, so it stays out of To do.
+  const todo = inTodo(isTodo);
   return {
     month: MONTH,
     earlierMonth: earlierMonth(MONTH),
     ready: receipts.slice(0, READY).map((r) => r.id as string),
     needsReview: todoOrder,
-    // What Receipts To do holds, in its order. Every receipt needing review today; the PR that
-    // keeps optional-only reasons out of To do narrows this to requiredReasons.
-    todo: todoOrder,
+    // What Receipts To do holds, in its order.
+    todo,
     // Facts all there, so Approve accepts them.
     approvable,
-    // Approvable and still in To do after that cut: they carry a required reason.
-    todoApprovable: approvable.filter((id) => todoOrder.includes(id)),
+    // Approvable and in To do: they carry a reason Approve clears.
+    todoApprovable: approvable.filter((id) => todo.includes(id)),
     // Complete receipts dated the month before, in To do order.
     earlier: EARLIER.map((j: number) => reviewIds[j]!).sort(
       (a: string, b: string) => todoOrder.indexOf(a) - todoOrder.indexOf(b),
     ),
-    requiredReasons: inTodo(requiredFact),
-    optionalOnly: inTodo((r) => !requiredFact(r)),
     sales: SALES.map((j: number) => reviewIds[j]!),
     undated: UNDATED.map((j: number) => reviewIds[j]!),
     heldMail: busyMail(MONTH).map((m) => m.id as string),

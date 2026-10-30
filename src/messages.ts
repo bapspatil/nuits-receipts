@@ -118,7 +118,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Invalid selection': "Something you selected isn't there any more. Reload the page and try again.",
 
   // discard
-  'Invalid reason': 'Pick one of the reasons listed.',
   'Choose a receipt': 'Choose at least one receipt.',
   'Invalid receipt': "We couldn't find that receipt. Reload the page and try again.",
   'Receipt not found': "We couldn't find that receipt. It may have been removed.",
@@ -176,8 +175,7 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Approve receipt before matching': 'Approve this receipt first. Only approved receipts can be matched.',
   'Money in can only be matched to an invoice you sent': 'Money coming in can only match an invoice you sent.',
   'A payment out needs a receipt, not a sales invoice': 'A payment going out needs a receipt, not an invoice you sent.',
-  'Confirm match exceptions':
-    "This receipt and payment don't line up exactly. Choose Match anyway if they belong together.",
+  'Confirm match exceptions': "This receipt and payment don't line up exactly. Press Match if they belong together.",
   'Nothing to match': 'There is nothing to match here. Reload the page and try again.',
   'Pick a receipt from the list':
     'Pick one of the receipts in the list. Type a seller, a date or an amount to find it.',

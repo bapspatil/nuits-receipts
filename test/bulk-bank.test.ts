@@ -194,11 +194,11 @@ test('all=1 takes the month and the Show chip', async () => {
   expect((await tx('Sample Cloud Lantern Oy')).receipt_required).toBe(1);
   expect((await tx('Fake October Shop')).receipt_required).toBe(1);
 
-  const auto = await json({ month: '2026-09', show: 'auto', op: 'unmatch', all: '1' });
+  const auto = await json({ month: '2026-09', show: 'matched', op: 'unmatch', all: '1' });
   expect(await auto.json()).toMatchObject({ n: 1, skipped: 0 });
   expect((await tx('Sample Cloud Lantern Oy')).receipt_id).toBeNull();
   // Nothing left in the chip.
-  expect((await json({ month: '2026-09', show: 'auto', op: 'unmatch', all: '1' })).status).toBe(400);
+  expect((await json({ month: '2026-09', show: 'matched', op: 'unmatch', all: '1' })).status).toBe(400);
 });
 
 test('Bank renders a box per payment, the bar for its filter, and the script once', async () => {
@@ -222,7 +222,10 @@ test('Bank renders a box per payment, the bar for its filter, and the script onc
   expect(html).toContain(`<form action="/payments/${paper.id}" method="post">`);
   expect([...html.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
   const missing = await (await request('/payments?month=2026-09&show=missing&select=1')).text();
-  expect(missing).toContain('<div data-bulk-list="bulk-payments" data-selecting>');
+  expect(missing).toContain('<div data-bulk-list="bulk-payments">');
+  expect(missing).not.toContain('data-selecting');
+  expect(html).not.toContain('select=1');
+  expect(html).not.toContain('data-bulk-select');
   expect(missing).toContain('data-total="1"');
 });
 

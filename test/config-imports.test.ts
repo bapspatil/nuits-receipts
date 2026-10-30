@@ -74,12 +74,10 @@ test('configured owner imports into a new account and retains products, notices 
     const rendered = await page.text();
     expectBranding(rendered);
     if (path.startsWith('/?')) {
-      expect(rendered).toContain('<th scope="row">Studio work</th>');
+      expect(rendered).not.toContain('By part');
       expect(rendered).toContain('<b>Send</b>');
       expect(rendered).toMatch(/Mark September as sent<\/button>/);
       expect(rendered).toContain(EXPORT_LINE);
-    } else {
-      expect(rendered).toContain('Synthetic operating account');
     }
   }
   const csv = await request('/export.csv?month=2026-09');

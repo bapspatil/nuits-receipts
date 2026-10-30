@@ -39,7 +39,7 @@ import {
   type SalesFacts,
 } from './domain';
 import { SALES_DERIVED, salesReview } from './sales';
-import { REQUIRED_FIELDS, REQUIRED_SALES_FIELDS } from './flags';
+import { hasTodoReason, REQUIRED_FIELDS, REQUIRED_SALES_FIELDS } from './flags';
 import { parseDocument } from './parse';
 
 export async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
@@ -326,7 +326,7 @@ export async function processReceipt(
       ...entries.map(([, v]) => v),
       product,
       expenseType,
-      reasons.length ? 'needs_review' : 'ready',
+      hasTodoReason(reasons) ? 'needs_review' : 'ready',
       JSON.stringify(extracted.raw),
       JSON.stringify(extracted.classification),
       JSON.stringify([...new Set(reasons)]),
@@ -741,7 +741,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     facts.currency !== current.currency ||
     facts.issue_date !== current.issue_date ||
     facts.total_minor !== current.total_minor;
-  const status = approved || !reasons.length ? 'ready' : 'needs_review';
+  const status = approved || !hasTodoReason(reasons) ? 'ready' : 'needs_review';
   // A manual match stays unless the facts it was made on change or the receipt
   // becomes a duplicate (a receipt in Review can stay matched; a sales invoice
   // can't). Automatic matches are dropped and re-run by reconcile below.

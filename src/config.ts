@@ -281,6 +281,10 @@ export function config(env: Env): AppConfig {
 export function productIds(env: Env): Product[] {
   return config(env).products.map((p) => p.id);
 }
+// The Part field and everything about parts stays out of sight while there is only one.
+export function hasParts(env: Env): boolean {
+  return config(env).products.length > 1;
+}
 export function isProduct(env: Env, value: string): value is Product {
   return config(env).products.some((p) => p.id === value);
 }
