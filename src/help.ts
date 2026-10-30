@@ -4,6 +4,7 @@
 // test/help.test.ts holds both to that.
 import type { Receipt } from './domain';
 import { bodyOf, FLAGS, type Flag, type FlagGroup } from './flags';
+import { KEY_GROUPS, KEYS_NOTE } from './keys';
 import { STATUS, type StatusKey } from './status';
 import { escape } from './ui';
 
@@ -116,6 +117,15 @@ export function helpSections(): HelpSection[] {
       ],
     },
     { id: 'books', title: 'Your books', groups: [{ entries: [...GLOSSARY] }] },
+    {
+      id: 'keyboard',
+      title: 'Keyboard',
+      lede: `${KEYS_NOTE} Press ? on any page to see this list.`,
+      groups: KEY_GROUPS.map((g, gi) => ({
+        title: g.title,
+        entries: g.keys.map((k, ki) => ({ ids: [`keys-${gi}-${ki}`], term: k.keys.join(' and '), text: k.does })),
+      })),
+    },
     ...FLAG_GROUPS.filter((g) => flags.has(g)).map((g, i) => ({
       id: `flags-${g.toLowerCase().replace(/\W+/g, '-')}`,
       title: `Flags: ${g}`,

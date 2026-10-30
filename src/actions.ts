@@ -77,6 +77,7 @@ export const ACTIONS = {
   clear: { label: 'Clear', icon: 'eraser', tone: 'ghost' },
   back: { label: 'Go back', icon: 'arrow-left', tone: 'secondary' },
   home: { label: 'Home', icon: 'house', tone: 'ghost' },
+  close: { label: 'Close', icon: 'circle-x', tone: 'secondary' },
   signOut: { label: 'Sign out', icon: 'log-out', tone: 'secondary' },
 } as const satisfies Record<string, Action>;
 export type ActionKey = keyof typeof ACTIONS;

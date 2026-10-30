@@ -10,6 +10,7 @@ import { isReady, needsReview } from './flags';
 import { LIST_DEFS, RECEIPTS_TODO, type View } from './worklist';
 import { STEP, type StepState } from './status';
 import { button, buttonLink, buttonSummary, statusMark } from './actions';
+import { keysSheet } from './keys';
 import { icon, sprite, type IconName } from './icons';
 import { failureFor, kept, requestState } from './request';
 
@@ -655,7 +656,16 @@ export const VIEW_TRANSITION_CSS = `@view-transition{navigation:auto}
 ::view-transition-group(*){animation-duration:.25s}
 #${BANNER_ID}{view-transition-name:banner}.listhead{view-transition-name:listhead}.fixes{view-transition-name:fixes}
 [data-row]{scroll-margin-top:72px}
-[data-row]:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}`;
+[data-row]:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
+.keys-sheet{border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--surface-raised);color:var(--text);padding:var(--space-5);max-width:min(30rem,calc(100vw - 2rem))}
+.keys-sheet::backdrop{background:rgba(0,0,0,.35)}
+.keys-sheet h2{margin:0 0 var(--space-3)}.keys-sheet h3{margin:var(--space-4) 0 var(--space-2)}
+.keys-list{margin:0}.keys-list>div{display:flex;gap:var(--space-4);align-items:baseline;padding:var(--space-1) 0}
+.keys-list dt{flex:0 0 5.5rem}.keys-list dd{margin:0}
+kbd{font:500 var(--text-sm)/1.4 var(--font-mono);background:var(--surface-sunken);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 var(--space-2)}
+.keys-sheet form{margin-top:var(--space-4)}
+form[aria-busy=true] .btn:disabled{cursor:progress}`;
+
 // A list row the next action can land on: focusable by its #row- fragment, and described by the
 // banner when the page has one, so a screen reader reads what happened with the row it lands on.
 export const rowAttrs = (id: string) =>
@@ -667,6 +677,8 @@ const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
 // On a phone the keyboard covers the bottom of the page, and with it the bar that holds Approve.
 // The script writes the keyboard's height to --kb, and the bar sits above it.
 const KEYBOARD_SCRIPT = '<script src="/assets/keyboard.js" defer></script>';
+// Shortcuts and the pending cue, on every page, once.
+const KEYS_SCRIPT = '<script src="/assets/keys.js" defer></script>';
 export const KEYBOARD_JS = `(() => {
   const vv = window.visualViewport;
   if (!vv) return;
@@ -695,7 +707,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}SPRITE</body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {
