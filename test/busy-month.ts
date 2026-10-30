@@ -10,6 +10,7 @@ import {
   earlierMonth,
   EARLIER,
   classifyBank,
+  isComplete,
   READY,
   SALES,
   statementCsv,
@@ -82,19 +83,12 @@ export async function seedBusyMonth() {
   const reasonsOf = (r: (typeof receipts)[number]) => JSON.parse(r.review_reasons_json as string) as string[];
   const requiredFact = (r: (typeof receipts)[number]) =>
     reasonsOf(r).some((code) => FLAGS[code] && isRequired(FLAGS[code]));
-  const complete = (r: (typeof receipts)[number]) =>
-    !!r.vendor &&
-    !!r.issue_date &&
-    r.total_minor !== null &&
-    r.net_minor !== null &&
-    r.vat_minor !== null &&
-    (r.kind !== 'sales' || !!r.client);
   const inTodo = (pick: (r: (typeof receipts)[number]) => boolean) => {
     const ids = new Set(review.filter(pick).map((r) => r.id as string));
     return todoOrder.filter((id) => ids.has(id));
   };
   const reviewIds = review.map((r) => r.id as string);
-  const approvable = inTodo(complete);
+  const approvable = inTodo(isComplete);
   return {
     month: MONTH,
     earlierMonth: earlierMonth(MONTH),

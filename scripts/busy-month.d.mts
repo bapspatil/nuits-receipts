@@ -9,6 +9,7 @@ export function earlierMonth(month: string): string;
 export function hex64(prefix: string, n: number): string;
 type Cols = Record<string, string | number | null>;
 export function busyReceipts(month: string): Cols[];
+export function isComplete(row: Cols): boolean;
 export function busyMail(month: string): Cols[];
 export type StatementRow = { ext: string; date: string; amount_minor: number; merchant: string; reference: string };
 export function busyStatement(month: string): StatementRow[];

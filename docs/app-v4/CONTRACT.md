@@ -19,6 +19,8 @@ The To do / All switch is two links, `a[data-view="todo"]` and `a[data-view="all
 
 The "all done" message appears only when `data-total="0"`.
 
+Selection: a row's checkbox is `input[name=id]` inside it, the select-all-on-page checkbox is `input[data-bulk-page]` inside the list container, and a bulk bar button is `button[name=op][value=<op>]` inside `form[data-bulk]` (`exempt` on Bank, `approve` on Receipts).
+
 ## URLs
 
 | Page | URL |

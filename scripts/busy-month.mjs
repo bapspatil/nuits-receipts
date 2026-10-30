@@ -86,6 +86,15 @@ export function busyReceipts(month) {
   return rows;
 }
 
+// Facts all there, so Approve accepts it.
+export const isComplete = (r) =>
+  !!r.vendor &&
+  !!r.issue_date &&
+  r.total_minor !== null &&
+  r.net_minor !== null &&
+  r.vat_minor !== null &&
+  (r.kind !== 'sales' || !!r.client);
+
 export function busyMail(month) {
   return [1, 2, 3].map((n) => ({
     id: `00000000-0000-4000-8000-00000000000${n}`,

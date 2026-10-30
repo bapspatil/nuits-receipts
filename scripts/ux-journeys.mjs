@@ -10,11 +10,12 @@
 // signs in with NUITS_PASSWORD from .dev.vars, and uses the Chromium that
 // Playwright cached unless CHROME is set.
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright-core';
+import { chromePath } from './chrome-path.mjs';
+import { busySql } from './busy-month.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -36,30 +37,6 @@ const password = readFileSync('.dev.vars', 'utf8')
   .match(/^NUITS_PASSWORD=(.*)$/m)?.[1]
   ?.trim();
 if (!password) throw new Error('NUITS_PASSWORD missing from .dev.vars');
-
-function chromePath() {
-  if (process.env.CHROME) return process.env.CHROME;
-  const cache = join(homedir(), 'Library/Caches/ms-playwright');
-  const builds = existsSync(cache)
-    ? readdirSync(cache)
-        .filter((d) => /^chromium-\d+$/.test(d))
-        .sort()
-    : [];
-  for (const build of builds.reverse()) {
-    for (const app of ['chrome-mac-arm64', 'chrome-mac']) {
-      for (const bundle of [
-        'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
-        'Chromium.app/Contents/MacOS/Chromium',
-      ]) {
-        const path = join(cache, build, app, bundle);
-        if (existsSync(path)) return path;
-      }
-    }
-    const linux = join(cache, build, 'chrome-linux/chrome');
-    if (existsSync(linux)) return linux;
-  }
-  throw new Error('No Chromium found. Set CHROME, or run `npx playwright install chromium`.');
-}
 
 const wranglerEnv = {
   ...process.env,
@@ -227,6 +204,8 @@ class Recorder {
     this.deadEnds = [];
     this.inlineErrors = [];
     this.notes = [];
+    this.checked = 0;
+    this.misses = [];
     this.posted = false;
     this.status = 200;
     page.on('request', (r) => {
@@ -293,8 +272,16 @@ class Recorder {
   note(text) {
     this.notes.push(text);
   }
+  // An assertion about what the owner sees. A miss is reported and fails the run, but the journey goes on.
+  check(cond, msg) {
+    this.checked++;
+    if (!cond) this.misses.push(msg);
+    return !!cond;
+  }
   result() {
     return {
+      checked: this.checked,
+      misses: this.misses,
       journey: this.journey,
       clicks: this.clicks,
       edits: this.edits,
@@ -307,7 +294,7 @@ class Recorder {
   }
 }
 
-import { journeys as JOURNEYS, tourScreens } from './ux-journeys.steps.mjs';
+import { journeys as JOURNEYS, busyJourney, tourScreens } from './ux-journeys.steps.mjs';
 
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
@@ -380,6 +367,10 @@ function report(results, screens) {
       if (r.inlineErrors.length)
         lines.push(`Fixed in place: ${r.inlineErrors.map((s) => '`' + s + '`').join(', ')}`, '');
       for (const n of r.notes) lines.push(`- ${n}`);
+      if (r.checked) {
+        lines.push('', `Checks: ${r.checked - r.misses.length} of ${r.checked} passed.`);
+        for (const m of r.misses) lines.push(`- MISS: ${m}`);
+      }
       lines.push('');
     }
   }
@@ -389,6 +380,32 @@ function report(results, screens) {
       `| [${s.name}](${s.file}) | ${s.viewport} | ${s.viewports} | ${s.axe.map((a) => `${a.id} (${a.impact}, ${a.nodes})`).join(', ') || '0'} |`,
     );
   return lines.join('\n') + '\n';
+}
+
+// Journey f's month, apart from the Septembers that a-e use, applied once they are done so
+// Review and Bank in a-e keep their small data.
+const BUSY_MONTH = '2026-08';
+function seedBusyMonth() {
+  const file = `${STATE}-busy.sql`;
+  writeFileSync(file, busySql(BUSY_MONTH));
+  const seeded = spawnSync(
+    'bunx',
+    [
+      'wrangler',
+      'd1',
+      'execute',
+      'DB',
+      '--local',
+      '--config',
+      'wrangler.local.jsonc',
+      '--persist-to',
+      STATE,
+      '--file',
+      file,
+    ],
+    { env: wranglerEnv, encoding: 'utf8' },
+  );
+  if (seeded.status !== 0) throw new Error(`busy month seed failed:\n${seeded.stderr}`);
 }
 
 const { server, log } = startServer();
@@ -414,9 +431,34 @@ try {
     console.log(`${journey.name}: ${recorder.clicks} clicks, ${recorder.edits} edits`);
   }
   const screens = await audit(browser, await tourScreens(page, BASE, helpers));
+  seedBusyMonth();
+  screens.push(
+    ...(await audit(browser, [
+      { name: 'busy-receipts-todo', path: '/receipts?view=todo' },
+      { name: 'busy-bank-todo', path: `/payments?month=${BUSY_MONTH}&view=todo` },
+    ])),
+  );
+  const busy = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    httpCredentials: { username: 'owner', password },
+  });
+  page = await busy.newPage();
+  const f = new Recorder(page, busyJourney.name);
+  try {
+    await busyJourney.run(page, f, { ...helpers, BUSY_MONTH });
+  } catch (error) {
+    f.check(false, `journey f stopped: ${String(error.message).split('\n')[0]}`);
+  }
+  results.push(f.result());
+  console.log(`${busyJourney.name}: ${f.clicks} clicks, ${f.misses.length} of ${f.checked} checks missed`);
   writeFileSync(join(OUT, 'results.json'), JSON.stringify({ results, screens }, null, 2));
   writeFileSync(join(OUT, 'RESULTS.md'), report(results, screens));
   console.log(`wrote ${join(OUT, 'RESULTS.md')}`);
+  const missed = results.flatMap((r) => r.misses.map((m) => `${r.journey}: ${m}`));
+  if (missed.length) {
+    console.error(`${missed.length} check(s) missed:\n${missed.map((m) => `  ${m}`).join('\n')}`);
+    process.exitCode = 1;
+  }
 } catch (error) {
   console.error(log().slice(-1500));
   if (page) {
