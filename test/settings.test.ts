@@ -199,7 +199,7 @@ test('the page is one fold per section, one Save per group and history tucked aw
   );
   expect(html).toMatch(/id="f-RECEIPT_ADDRESS" title="[^"]+" pattern="receipts@example\\\.com" required/);
   expect(html).toMatch(/id="f-FORWARD_COPY_TO"[^>]*>.*?name="confirm_FORWARD_COPY_TO" value="yes"/);
-  expect(html).toContain('.setup-form .srow:has(:invalid) .confirm{display:flex}');
+  expect(html).toContain('.setup-form .frow:has(:invalid) .confirm{display:flex}');
   expect(html).not.toContain('<details class="why"><summary>Why');
 });
 

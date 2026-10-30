@@ -24,5 +24,5 @@ test.each([
   const html = await (await request(path)).text();
   expect(html).toContain(`<title>${title} ·`);
   const current = [...html.matchAll(/<nav class="main"[\s\S]*?<\/nav>/g)][0]![0];
-  expect(current.match(/aria-current="page"[^>]*>([A-Za-z]+)/)![1]).toBe(tab);
+  expect(current.match(/aria-current="page"[^>]*>(?:<svg[\s\S]*?<\/svg>)?([A-Za-z]+)/)![1]).toBe(tab);
 });

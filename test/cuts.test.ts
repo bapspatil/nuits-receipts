@@ -36,7 +36,7 @@ async function seedMismatch() {
   });
   return { id, tx: await hash('race:id:a') };
 }
-const rowOf = (html: string) => html.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
+const rowOf = (html: string) => html.match(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/)![0];
 
 test('a Bank row asks for Match, Not a purchase and More, and keeps the rest under More', async () => {
   idFrom(await uploadPdf());

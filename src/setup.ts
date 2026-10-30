@@ -274,7 +274,7 @@ function fieldRow(env: Env, field: Field): string {
     ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes" id="f-confirm_${key}"${kept(scopeOf(field.group), `confirm_${key}`, '') === 'yes' ? ' checked' : ''}${ariaFor(scopeOf(field.group), `confirm_${key}`)}> ${escape(field.confirm)}</label></div>`
     : '';
   const meta = `<p class="meta">${SOURCE_WORDS[source]}${source === 'app' ? ` · ${resetButton(field, 'Reset')}` : ''}${field.key === 'PRODUCTS_JSON' ? ' · <a href="/help#part">What is a part?</a>' : ''}</p>`;
-  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(scopeOf(field.group), key)}${bad}${confirm}${errorLine(scopeOf(field.group), `confirm_${key}`)}${meta}</div></div>`;
+  return `<div class="frow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(scopeOf(field.group), key)}${bad}${confirm}${errorLine(scopeOf(field.group), `confirm_${key}`)}${meta}</div></div>`;
 }
 function resetForms(env: Env, fields: readonly Field[]): string {
   const state = applied(env);

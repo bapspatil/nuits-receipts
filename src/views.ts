@@ -113,11 +113,11 @@ import {
   chosenReceipt,
   errorId,
   VIEW_TRANSITION_CSS,
-  rowAttrs,
   errorLine,
   matchError,
 } from './ui';
 import { failureFor, kept } from './request';
+import { row, rowList } from './row';
 import { STATUS } from './status';
 import { ACTIONS, button, buttonLink, buttonSummary, statusMark, type ActionKey, type Tone } from './actions';
 import {
@@ -507,7 +507,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   };
   // One row: the label on the left, the control on the right.
   const row = (c: Control, label = escape(c.label), title = '', meta = '') =>
-    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label>${meta ? `<span class="meta">${meta}</span>` : ''}</div><div class="sc">${c.html}${c.note ? `<p class="meta" id="h-${c.id.slice(2)}">${escape(c.note)}</p>` : ''}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
+    `<div class="frow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label>${meta ? `<span class="meta">${meta}</span>` : ''}</div><div class="sc">${c.html}${c.note ? `<p class="meta" id="h-${c.id.slice(2)}">${escape(c.note)}</p>` : ''}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
   const rows = (name: FlagField | 'due_date') =>
     controls(name)
       .map((c) => row(c))
@@ -845,10 +845,11 @@ export async function payments(
     .map((t) => {
       const pair = paired.get(t.id);
       const extra: string[] = [];
-      let status: string,
+      let status = '',
+        meta = '',
         controls = '';
       if (pair) {
-        status = tag(
+        meta = tag(
           t.id === pair.debit_id
             ? `Transfer to ${escape(pair.credit_account_name)}`
             : `Transfer from ${escape(pair.debit_account_name)}`,
@@ -857,12 +858,14 @@ export async function payments(
           `<form action="/transfers/${pair.debit_id}/undo" method="post">${fields}${button('undo', { label: 'Undo transfer' })}</form>`,
         );
       } else if (t.receipt_id) {
-        status = `${statusMark('matched')} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>${counts.reviewing.has(t.receipt_id) ? ` ${statusMark('needs', { href: `/receipts/${t.receipt_id}` })}` : ''}`;
+        // One stamp per row: a matched receipt that still needs checking says so in its link.
+        const doc = t.amount_minor > 0 ? 'Invoice' : 'Receipt';
+        status = `${statusMark('matched')} <a class="tag" href="/receipts/${t.receipt_id}">${counts.reviewing.has(t.receipt_id) ? `Check the ${doc.toLowerCase()}` : doc}</a>`;
         extra.push(
           `<form action="/matches" method="post">${fields}<input type="hidden" name="transaction_id" value="${t.id}">${button('unmatch', { attrs: ' name="action" value="unlink"' })}</form>`,
         );
       } else if (t.amount_minor >= 0) {
-        status = tag('Money in');
+        meta = tag('Money in');
         const likely = invoices.find((r) => creditFit(r, t, tuning) !== null);
         if (invoices.length && t.amount_minor > 0 && t.receipt_required) {
           const found = matchControls(t, invoices, 'pick-invoices', 'Invoice', likely);
@@ -871,7 +874,8 @@ export async function payments(
         }
       } else if (!t.receipt_required) {
         const by = t.exempt_by && t.exempt_by !== 'owner' ? EXEMPT_LABELS[t.exempt_by] : '';
-        status = `${statusMark('notPurchase')}${by ? ` <span class="tag">${by}</span>` : ''}`;
+        status = statusMark('notPurchase');
+        meta = by ? tag(by) : '';
         extra.push(
           `<form action="/payments/${t.id}" method="post">${fields}${button('needs', { attrs: ' name="receipt_required" value="1"' })}</form>`,
         );
@@ -897,7 +901,20 @@ export async function payments(
           );
       }
       // No bulk action applies to a transfer side.
-      return `<li class="pay${unmatched(t) ? ' missing' : ''}" data-row="${t.id}" id="row-${t.id}"${rowAttrs(t.id)}>${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id') : ''}</div>${controls}</li>`;
+      const account = accounts.size > 1 ? escape(t.account_name) : '';
+      return row({
+        key: t.id,
+        pick: pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`),
+        date: day(t.booking_date, false),
+        title: escape(t.merchant),
+        meta: [account, meta].filter(Boolean).join(' · '),
+        status,
+        amount: amount(t.amount_minor, t.currency),
+        actions: extra.length
+          ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id')
+          : '',
+        below: controls,
+      });
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -915,7 +932,7 @@ export async function payments(
         )}</ul></details>${bulk.map(({ t, r }) => `<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">`).join('')}${button('matchAll', { label: matchAllLabel(bulk.length) })}</form>`
     : '';
   const picks = shown.filter((t) => !paired.has(t.id)).length;
-  const table = `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>`;
+  const table = rowList([items]);
   const others = elsewhere.length
     ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="${bankPath(e.m, 'todo')}">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
@@ -1304,10 +1321,14 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
       scope: { back: 'settings' },
       actions: [action],
     };
-    return `<div data-bulk-list="${form}">${bulkTools(bulk, addresses.length)}<ul class="plain rowlist">${addresses.map((a) => row(bulk, a, path, key)).join('')}</ul></div>${bulkBar(bulk)}`;
+    return `<div data-bulk-list="${form}">${bulkTools(bulk, addresses.length)}${rowList(addresses.map((a) => sender(bulk, a, path, key)))}</div>${bulkBar(bulk)}`;
   };
-  const row = (bulk: BulkList, address: string, action: string, key: 'remove' | 'unignore') =>
-    `<li class="srow">${bulkCheck(bulk, address, address)}<div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings">${button(key, { attrs: ` aria-label="${ACTIONS[key].label} ${escape(address)}"` })}</form></li>`;
+  const sender = (bulk: BulkList, address: string, action: string, key: 'remove' | 'unignore') =>
+    row({
+      pick: bulkCheck(bulk, address, address),
+      title: escape(address),
+      actions: `<form action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings">${button(key, { attrs: ` aria-label="${ACTIONS[key].label} ${escape(address)}"` })}</form>`,
+    });
   const approved = allowed.length
     ? list('bulk-allowed', SENDER_ACTIONS.remove, allowed, 'remove', '/senders/remove')
     : '<p class="warning">None yet. All mail waits in To do.</p>';
@@ -1335,12 +1356,17 @@ async function mailLog(env: Env): Promise<string> {
     const offer =
       reasonAllows(m.reason) && !allowed.has(m.sender) && m.sender.includes('@') && !/[\s<>]/.test(m.sender);
     const action = offer
-      ? `<form class="sc" action="/senders/approve" method="post"><input type="hidden" name="address" value="${escape(m.sender)}"><input type="hidden" name="back" value="mail">${button('allow', { attrs: ` aria-label="Allow ${escape(m.sender)}"` })}</form>`
+      ? `<form action="/senders/approve" method="post"><input type="hidden" name="address" value="${escape(m.sender)}"><input type="hidden" name="back" value="mail">${button('allow', { attrs: ` aria-label="Allow ${escape(m.sender)}"` })}</form>`
       : '';
-    return `<li class="srow"><div class="sl"><span class="flabel">${escape(m.sender)}</span><span class="meta">${escape(when)}${m.subject ? ` · ${escape(m.subject)}` : ''}</span><span class="meta">${escape(reasonWords(m.reason))}</span></div>${action}</li>`;
+    return row({
+      date: escape(when),
+      title: escape(m.sender),
+      meta: `${m.subject ? `${escape(m.subject)} · ` : ''}${escape(reasonWords(m.reason))}`,
+      actions: action,
+    });
   };
   const body = rows.length
-    ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
+    ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p>${rowList(rows.map(item))}`
     : '<p>Every email that reached the app was kept.</p>';
   return `<h3 id="mail">Mail we didn't keep</h3>${body}`;
 }
@@ -1367,12 +1393,15 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     String(accounts.length),
     `${
       accounts.length
-        ? `<ul class="plain rowlist">${accounts
-            .map(
-              (a, i) =>
-                `<li class="srow"><div class="sl"><span class="flabel">${escape(a.label)}</span><span class="meta">${escape(a.bank_name) || 'No bank'} · ${escape(a.default_currency)}</span></div><form class="sc inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="acct-${i}">New name for ${escape(a.label)}</label><input id="acct-${i}" name="label" value="${escape(a.label)}">${button('edit', { label: 'Rename', attrs: ` aria-label="Rename ${escape(a.label)}"` })}</form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}</li>`,
-            )
-            .join('')}</ul>`
+        ? rowList(
+            accounts.map((a, i) =>
+              row({
+                title: escape(a.label),
+                meta: `${escape(a.bank_name) || 'No bank'} · ${escape(a.default_currency)}`,
+                actions: `<form class="inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="acct-${i}">New name for ${escape(a.label)}</label><input id="acct-${i}" name="label" value="${escape(a.label)}">${button('edit', { label: 'Rename', attrs: ` aria-label="Rename ${escape(a.label)}"` })}</form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}`,
+              }),
+            ),
+          )
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
     }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div>${button('add')}</form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>`,
     opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
@@ -1383,7 +1412,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     String(rules.results.length),
     `${
       rules.results.length
-        ? `<ul class="plain rowlist rules">${rules.results
+        ? `<ul class="list rules">${rules.results
             .map(
               (rule) =>
                 `<li><details><summary>${escape(rule.vendor_contains)} → ${hasParts(env) ? `${escape(productLabel(env, rule.product))}, ` : ''}${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule)}<div class="btns">${button('save')}${button('remove', { attrs: ` formaction="/rules/${rule.id}/delete"` })}</div></form></div></details></li>`,

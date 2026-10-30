@@ -4,10 +4,11 @@ Copyright 2026 Bapusaheb Shankaragouda Patil / Nuits
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 "Nuits" and "Nuits Receipts" are not licensed under it (Apache License 2.0, section 6).
 
-The app bundles two fonts in src/fonts.ts, each under the SIL Open Font License 1.1
+The app bundles three fonts in src/fonts.ts, each under the SIL Open Font License 1.1
 (https://openfontlicense.org): Bricolage Grotesque (Copyright 2022 The Bricolage
-Grotesque Project Authors) and Instrument Sans (Copyright 2022 The Instrument Sans
-Project Authors). The fonts are not covered by the Apache License.
+Grotesque Project Authors), Instrument Sans (Copyright 2022 The Instrument Sans
+Project Authors) and DM Mono (Copyright 2020 The DM Mono Project Authors). The fonts
+are not covered by the Apache License.
 
 The app draws its icons from Lucide (lucide-static 1.65.0, https://lucide.dev), ISC
 License, Copyright (c) 2026 Lucide Icons and Contributors. Permission to use, copy,

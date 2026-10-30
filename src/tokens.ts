@@ -3,27 +3,28 @@
 
 // The :root block of custom properties, in three layers.
 export const TOKENS_CSS =
-  ":root{/* primitives */--grey50:#F5F6F7;--grey0:#FFFFFF;--grey100:#ECEEF0;--petrol50:#E2ECEA;--red50:#FCEBEA;--green50:#E6F2EA;--grey950:#101418;--grey700:#4B5560;--petrol900:#0D3A36;--petrol950:#072522;--red700:#B3261E;--green800:#1E6B3C;--grey500:#7D8691;--grey200:#D6DADF;--paper:#E6EFE9;--amber50:#F6E3C1;--slate50:#E1E7EC;--amber700:#87470A;--slate700:#2D4E73;--font-display:\"Bricolage\",\"Arial Narrow\",system-ui,sans-serif;--font-ui:\"Instrument Sans\",system-ui,sans-serif;--font-mono:ui-monospace,Menlo,Consolas,monospace;--text-xs:12px;--text-sm:13px;--text-base:15px;--text-lg:18px;--text-xl:24px;--text-2xl:32px;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;--space-8:64px;--radius-sm:2px;--radius-md:4px;--radius-pill:999px;--shadow-raised:0 1px 2px rgb(16 20 24/.08);/* semantic */--surface-page:var(--grey50);--surface-raised:var(--grey0);--surface-sunken:var(--grey100);--surface-accent-quiet:var(--petrol50);--text:var(--grey950);--text-muted:var(--grey700);--text-on-accent:var(--grey0);--border:var(--grey200);--border-strong:var(--grey500);--accent:var(--petrol900);--accent-hover:var(--petrol950);--danger:var(--red700);--danger-surface:var(--red50);--success:var(--green800);--success-surface:var(--green50);--focus-ring:var(--petrol900);--warn:var(--amber700);--warn-surface:var(--amber50);--info:var(--slate700);--info-surface:var(--slate50);/* component */--btn-primary-bg:var(--accent);--btn-primary-text:var(--text-on-accent);--btn-height:44px;--nav-height:56px;--tabbar-height:calc(3.5rem + 1px + env(safe-area-inset-bottom));--stamp-needs:var(--warn);--stamp-ok:var(--success);--stamp-missing:var(--warn);--field-height:44px;--row-height:48px;--frame-bg:var(--surface-sunken);--page-max:1120px;}@media(max-width:720px){:root{--text-base:16px;--text-2xl:26px;}}";
+  ":root{/* primitives */--paper50:#F3EDE2;--paper0:#FBF8F2;--paper-field:#FFFDF8;--paper200:#E6DDCC;--petrol50:#DCE6DF;--red50:#F5DCD5;--green50:#E2ECD9;--amber50:#F6E3C1;--slate50:#E1E7EC;--ink950:#211C16;--ink700:#5E5446;--petrol900:#0D3A36;--petrol950:#072522;--red700:#A12820;--green800:#2E6A3C;--amber700:#87470A;--slate700:#2D4E73;--ink500:#857861;--ink200:#D8CCB8;--paper:#E6EFE9;--font-display:\"Bricolage\",\"Arial Narrow\",system-ui,sans-serif;--font-ui:\"Instrument Sans\",system-ui,sans-serif;--font-num:\"DM Mono\",ui-monospace,Menlo,monospace;--font-mono:\"DM Mono\",ui-monospace,Menlo,Consolas,monospace;--text-xs:12px;--text-sm:13px;--text-base:15px;--text-lg:18px;--text-xl:24px;--text-2xl:34px;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;--space-8:64px;--radius-sm:8px;--radius-md:10px;--radius-lg:14px;--radius-glass:22px;--radius-pill:999px;--shadow-raised:0 1px 0 rgb(216 204 184),0 2px 6px rgb(33 28 22/.05);--shadow-glass:0 1px 2px rgb(33 28 22/.1),0 12px 32px -8px rgb(33 28 22/.24);--shadow-glass-edge:inset 0 1px 0 rgb(255 255 255/.8),inset 0 -1px 0 rgb(33 28 22/.08);/* semantic */--surface-page:var(--paper50);--surface-raised:var(--paper0);--surface-field:var(--paper-field);--surface-sunken:var(--paper200);--surface-accent-quiet:var(--petrol50);--text:var(--ink950);--text-muted:var(--ink700);--text-on-accent:var(--paper0);--border:var(--ink200);--border-strong:var(--ink500);--accent:var(--petrol900);--accent-hover:var(--petrol950);--danger:var(--red700);--danger-surface:var(--red50);--success:var(--green800);--success-surface:var(--green50);--focus-ring:var(--petrol900);--warn:var(--amber700);--warn-surface:var(--amber50);--info:var(--slate700);--info-surface:var(--slate50);--glass-filter:blur(24px) saturate(170%);--glass-border:rgb(133 120 97/.3);--glass:rgb(251 248 242/0.85);/* component */--btn-primary-bg:var(--accent);--btn-primary-text:var(--text-on-accent);--btn-height:40px;--sidebar-width:260px;--tabbar-height:calc(76px + env(safe-area-inset-bottom));--stamp-needs:var(--warn);--stamp-ok:var(--success);--stamp-missing:var(--warn);--field-height:46px;--row-height:62px;--frame-bg:var(--surface-sunken);--page-max:1120px;}@media(max-width:720px){:root{--text-sm:13.5px;--text-base:16px;--text-2xl:30px;--btn-height:44px;}}";
 
 // The primitive colours as hex, for the places CSS variables cannot reach (the tab icon).
 export const PALETTE = {
-  "grey50": "#F5F6F7",
-  "grey0": "#FFFFFF",
-  "grey100": "#ECEEF0",
-  "petrol50": "#E2ECEA",
-  "red50": "#FCEBEA",
-  "green50": "#E6F2EA",
-  "grey950": "#101418",
-  "grey700": "#4B5560",
-  "petrol900": "#0D3A36",
-  "petrol950": "#072522",
-  "red700": "#B3261E",
-  "green800": "#1E6B3C",
-  "grey500": "#7D8691",
-  "grey200": "#D6DADF",
-  "paper": "#E6EFE9",
+  "paper50": "#F3EDE2",
+  "paper0": "#FBF8F2",
+  "paperField": "#FFFDF8",
+  "paper200": "#E6DDCC",
+  "petrol50": "#DCE6DF",
+  "red50": "#F5DCD5",
+  "green50": "#E2ECD9",
   "amber50": "#F6E3C1",
   "slate50": "#E1E7EC",
+  "ink950": "#211C16",
+  "ink700": "#5E5446",
+  "petrol900": "#0D3A36",
+  "petrol950": "#072522",
+  "red700": "#A12820",
+  "green800": "#2E6A3C",
   "amber700": "#87470A",
-  "slate700": "#2D4E73"
+  "slate700": "#2D4E73",
+  "ink500": "#857861",
+  "ink200": "#D8CCB8",
+  "paper": "#E6EFE9"
 } as const;

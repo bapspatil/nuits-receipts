@@ -11,7 +11,17 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
-import { FAVICON_SVG, errorId, errorPage, exportCsv, exportSalesCsv, month, navCounts, SPECULATION_RULES } from './ui';
+import {
+  FAVICON_SVG,
+  GRAIN_SVG,
+  errorId,
+  errorPage,
+  exportCsv,
+  exportSalesCsv,
+  month,
+  navCounts,
+  SPECULATION_RULES,
+} from './ui';
 import { BULK_CAP, BULK_JS } from './bulk';
 import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
 import { ADD_JS, addPage, invoicesPage, MAX_UPLOAD_FILES } from './invoices';
@@ -398,6 +408,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     });
   if (request.method === 'GET' && path === '/export-sales.csv')
     return exportSalesCsv(env, month(url.searchParams.get('month')), url.origin + base);
+  if (request.method === 'GET' && path === '/assets/grain.svg')
+    return new Response(GRAIN_SVG, {
+      headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },
+    });
   if (request.method === 'GET' && path === '/favicon.svg')
     return new Response(FAVICON_SVG, {
       headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },

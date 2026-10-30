@@ -85,10 +85,10 @@ export async function importForm(): Promise<string> {
 }
 export function wizard(step: 1 | 2 | 3): string {
   return `<ol class="wizard" aria-label="Import steps">${['Choose file', 'Check', 'Import']
-    .map(
-      (name, i) =>
-        `<li${i + 1 === step ? ' aria-current="step"' : i + 1 < step ? ' class="done"' : ''}>${stepWord(i + 1 === step ? 'now' : i + 1 < step ? 'done' : 'todo')}${name}</li>`,
-    )
+    .map((name, i) => {
+      const state = i + 1 === step ? 'now' : i + 1 < step ? 'done' : 'todo';
+      return `<li class="step ${state}"${state === 'now' ? ' aria-current="step"' : ''}>${stepWord(state)}${name}</li>`;
+    })
     .join('')}</ol>`;
 }
 function bytesFromForm(form: FormData): Uint8Array {

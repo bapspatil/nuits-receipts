@@ -101,7 +101,7 @@ export const journeys = [
       rec.note(
         `Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`,
       );
-      const row = (merchant) => page.locator('li.pay', { hasText: merchant });
+      const row = (merchant) => page.locator('li.row', { hasText: merchant });
       // A likely pair is one button: "Match", or "Match anyway" when the names differ.
       const likely = row('DOMAINDESK').getByRole('button', { name: /^Match( anyway)?$/ });
       if (await likely.count()) {
@@ -147,9 +147,9 @@ export const journeys = [
       await rec.click(nav(page, '/payments'));
       if (!(await page.locator('main h1', { hasText: 'September' }).count()))
         await rec.click(page.locator('main a[href$="month=2026-09"]'));
-      if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
+      if (!(await page.locator('li.row', { hasText: 'Sample Client Oy' }).count()))
         await rec.click(page.locator('main a[href*="view=all"]'));
-      const money = page.locator('li.pay', { hasText: 'Sample Client Oy' });
+      const money = page.locator('li.row', { hasText: 'Sample Client Oy' });
       rec.note(`Money-in row: ${(await money.innerText()).replace(/\s+/g, ' ').trim()}`);
       if (await money.locator('select').count()) {
         await rec.select(money.locator('select'), { index: 1 });
@@ -211,7 +211,7 @@ async function keyboardCheck(page, base) {
 async function unsettleBank(page, base) {
   const bank = () => page.goto(base + '/payments?month=2026-09&view=all');
   const open = async (merchant, button) => {
-    const row = page.locator('li.pay', { hasText: merchant });
+    const row = page.locator('li.row', { hasText: merchant });
     await row.locator('summary', { hasText: 'More' }).click();
     await row.getByRole('button', { name: button }).click();
     await page.waitForLoadState('load');

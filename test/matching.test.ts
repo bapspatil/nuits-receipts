@@ -9,7 +9,7 @@ import { statusMark } from '../src/actions';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 const rowOf = (html: string, merchant: string) =>
-  [...html.matchAll(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li><\/ol>|<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/g)]
+  [...html.matchAll(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/g)]
     .map((m) => m[0])
     .find((r) => r.includes(merchant))!;
 
@@ -130,7 +130,8 @@ test('a receipt still in Review is matched, and the payment says the receipt nee
   expect(row).toContain('Matched');
   expect(row).not.toContain('Matched automatically');
   expect(row).not.toContain('tag ok auto');
-  expect(row).toContain(statusMark('needs', { href: `/receipts/${id}` }));
+  // One stamp per row: Matched, and the link to the receipt says it still needs checking.
+  expect(row).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${id}">Check the receipt</a>`);
   expect(row).not.toContain('Missing');
   expect(await bank()).toContain('1 out, 1 matched, 0 not a purchase, <span>0 missing</span>, 1 needs you');
   // A real gap next to it still says Missing.
