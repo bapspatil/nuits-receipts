@@ -44,7 +44,7 @@ test('confirmed import and reimport match one receipt and show one missing payme
   await importCsv();
   expect(await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions').first('n')).toBe(2);
   expect((await eurValue(env, row)).source).toBe('bank');
-  const view = await (await request('/payments?month=2026-09&show=all')).text();
+  const view = await (await request('/payments?month=2026-09&view=all')).text();
   expect(view).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${row.id}">Receipt</a>`);
   expect(view).toContain('<span class="stamp missing">Missing</span>');
   // Bank opens on what is missing.

@@ -67,7 +67,7 @@ const NEXT_STEP: Record<
   },
   match: {
     text: (m) => `match ${m}'s payments`,
-    link: (m) => ({ href: `/payments?month=${m}&show=missing`, label: 'Open Bank' }),
+    link: (m) => ({ href: `/payments?month=${m}&view=todo`, label: 'Open Bank' }),
   },
   send: {
     text: (m) => `send ${m} to your accountant`,
@@ -367,7 +367,7 @@ export const EVENTS = {
     },
     link: (p) =>
       count(p, 'auto') && MONTH.test(p.get('month') ?? '')
-        ? { href: `/payments?month=${p.get('month')}&show=matched`, label: 'See them' }
+        ? { href: `/payments?month=${p.get('month')}&view=all`, label: 'See them' }
         : null,
   },
   exemptUndone: {

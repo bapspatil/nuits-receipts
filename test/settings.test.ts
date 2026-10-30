@@ -174,7 +174,7 @@ test('the page is one fold per section, one Save per group and history tucked aw
     '<p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p>',
   );
   expect(html).toContain(
-    '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>',
+    '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>',
   );
   // Every group form has exactly one button of its own: Save.
   const forms = [...html.matchAll(/<form action="\/settings\/setup" method="post"[^>]*>([\s\S]*?)<\/form>/g)];

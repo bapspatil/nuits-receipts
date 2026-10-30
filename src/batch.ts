@@ -13,7 +13,18 @@ import {
   type Receipt,
   type Rule,
 } from './domain';
-import { BANK_SHOWS, cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
+import {
+  BANK_VIEWS,
+  bankPath,
+  bankUpto,
+  cacheFx,
+  clearBankReview,
+  nextOpenPayment,
+  reconcile,
+  SET_REQUIRED_SQL,
+  viewRows,
+  type BankView,
+} from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
 import { discardReceipts, restoreReceipts } from './discard';
@@ -51,6 +62,8 @@ type Endpoint = {
   id: (value: string) => string;
   all?: (env: Env, form: FormData) => Promise<string[]>;
   back: (form: FormData) => string;
+  // The open row to land on after the save, as #row-<id>.
+  next?: (env: Env, form: FormData, ids: string[]) => Promise<string | null>;
 };
 export type BulkResult = { location: string; n: number; skipped: number };
 const ROW_ID = /^[a-f0-9]{64}$/;
@@ -200,25 +213,24 @@ const RECEIPTS: Endpoint = {
 };
 
 // ---------- Bank ----------
-// The month, Show chip and page the bar was drawn for.
-function bankScope(form: FormData): { month: string; show: BankShow; offset: number } {
+// The month, view and rows shown that the bar was drawn for.
+function bankScope(form: FormData): { month: string; view: BankView; upto: number } {
   const month = text(form, 'month'),
-    show = text(form, 'show'),
-    offset = Number(text(form, 'offset') || 0);
+    view = text(form, 'view');
   requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
   requireInput(
-    BANK_SHOWS.some((s) => s === show),
+    BANK_VIEWS.some((v) => v === view),
     'Invalid filter',
     400,
   );
-  requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page', 400);
-  return { month, show: show as BankShow, offset };
+  return { month, view: view as BankView, upto: bankUpto(text(form, 'upto'), BULK_CAP) };
 }
-// Not a purchase (0) and Needs receipt (1): only money out that is not that already.
+// Not a purchase (0) and Needs receipt (1): only money out that is not that already. A matched
+// row is left alone, since SET_REQUIRED_SQL would drop its match without a word.
 const required = (to: 0 | 1, event: EventKey): Op => ({
   run: async (env, ids) => {
     const result = await env.DB.prepare(
-      `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=?`,
+      `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=? AND receipt_id IS NULL`,
     )
       .bind(to, JSON.stringify(ids), 1 - to)
       .run();
@@ -235,7 +247,7 @@ const PAYMENT_OPS: Record<PaymentOp, Op> = {
       const { month } = bankScope(form);
       const tuning = config(env).tuning;
       const [open, receipts, rules] = await Promise.all([
-        showRows(env, month, 'missing', BULK_CAP),
+        viewRows(env, month, 'todo', BULK_CAP),
         matchableReceipts(env),
         env.DB.prepare('SELECT * FROM vendor_rules')
           .all<Rule>()
@@ -267,13 +279,14 @@ const PAYMENTS: Endpoint = {
   ops: PAYMENT_OPS,
   id: rowId,
   all: async (env, form) => {
-    const { month, show } = bankScope(form);
-    return (await showRows(env, month, show, BULK_CAP + 1)).map((t) => t.id);
+    const { month, view } = bankScope(form);
+    return (await viewRows(env, month, view, BULK_CAP + 1)).map((t) => t.id);
   },
   back: (form) => {
-    const { month, show, offset } = bankScope(form);
-    return `/payments?month=${month}&show=${show}${offset ? `&offset=${offset}` : ''}`;
+    const { month, view, upto } = bankScope(form);
+    return bankPath(month, view, upto);
   },
+  next: (env, form, ids) => nextOpenPayment(env, bankScope(form).month, ids),
 };
 
 // ---------- Unknown senders and Settings > Senders ----------
@@ -369,8 +382,13 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
     skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
+  const next = await endpoint.next?.(env, form, ids);
   return {
-    location: withDone(done.event, back, { n, ...done.params, skipped: skipped || null }),
+    location: withDone(done.event, next ? `${back}#row-${next}` : back, {
+      n,
+      ...done.params,
+      skipped: skipped || null,
+    }),
     n,
     skipped,
   };

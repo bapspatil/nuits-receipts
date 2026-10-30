@@ -7,9 +7,15 @@ import {
   eurValue,
   monthEurValues,
   openSales,
-  showCounts,
+  BANK_UPTO,
+  BANK_VIEWS,
+  bankPath,
+  bankUpto,
+  viewCounts,
+  viewRows,
+  type BankRow,
+  type BankView,
   type EurValue,
-  type Transaction,
 } from './banking';
 import { importForm, wizard } from './imports';
 import { listAccounts, listTransfers } from './accounts';
@@ -24,6 +30,7 @@ import { matchedIds, mergePlan } from './dedupe';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import {
+  BULK_CAP,
   bulkBar,
   bulkCheck,
   bulkTools,
@@ -69,7 +76,6 @@ import {
   amount,
   day,
   escape,
-  chipRow,
   EXPORT_LINE,
   input,
   MISSING_PAYMENTS,
@@ -111,7 +117,7 @@ import {
   type Cell,
 } from './match';
 
-type Payment = Transaction & { account_name: string; bank_name: string };
+type Payment = BankRow;
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
   return INLINE_IMAGES.includes(r.media_type);
@@ -735,7 +741,7 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
 async function monthCounts(env: Env, month: string) {
   const [sums, reviewing] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
+      `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
     ).bind(month),
     env.DB.prepare(
       `SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE ${needsReviewSql('r')} AND substr(t.booking_date,1,7)=?`,
@@ -746,22 +752,23 @@ async function monthCounts(env: Env, month: string) {
     out: n.out ?? 0,
     matched: n.matched ?? 0,
     exempt: n.exempt ?? 0,
-    missing: n.missing ?? 0,
     reviewing: new Set(((reviewing?.results ?? []) as { id: string }[]).map((r) => r.id)),
   };
 }
+// To do lists the month's open payments, the first upto of them; All lists the whole month.
 // month: the month to show, or the lookup that picks it, so the queries that
 // don't need it start right away.
 export async function payments(
   env: Env,
   month: string | Promise<string>,
-  offset: number,
   params = new URLSearchParams(),
 ): Promise<Response> {
   const chosen = Promise.resolve(month);
-  // One round for everything. The open invoices, the transfer credits and the
-  // receipts still in Review are needed only for some months, but loading them
-  // every time is cheaper than waiting a second round for them.
+  const view: BankView = params.get('view') === 'all' ? 'all' : 'todo';
+  const upto = bankUpto(params.get('upto'), BULK_CAP);
+  // One round for everything. The open invoices, the transfer credits, the
+  // receipts still in Review and the month's state are needed only for some
+  // months, but loading them every time is cheaper than waiting a second round.
   const [
     selected,
     rows,
@@ -771,20 +778,14 @@ export async function payments(
     transfers,
     allCredits,
     counts,
-    showTotals,
+    views,
     elsewhere,
     droppedRecently,
     importButton,
+    state,
   ] = await Promise.all([
     chosen,
-    chosen.then((m) =>
-      env.DB.prepare(
-        "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
-      )
-        .bind(m, offset)
-        .all<Payment>()
-        .then((r) => r.results),
-    ),
+    chosen.then((m) => viewRows(env, m, view, view === 'todo' ? BULK_CAP : undefined)),
     matchableReceipts(env),
     openSales(env),
     env.DB.prepare('SELECT * FROM vendor_rules')
@@ -797,10 +798,10 @@ export async function payments(
     )
       .all<Payment>()
       .then((r) => r.results),
-    // The whole month in numbers, whichever page of it is shown, and the
+    // The whole month in numbers, however many rows are shown, and the
     // matched receipts that still need a look.
     chosen.then((m) => monthCounts(env, m)),
-    chosen.then((m) => showCounts(env, m)),
+    chosen.then((m) => viewCounts(env, m)),
     chosen.then((m) =>
       env.DB.prepare(
         `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
@@ -811,6 +812,7 @@ export async function payments(
     ),
     hasRecentDropped(env),
     importLink(env),
+    chosen.then((m) => monthState(env, m)),
   ]);
   const invoices = rows.some((t) => t.amount_minor > 0 && !t.receipt_id) ? allInvoices : [];
   const paired = new Map(
@@ -826,6 +828,7 @@ export async function payments(
     ? allCredits.filter((t) => !paired.has(t.id))
     : [];
   const unmatched = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
+  // The month's open payments (up to BULK_CAP in To do), so Match all never depends on upto.
   const open = rows.filter(unmatched);
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
@@ -838,26 +841,14 @@ export async function payments(
     return found.length === 1 ? found[0] : undefined;
   };
   const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
-  const isMissing = unmatched;
-  const missing = open;
-  // Missing first: it is the only thing Bank asks of you. ?show=auto is the old name of Matched.
-  const matched = rows.filter((t) => t.receipt_id);
-  const asked = params.get('show') === 'auto' ? 'matched' : params.get('show');
-  const show =
-    asked === 'matched' && matched.length
-      ? 'matched'
-      : asked === 'all' || (asked !== 'missing' && !missing.length)
-        ? 'all'
-        : 'missing';
-  const firstMissing = missing[0]?.id;
-  const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
-  const shown = show === 'missing' ? missing : show === 'matched' ? matched : rows;
+  const firstMissing = open[0]?.id;
+  const shown = view === 'todo' ? rows.slice(0, upto) : rows;
   const bar: BulkList = {
     form: 'bulk-payments',
     action: '/payments/bulk',
     noun: ['payment', 'payments'],
-    total: showTotals[show],
-    scope: { month: selected, show, ...(offset ? { offset: String(offset) } : {}) },
+    total: views[view],
+    scope: { month: selected, view, upto: String(upto) },
     actions: [...PAYMENT_ACTIONS],
   };
   const dayIn = (value: string | null, other: string) =>
@@ -960,7 +951,7 @@ export async function payments(
           );
       }
       // No bulk action applies to a transfer side.
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}>${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id') : ''}</div>${controls}</li>`;
+      return `<li class="pay${unmatched(t) ? ' missing' : ''}" data-row="${t.id}" id="row-${t.id}">${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id') : ''}</div>${controls}</li>`;
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -980,31 +971,30 @@ export async function payments(
   const picks = shown.filter((t) => !paired.has(t.id)).length;
   const table = `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>`;
   const others = elsewhere.length
-    ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="/payments?month=${e.m}&show=missing">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
+    ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="${bankPath(e.m, 'todo')}">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
-  const filter = chipRow('Show', [
-    { href: `/payments?month=${selected}&show=all`, label: 'All', count: rows.length, current: show === 'all' },
-    {
-      href: `/payments?month=${selected}&show=missing`,
-      label: STATUS.missing,
-      count: counts.missing,
-      current: show === 'missing',
-    },
-    {
-      href: `/payments?month=${selected}&show=matched`,
-      label: STATUS.matched,
-      count: showTotals.matched,
-      current: show === 'matched',
-    },
-  ]);
-  const body = rows.length
-    ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${counts.missing ? ' class="red"' : ''}>${counts.missing} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
-        open.length ? '' : await settled(env, selected)
-      }${matchAll}${shown.length ? `${picks ? `<div data-bulk-list="${bar.form}">${bulkTools(bar, picks)}${table}</div>${bulkBar(bar)}` : table}${lists}` : ''}${
-        offset > 0 || rows.length === 100
-          ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
-          : ''
-      }`
+  const switcher = `<ul class="chips" aria-label="View">${BANK_VIEWS.map(
+    (v) =>
+      `<li><a href="${bankPath(selected, v)}" data-view="${v}" data-count="${views[v]}"${v === view ? ' aria-current="page"' : ''}>${v === 'todo' ? 'To do' : 'All'} (${views[v]})</a></li>`,
+  ).join('')}</ul>`;
+  const left = views.todo - shown.length;
+  const head =
+    view === 'todo'
+      ? `<p class="listhead">${left > 0 ? `${shown.length} of ${views.todo}` : views.todo} to do</p>`
+      : '';
+  const showMore =
+    view === 'todo' && left > 0 && upto < BULK_CAP
+      ? `<p><a class="btn secondary" href="${bankPath(selected, 'todo', Math.min(upto + BANK_UPTO, BULK_CAP))}">Show ${Math.min(left, BANK_UPTO)} more</a></p>`
+      : '';
+  const list = `<div data-list="bank-${view}" data-total="${views[view]}"${picks ? ` data-bulk-list="${bar.form}"` : ''}>${
+    shown.length
+      ? `${head}${picks ? bulkTools(bar, picks) : ''}${table}`
+      : view === 'todo'
+        ? settled(state, selected)
+        : ''
+  }</div>`;
+  const body = views.all
+    ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${views.todo ? ' class="red"' : ''}>${views.todo} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${switcher}${matchAll}${list}${picks ? bulkBar(bar) : ''}${lists}${showMore}`
     : emptyState(
         `No statement for ${escape(monthName(selected))} yet.`,
         '<a class="btn primary" href="/import">Import statement</a>',
@@ -1017,8 +1007,7 @@ export async function payments(
 
 // Bank when every payment has a receipt: say so, and offer the month's next step as the one
 // primary. Once the month is sent there is none, and a quiet link back to it.
-async function settled(env: Env, selected: string): Promise<string> {
-  const s = await monthState(env, selected);
+function settled(s: MonthState, selected: string): string {
   const short = escape(monthName(selected, false));
   const step = nextStep(s, selected);
   const action = s.sent
@@ -1050,7 +1039,7 @@ function nextStep(s: MonthState, selected: string): { label: string; href: strin
   if (s.docs === 0) return { label: 'Add receipts', href: '/add' };
   if (!s.done.review) return { label: 'Check receipts', href: '/review' };
   if (!s.imported) return { label: 'Import statement', href: '/import' };
-  if (!s.done.match) return { label: 'Find receipts', href: `/payments?month=${selected}&show=missing` };
+  if (!s.done.match) return { label: 'Find receipts', href: bankPath(selected, 'todo') };
   return null;
 }
 
@@ -1110,7 +1099,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
-      ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
+      ? row(2, 'Match', `${s.missing.length} missing`, bankPath(selected, 'todo'), true)
       : row(2, 'Match', 'All matched', `/payments?month=${selected}`, false, true);
   const send = await sendStep(env, s, selected, current, params, undatedDocs);
   const step = nextStep(s, selected);
@@ -1417,7 +1406,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             )
             .join('')}</ul>`
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
-    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
+    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>`,
     opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
   );
   const rulesPart = sect(

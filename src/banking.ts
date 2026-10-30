@@ -905,32 +905,50 @@ function eurFrom(row: Receipt, bank: Matched | undefined, rateDate: string | und
 export const SET_REQUIRED_SQL =
   "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')";
 
-// What Bank's Show chip picks within a month, as the page defines it.
-export const BANK_SHOWS = ['all', 'missing', 'matched'] as const;
-export type BankShow = (typeof BANK_SHOWS)[number];
-const SHOW_SQL: Record<BankShow, string> = {
+// Bank's two views of a month. To do is the money out that still needs a receipt; All is every
+// row. Counts, rows, select-all and Match all read the same predicate, month-wide.
+export const BANK_VIEWS = ['todo', 'all'] as const;
+export type BankView = (typeof BANK_VIEWS)[number];
+const VIEW_SQL: Record<BankView, string> = {
+  todo: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
   all: '1',
-  missing: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
-  matched: 't.receipt_id IS NOT NULL',
 };
 const IN_MONTH =
-  "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
-// How many rows each chip holds across the whole month, not just the page shown.
-export async function showCounts(env: Env, month: string): Promise<Record<BankShow, number>> {
+  "FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
+const BANK_ORDER = 't.booking_date,t.account_key,t.id';
+// To do renders its first upto rows, and Show more raises it; there is no offset.
+export const BANK_UPTO = 50;
+export function bankUpto(value: string | null, cap: number): number {
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n > 0 ? Math.min(n, cap) : BANK_UPTO;
+}
+export function bankPath(month: string, view: BankView, upto = BANK_UPTO): string {
+  return `/payments?month=${month}&view=${view}${view === 'todo' && upto !== BANK_UPTO ? `&upto=${upto}` : ''}`;
+}
+export async function viewCounts(env: Env, month: string): Promise<Record<BankView, number>> {
   const row = await env.DB.prepare(
-    `SELECT ${BANK_SHOWS.map((s) => `total(${SHOW_SQL[s]}) "${s}"`).join(',')} ${IN_MONTH}`,
+    `SELECT ${BANK_VIEWS.map((v) => `total(${VIEW_SQL[v]}) "${v}"`).join(',')} ${IN_MONTH}`,
   )
     .bind(month)
-    .first<Record<BankShow, number>>();
-  return { all: row?.all ?? 0, missing: row?.missing ?? 0, matched: row?.matched ?? 0 };
+    .first<Record<BankView, number>>();
+  return { todo: row?.todo ?? 0, all: row?.all ?? 0 };
 }
-// The chip's rows in page order, up to limit.
-export async function showRows(env: Env, month: string, show: BankShow, limit: number): Promise<Transaction[]> {
+// The view's rows in Bank's order, up to limit, or the whole month without one.
+export type BankRow = Transaction & { account_name: string; bank_name: string };
+export async function viewRows(env: Env, month: string, view: BankView, limit?: number): Promise<BankRow[]> {
   return (
     await env.DB.prepare(
-      `SELECT t.* ${IN_MONTH} AND ${SHOW_SQL[show]} ORDER BY t.booking_date,t.account_key,t.id LIMIT ?`,
+      `SELECT t.*,a.label AS account_name,a.bank_name ${IN_MONTH} AND ${VIEW_SQL[view]} ORDER BY ${BANK_ORDER} LIMIT ?`,
     )
-      .bind(month, limit)
-      .all<Transaction>()
+      .bind(month, limit ?? -1)
+      .all<BankRow>()
   ).results;
+}
+// After a save: the first open payment after the first of ids in Bank's order, else the first open one.
+export async function nextOpenPayment(env: Env, month: string, ids: readonly string[]): Promise<string | null> {
+  return env.DB.prepare(
+    `SELECT t.id ${IN_MONTH} AND ${VIEW_SQL.todo} ORDER BY (${BANK_ORDER})>(SELECT booking_date,account_key,id FROM bank_transactions WHERE id IN (SELECT value FROM json_each(?)) ORDER BY booking_date,account_key,id LIMIT 1) DESC,${BANK_ORDER} LIMIT 1`,
+  )
+    .bind(month, JSON.stringify(ids))
+    .first<string>('id');
 }

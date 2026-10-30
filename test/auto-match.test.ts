@@ -259,7 +259,7 @@ test('an import marks non-purchases by rule, an owner choice sticks, and Undo br
   expect(await row('Fakebank service fee')).toMatchObject({ receipt_required: 0, exempt_by: 'fee' });
   expect(await row('ATM 01234 FAKE STREET')).toMatchObject({ receipt_required: 0, exempt_by: 'cash' });
   expect(await row('Fake Corner Shop')).toMatchObject({ receipt_required: 1, exempt_by: null });
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toContain('<span class="tag">Tax</span>');
   expect(bank).toContain('4 out, 0 matched, 3 not a purchase, <span class="red">1 missing</span>');
   // The owner says the fee needs a receipt: no rule marks it again.
@@ -330,7 +330,7 @@ test('a delivery mark shows its label, Undo brings it back, and an owner choice 
   expect(await row('WOLT FAKE KITCHEN')).toMatchObject({ receipt_required: 0, exempt_by: 'delivery' });
   expect(await row('UBER *TRIP')).toMatchObject({ receipt_required: 1, exempt_by: null });
   expect(await row('Fake Bistro Oy')).toMatchObject({ receipt_required: 1, exempt_by: null });
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toContain('<span class="tag">Delivery</span>');
   // The owner says the Wolt order needs a receipt: no rule marks it again.
   const wolt = (await env.DB.prepare("SELECT id FROM bank_transactions WHERE merchant='WOLT FAKE KITCHEN'").first<{
