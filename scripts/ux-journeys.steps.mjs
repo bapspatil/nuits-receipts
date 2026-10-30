@@ -132,7 +132,9 @@ export const journeys = [
         'total: 125.50',
       ]);
       await rec.click(nav(page, '/receipts'));
-      await rec.click(page.locator('main nav.seg a[href^="/invoices"]'));
+      // Receipts opens on To do; the kind tabs are in All.
+      await rec.click(page.locator('main a[data-view="all"]'));
+      await rec.click(page.locator('main nav.seg a[href*="kind=sales"]'));
       await rec.click(link(page, 'Add invoice'));
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
