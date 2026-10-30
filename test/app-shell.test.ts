@@ -872,7 +872,9 @@ test('a ready receipt has one Save; a new problem sends it back to Review', asyn
 test('the receipt page: flags first, Other fields closed, rare actions under one More', async () => {
   const { flagged } = await seed();
   const html = await (await request(`/receipts/${flagged.id}`)).text();
-  expect(html).toContain('<h2 id="fix-h">5 to check</h2>');
+  // The count of fields is said once, as work to do; "N of M to check" in the bar is the receipts.
+  expect(html).toContain('<h2 id="fix-h">5 fields to fill</h2>');
+  expect(html).not.toContain('5 to check');
   expect(html).toContain('<details class="all"><summary>Other fields</summary>');
   expect(html).toContain('<details class="note"><summary>Note</summary>');
   const more =
@@ -881,6 +883,16 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
     )?.[1] ?? '';
   for (const action of ['Read again', 'Move to invoices', 'Download original', 'Upload a copy', 'Always file as'])
     expect(more, action).toContain(action);
+  // Two groups: the document, and the receipt's status and filing.
+  const groups = [
+    ...more.matchAll(/<div class="mgrp" role="group" aria-label="([^"]+)">([\s\S]*?)(?=<div class="mgrp"|$)/g),
+  ];
+  expect(groups.map((g) => g[1])).toEqual(['The document', 'This receipt']);
+  for (const action of ['Read again', 'Download original', 'Upload a copy'])
+    expect(groups[0]![2], action).toContain(action);
+  for (const action of ['Move to invoices', 'Always file as']) expect(groups[1]![2], action).toContain(action);
+  expect(groups[0]![2]).not.toContain('Move to invoices');
+  expect(groups[1]![2]).not.toContain('Read again');
   // Move has no Undo, so it says what it clears before it runs.
   expect(more).toMatch(
     /<details><summary class="btn ghost"><svg[^>]*><use href="#i-folder-input"\/><\/svg><span>Move to invoices<\/span><\/summary><div class="body"><form action="\/receipts\/[0-9a-f]{64}\/kind" method="post">[^]*?<p class="ask">Moving clears the client, VAT details, paid date, your corrections and any match.<\/p><button class="btn ghost" name="kind" value="sales"><svg[^>]*><use href="#i-folder-input"\/><\/svg><span>Move to invoices<\/span><\/button>/,
@@ -997,4 +1009,18 @@ test('amounts accept a decimal comma or point, and the hint echoes the document'
   expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
     /class="doch">The PDF, as text<\/h2><pre class="paper"/,
   );
+});
+
+test('Approve stays above the phone keyboard: the receipt page sizes with it and lifts its bar', async () => {
+  const { flagged } = await seed();
+  const html = await (await request(`/receipts/${flagged.id}`)).text();
+  expect(html).toContain('interactive-widget=resizes-content');
+  expect(html).toContain('<script src="/assets/keyboard.js" defer></script>');
+  // The bar sits above the keyboard height the script writes, on the pages that have a bar of fields.
+  expect(html).toContain('body.p-reviewItem .sbar{bottom:calc(var(--kb,0px)');
+  const script = await request('/assets/keyboard.js');
+  expect(script.headers.get('Content-Type')).toContain('text/javascript');
+  expect(await script.text()).toContain("setProperty('--kb'");
+  // Other pages carry neither the script nor a reason to.
+  expect(await (await request('/settings')).text()).not.toContain('/assets/keyboard.js');
 });

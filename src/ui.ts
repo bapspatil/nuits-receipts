@@ -328,6 +328,7 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .sbar>details{border:0;background:none;margin:0;border-radius:0}
 .sbar>details>summary{font-size:var(--text-sm);font-weight:600;display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);list-style:none;color:var(--text-muted)}
 .sbar>details>summary::-webkit-details-marker{display:none}
+.mgrp{display:grid;gap:var(--space-2);padding:var(--space-2) 0}.mgrp+.mgrp{border-top:1px solid var(--border)}.mgrp p{margin:0}.mgrp .mh{font:600 var(--text-xs)/1.4 var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
 .sbar>details>.body{position:absolute;left:0;right:0;bottom:100%;max-height:60vh;overflow:auto;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
 .fix{padding-bottom:var(--space-4)}
 html:has(.sbar){scroll-padding-bottom:7rem}
@@ -456,7 +457,7 @@ nav.tabs{display:none}
 html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}
 .sbar{position:sticky;bottom:var(--tabbar-height);margin-top:var(--space-3);margin-bottom:0}
 body{padding-bottom:var(--tabbar-height)}
-body.p-reviewItem{padding-bottom:0}body.p-reviewItem .sbar{bottom:calc(var(--space-2) + env(safe-area-inset-bottom))}
+body.p-reviewItem{padding-bottom:0}body.p-reviewItem .sbar{bottom:calc(var(--kb,0px) + var(--space-2) + env(safe-area-inset-bottom))}body.p-receipt .sbar{bottom:max(var(--kb,0px),var(--tabbar-height))}
 header.top{display:none}
 nav.main,.sign-out{display:none}
 nav.tabs{display:block;position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;border-radius:32px;padding:0 var(--space-1)}
@@ -663,6 +664,18 @@ export const rowAttrs = (id: string) =>
 
 // Once per page however many bulk lists it has: the script binds every bar it finds.
 const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
+// On a phone the keyboard covers the bottom of the page, and with it the bar that holds Approve.
+// The script writes the keyboard's height to --kb, and the bar sits above it.
+const KEYBOARD_SCRIPT = '<script src="/assets/keyboard.js" defer></script>';
+export const KEYBOARD_JS = `(() => {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const set = () => document.documentElement.style.setProperty('--kb', Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop)) + 'px');
+  vv.addEventListener('resize', set);
+  vv.addEventListener('scroll', set);
+  set();
+})();
+`;
 export async function page(
   view: PageKey,
   body: string,
@@ -682,7 +695,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {

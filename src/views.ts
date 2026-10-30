@@ -591,7 +591,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const due = rows('due_date');
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
-  const heading = reading ? STATUS.reading.word : needs ? `${cards.length} to check` : '';
+  const heading = reading ? STATUS.reading.word : needs ? `${plural(cards.length, 'field')} to fill` : '';
   const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
     {
       id: 'f-approval_reason',
@@ -641,7 +641,16 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const always = sales
     ? ''
     : `<details${failureFor(RECEIPT_RULE) ? ' open' : ''}><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type }, failureFor(RECEIPT_RULE) ? RECEIPT_RULE : '')}${button('save', { label: 'Save rule' })}</form></div></details>`;
-  const extras = `<details class="more">${buttonSummary('more')}<div class="body"><form action="/receipts/${r.id}/retry" method="post">${own}${button('reread')}</form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
+  // Two groups: what you can do with the file, and what you can change about the receipt's status
+  // and filing. Discard stays on the bar, one click with Undo.
+  const group = (name: string, inner: string) =>
+    inner ? `<div class="mgrp" role="group" aria-label="${name}"><p class="mh">${name}</p>${inner}</div>` : '';
+  const documentGroup = group(
+    'The document',
+    `<form action="/receipts/${r.id}/retry" method="post">${own}${button('reread')}</form><p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>`,
+  );
+  const statusGroup = group('This receipt', `${move}${always}`);
+  const extras = `<details class="more"${failureFor(RECEIPT_RULE) ? ' open' : ''}>${buttonSummary('more')}<div class="body">${documentGroup}${statusGroup}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
   const open = `<p>${buttonLink('original', `/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}`)}</p>`;

@@ -15,6 +15,7 @@ import {
   FAVICON_SVG,
   GRAIN_SVG,
   errorId,
+  KEYBOARD_JS,
   fieldId,
   errorPage,
   exportCsv,
@@ -411,6 +412,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     });
   if (request.method === 'GET' && path === '/assets/add.js')
     return new Response(ADD_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
+  if (request.method === 'GET' && path === '/assets/keyboard.js')
+    return new Response(KEYBOARD_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/assets/bulk.js')
