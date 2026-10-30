@@ -1,7 +1,7 @@
 // Sales invoices you sent: the Invoices list, payment status, the receipt
 // page's money-in matching, and the Add page (several files, either kind).
 import { DEFAULT_TUNING, money, type Receipt } from './domain';
-import { creditFit, eurValues, type Transaction } from './banking';
+import { creditFit, monthEurValues, type Transaction } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
@@ -107,22 +107,38 @@ export const invoiceShow = (value: unknown): Show => (Object.keys(SHOWS) as Show
 export async function invoiceRows(env: Env, selected: string, show: Show) {
   // Unpaid and overdue span every month: an old invoice is still owed.
   const across = show === 'unpaid' || show === 'overdue';
-  const month = await salesRows(env, 'substr(r.issue_date,1,7)=?', selected);
-  const open = across ? await salesRows(env, 'r.issue_date IS NOT NULL') : month;
+  const [month, open] = await Promise.all([
+    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
+    across ? salesRows(env, 'r.issue_date IS NOT NULL') : null,
+  ]);
+  return { across, month, open: open ?? month, ...chosen(env, show, across, month, open ?? month) };
+}
+function chosen(env: Env, show: Show, across: boolean, month: SalesRow[], open: SalesRow[]) {
   const base = across ? open : month;
   const shown =
     show === 'all' ? base : base.filter((r) => salesStatus(r, config(env).tuning.paymentTermsDays) === show);
-  return { across, month, open, base, shown };
+  return { base, shown };
 }
 export async function invoicesPage(env: Env, selected: string, params: URLSearchParams): Promise<Response> {
   const settings = config(env);
   const show = invoiceShow(params.get('show'));
-  const { across, month, open, base, shown } = await invoiceRows(env, selected, show);
-  const undated = await salesRows(env, 'r.issue_date IS NULL');
+  const across = show === 'unpaid' || show === 'overdue';
+  // One round: every query the page needs starts together, so it waits on D1 once.
+  const [month, acrossRows, undated, overdueAll, switcher, tabs, eurOf] = await Promise.all([
+    salesRows(env, 'substr(r.issue_date,1,7)=?', selected),
+    across ? salesRows(env, 'r.issue_date IS NOT NULL') : null,
+    salesRows(env, 'r.issue_date IS NULL'),
+    across ? [] : overdueInvoices(env),
+    receiptsSwitch(env, selected, 'all'),
+    tabCounts(env, selected),
+    monthEurValues(env, selected),
+  ]);
+  const open = acrossRows ?? month;
+  const { base, shown } = chosen(env, show, across, month, open);
   let invoiced = 0n,
     received = 0n,
     noEur = 0;
-  const eurs = await eurValues(env, month);
+  const eurs = eurOf(month);
   for (const [i, r] of month.entries()) {
     const eur = eurs[i]!;
     if (eur.minor === null) {
@@ -203,8 +219,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
             }`,
         addButton('invoices', true),
       );
-  const overdue = across ? [] : (await overdueInvoices(env)).filter((r) => !month.includes(r));
-  const [switcher, tabs] = await Promise.all([receiptsSwitch(env, selected, 'all'), tabCounts(env, selected)]);
+  const overdue = overdueAll.filter((r) => !month.includes(r));
   const body = `${switcher}${receiptsTabs(tabs, 'invoices', selected)}${
     month.length
       ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`
