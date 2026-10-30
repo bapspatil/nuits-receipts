@@ -361,7 +361,13 @@ async function bankTodo(page, rec, month) {
   await selectPage(page, rec, 'exempt');
   const acted = await rowIds(page);
   await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.4)));
-  const scrollBefore = await page.evaluate(() => window.scrollY);
+  // Where the first resolved row still on screen stands, in the viewport. The row that takes its
+  // place should stand about there: the list moved up, the person's eye did not.
+  const anchorTop = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-row]')].filter((r) => r.querySelector('input[name=id]:checked'));
+    const seen = rows.find((r) => r.getBoundingClientRect().bottom > 0);
+    return seen ? Math.round(seen.getBoundingClientRect().top) : null;
+  });
   await bulkClick(page, rec, 'form[data-bulk] button[name=op][value=exempt]');
   const remaining = OPEN_PAYMENTS - acted.length;
   const after = await rowIds(page);
@@ -376,8 +382,15 @@ async function bankTodo(page, rec, month) {
     !/Every payment has a receipt/.test(text),
     `Bank does not say every payment has a receipt while ${remaining} are open`,
   );
-  const scrollAfter = await page.evaluate(() => window.scrollY);
-  rec.check(Math.abs(scrollAfter - scrollBefore) <= 200, `Scroll stays put (${scrollBefore} to ${scrollAfter} px)`);
+  const nextTop = await page.evaluate(() => {
+    const row = document.querySelector(':target') ?? document.activeElement?.closest?.('[data-row]');
+    return row ? Math.round(row.getBoundingClientRect().top) : null;
+  });
+  const drift = anchorTop === null || nextTop === null ? null : nextTop - anchorTop;
+  rec.check(
+    drift !== null && Math.abs(drift) <= 200,
+    `Scroll stays put (the next row is ${drift} px from where the first resolved row was)`,
+  );
   const focused = await page.evaluate(() => document.activeElement?.closest?.('[data-row]')?.dataset.row ?? null);
   rec.check(focused !== null && !acted.includes(focused), 'Focus is inside the next open row');
 }

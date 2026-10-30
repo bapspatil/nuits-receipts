@@ -82,7 +82,7 @@ function expectShell(html: string, current: string | null) {
   expect(banned(html)).toBeNull();
   expect(html).toContain('viewport-fit=cover');
   expect(html).toContain('<a class="skip" href="#main">Skip to content</a>');
-  expect(html).toContain('<main id="main">');
+  expect(html).toContain('<main id="main" tabindex="-1">');
   expect(html).toContain(`<footer class="foot"><p class="notice">${FOOTER_NOTICE}</p>`);
   expect(html.split(FOOTER_NOTICE)).toHaveLength(2);
   expect(html).not.toContain('class="kicker"');
@@ -797,7 +797,8 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   skip.set('vendor', 'Typed Then Skipped');
   skip.set('action', 'skip');
   const skipped = await request(`/receipts/${flagged.id}`, { method: 'POST', body: skip });
-  expect(locationOf(skipped)).toBe(`/receipts/${second.id}?from=todo&done=skipped`);
+  // The next receipt opens on its first field to fill.
+  expect(locationOf(skipped)).toMatch(new RegExp(`^/receipts/${second.id}\\?from=todo&done=skipped#f-[a-z_]+$`));
   expect((await getReceipt(env, flagged.id)).vendor).toBe('Typed Then Skipped');
   expect((await getReceipt(env, flagged.id)).status).toBe('needs_review');
   // Approve opens the next one with a one-word confirmation.
@@ -806,9 +807,11 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
     approve.set(k, v);
   approve.set('action', 'approve');
   const approved = await request(`/receipts/${second.id}`, { method: 'POST', body: approve });
-  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?from=todo&done=approved&name=Fake+Shop`);
+  expect(locationOf(approved)).toMatch(
+    new RegExp(`^/receipts/${flagged.id}\\?from=todo&done=approved&name=Fake\\+Shop#f-[a-z_]+$`),
+  );
   expect(await (await request(await signed(`/receipts/${flagged.id}?done=approved`))).text()).toContain(
-    '<p class="banner" role="status">Approved.</p>',
+    '<p class="banner" id="banner" role="status">Approved.</p>',
   );
   const last = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
@@ -879,7 +882,7 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   // To do rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/receipts?view=todo')).text();
   expect(review).toContain(
-    `<li data-row="${flagged.id}" id="row-${flagged.id}"><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-todo"><span class="vh">Select photo.png</span></label><a href="/receipts/${flagged.id}?from=todo">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span></li>`,
+    `<li data-row="${flagged.id}" id="row-${flagged.id}" tabindex="-1" style="view-transition-name:r-${flagged.id}"><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-todo"><span class="vh">Select photo.png</span></label><a href="/receipts/${flagged.id}?from=todo">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span></li>`,
   );
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('action="/discard" class="discard"');

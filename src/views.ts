@@ -112,6 +112,8 @@ import {
   ariaFor,
   chosenReceipt,
   errorId,
+  VIEW_TRANSITION_CSS,
+  rowAttrs,
   errorLine,
   matchError,
 } from './ui';
@@ -285,6 +287,24 @@ function eurLine(eur: EurValue): string {
 // The failure scope of the receipt form.
 const RECEIPT = 'receipt';
 // params: the list it was opened from (?from=todo&month=M), so its count, Next and Skip use that filter.
+// The fragment an Approve lands on for the receipt it moves to: the first field its required flags
+// leave empty, else the page's own start, so focus is never lost to the body.
+const FIELD_COLUMN: Record<string, string> = {
+  net: 'net_minor',
+  vat: 'vat_minor',
+  total: 'total_minor',
+  vat_rate: 'vat_rate_bps',
+};
+export function firstToFill(r: Receipt): string {
+  const row = r as unknown as Record<string, unknown>;
+  for (const { flag } of flagCards(reasonCodes(r.review_reasons_json)))
+    if (isRequired(flag))
+      for (const f of flag.fields) {
+        const v = row[FIELD_COLUMN[f] ?? f];
+        if (f !== 'product' && (v === null || v === undefined || v === '')) return `#f-${f}`;
+      }
+  return '#main';
+}
 export async function receiptPage(env: Env, r: Receipt, params: Params): Promise<Response> {
   const sales = r.kind === 'sales';
   const list = receiptState(params, needsReview(r) && !r.discarded_at);
@@ -654,6 +674,8 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
     200,
     env,
     {
+      style: VIEW_TRANSITION_CSS,
+      refresh: reading ? 10 : undefined,
       detail: receiptName(r),
       head: `<div class="crumbs">${back}${nextLink}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
@@ -876,7 +898,7 @@ export async function payments(
           );
       }
       // No bulk action applies to a transfer side.
-      return `<li class="pay${unmatched(t) ? ' missing' : ''}" data-row="${t.id}" id="row-${t.id}">${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id') : ''}</div>${controls}</li>`;
+      return `<li class="pay${unmatched(t) ? ' missing' : ''}" data-row="${t.id}" id="row-${t.id}"${rowAttrs(t.id)}>${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id') : ''}</div>${controls}</li>`;
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -922,6 +944,7 @@ export async function payments(
         '<a class="btn primary" href="/import">Import statement</a>',
       );
   return page('bank', `${others}${body}${importButton}`, 200, env, {
+    style: VIEW_TRANSITION_CSS,
     detail: monthName(selected),
     // The one primary, as on Receipts To do: the first open payment, not a button on its row.
     head: monthHead(

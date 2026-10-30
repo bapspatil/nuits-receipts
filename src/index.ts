@@ -24,6 +24,7 @@ import {
   helpPage,
   NEW_ACCOUNT,
   receiptPage,
+  firstToFill,
   settingsPage,
 } from './views';
 import { FONT_FILES } from './fonts';
@@ -509,6 +510,13 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     // Where it stood in To do before the save, which may give it a date and move it.
     const [before, cursor] = await Promise.all([getReceipt(env, id), cursorOf(env, LIST_DEFS.receipts!, [id])]);
     const state = receiptState(form, needsReview(before));
+    // A second submit of Approve or Skip carries the revision the first one replaced, or finds the
+    // receipt discarded: back to the list, quietly, with nothing written and no second banner.
+    if (
+      (action === 'approve' || action === 'skip') &&
+      (before.discarded_at || (isReady(before) && Number(form.get('revision')) !== before.revision))
+    )
+      return redirect(listUrl({ ...state, view: 'todo' }));
     const at = await correctReceipt(env, id, form);
     // Approve and Skip move on through To do under the page's filter, from where it stood: Approve
     // wraps to the first open one, Skip doesn't. With none left they land on the list.
@@ -522,7 +530,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     if (moving) {
       const event = action === 'approve' ? 'approved' : 'skipped';
       const undone = at ? { at, op: 'approve', name: receiptName(after) } : {};
-      if (next) return redirect(withDone(event, receiptUrl(next, state), undone));
+      if (next)
+        return redirect(withDone(event, receiptUrl(next, state) + firstToFill(await getReceipt(env, next)), undone));
       if (action === 'skip') return redirect(await landing(env, state, cursor, { event }));
       const last = await afterLastReview(env, state.month ?? after.issue_date);
       return redirect(listUrl(state, { done: { event: 'approvedLast', params: { ...last, ...undone } } }));
@@ -572,6 +581,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       cursorOf(env, LIST_DEFS.bank!, [payment[1]]),
     ]);
     requireInput(transaction, 'Payment not found', 404);
+    // A second submit of Not a purchase finds the payment already exempt: back to the list, quietly.
+    if (required === '0' && !transaction.receipt_required && transaction.exempt_by === 'owner')
+      return redirect(listUrl(bankList(form, transaction)));
     const op = required === '0' ? 'exempt' : 'require',
       at = undoAt();
     const [changed] = await withUndo(env, { at, op, ids: [transaction.id] }, [

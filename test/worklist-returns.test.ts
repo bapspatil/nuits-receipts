@@ -133,7 +133,7 @@ test('C: Approve while typing a date moves on from where the receipt stood, not 
   );
   expect(await env.DB.prepare('SELECT status FROM receipts WHERE id=?').bind(first).first('status')).toBe('ready');
   expect(locationOf(res)).toMatch(
-    new RegExp(`^/receipts/${second}\\?from=todo&month=${month}&done=approved&name=[^&#]+$`),
+    new RegExp(`^/receipts/${second}\\?from=todo&month=${month}&done=approved&name=[^&#]+#f-issue_date$`),
   );
 });
 

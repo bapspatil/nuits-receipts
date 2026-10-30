@@ -40,6 +40,8 @@ import {
   receiptsTabs,
   tag,
   viewSwitch,
+  VIEW_TRANSITION_CSS,
+  rowAttrs,
 } from './ui';
 
 export const PAGE_SIZE = 50;
@@ -273,7 +275,7 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
       const note = overdue
         ? `<span class="ok">${invoice}<span class="stamp missing">Overdue</span> ${escape(shortDay(dueOn(r, terms) ?? r.issue_date!))}</span><details class="more"><summary aria-label="Mark ${escape(name)} paid">Mark paid</summary><div class="body"><form method="post" action="/receipts/${r.id}/paid">${fields}<label>Paid on<input type="date" name="paid_outside_on" value="${iso()}" required></label><label>How<input name="paid_outside_note" maxlength="300" required placeholder="Stripe payout 14 Oct"></label><button class="btn secondary">Mark paid</button></form></div></details>`
         : `<span class="why" title="${escape(firstFlag(r))}">${invoice}${escape(reasonWord(r))}</span>`;
-      return `<li data-row="${r.id}" id="row-${r.id}">${bulkCheck(bulk, r.id, name)}<a href="${escape(receiptUrl(r.id, state))}">${escape(name)}</a>${amt}${note}</li>`;
+      return `<li data-row="${r.id}" id="row-${r.id}"${rowAttrs(r.id)}>${bulkCheck(bulk, r.id, name)}<a href="${escape(receiptUrl(r.id, state))}">${escape(name)}</a>${amt}${note}</li>`;
     })
     .join('');
   const everything = total + heldTotal;
@@ -311,10 +313,10 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
     : '';
   return page(
     'receipts',
-    `${switcher}${month}${merge}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${head}${mail}${list}`,
+    `${switcher}${month}${merge}${reading ? `<p class="banner" role="status">${reading} being read <a href="${escape(listUrl(state))}">Refresh</a></p>` : ''}${head}${mail}${list}`,
     200,
     env,
-    { head: pageHead('Receipts', start) },
+    { head: pageHead('Receipts', start), style: VIEW_TRANSITION_CSS },
   );
 }
 
@@ -375,7 +377,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
             ? `${tag(chip.label)} `
             : '';
       const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
-      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}</li>`;
+      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.status === 'pending' || r.status === 'processing' ? `<a class="refresh" href="${escape(listUrl(state))}">Refresh</a>` : ''}${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}</li>`;
     })
     .join('')}</ul>`;
   const last = shown[shown.length - 1];

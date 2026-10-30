@@ -322,7 +322,7 @@ test('overdue and paid outside the bank', async () => {
   const todo = await (await request('/receipts?view=todo')).text();
   expect(todo).toMatch(
     new RegExp(
-      `<li data-row="${r.id}" id="row-${r.id}">[^]*?<span class="tag">Invoice</span> <span class="stamp missing">Overdue</span>[^]*?<summary aria-label="Mark [^"]+ paid">Mark paid</summary>`,
+      `<li data-row="${r.id}" id="row-${r.id}" tabindex="-1" style="view-transition-name:r-${r.id}">[^]*?<span class="tag">Invoice</span> <span class="stamp missing">Overdue</span>[^]*?<summary aria-label="Mark [^"]+ paid">Mark paid</summary>`,
     ),
   );
   const form = new FormData();

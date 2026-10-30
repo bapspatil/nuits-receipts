@@ -32,7 +32,7 @@ test('Settings lists vendor rules with an open Add form when there are none', as
   expect(saved.status).toBe(303);
   expect(locationOf(saved)).toBe('/settings?done=ruleSaved#rules');
   const after = await (await request(await signed('/settings?done=ruleSaved'))).text();
-  expect(after).toContain('<p class="banner" role="status">Rule saved.</p>');
+  expect(after).toContain('<p class="banner" id="banner" role="status">Rule saved.</p>');
   // One plain row per rule; it opens its own edit form. The saved section is open.
   expect(after).toContain('<details class="sect" open><summary><h2>Vendor rules</h2><span class="sum">1</span>');
   expect(after).toContain('<li><details><summary>Sample Cloud → Hosting, infra · 5</summary>');
