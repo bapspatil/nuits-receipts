@@ -478,12 +478,15 @@ test('home closes the month and lists what needs you, counting undated receipts'
   expect(
     [...checklist.matchAll(/<a href="([^"]+)"><span class="vh">[^<]*<\/span><b>([^<]+)<\/b>/g)].map((m) => m[1]),
   ).toEqual([
-    '/settings#f-SELLER_NAMES',
+    // What is left first, then the finished ones folded below.
     '/settings?routing=1#setup-email',
     '/settings#f-ACCOUNTANT_LABEL',
-    '/settings#accounts',
     '/import',
+    '/settings#f-SELLER_NAMES',
+    '/settings#accounts',
   ]);
+  expect(checklist).toContain('<details class="finished"><summary>2 done</summary>');
+  expect(checklist.indexOf('<details class="finished">')).toBeGreaterThan(checklist.indexOf('/import'));
   expect(checklist).toContain('<b>Confirm Email Routing in Cloudflare</b>');
   expect(checklist).toContain('href="/help"');
   expect(first).toContain('receipts@example.com');

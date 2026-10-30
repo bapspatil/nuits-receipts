@@ -88,11 +88,17 @@ export function setupChecklist(steps: readonly SetupStep[]): string | null {
   const done = steps.filter((s) => s.done).length;
   if (done === steps.length) return null;
   const next = steps.find((s) => !s.done)?.id;
-  const rows = steps
-    .map((s) => {
-      const state: StepState = s.done ? 'done' : s.id === next ? 'now' : 'todo';
-      return `<li class="step ${state}"><a href="${s.href}">${stepWord(state)}<b>${escape(s.done ? s.finished : s.action)}</b><span>${escape(s.why)}</span></a></li>`;
-    })
-    .join('');
-  return `<section class="setup" aria-labelledby="setup-h"><h2 id="setup-h">Finish setting up <span>${done} of ${steps.length} done</span></h2><ol class="steps checklist">${rows}</ol><p class="small"><a href="/help">New here? See what the words mean.</a></p></section>`;
+  const rows = (list: readonly SetupStep[]) =>
+    list
+      .map((s) => {
+        const state: StepState = s.done ? 'done' : s.id === next ? 'now' : 'todo';
+        return `<li class="step ${state}"><a href="${s.href}">${stepWord(state)}<b>${escape(s.done ? s.finished : s.action)}</b><span>${escape(s.why)}</span></a></li>`;
+      })
+      .join('');
+  // What is left comes first; what is finished folds below it, so the month is not pushed down.
+  const finished = steps.filter((s) => s.done);
+  const folded = finished.length
+    ? `<details class="finished"><summary>${finished.length} done</summary><ol class="steps checklist">${rows(finished)}</ol></details>`
+    : '';
+  return `<section class="setup" aria-labelledby="setup-h"><h2 id="setup-h">Finish setting up <span>${done} of ${steps.length} done</span></h2><ol class="steps checklist">${rows(steps.filter((s) => !s.done))}</ol>${folded}<p class="small"><a href="/help">New here? See what the words mean.</a></p></section>`;
 }

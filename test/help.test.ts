@@ -66,6 +66,14 @@ test('the checklist counts what is done, marks the first open step Next, and is 
   expect(html).toContain('<li class="step now"><a href="/x#email"><span class="vh">Next: </span><b>Do email</b>');
   expect(html).toContain('<li class="step todo"><a href="/x#accountant">');
   expect(html).toContain('<span>Because email.</span>');
+  // The open steps come first and the done ones fold below as "N done", out of the way of the month.
+  const open = html.slice(0, html.indexOf('<details class="finished">'));
+  expect(open).not.toContain('class="step done"');
+  expect(open).toContain('class="step now"');
+  expect(html).toMatch(
+    /<details class="finished"><summary>2 done<\/summary><ol class="steps checklist"><li class="step done">/,
+  );
+  expect(setupChecklist(IDS.map((id) => step(id, false)))).not.toContain('class="finished"');
   expect(setupChecklist(IDS.map((id) => step(id, true)))).toBeNull();
 });
 
