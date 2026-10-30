@@ -418,8 +418,8 @@ export type Feedback = {
   section: string | null;
 };
 // An Undo returns to the list it was offered on: the page's list state rides along in its form,
-// under the names the list URL uses, unless the Undo sets them itself.
-const LIST_PARAMS = ['view', 'month', 'upto', 'show', 'q'] as const;
+// under the names the list URL uses (from, on a receipt page), unless the Undo sets them itself.
+const LIST_PARAMS = ['view', 'from', 'month', 'upto', 'show', 'q'] as const;
 function onList(undo: Undo | null, params: URLSearchParams): Undo | null {
   if (!undo) return null;
   const fields = { ...undo.fields };

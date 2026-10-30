@@ -103,6 +103,7 @@ export function discardControl(
   return `<details class="discard"><summary${aria}>Discard</summary><div class="body"><form method="post" action="/discard">${fields}<p class="ask">Remove match?</p><button class="btn secondary">Remove and discard</button></form></div></details>`;
 }
 
-export function restoreForm(id: string, back: string, primary = false): string {
-  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}"><button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
+// fields: on a receipt page, the list it was opened from (receiptFields), which Restore keeps.
+export function restoreForm(id: string, back: string, primary = false, fields = ''): string {
+  return `<form method="post" action="/restore"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${escape(back)}">${fields}<button class="${primary ? 'btn primary' : 'linkbtn'}">Restore</button></form>`;
 }

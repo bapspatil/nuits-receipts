@@ -70,19 +70,20 @@ export function postedState(p: Params, key: ListKey, shows: (show: string) => bo
   );
   return s;
 }
-// The list a receipt page was opened from: ?from=todo|all&month=M. Without one, an open receipt
-// belongs to To do and any other to All.
+// The list a receipt page was opened from: ?from=todo|all&month=M, and &q= from a searched All.
+// Without one, an open receipt belongs to To do and any other to All.
 export function receiptState(p: Params, open: boolean): ListState {
   const from = read(p, 'from');
-  return listState(
-    new URLSearchParams({
-      view: from === 'todo' || from === 'all' ? from : open ? 'todo' : 'all',
-      month: read(p, 'month'),
-    }),
-    {
-      key: 'receipts',
-    },
-  );
+  const view = from === 'todo' || from === 'all' ? from : open ? 'todo' : 'all';
+  return listState(new URLSearchParams({ view, month: read(p, 'month'), q: view === 'all' ? read(p, 'q') : '' }), {
+    key: 'receipts',
+  });
+}
+// Where a receipt page's own form returns: the page under the list it was opened from, rebuilt from
+// the fields receiptFields posted. A form without them (a page older than the server) gets the
+// bare page, which picks its list from the receipt's status.
+export function receiptReturn(id: string, p: Params): string {
+  return read(p, 'from') ? receiptUrl(id, receiptState(p, true)) : `/receipts/${id}`;
 }
 
 // Each list's address. Empty parameters are left out, and upto only when it isn't the default.
@@ -113,7 +114,7 @@ export function listUrl(state: ListState, o: { done?: Done; next?: string | null
 }
 // A receipt page that keeps the list it was opened from, so its count and Next use the same filter.
 export function receiptUrl(id: string, state: ListState): string {
-  return query(`/receipts/${id}`, { from: state.view, month: state.month });
+  return query(`/receipts/${id}`, { from: state.view, month: state.month, q: state.view === 'all' ? state.q : null });
 }
 // The list state as form fields, for every form and bulk bar on a list.
 export function listParams(state: ListState): Record<string, string> {
@@ -132,9 +133,13 @@ export function listFields(state: ListState): string {
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
     .join('');
 }
-// The receipt page's list, for its own forms.
+// The receipt page's list, for every one of its own forms, under the names its URL uses.
 export function receiptFields(state: ListState): string {
-  return `<input type="hidden" name="from" value="${state.view}">${state.month ? `<input type="hidden" name="month" value="${state.month}">` : ''}`;
+  const fields = { from: state.view, month: state.month, q: state.view === 'all' ? state.q : null };
+  return Object.entries(fields)
+    .filter((f): f is [string, string] => !!f[1])
+    .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
+    .join('');
 }
 // A list's state from one of its own addresses, or null for anything else.
 export function listFrom(path: string): ListState | null {

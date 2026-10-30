@@ -48,7 +48,8 @@ test('a rule made from a receipt goes back to that receipt', async () => {
   form.set('vendor_contains', 'Sample Cloud');
   const saved = await request('/rules', { method: 'POST', body: form });
   expect(saved.status).toBe(303);
-  expect(locationOf(saved)).toBe(`/receipts/${receipt.id}?done=ruleSaved`);
+  // The page posts the list it was opened from (All, for a ready receipt) and keeps it.
+  expect(locationOf(saved)).toBe(`/receipts/${receipt.id}?from=all&done=ruleSaved`);
   // Anything else in return_to is ignored.
   const elsewhere = await post('/rules', rule({ vendor_contains: 'Other', return_to: 'https://evil.example/' }));
   expect(locationOf(elsewhere)).toBe('/settings?done=ruleSaved#rules');

@@ -194,3 +194,88 @@ test('A: a bulk post without its full list state is refused, and select-all on A
   });
   expect(locationOf(back)).toMatch(/done=restored&n=2/);
 });
+
+const prog = (html: string) => html.match(/<span class="prog">([^<]*)<\/span>/)?.[1];
+test('D: every receipt page form returns to the page under the list it was opened from', async () => {
+  const b = await seedBusyMonth();
+  const month = b.earlierMonth;
+  const e = b.earlier[1]!;
+  const url = `/receipts/${e}?from=todo&month=${month}`;
+  const page = await get(url);
+  const count = prog(page);
+  expect(count).toMatch(/^\d+ of \d+ to check$/);
+  const onPage = new RegExp(`^/receipts/${e}\\?from=todo&month=${month}&done=`);
+  for (const action of [`/receipts/${e}/retry`, '/rules']) {
+    const res = await request(action, { method: 'POST', body: htmlForm(page, action) });
+    expect(locationOf(res), action).toMatch(onPage);
+    expect(prog(await get(res.headers.get('Location')!)), action).toBe(count);
+  }
+
+  // Restore on a discarded receipt's page keeps its month, so the count is the month's again.
+  await post('/discard', { id: e });
+  const gone = await get(url);
+  const restored = await request('/restore', { method: 'POST', body: htmlForm(gone, '/restore') });
+  expect(locationOf(restored)).toBe(`/receipts/${e}?from=todo&month=${month}&done=restored&n=1`);
+  expect(prog(await get(restored.headers.get('Location')!))).toBe(count);
+});
+
+test('D: an invoice page keeps its list through Move, Mark paid and matching', async () => {
+  const b = await seedBusyMonth();
+  const s = b.sales[0]!;
+  const url = `/receipts/${s}?from=all&month=${b.month}`;
+  const page = await get(url);
+  const paid = await post(`/receipts/${s}/paid`, {
+    from: 'all',
+    month: b.month,
+    paid_outside_on: `${b.month}-20`,
+    paid_outside_note: 'Fake payout',
+  });
+  expect(locationOf(paid)).toMatch(new RegExp(`^/receipts/${s}\\?from=all&month=${b.month}&done=paid&`));
+  // Move is a button inside the fields form, which posts the page's list with it.
+  const move = htmlForm(page, `/receipts/${s}/kind`);
+  move.set('kind', 'expense');
+  const moved = await request(`/receipts/${s}/kind`, { method: 'POST', body: move });
+  expect(locationOf(moved)).toMatch(new RegExp(`^/receipts/${s}\\?from=all&month=${b.month}&done=kindMoved&`));
+});
+
+test('D: Match from a receipt page returns to that page, not to Bank', async () => {
+  const b = await seedBusyMonth();
+  const r = (await env.DB.prepare(
+    "SELECT id FROM receipts WHERE status='ready' AND kind='expense' AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions WHERE receipt_id IS NOT NULL) ORDER BY id LIMIT 1",
+  ).first<string>('id'))!;
+  const tx = b.missing[0]!;
+  const res = await post('/matches', {
+    transaction_id: tx,
+    receipt_id: r,
+    action: 'link',
+    confirm_exception: 'yes',
+    return_to: `/receipts/${r}`,
+    from: 'all',
+    month: b.month,
+  });
+  expect(await env.DB.prepare('SELECT receipt_id FROM bank_transactions WHERE id=?').bind(tx).first('receipt_id')).toBe(
+    r,
+  );
+  expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${r}\\?from=all&month=${b.month}&done=matched&`));
+  // Its Undo keeps the page's list too.
+  const landed = await get(res.headers.get('Location')!);
+  const undo = await request('/matches', { method: 'POST', body: htmlForm(landed, '/matches') });
+  expect(locationOf(undo)).toMatch(new RegExp(`^/receipts/${r}\\?from=all&month=${b.month}&done=unmatched&`));
+});
+
+test('H: a receipt opened from a searched All list keeps the search on the way back', async () => {
+  const b = await seedBusyMonth();
+  const vendor = (await env.DB.prepare('SELECT vendor FROM receipts WHERE id=?')
+    .bind(b.ready[0]!)
+    .first<string>('vendor'))!;
+  const q = vendor.split(' ')[0]!;
+  const listPath = `/receipts?view=all&month=${b.month}&q=${encodeURIComponent(q)}`;
+  const list = await get(listPath);
+  const href = list.match(/<a href="(\/receipts\/[0-9a-f]{64}[^"]*)"/)![1]!.replace(/&amp;/g, '&');
+  expect(href).toContain(`q=${encodeURIComponent(q)}`);
+  const page = await get(href);
+  const back = page.match(/<a href="([^"]*)">‹ Receipts<\/a>/)?.[1]?.replace(/&amp;/g, '&');
+  expect(back).toBe(listPath);
+  const res = await request('/discard', { method: 'POST', body: htmlForm(page, '/discard') });
+  expect(locationOf(res).split('&done=')[0]).toBe(listPath);
+});

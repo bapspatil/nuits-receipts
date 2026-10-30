@@ -57,6 +57,7 @@ import {
   parseReturn,
   RECEIPTS_TODO,
   receiptState,
+  receiptReturn,
   receiptUrl,
   type ListState,
 } from './worklist';
@@ -277,7 +278,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     if (at) ids = await restoreBatch(env, String(at));
     const n = at ? ids.length : await restoreReceipts(env, ids);
     if (n) await reconcile(env);
-    if (back?.startsWith('/receipts/')) return redirect(withDone('restored', back, { n }));
+    if (back?.startsWith('/receipts/'))
+      return redirect(withDone('restored', receiptReturn(back.slice('/receipts/'.length), form), { n }));
     const cursor = before ?? (await cursorFor(env, state, ids, { at: true }));
     return redirect(await landing(env, state, cursor, { event: 'restored', params: { n } }));
   }
@@ -419,15 +421,17 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {
+    // Read again also posts from inside the fields form, so it may carry all of them.
+    const form = await formData(request, 64 * 1024);
     await processReceipt(env, retry[1], { retry: true });
-    return redirect(withDone('readAgain', `/receipts/${retry[1]}`));
+    return redirect(withDone('readAgain', receiptReturn(retry[1], form)));
   }
   const kind = path.match(/^\/receipts\/([a-f0-9]{64})\/kind$/);
   if (request.method === 'POST' && kind?.[1]) {
     const form = await formData(request, 64 * 1024);
     const to = String(form.get('kind') ?? '');
     await changeKind(env, kind[1], to, Number(form.get('revision')));
-    return redirect(withDone('kindMoved', `/receipts/${kind[1]}`, { to }));
+    return redirect(withDone('kindMoved', receiptReturn(kind[1], form), { to }));
   }
   const paid = path.match(/^\/receipts\/([a-f0-9]{64})\/paid$/);
   if (request.method === 'POST' && paid?.[1]) {
@@ -439,8 +443,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     // when nothing was recorded before.
     return redirect(
       on
-        ? withDone('paid', `/receipts/${paid[1]}`, { on, id: before.paid_outside_on ? null : paid[1] })
-        : withDone('notPaid', `/receipts/${paid[1]}`),
+        ? withDone('paid', receiptReturn(paid[1], form), { on, id: before.paid_outside_on ? null : paid[1] })
+        : withDone('notPaid', receiptReturn(paid[1], form)),
     );
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
@@ -532,13 +536,17 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/matches') {
     const form = await formData(request, 4096),
       id = String(form.get('transaction_id'));
-    const [transaction, cursor] = await Promise.all([
+    // A receipt or invoice page sends its own address back; nothing else is followed.
+    const page = /^\/receipts\/([a-f0-9]{64})$/.exec(String(form.get('return_to') ?? ''))?.[1];
+    // Where the payment, or the page's receipt, stood before the write.
+    const [transaction, cursor, opened] = await Promise.all([
       env.DB.prepare(
         "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
       )
         .bind(id)
         .first<Transaction>(),
-      cursorOf(env, LIST_DEFS.bank!, [id]),
+      page ? null : cursorOf(env, LIST_DEFS.bank!, [id]),
+      page ? Promise.all([getReceipt(env, page), cursorOf(env, LIST_DEFS.receipts!, [page])]) : null,
     ]);
     requireInput(transaction, 'Payment not found', 404);
     const unlink = form.get('action') === 'unlink';
@@ -607,9 +615,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       }
     }
     await clearBankReview(env);
-    // The invoice page sends its own address back; nothing else is followed.
-    const back = String(form.get('return_to') ?? '');
-    const onReceipt = /^\/receipts\/[a-f0-9]{64}$/.test(back);
+    const back = page ? `/receipts/${page}` : '';
+    const onReceipt = !!page;
     const done = {
       event: unlink ? 'unmatched' : 'matched',
       params: {
@@ -621,11 +628,20 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         exc: unlink && exception ? 1 : null,
       },
     } as const;
-    return redirect(
-      onReceipt
-        ? withDone(done.event, back, done.params)
-        : await landing(env, bankList(form, transaction), cursor, done),
-    );
+    if (!opened) return redirect(await landing(env, bankList(form, transaction), cursor, done));
+    // From a receipt page, the same rule as Approve: a match that settles a receipt waiting in To do
+    // moves on to the next open one (or the list when none is left); otherwise back to the page.
+    const [pageBefore, pageCursor] = opened;
+    const state = receiptState(form, needsReview(pageBefore));
+    if (needsReview(pageBefore)) {
+      const [after, next] = await Promise.all([
+        getReceipt(env, pageBefore.id),
+        nextOpen(env, LIST_DEFS.receipts!, { ...state, view: 'todo' }, pageCursor, { wrap: true }),
+      ]);
+      if (!needsReview(after))
+        return redirect(next ? withDone(done.event, receiptUrl(next, state), done.params) : listUrl(state, { done }));
+    }
+    return redirect(withDone(done.event, receiptReturn(pageBefore.id, form), done.params));
   }
   // Match all likely: each pair is checked again here and skipped if it changed or is no longer an exact fit.
   if (request.method === 'POST' && path === '/matches/bulk') {
@@ -683,8 +699,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       ).bind(...rule),
     );
     // A rule made from a receipt goes back to that receipt; otherwise to Settings.
-    const back = String(form.get('return_to') ?? '');
-    return redirect(withDone('ruleSaved', /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : '/settings#rules'));
+    const page = /^\/receipts\/([a-f0-9]{64})$/.exec(String(form.get('return_to') ?? ''))?.[1];
+    return redirect(withDone('ruleSaved', page ? receiptReturn(page, form) : '/settings#rules'));
   }
   const rule = path.match(/^\/rules\/(\d{1,15})(\/delete)?$/);
   if (request.method === 'POST' && rule?.[1]) {
@@ -833,7 +849,7 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
           refused(scope, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope)),
           async () =>
             onReceipt
-              ? receiptPage(env, await getReceipt(env, onReceipt[1]!), new URLSearchParams())
+              ? receiptPage(env, await getReceipt(env, onReceipt[1]!), form)
               : payments(
                   env,
                   month(row.booking_date.slice(0, 7)),

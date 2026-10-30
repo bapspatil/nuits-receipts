@@ -383,6 +383,8 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const sales = r.kind === 'sales';
   const list = receiptState(params, needsReview(r) && !r.discarded_at);
   const todo = { ...list, view: 'todo' } as const;
+  // Every form on the page posts the list it was opened from, so its return keeps it.
+  const own = receiptFields(list);
   // Every query the page needs, in one round. The sales payment box waits only on the euro value.
   const eurQuery = eurValue(env, r);
   const [eur, rules, candidateRows, place, next, duplicates, files, linked, shown, salesBox] = await Promise.all([
@@ -414,7 +416,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
       .then((row) => !!row),
     // The original as text when it isn't an image; its number format is echoed in the hints.
     previewable(r) ? null : readableText(env, r),
-    sales ? eurQuery.then((e) => paymentBox(env, { ...r, paid_bank_on: e.transaction ? 'linked' : null })) : '',
+    sales ? eurQuery.then((e) => paymentBox(env, { ...r, paid_bank_on: e.transaction ? 'linked' : null }, own)) : '',
   ]);
   const { position, total } = place;
   const suggestions =
@@ -689,7 +691,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const verb = needs || reading ? 'approve' : 'save';
   // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
   const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${receiptFields(list)}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${own}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
     <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}</form>`;
   const matches = sales
@@ -699,18 +701,18 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
           .map((t) => {
             // Only a pair that isn't an exact fit asks for the exception, and says why.
             const facts = pairFacts(r, t, rules, config(env).tuning);
-            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">Match</button></form>${matchError(t.id)}`;
+            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">Match</button></form>${matchError(t.id)}`;
           })
           .join('')}</section>`
       : '';
   const move =
     sales || config(env).invoicesAddress
-      ? `<form action="/receipts/${r.id}/kind" method="post">${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
+      ? `<form action="/receipts/${r.id}/kind" method="post">${own}${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
       : '';
   const always = sales
     ? ''
-    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
-  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
+    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
+  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post">${own}<button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
   const open = `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
@@ -734,12 +736,12 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
     needs && next && next !== r.id
       ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
       : '';
-  const discard = discardControl(r.id, { list: receiptFields(list), matched: linked, revision: r.revision });
-  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true)}</section>`;
+  const discard = discardControl(r.id, { list: own, matched: linked, revision: r.revision });
+  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true, own)}</section>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const verbLabel = verb === 'save' ? 'Save' : sales ? 'Approve invoice' : 'Approve receipt';
   // One bar on every width: where you are, the quiet actions, and the one primary.
-  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
+  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="${escape(receiptUrl(r.id, list))}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
     `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>`,
