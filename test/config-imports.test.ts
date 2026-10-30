@@ -5,6 +5,7 @@ import worker from '../src/index';
 import type { Env } from '../src/env';
 import { FOOTER_NOTICE, EXPORT_LINE } from '../src/ui';
 import { confirmationForm, pdfBytes } from './helpers';
+import { button } from '../src/actions';
 
 const configured: Env = {
   ...env,
@@ -74,12 +75,10 @@ test('configured owner imports into a new account and retains products, notices 
     const rendered = await page.text();
     expectBranding(rendered);
     if (path.startsWith('/?')) {
-      expect(rendered).toContain('<th scope="row">Studio work</th>');
+      expect(rendered).not.toContain('By part');
       expect(rendered).toContain('<b>Send</b>');
-      expect(rendered).toMatch(/Mark September as sent<\/button>/);
+      expect(rendered).toContain(button('sent', { label: 'Mark September as sent' }));
       expect(rendered).toContain(EXPORT_LINE);
-    } else {
-      expect(rendered).toContain('Synthetic operating account');
     }
   }
   const csv = await request('/export.csv?month=2026-09');
@@ -87,14 +86,12 @@ test('configured owner imports into a new account and retains products, notices 
   expect(await csv.text()).toMatch(/matched_account_id,matched_account_name[\s\S]*Synthetic operating account/);
 });
 
-test('invalid preview and successful import with preset failure retain configured branding and notices', async () => {
+test('invalid preview retains configured branding and notices, and a layout that cannot be saved does not fail the import', async () => {
   const invalid = await preview('invalid');
   expect(invalid.status).toBe(422);
   expectBranding(await invalid.text());
   const valid = await preview();
   const body = confirmationForm(await valid.text());
-  body.set('preset_name', 'Synthetic saved layout');
-  body.set('preset_bank', 'Synthetic Bank');
   const prepare = env.DB.prepare.bind(env.DB);
   const spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
     if (sql.startsWith('INSERT INTO bank_presets')) throw new Error('Synthetic preset failure');
@@ -102,10 +99,7 @@ test('invalid preview and successful import with preset failure retain configure
   });
   try {
     const response = await request('/imports/csv/confirm', body);
-    expect(response.status).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('Transactions were imported. Preset was not saved.');
-    expectBranding(html);
+    expect(response.status).toBe(303);
   } finally {
     spy.mockRestore();
   }

@@ -11,7 +11,7 @@ const entries = () => helpSections().flatMap((s) => s.groups.flatMap((g) => g.en
 
 test('every status word and every flag has a help entry', () => {
   const terms = entries().map((e) => e.term);
-  for (const [key, word] of Object.entries(STATUS)) {
+  for (const [key, { word }] of Object.entries(STATUS)) {
     expect(terms, key).toContain(word);
     expect(
       entries().some((e) => e.ids.includes(`status-${key}`)),
@@ -26,7 +26,7 @@ test('every status word and every flag has a help entry', () => {
       code,
     ).toBe(true);
   }
-  for (const term of ['Match anyway', 'Undated', 'Changed since you sent it', 'Kind', 'Email Routing'])
+  for (const term of ['Matched', 'Undated', 'Changed since you sent it', 'Kind', 'Email Routing'])
     expect(terms, term).toContain(term);
 });
 
@@ -35,7 +35,7 @@ test('every /help#anchor the app links to exists', async () => {
   const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   const linked = new Set<string>();
   for (const text of Object.values(sources)) for (const m of text.matchAll(/\/help#([a-z-]+)/g)) linked.add(m[1]!);
-  expect([...linked].sort()).toEqual(expect.arrayContaining(['kind', 'match-anyway', 'part']));
+  expect([...linked].sort()).toEqual(expect.arrayContaining(['kind', 'part']));
   for (const id of linked) expect(ids.has(id), id).toBe(true);
 });
 
@@ -66,6 +66,14 @@ test('the checklist counts what is done, marks the first open step Next, and is 
   expect(html).toContain('<li class="step now"><a href="/x#email"><span class="vh">Next: </span><b>Do email</b>');
   expect(html).toContain('<li class="step todo"><a href="/x#accountant">');
   expect(html).toContain('<span>Because email.</span>');
+  // The open steps come first and the done ones fold below as "N done", out of the way of the month.
+  const open = html.slice(0, html.indexOf('<details class="finished">'));
+  expect(open).not.toContain('class="step done"');
+  expect(open).toContain('class="step now"');
+  expect(html).toMatch(
+    /<details class="finished"><summary>2 done<\/summary><ol class="steps checklist"><li class="step done">/,
+  );
+  expect(setupChecklist(IDS.map((id) => step(id, false)))).not.toContain('class="finished"');
   expect(setupChecklist(IDS.map((id) => step(id, true)))).toBeNull();
 });
 

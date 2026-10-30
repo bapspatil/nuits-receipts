@@ -98,7 +98,7 @@ test('pages show the notices, configured labels and no private links', async () 
   expect(monthHtml).toContain(FOOTER_NOTICE);
   expect(monthHtml).toContain(EXPORT_LINE);
   expect(monthHtml).toContain('<b>Send</b>');
-  expect(monthHtml).toContain('>CSV</a>');
+  expect(monthHtml).toContain('<span>CSV</span></a>');
   const settings = await (await as('owner', 'local-dummy-password', labelled, '/settings')).text();
   for (const label of ['General', 'App', 'Website', 'Hosting'])
     expect(settings).toContain(`name="product_label" value="${label}"`);

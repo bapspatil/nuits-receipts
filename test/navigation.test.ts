@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { htmlForm, locationOf, request, signed } from './helpers';
 import { missingPayment, seed } from './package-helpers';
+import { buttonLink, statusMark } from '../src/actions';
 
 const open = (month: string) => `${month}-12`;
 const home = async (path = '/') => (await request(path)).text();
@@ -68,7 +69,7 @@ test('a later step that is done shows done, even before an earlier one is', asyn
   // Money in only: the statement is there and nothing is missing a receipt.
   await missingPayment('2020-03', 'Client Oy', 4200);
   const html = await home('/?month=2020-03');
-  expect(html).toContain('<li class="step now" aria-current="step"><a href="/review">');
+  expect(html).toContain('<li class="step now" aria-current="step"><a href="/receipts?view=todo&amp;month=2020-03">');
   expect(html).toContain('<li class="step done"><a href="/payments?month=2020-03">');
 });
 
@@ -100,18 +101,20 @@ test('the Send step downloads first, then asks whether it was sent', async () =>
   await missingPayment('2020-03');
   await env.DB.prepare('UPDATE bank_transactions SET receipt_id=(SELECT id FROM receipts LIMIT 1)').run();
   const html = await home('/?month=2020-03');
-  expect(html).toMatch(/<a class="btn primary" href="\/month\/package.zip\?month=2020-03">Download ZIP/);
+  expect(html).toMatch(
+    /<a class="btn primary" href="\/month\/package.zip\?month=2020-03" download><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP/,
+  );
   expect(html).toContain('<h3>Did you send it?</h3>');
-  expect(html).toContain('Mark March as sent</button>');
+  expect(html).toContain('<span>Mark March as sent</span></button>');
   expect(html.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
   const bank = await home('/payments?month=2020-03');
   expect(bank).toContain('Every payment has a receipt.');
-  expect(bank).toContain('Send March</a>');
+  expect(bank).toContain('<span>Send March</span></a>');
   await markSent('2020-03');
   const after = await home('/payments?month=2020-03');
   // The bulk bar stays hidden until a row is picked.
   expect(after.replace(/<form id="[^"]*" class="bulkbar"[\s\S]*?<\/form>/g, '')).not.toContain('btn primary');
-  expect(after).toContain('March is sent');
+  expect(after).toContain(statusMark('sent', { after: 'March' }));
 });
 
 test('step markers carry the same three words everywhere', async () => {
@@ -121,18 +124,22 @@ test('step markers carry the same three words everywhere', async () => {
     (m) => `${m[1]} ${m[2]}`,
   );
   expect(words.every((w) => /^(done Done|now Next|todo To do): $/.test(w))).toBe(true);
-  expect((await home('/import')).match(/<span class="vh">(Done|Next|To do): <\/span>/g)).toHaveLength(3);
+  const body = new FormData();
+  body.set('file', new File(['Date;Amount;Payee\n2026-09-01;-1.00;Shop\n'], 'b.csv', { type: 'text/csv' }));
+  body.set('account', 'holvi');
+  const editor = await (await request('/imports/csv', { method: 'POST', body })).text();
+  expect(editor.match(/<span class="vh">(Done|Next|To do): <\/span>/g)).toHaveLength(3);
 });
 
 test('Receipts has one Add button that follows the open tab', async () => {
   await seed({ bytes: 'r', issue_date: open('2020-03') });
   await seed({ bytes: 'i', issue_date: open('2020-03'), kind: 'sales', client: 'Client Oy', invoice_number: 'I-1' });
-  const receipts = await home('/receipts?month=2020-03');
+  const receipts = await home('/receipts?view=all&month=2020-03');
   expect(receipts).toContain('Receipts <span class="num">1</span>');
   expect(receipts).toContain('Invoices <span class="num">1</span>');
-  expect(receipts).toContain('<a class="btn primary" href="/add">Add receipt</a>');
+  expect(receipts).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
   expect(receipts).not.toContain('Add invoice');
-  const invoices = await home('/invoices?month=2020-03');
-  expect(invoices).toContain('<a class="btn primary" href="/add?kind=sales">Add invoice</a>');
+  const invoices = await home('/receipts?view=all&kind=sales&month=2020-03');
+  expect(invoices).toContain(buttonLink('addInvoice', '/add?kind=sales', { tone: 'primary' }));
   expect(invoices).not.toContain('>Add receipt<');
 });

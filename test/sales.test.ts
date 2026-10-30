@@ -11,6 +11,7 @@ import { hash, type Receipt } from '../src/domain';
 import type { Env } from '../src/env';
 import { htmlForm, idFrom, locationOf, pdfBytes, request } from './helpers';
 import { seed, zipOf } from './package-helpers';
+import { statusMark } from '../src/actions';
 // Headers Cloudflare Email Routing prepends after authenticating the envelope.
 const cloudflarePass = 'Authentication-Results: mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass;\r\n';
 
@@ -302,11 +303,11 @@ test('money in is matched to a sales invoice by amount and reference, never to a
   expect(linked.status, await linked.clone().text()).toBe(303);
   expect(idFrom(linked)).toBe(other.id);
   expect((await t(loose))!.receipt_id).toBe(other.id);
-  const list = await (await request('/invoices?month=2026-09')).text();
+  const list = await (await request('/receipts?view=all&kind=sales&month=2026-09')).text();
   expect(list).toContain('Sample Client GmbH');
-  expect(list.match(/tag ok">Paid/g)).toHaveLength(2);
+  expect(list.split(statusMark('paid').slice(0, -'</span></span>'.length))).toHaveLength(3);
   // Money in on Payments links to the invoice.
-  expect(await (await request('/payments?month=2026-09&show=all')).text()).toContain(
+  expect(await (await request('/payments?month=2026-09&view=all')).text()).toContain(
     `<a class="tag" href="/receipts/${other.id}">Invoice</a>`,
   );
 });
@@ -314,14 +315,38 @@ test('money in is matched to a sales invoice by amount and reference, never to a
 test('overdue and paid outside the bank', async () => {
   const r = await sales(DOMESTIC, 'lasku.txt');
   const home = await (await request('/?month=2026-09')).text();
-  expect(home).toContain(
-    '<p class="alert" role="note"><a href="/invoices?month=2026-09&show=overdue">1 invoice overdue ›</a></p>',
+  expect(home).toContain('<p class="alert" role="note"><a href="/receipts?view=todo">1 invoice overdue ›</a></p>');
+  expect(await (await request('/receipts?view=all&kind=sales&month=2026-10&show=overdue')).text()).toContain(
+    'Esimerkki Asiakas Oy',
   );
-  expect(await (await request('/invoices?month=2026-10&show=overdue')).text()).toContain('Esimerkki Asiakas Oy');
+  // The "older invoices" note counts invoices dated in other months only.
+  expect(await (await request('/receipts?view=all&kind=sales&month=2026-09')).text()).not.toContain('older invoice');
+  expect(await (await request('/receipts?view=all&kind=sales&month=2026-10')).text()).toContain(
+    '1 older invoice overdue ›',
+  );
+  // Overdue is To do: an Invoice row that Mark paid resolves, back on the list.
+  const todo = await (await request('/receipts?view=todo')).text();
+  expect(todo).toMatch(
+    new RegExp(
+      `<li class="row" data-row="${r.id}" id="row-${r.id}" tabindex="-1" style="view-transition-name:r-${r.id}">[^]*?<span class="kind">Invoice</span>[^]*?<span class="stamp warn">[^]*?<span>Overdue</span>[^]*?<summary class="btn secondary" aria-label="Mark paid: [^"]+">[^]*?<span>Mark paid</span></summary>`,
+    ),
+  );
   const form = new FormData();
   form.set('paid_outside_on', '2026-09-30');
   form.set('paid_outside_note', 'Stripe payout');
+  form.set('view', 'todo');
+  form.set('upto', '50');
+  const paid = await request(`/receipts/${r.id}/paid`, { method: 'POST', body: form });
+  expect(paid.status).toBe(303);
+  expect(locationOf(paid)).toMatch(/^\/receipts\?view=todo&done=paid&on=2026-09-30$/);
+  expect(await (await request('/receipts?view=todo')).text()).not.toContain(`data-row="${r.id}"`);
+  // Undo puts the invoice back in To do, where it lands.
+  const landed = await (await request(paid.headers.get('Location')!)).text();
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undo)).toBe(`/receipts?view=todo&done=undone&op=paid&n=1#row-${r.id}`);
+  expect((await getReceipt(env, r.id)).paid_outside_on).toBeNull();
   expect((await request(`/receipts/${r.id}/paid`, { method: 'POST', body: form })).status).toBe(303);
+  form.delete('view');
   expect(await getReceipt(env, r.id)).toMatchObject({
     paid_outside_on: '2026-09-30',
     paid_outside_note: 'Stripe payout',
@@ -361,7 +386,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   });
   // Unpaid doesn't hold the month back...
   let month = await (await request('/?month=2026-09')).text();
-  expect(month).toContain('1 invoice dated September ›');
+  expect(month).not.toContain('dated September');
   expect(month).not.toContain('to check</span>');
   // ...an invoice that needs a look does.
   const flagged = await sales(
@@ -375,7 +400,7 @@ test('the month package puts checked invoices in sales/ with their own index; a 
   expect(flagged.status).toBe('needs_review');
   month = await (await request('/?month=2026-09')).text();
   expect(month).toContain(
-    '<a href="/review"><span class="vh">Next: </span><b>Check</b><span class="red">1 to check</span></a>',
+    '<a href="/receipts?view=todo&amp;month=2026-09"><span class="vh">Next: </span><b>Check</b><span class="red">1 to check</span></a>',
   );
   const csv = await request('/export-sales.csv?month=2026-09');
   expect(csv.headers.get('Content-Disposition')).toContain('receipts-sales-2026-09.csv');

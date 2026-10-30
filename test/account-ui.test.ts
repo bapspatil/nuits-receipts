@@ -3,7 +3,8 @@ import Papa from 'papaparse';
 import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset, reconcile, eurValue } from '../src/banking';
 import { getReceipt } from '../src/receipts';
-import { idFrom, locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { button, buttonLink, statusMark } from '../src/actions';
 async function account(id: string, label: string) {
   await env.DB.prepare('INSERT INTO accounts(id,label,bank_name,default_currency,created_at) VALUES (?,?,?, ?,?)')
     .bind(id, label, 'Fake Bank', 'EUR', '2026-10-20')
@@ -27,8 +28,8 @@ test('account picker and create/rename forms use immutable IDs and generic label
   expect(await (await request('/?month=2026-09')).text()).not.toContain('action="/imports/csv"');
   const page = await (await request('/import')).text();
   expect(page).toContain('Import a bank statement');
-  expect(page).toContain('value="default-account"');
-  expect(page).toContain('account_label');
+  expect(page).toContain('action="/import"');
+  expect(page).not.toContain('account_label');
   const created = await request('/accounts', {
     method: 'POST',
     body: new URLSearchParams({ label: 'Fake Savings', bank_name: 'Fake Bank', default_currency: 'EUR' }),
@@ -67,12 +68,8 @@ test('matches and payments show accounts and export appends two formula-safe acc
   await bank('account-a');
   const r = await receipt();
   expect((await eurValue(env, r)).source).toBe('bank');
-  const payments = await (await request('/payments?month=2026-09')).text();
-  expect(payments).toContain('=Fake Main');
-  expect(payments).toContain(
-    `<span class="tag ok auto">Matched automatically</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`,
-  );
-  expect(await (await request('/receipts/' + r.id)).text()).toContain('=Fake Main');
+  const payments = await (await request('/payments?month=2026-09&view=all')).text();
+  expect(payments).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${r.id}">Receipt</a>`);
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,
   });
@@ -96,28 +93,41 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
     credit = rows[1]!.id;
   const paired = await request('/transfers', {
     method: 'POST',
-    body: new URLSearchParams({ debit_id: debit, credit_id: credit, reason: 'Fake own transfer' }),
+    body: new URLSearchParams({
+      debit_id: debit,
+      credit_id: credit,
+      reason: 'Fake own transfer',
+      view: 'all',
+      month: '2026-09',
+    }),
   });
   expect(paired.status).toBe(303);
-  // Transfers live on Bank now, in the month the money left.
+  // Back to the Bank list it was made on; no payment is left open to land on.
   expect(locationOf(paired)).toMatch(
-    /^\/payments\?month=2026-09&show=all&done=transferMade&tx=[a-f0-9]{64}&name=[^&#]+#transfers$/,
+    new RegExp(`^/payments\\?month=2026-09&view=all&done=transferMade&tx=${debit}&name=[^&#]+$`),
   );
-  const page = await (await request('/payments?month=2026-09&show=all')).text();
+  const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Both legs say where the money went; Undo is in each row's More.
-  expect(page).toContain(`<li class="pay" id="transfers">`);
+  expect(page).toContain(
+    `<li class="row" data-row="${debit}" id="row-${debit}" tabindex="-1" style="view-transition-name:r-${debit}">`,
+  );
   expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
   expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');
-  expect(page.match(/<button class="linkbtn">Undo transfer<\/button>/g)).toHaveLength(2);
-  expect(page).toContain('<div class="stmts" id="imports"><details><summary>Statements (2)</summary>');
+  expect(page.split(button('undo', { label: 'Undo transfer' }))).toHaveLength(3);
+  expect(page).toContain(`<div class="stmts" id="imports">${buttonLink('importStmt', '/import')}</div>`);
+  expect(page).not.toContain('Statements (2)');
   expect(page).not.toContain('stamp missing');
   expect(
     (await request('/payments/' + debit, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) }))
       .status,
   ).toBe(409);
-  const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
+  const undone = await request('/transfers/' + debit + '/undo', {
+    method: 'POST',
+    body: htmlForm(page, `/transfers/${debit}/undo`),
+  });
   expect(undone.status).toBe(303);
-  expect(locationOf(undone)).toMatch(/^\/payments\?month=2026-09&show=all&done=transferUndone#transfers$/);
+  // It lands on the payment it opened again.
+  expect(locationOf(undone)).toBe(`/payments?month=2026-09&view=all&done=transferUndone#row-${debit}`);
   // Unpaired again: the debit is missing, and its More offers the pair once more.
   const again = await (await request('/payments?month=2026-09')).text();
   expect(again).toContain(
@@ -125,9 +135,7 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   );
   expect(await env.DB.prepare('SELECT sum(receipt_required) n FROM bank_transactions').first('n')).toBe(2);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
-  expect(await (await request('/payments?month=2026-09')).text()).toContain(
-    '<span class="stamp missing">Missing</span>',
-  );
+  expect(await (await request('/payments?month=2026-09')).text()).toContain(statusMark('missing'));
 });
 
 test('legacy account IDs with spaces keep their identity when renamed through the rendered form', async () => {

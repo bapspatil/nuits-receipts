@@ -6,7 +6,8 @@ import worker from '../src/index';
 import { importBankCsv, parsePreset } from '../src/banking';
 import { BULK_CAP } from '../src/bulk';
 import type { Receipt } from '../src/domain';
-import { idFrom, locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 type Seed = { status?: string; kind?: string; vendor?: string; net?: number | null; month?: string; client?: string };
@@ -38,8 +39,9 @@ function form(fields: Record<string, string | string[]>) {
   for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one);
   return body;
 }
+// Every bar posts its list's state; these default to Receipts All unless a test says otherwise.
 const bulk = (fields: Record<string, string | string[]>, headers: Record<string, string> = {}) =>
-  request('/receipts/bulk', { method: 'POST', body: form(fields), headers });
+  request('/receipts/bulk', { method: 'POST', body: form({ list: 'receipts', view: 'all', ...fields }), headers });
 const json = (fields: Record<string, string | string[]>) => bulk(fields, { Accept: 'application/json' });
 const ids = (...ns: number[]) => ns.map(id);
 
@@ -91,9 +93,10 @@ test('approve takes the complete ones, skips the rest, needs a reason, and survi
   expect(missing.status).toBe(422);
   expect(await missing.json()).toEqual({ error: expect.stringContaining('note') });
 
-  const res = await bulk({ op: 'approve', id: all, approval_reason: 'Checked against the original', back: '/review' });
+  const res = await bulk({ op: 'approve', id: all, approval_reason: 'Checked against the original', view: 'todo' });
   expect(res.status).toBe(303);
-  expect(locationOf(res)).toBe('/review?done=approvedMany&n=2&skipped=2');
+  // Back to To do, at the first row still open after the first one acted on.
+  expect(locationOf(res)).toBe(`/receipts?view=todo&done=approvedMany&n=2&skipped=2#row-${id(3)}`);
   const done = (await row(1))!;
   expect(done).toMatchObject({ status: 'ready', review_reasons_json: '[]' });
   expect(done.reviewed_at).toBeTruthy();
@@ -118,22 +121,18 @@ test('discard sets the rows aside with one Undo back to the same list; restore b
   const res = await bulk({
     op: 'discard',
     id: ids(1, 2),
-    reason: 'personal',
     list: 'receipts',
-    back: '/receipts?month=2026-10&q=vendor',
+    view: 'all',
+    month: '2026-10',
+    q: 'vendor',
+    offset: '50',
   });
-  const location = locationOf(res);
-  expect(location).toMatch(/^\/receipts\?month=2026-10&q=vendor&done=discarded&n=2&at=[^&]+&back=/);
-  expect((await row(1))!.discard_reason).toBe('personal');
+  expect(locationOf(res)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=discarded&n=2');
+  expect((await row(1))!.discard_reason).toBeNull();
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('2 discarded.');
-  expect(page).toContain('action="/restore"');
-  const at = new URL(location, 'http://localhost').searchParams.get('at')!;
-  const undo = await request('/restore', {
-    method: 'POST',
-    body: form({ at, back: '/receipts?month=2026-10&q=vendor' }),
-  });
-  expect(locationOf(undo)).toBe('/receipts?month=2026-10&q=vendor&done=restored&n=2');
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(page, '/undo') });
+  expect(locationOf(undo)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=undone&op=discard&n=2');
   expect((await row(1))!.discarded_at).toBeNull();
 
   await bulk({ op: 'discard', id: ids(1, 2) });
@@ -171,9 +170,9 @@ test('paid marks sales invoices only, and needs the day and how', async () => {
     paid_outside_on: '2026-10-25',
     paid_outside_note: 'Stripe payout',
     list: 'invoices',
-    back: '/invoices?month=2026-10',
+    month: '2026-10',
   });
-  expect(locationOf(res)).toBe('/invoices?month=2026-10&done=paidMany&n=1&on=2026-10-25&skipped=1');
+  expect(locationOf(res)).toBe('/receipts?view=all&kind=sales&month=2026-10&done=paidMany&n=1&on=2026-10-25&skipped=1');
   expect(await row(1)).toMatchObject({ paid_outside_on: '2026-10-25', paid_outside_note: 'Stripe payout' });
   expect((await row(2))!.paid_outside_on).toBeNull();
 });
@@ -195,19 +194,19 @@ test('all=1 takes the list filter, never more than the cap', async () => {
   await receipt(1, { vendor: 'Alpha Fake Oy' });
   await receipt(2, { vendor: 'Beta Fake Oy' });
   await receipt(3, { vendor: 'Alpha Fake Oy', month: '2026-09' });
-  const res = await json({ op: 'discard', all: '1', list: 'receipts', q: 'alpha', month: '2026-10' });
+  const res = await json({ op: 'discard', all: '1', list: 'receipts', view: 'all', q: 'alpha', month: '2026-10' });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { location: string; n: number; skipped: number };
   expect(body).toMatchObject({ n: 1, skipped: 0 });
   // The location is the signed banner link for the list the post came from.
-  expect(body.location).toMatch(/^\/receipts\?done=discarded&n=1&at=.*&iat=\d+&sig=/);
+  expect(body.location).toMatch(/^\/receipts\?view=all&month=2026-10&q=alpha&done=discarded&n=1&at=.*&iat=\d+&sig=/);
   expect((await row(1))!.discarded_at).toBeTruthy();
   expect((await row(2))!.discarded_at).toBeNull();
   expect((await row(3))!.discarded_at).toBeNull();
 
   // Over the AI cap for the filter: refused, nothing read.
   for (let n = 10; n < 21; n++) await receipt(n);
-  const capped = await json({ op: 'retry', all: '1', list: 'receipts' });
+  const capped = await json({ op: 'retry', all: '1', list: 'receipts', view: 'all' });
   expect(capped.status).toBe(400);
   expect(await capped.json()).toEqual({ error: 'Up to 10 at a time. Narrow the filter.' });
 
@@ -217,44 +216,45 @@ test('all=1 takes the list filter, never more than the cap', async () => {
     ).bind(id(1000 + i), `receipts/${id(1000 + i)}`),
   );
   await env.DB.batch(many);
-  const over = await bulk({ op: 'discard', all: '1', list: 'receipts' });
-  expect(over.status).toBe(400);
-  expect(await over.text()).toContain('Up to 500 at a time. Narrow the filter.');
+  // Over the cap: the first 500 in the list's order (newest first), as the bar offers.
+  const over = await json({ op: 'discard', all: '1', list: 'receipts', view: 'all' });
+  expect(await over.json()).toMatchObject({ n: BULK_CAP });
+  expect((await row(1000 + BULK_CAP))!.discarded_at).toBeTruthy();
+  expect((await row(1000))!.discarded_at).toBeNull();
 });
 
-test('all=1 on Review follows the reason filter', async () => {
+test('all=1 on To do acts on the To do rows only', async () => {
   await receipt(1, { status: 'needs_review' });
   await receipt(2, { status: 'needs_review' });
-  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["sender_unverified"]' WHERE id=?`).bind(id(2)).run();
-  const res = await json({
-    op: 'discard',
-    reason: 'personal',
-    all: '1',
-    list: 'review',
-    filter: 'sender',
-    back: '/review?reason=sender',
-  });
-  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/review\?reason=sender&done=/) });
-  expect((await row(2))!.discarded_at).toBeTruthy();
-  expect((await row(1))!.discarded_at).toBeNull();
-  expect((await row(2))!.discard_reason).toBe('personal');
-  expect((await json({ op: 'discard', all: '1', list: 'review', filter: 'nope' })).status).toBe(400);
+  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_total"]' WHERE id=?`).bind(id(1)).run();
+  await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_invoice_number"]' WHERE id=?`)
+    .bind(id(2))
+    .run();
+  const res = await json({ op: 'discard', all: '1', list: 'receipts', view: 'todo' });
+  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/receipts\?view=todo&done=/) });
+  expect((await row(1))!.discarded_at).toBeTruthy();
+  expect((await row(2))!.discarded_at).toBeNull();
 });
 
-test('back goes only to a list in this app', async () => {
+test('the return is rebuilt from the list state, never followed as sent', async () => {
   await receipt(1);
   for (const back of ['https://evil.example/receipts', '//evil.example/review', '/\\evil.example', '/settings', 'x'])
     expect(locationOf(await bulk({ op: 'restore', id: id(1), list: 'invoices', back })), back).toBe(
-      '/invoices?done=restored&n=0&skipped=1',
+      '/receipts?view=all&kind=sales&done=restored&n=0&skipped=1',
     );
-  // Only the list's own filter is kept.
-  expect(locationOf(await bulk({ op: 'restore', id: id(1), back: '/receipts?show=discarded&select=1&evil=1#x' }))).toBe(
-    '/receipts?show=discarded&done=restored&n=0&skipped=1',
+  // Only the list's own state is kept. Other fields are ignored; a value the list doesn't take is
+  // refused, never guessed.
+  const odd = { list: 'receipts', view: 'all', show: 'discarded', select: '1', evil: '1' };
+  expect(locationOf(await bulk({ op: 'restore', id: id(1), ...odd }))).toBe(
+    '/receipts?view=all&show=discarded&done=restored&n=0&skipped=1',
   );
+  const stale = await json({ op: 'restore', id: id(1), ...odd, month: '2026-13' });
+  expect(stale.status).toBe(400);
+  expect(await stale.json()).toEqual({ error: 'This page is out of date. Reload it and try again.' });
 });
 
 test('the lists render checkboxes, the bar and its script; an empty list renders none', async () => {
-  for (const path of ['/review', '/receipts', '/invoices?month=2026-10']) {
+  for (const path of ['/receipts?view=todo', '/receipts?view=all', '/receipts?view=all&kind=sales&month=2026-10']) {
     const empty = await (await request(path)).text();
     expect(empty, path).not.toContain('<form id="bulk-');
     expect(empty, path).not.toContain('/assets/bulk.js');
@@ -263,37 +263,49 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   await receipt(1, { status: 'needs_review' });
   await receipt(2);
   await receipt(3, { kind: 'sales', client: 'Example Client Oy' });
-  const review = await (await request('/review')).text();
-  expect(review).toContain(`<input type="checkbox" name="id" value="${id(1)}" form="bulk-review">`);
-  expect(review).toContain('<div data-bulk-list="bulk-review">');
-  expect(review).toMatch(/<\/div><form id="bulk-review" class="bulkbar" data-bulk data-total="1"/);
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review).toContain(`<input type="checkbox" name="id" value="${id(1)}" form="bulk-todo">`);
+  expect(review).toContain('<div data-list="receipts-todo" data-total="1" data-bulk-list="bulk-todo">');
+  expect(review).toMatch(/<\/div><form id="bulk-todo" class="bulkbar" data-bulk data-total="1"/);
   expect(review).toContain('name="approval_reason" value="Checked against the original"');
-  expect(review).toContain('<input type="hidden" name="list" value="review">');
-  expect(review).toContain('<script src="/assets/bulk.js" defer></script>');
-  // The old Select mode is gone; the per-row Discard stays.
-  expect(review).not.toContain('class="bulk"');
-  expect(review).toContain('action="/discard"');
-  expect(await (await request('/review?select=1')).text()).toContain(
-    '<div data-bulk-list="bulk-review" data-selecting>',
+  expect(review).toContain(
+    '<input type="hidden" name="list" value="receipts"><input type="hidden" name="view" value="todo">',
   );
+  expect(review).toContain('<script src="/assets/bulk.js" defer></script>');
+  // The old Select mode is gone, and so is the per-row Discard: it is in the bar.
+  expect(review).not.toContain('class="bulk"');
+  expect(review).not.toContain('action="/discard"');
+  expect(await (await request('/receipts?view=todo&select=1')).text()).not.toContain('data-selecting');
 
-  const all = await (await request('/receipts?month=2026-10')).text();
+  const all = await (await request('/receipts?view=all&month=2026-10')).text();
   expect(all).toContain(`value="${id(2)}" form="bulk-receipts"`);
   expect(all).toContain('data-total="2"');
-  expect(all).toContain('href="/receipts?month=2026-10&amp;select=1" data-bulk-select');
-  expect(all).toContain('<button name="op" value="retry" class="btn" data-max="10">Read again</button>');
+  expect(all).toContain(button('reread', { attrs: ' name="op" value="retry" data-max="10"' }));
   expect(all).not.toContain('value="restore"');
   const discarded = await (await request('/receipts?show=discarded')).text();
   expect(discarded).not.toContain('<form id="bulk-');
   await bulk({ op: 'discard', id: id(2) });
   const after = await (await request('/receipts?show=discarded')).text();
-  expect(after).toContain('<button name="op" value="restore" class="btn">Restore</button>');
+  expect(after).toContain(button('restore', { attrs: ' name="op" value="restore"' }));
   expect(after).not.toContain('value="discard"');
 
-  const invoices = await (await request('/invoices?month=2026-10')).text();
+  const invoices = await (await request('/receipts?view=all&kind=sales&month=2026-10')).text();
   expect(invoices).toContain(`value="${id(3)}" form="bulk-invoices"`);
   expect(invoices).toContain('name="paid_outside_on" value="');
   expect(invoices).toContain('<input type="hidden" name="list" value="invoices">');
+
+  // Select mode is gone: the boxes are always there and no list links to ?select=1.
+  for (const path of [
+    '/receipts?view=todo',
+    '/receipts?view=all&month=2026-10',
+    '/receipts?view=all&kind=sales&month=2026-10',
+    '/settings?open=senders',
+  ]) {
+    const html = await (await request(path)).text();
+    expect(html, path).not.toContain('select=1');
+    expect(html, path).not.toContain('data-bulk-select');
+    expect(html, path).not.toContain('data-selecting');
+  }
 });
 
 test('chunk totals of done and skipped add up, within bounds', async () => {
@@ -306,12 +318,10 @@ test('chunk totals of done and skipped add up, within bounds', async () => {
       expect((await bulk({ op: 'restore', id: id(1), [key]: bad })).status, `${key}=${bad}`).toBe(400);
 });
 
-test('names from the object prototype are not filters or reasons', async () => {
+test('names from the object prototype are not reasons or shows', async () => {
   await receipt(1, { status: 'needs_review' });
-  expect((await json({ op: 'discard', all: '1', list: 'review', filter: 'constructor' })).status).toBe(400);
-  expect((await json({ op: 'discard', id: id(1), reason: 'toString' })).status).toBe(400);
   expect((await row(1))!.discarded_at).toBeNull();
-  for (const path of ['/review?reason=constructor', '/receipts?show=toString'])
+  for (const path of ['/receipts?view=todo&reason=constructor', '/receipts?show=toString'])
     expect((await request(path)).status, path).toBe(200);
 });
 
@@ -326,9 +336,9 @@ test('approving a foreign receipt values it in euros, as approving one does', as
 test('a run that changed nothing says so, with no Undo', async () => {
   await receipt(1);
   await bulk({ op: 'discard', id: id(1) });
-  const res = await bulk({ op: 'discard', id: id(1), back: '/receipts' });
-  expect(locationOf(res)).toMatch(/^\/receipts\?done=discarded&n=0&at=[^&]+&back=%2Freceipts&skipped=1$/);
+  const res = await bulk({ op: 'discard', id: id(1), list: 'receipts', view: 'all' });
+  expect(locationOf(res)).toBe('/receipts?view=all&done=discarded&n=0&skipped=1');
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('Nothing changed. 1 skipped.');
-  expect(page).not.toContain('action="/restore"');
+  expect(page).not.toContain('action="/undo"');
 });

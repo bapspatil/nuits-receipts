@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
+import { savePreset } from '../src/banking';
 import { request, htmlForm, confirmationForm } from './helpers';
 import { MAX_CSV_BYTES } from '../src/domain';
 async function preview(csv: string, values: Record<string, string> = {}) {
@@ -13,9 +14,13 @@ test('changing a selected saved preset mapping takes effect only after a new pre
   const csv = 'Date;Amount;Payee\n2026-09-01;-12.50;Synthetic Shop\n';
   const initial = await preview(csv),
     body = confirmationForm(await initial.text());
-  body.set('preset_bank', 'Synthetic');
-  body.set('preset_name', 'Monthly');
   expect((await request('/imports/csv/confirm', { method: 'POST', body })).status).toBe(303);
+  await savePreset(env, {
+    bank_name: 'Synthetic',
+    name: 'Monthly',
+    headers: ['Date', 'Amount', 'Payee'],
+    mapping: JSON.parse(String(body.get('mapping'))),
+  });
   const saved = await env.DB.prepare('SELECT id FROM bank_presets').first<string>('id');
   const second = await preview(csv.replace('-12.50', '-15.50'), { preset_id: saved! });
   expect(second.status).toBe(200);
@@ -101,9 +106,13 @@ test('preset picker labels presets as CSV layouts, with no disclaimer of its own
 test('saved presets are labelled as layouts too', async () => {
   const csv = 'Date;Amount;Payee\n2026-09-01;-12.50;Synthetic Shop\n';
   const body = confirmationForm(await (await preview(csv)).text());
-  body.set('preset_bank', 'Synthetic');
-  body.set('preset_name', 'Monthly');
   expect((await request('/imports/csv/confirm', { method: 'POST', body })).status).toBe(303);
+  await savePreset(env, {
+    bank_name: 'Synthetic',
+    name: 'Monthly',
+    headers: ['Date', 'Amount', 'Payee'],
+    mapping: JSON.parse(String(body.get('mapping'))),
+  });
   const html = await (await preview(csv.replace('-12.50', '-13.50'))).text();
   expect(html).toContain('>Monthly · Synthetic (CSV layout)</option>');
   expect(html.match(/Not affiliated/g)).toHaveLength(1);

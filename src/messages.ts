@@ -109,7 +109,7 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   // batch
   'Invalid action': "That action isn't available here. Reload the page and try again.",
   'Invalid list': "We couldn't tell which list this was. Reload the page and try again.",
-  'Invalid filter': "That filter isn't available. Reload the page and try again.",
+  'This page is out of date. Reload it and try again.': 'This page is out of date. Reload it and try again.',
   'Invalid progress': 'Something went wrong part way through. Reload the page and try again.',
   'Nothing matches the filter.': 'Nothing matches the filter any more. Reload the page.',
   'Choose where to move them': 'Choose Sales invoices or Receipts.',
@@ -118,13 +118,10 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Invalid selection': "Something you selected isn't there any more. Reload the page and try again.",
 
   // discard
-  'Invalid reason': 'Pick one of the reasons listed.',
   'Choose a receipt': 'Choose at least one receipt.',
   'Invalid receipt': "We couldn't find that receipt. Reload the page and try again.",
   'Receipt not found': "We couldn't find that receipt. It may have been removed.",
   'This receipt changed. Reload and try again.': 'This receipt changed since you opened it. Reload and try again.',
-  'Remove the match first.':
-    'This receipt is matched to a payment. Remove the match first, or choose Remove and discard.',
   'Invalid undo': "That undo link isn't valid any more.",
 
   // domain
@@ -139,6 +136,11 @@ export const MESSAGES: Readonly<Record<string, string>> = {
 
   // imports
   'Choose CSV': 'Choose a CSV file first.',
+  'Account unavailable. Choose the file again.': 'That account is no longer there. Choose the file again.',
+  'Import not found': 'We could not find that import.',
+  'This import cannot be repeated. Choose the file again.':
+    'We no longer have that file to read again. Choose it again to import it.',
+  'Nothing was skipped in that import': 'Nothing was left out of that import, so there is nothing to add.',
   'Read file before decoding': 'Something went wrong with the file. Choose it again.',
   'Invalid CSV preview data': 'We lost track of the file. Choose it again.',
   'Invalid preview settings': "Those settings aren't valid. Check the file again.",
@@ -164,7 +166,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'A rule with the same seller text already exists':
     'You already have a rule for that seller text. Edit that one instead.',
   'Origin does not match': 'That request came from another site, so we ignored it. Open the app and try again.',
-  'Invalid page': "That page number isn't valid.",
   'No preview for this file type': "There's no preview for this kind of file. Download it instead.",
   'Source email not found': "We don't have the original email for this one.",
   'Original not found': "We can't find the original file. Upload it again if you have it.",
@@ -176,8 +177,7 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Approve receipt before matching': 'Approve this receipt first. Only approved receipts can be matched.',
   'Money in can only be matched to an invoice you sent': 'Money coming in can only match an invoice you sent.',
   'A payment out needs a receipt, not a sales invoice': 'A payment going out needs a receipt, not an invoice you sent.',
-  'Confirm match exceptions':
-    "This receipt and payment don't line up exactly. Choose Match anyway if they belong together.",
+  'Confirm match exceptions': "This receipt and payment don't line up exactly. Press Match if they belong together.",
   'Nothing to match': 'There is nothing to match here. Reload the page and try again.',
   'Pick a receipt from the list':
     'Pick one of the receipts in the list. Type a seller, a date or an amount to find it.',
@@ -232,7 +232,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   // setup
   'Invalid parts of the business': 'Something went wrong with the list of parts. Reload the page and try again.',
   'Keep at least one part of the business': 'Keep at least one part of the business.',
-  'Unknown settings group': 'Reload the page and try again.',
   'Reload the page and try again': 'Reload the page and try again.',
   'Unknown setting': "We don't know that setting. Reload the page and try again.",
 
@@ -246,7 +245,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Enter one email address, like billing@example.com': 'Enter one email address, like billing@example.com.',
   'That sender is approved. Remove it from approved senders in Settings first.':
     'That sender is approved. Remove it from approved senders in Settings first.',
-  'That email is gone already.': 'That email is gone already.',
   'That sender is not on the list.': 'That sender is not on the list.',
   'Your Microsoft sign-in has expired or was revoked. Reconnect it in Settings, then try again.':
     'Your Microsoft sign-in has expired or was revoked. Reconnect it in Settings, then try again.',

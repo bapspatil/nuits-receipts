@@ -77,9 +77,7 @@ test('the plain words are plain: a sentence, no long dashes, no leftover jargon'
 
 test('InputError shows the plain words, keeps the status and the field, and passes unknown text through', () => {
   const refused = new InputError('Confirm match exceptions', 422, 'confirm_exception');
-  expect(refused.message).toBe(
-    "This receipt and payment don't line up exactly. Choose Match anyway if they belong together.",
-  );
+  expect(refused.message).toBe("This receipt and payment don't line up exactly. Press Match if they belong together.");
   expect(refused.status).toBe(422);
   expect(refused.field).toBe('confirm_exception');
   expect(new InputError('Something nobody wrote down').message).toBe('Something nobody wrote down');

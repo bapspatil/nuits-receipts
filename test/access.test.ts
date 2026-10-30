@@ -5,6 +5,7 @@ import { resetAccessCertCache, verifyAccessJwt } from '../src/access';
 import { parseConfig } from '../src/config';
 import type { Env } from '../src/env';
 import { authorization, request } from './helpers';
+import { buttonLink } from '../src/actions';
 
 // Synthetic team and audience only.
 const TEAM = 'https://example-team.cloudflareaccess.com';
@@ -156,7 +157,7 @@ test('in Access mode the app needs a valid Access token and ignores the password
   expect(html).toContain('href="/cdn-cgi/access/logout"');
   expect(html).not.toContain('href="/app/cdn-cgi');
   // Every page, error pages included, has the un-prefixed Access sign out.
-  for (const path of ['/app/review', '/app/?month=2026-09', '/app/settings', '/app/import', '/app/nope']) {
+  for (const path of ['/app/receipts?view=todo', '/app/?month=2026-09', '/app/settings', '/app/import', '/app/nope']) {
     const page = await (await at(path, { 'Cf-Access-Jwt-Assertion': await token() })).text();
     expect(page, path).toContain('<a href="/cdn-cgi/access/logout" class="sign-out">Sign out</a>');
     expect(page, path).toContain('<nav class="main" aria-label="Main">');
@@ -164,7 +165,7 @@ test('in Access mode the app needs a valid Access token and ignores the password
   }
   // On phones the header link is hidden; Settings carries Sign out, also un-prefixed.
   const settings = await (await at('/app/settings', { 'Cf-Access-Jwt-Assertion': await token() })).text();
-  expect(settings).toContain('<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>');
+  expect(settings).toContain(buttonLink('signOut', '/cdn-cgi/access/logout'));
   // The old More address redirects only after sign-in.
   const more = await at('/app/more', { 'Cf-Access-Jwt-Assertion': await token() });
   expect(more.status).toBe(302);

@@ -1,7 +1,7 @@
 // Settings > Setup: the editable form over src/settings.ts, its save and
 // reset handlers. Field names are the setting keys themselves.
 import type { Env } from './env';
-import { config, ConfigError, parseConfig, TUNING_VARS } from './config';
+import { config, ConfigError, hasParts, parseConfig, TUNING_VARS } from './config';
 import { EXPONENTS, InputError, requireInput, type Tuning } from './domain';
 import {
   applied,
@@ -30,8 +30,10 @@ import {
 } from './settings';
 import { reconcile } from './banking';
 import { ariaFor, day, errorLine, escape } from './ui';
-import { failureFor, kept } from './request';
+import { kept } from './request';
 import { withDone } from './events';
+import { undoAt } from './undo';
+import { button } from './actions';
 
 const tuningField = (key: SettingKey) =>
   (Object.entries(TUNING_VARS).find(([, v]) => v.name === key)?.[0] ?? null) as keyof Tuning | null;
@@ -74,18 +76,13 @@ function submittedProducts(env: Env, form: FormData): string {
 }
 // Who is saving: the Access email, or "password" in password mode.
 export async function saveSetup(env: Env, form: FormData, who: string): Promise<string> {
-  const group = String(form.get('group') ?? '') as Group;
-  requireInput(
-    GROUPS.some((g) => g.id === group),
-    'Unknown settings group',
-  );
   const revision = Number(form.get('revision') ?? -1);
   requireInput(Number.isSafeInteger(revision) && revision >= 0, 'Reload the page and try again');
   const base = deployEnv(env);
   const candidate = Object.create(base) as Record<string, unknown>;
   for (const [key, row] of applied(env).app) put(candidate, key, row.value);
   const changes: Change[] = [];
-  for (const field of FIELDS.filter((f) => f.group === group)) {
+  for (const field of FIELDS) {
     let submitted: string;
     if (field.kind === 'products') {
       if (!form.has('product_id')) continue;
@@ -112,7 +109,7 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
     if (value === null && !row) continue;
     changes.push({ key: field.key, value, old: row?.value ?? null });
   }
-  if (!changes.length) return withDone('settingsSame', `/settings#setup-${group}`, { group });
+  if (!changes.length) return withDone('settingsSame', '/settings');
   let next;
   try {
     next = parseConfig(candidate as Partial<Env>);
@@ -125,9 +122,10 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
       );
     throw error;
   }
+  let gone: { id: string; label: string }[] = [];
   if (changes.some((c) => c.key === 'PRODUCTS_JSON')) {
     const kept = new Set(next.products.map((p) => p.id));
-    const gone = config(env).products.filter((p) => !kept.has(p.id));
+    gone = config(env).products.filter((p) => !kept.has(p.id));
     for (const product of gone) {
       const used = await base.DB.prepare(
         'SELECT (SELECT COUNT(*) FROM receipts WHERE product=?)+(SELECT COUNT(*) FROM vendor_rules WHERE product=?) AS n',
@@ -147,10 +145,20 @@ export async function saveSetup(env: Env, form: FormData, who: string): Promise<
       value: JSON.stringify({ address: before, until: new Date(Date.now() + GRACE_DAYS * 86400000).toISOString() }),
       old: null,
     });
-  await saveChanges(env, changes, who, revision);
+  // A save that removes a part offers Undo, which puts back the whole save.
+  const at = gone.length ? undoAt() : undefined;
+  await saveChanges(env, changes, who, revision, at);
   await afterSave(base, changes);
   const routing = changes.some((c) => c.key === 'RECEIPT_ADDRESS' || c.key === 'INVOICES_ADDRESS');
-  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${group}`, { group });
+  // One save can touch several sections. The banner names the section when it was one, and the page
+  // opens the first, which is also where Undo lands.
+  const groups = [...new Set(changes.flatMap((c) => FIELD.get(c.key as SettingKey)?.group ?? []))];
+  const first = groups[0] ?? 'business';
+  return withDone('settingsSaved', `/settings${routing ? '?routing=1' : ''}#setup-${first}`, {
+    group: groups.length > 1 ? 'all' : first,
+    ...(groups.length > 1 ? { section: `setup-${first}` } : {}),
+    ...(at ? { at, op: 'settings', removed: gone.length } : {}),
+  });
 }
 export async function resetSetting(env: Env, form: FormData, who: string): Promise<string> {
   const key = String(form.get('reset') ?? '') as SettingKey,
@@ -199,13 +207,17 @@ async function afterSave(base: Env, changes: readonly Change[]): Promise<void> {
 function unchanged(value: string): string {
   return value.replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&');
 }
-const scopeOf = (group: Group) => `setup:${group}`;
+// The one form of the page: its controls sit in their sections and point back at it by id, so the
+// lists and add forms between them stay forms of their own.
+export const SETTINGS_FORM = 'settings-form';
+export const SETUP_SCOPE = 'setup';
+const OWN = ` form="${SETTINGS_FORM}"`;
 function control(env: Env, field: Field): string {
-  const scope = scopeOf(field.group);
+  const scope = SETUP_SCOPE;
   // After a refusal the form shows what was typed, not what is saved.
   const value = String(kept(scope, field.key, effective(env, field))),
     name = escape(field.key),
-    attrs = `id="f-${name}"${ariaFor(scope, field.key)} title="${escape(field.help)}"${field.confirm ? ` pattern="${escape(unchanged(value))}"${value ? ' required' : ''}` : ''}`;
+    attrs = `id="f-${name}"${OWN}${ariaFor(scope, field.key)} title="${escape(field.help)}"${field.confirm ? ` pattern="${escape(unchanged(value))}"${value ? ' required' : ''}` : ''}`;
   const settings = config(env);
   switch (field.kind) {
     case 'textarea':
@@ -221,14 +233,16 @@ function control(env: Env, field: Field): string {
     case 'number':
       return `<input name="${name}" value="${escape(value)}" type="number" inputmode="decimal" min="${field.min}" max="${field.max}" step="${field.step}" ${attrs}>`;
     case 'products':
+      if (!hasParts(env))
+        return `${settings.products.map((p) => `<input type="hidden"${OWN} name="product_id" value="${escape(p.id)}"><input type="hidden"${OWN} name="product_label" value="${escape(p.label)}">`).join('')}<input id="part-new"${OWN} name="product_new" placeholder="For example Consulting" maxlength="100" value="${escape(kept(scope, 'product_new', ''))}"${ariaFor(scope, 'product_new')}>`;
       return `<ul class="plain parts" role="group" aria-labelledby="${name}-label">${settings.products
         .map(
           (p) =>
-            `<li><input type="hidden" name="product_id" value="${escape(p.id)}"><label class="vh" for="part-${escape(p.id)}">Name for ${escape(p.label)}</label><input id="part-${escape(p.id)}" name="product_label" value="${escape(p.label)}" maxlength="100"><label class="check"><input type="checkbox" name="product_remove" value="${escape(p.id)}"> Remove<span class="vh"> ${escape(p.label)}</span></label></li>`,
+            `<li><input type="hidden"${OWN} name="product_id" value="${escape(p.id)}"><label class="vh" for="part-${escape(p.id)}">Name for ${escape(p.label)}</label><input id="part-${escape(p.id)}"${OWN} name="product_label" value="${escape(p.label)}" maxlength="100"><label class="check"><input type="checkbox"${OWN} name="product_remove" value="${escape(p.id)}"> Remove<span class="vh"> ${escape(p.label)}</span></label></li>`,
         )
         .join(
           '',
-        )}<li><label class="vh" for="part-new">Add a part</label><input id="part-new" name="product_new" placeholder="Add a part, for example Consulting" maxlength="100" value="${escape(kept(scope, 'product_new', ''))}"${ariaFor(scope, 'product_new')}></li></ul>`;
+        )}<li><label class="vh" for="part-new">Add a part</label><input id="part-new"${OWN} name="product_new" placeholder="Add a part, for example Consulting" maxlength="100" value="${escape(kept(scope, 'product_new', ''))}"${ariaFor(scope, 'product_new')}></li></ul>`;
     default:
       return `<input name="${name}" value="${escape(value)}" type="${field.kind === 'email' ? 'email' : 'text'}"${field.maxLength ? ` maxlength="${field.maxLength}"` : ''} ${attrs}${field.kind === 'email' ? ' autocomplete="off" spellcheck="false"' : ''}>`;
   }
@@ -236,7 +250,7 @@ function control(env: Env, field: Field): string {
 // Reset submits a small form of its own (resetForms), so Enter in a field
 // still submits Save rather than the first Reset in the group.
 function resetButton(field: Field, text: string): string {
-  return `<button class="linkbtn" form="reset-${field.key}" name="reset" value="${field.key}">${text}<span class="vh"> ${escape(field.label)}</span></button>`;
+  return `${button(text === 'Reset' ? 'reset' : 'clear', { label: text, attrs: ` form="reset-${field.key}" name="reset" value="${field.key}" aria-label="${text} ${escape(field.label)}"` })}`;
 }
 // Where a value in force came from, in plain words.
 const SOURCE_WORDS: Record<Source, string> = {
@@ -252,17 +266,19 @@ function fieldRow(env: Env, field: Field): string {
     key = field.key,
     label = escape(field.label);
   const name =
-    field.kind === 'products'
-      ? `<span class="flabel" id="${key}-label">${label}</span>`
-      : `<label for="f-${key}">${label}</label>`;
+    field.kind !== 'products'
+      ? `<label for="f-${key}">${label}</label>`
+      : hasParts(env)
+        ? `<span class="flabel" id="${key}-label">${label}</span>`
+        : '<label for="part-new">Add a part</label>';
   const bad = invalid
     ? `<p class="warning" role="alert">The saved value <code>${escape(invalid.value.slice(0, 80))}</code> isn’t valid (${escape(invalid.error)}), so the ${deploy ? 'value set when deployed' : 'built-in default'} is used. ${resetButton(field, 'Clear it')}</p>`
     : '';
   const confirm = field.confirm
-    ? `<div class="confirm"><label class="check"><input type="checkbox" name="confirm_${key}" value="yes" id="f-confirm_${key}"${kept(scopeOf(field.group), `confirm_${key}`, '') === 'yes' ? ' checked' : ''}${ariaFor(scopeOf(field.group), `confirm_${key}`)}> ${escape(field.confirm)}</label></div>`
+    ? `<div class="confirm"><label class="check"><input type="checkbox"${OWN} name="confirm_${key}" value="yes" id="f-confirm_${key}"${kept(SETUP_SCOPE, `confirm_${key}`, '') === 'yes' ? ' checked' : ''}${ariaFor(SETUP_SCOPE, `confirm_${key}`)}> ${escape(field.confirm)}</label></div>`
     : '';
   const meta = `<p class="meta">${SOURCE_WORDS[source]}${source === 'app' ? ` · ${resetButton(field, 'Reset')}` : ''}${field.key === 'PRODUCTS_JSON' ? ' · <a href="/help#part">What is a part?</a>' : ''}</p>`;
-  return `<div class="srow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(scopeOf(field.group), key)}${bad}${confirm}${errorLine(scopeOf(field.group), `confirm_${key}`)}${meta}</div></div>`;
+  return `<div class="frow${invalid ? ' bad' : ''}"><div class="sl">${name}</div><div class="sc">${control(env, field)}${errorLine(SETUP_SCOPE, key)}${bad}${confirm}${errorLine(SETUP_SCOPE, `confirm_${key}`)}${meta}</div></div>`;
 }
 function resetForms(env: Env, fields: readonly Field[]): string {
   const state = applied(env);
@@ -274,10 +290,23 @@ function resetForms(env: Env, fields: readonly Field[]): string {
     )
     .join('');
 }
-// Allowed senders are edited row by row in Senders, so Email leaves the list out.
-function groupForm(env: Env, group: (typeof GROUPS)[number], card: boolean): string {
-  const fields = FIELDS.filter((f) => f.group === group.id && f.key !== 'ALLOWED_SENDER_EMAILS');
-  return `<form action="/settings/setup" method="post" class="setup-form${card ? ' card' : ''}"${fields.some((f) => f.confirm) ? ' novalidate' : ''}><input type="hidden" name="group" value="${group.id}">${errorLine(scopeOf(group.id), '')}<input type="hidden" name="revision" value="${applied(env).revision}">${fields.map((f) => fieldRow(env, f)).join('')}<div class="save"><button class="btn secondary">Save</button></div></form>${resetForms(env, fields)}`;
+// The rows of one group. Allowed senders are edited row by row in Email, so they are left out.
+function groupRows(env: Env, id: Group): string {
+  return FIELDS.filter(
+    (f) => f.group === id && f.key !== 'ALLOWED_SENDER_EMAILS' && (hasParts(env) || f.key !== 'DEFAULT_PRODUCT'),
+  )
+    .map((f) => fieldRow(env, f))
+    .join('');
+}
+// The page's one form: empty, because the controls are spread over five sections and point back
+// at it by id. Its Reset forms are likewise siblings. The Save sits in a bar at the foot of the page.
+function settingsForm(env: Env): string {
+  const state = applied(env);
+  const fields = FIELDS.filter((f) => state.app.has(f.key) || state.invalid.has(f.key));
+  return `<form id="${SETTINGS_FORM}" action="/settings/setup" method="post" novalidate></form><input type="hidden"${OWN} name="revision" value="${state.revision}">${resetForms(env, fields)}`;
+}
+export function saveBar(): string {
+  return `<div class="sbar">${errorLine(SETUP_SCOPE, '')}${button('save', { tone: 'primary', attrs: OWN })}</div>`;
 }
 const AUDIT_LABEL = new Map(FIELDS.map((f) => [f.key as string, f.label]));
 function auditValue(json: string | null, key: string): string {
@@ -297,18 +326,17 @@ function auditValue(json: string | null, key: string): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   return text ? `<code>${escape(text.length > 80 ? text.slice(0, 77) + '…' : text)}</code>` : '<em>empty</em>';
 }
-// The editable groups, each with its own save notice, and the Advanced
-// section: review tuning, integrations, deploy-only values and history.
+// The parts of the page that hold setup fields, by section: Business, Email, Sending and Advanced
+// each take theirs, and the one form and its Save come with them.
 export async function setupParts(
   env: Env,
   params: URLSearchParams,
-  opened = '',
-): Promise<{ business: string; email: string; accountant: string; advanced: string }> {
+): Promise<{ form: string; business: string; email: string; sending: string; advanced: string }> {
   const settings = config(env),
     state = applied(env),
     rows = await history(env);
-  const notice = (group: Group) =>
-    group === 'email' && params.get('routing') === '1'
+  const notice =
+    params.get('routing') === '1'
       ? `<div class="alert" role="status"><p><strong>Saved. Now update Cloudflare Email Routing.</strong> The app can’t do this for you.</p><ol><li>In Cloudflare, Email &gt; Email Routing &gt; Routing rules, add a custom address with the action <strong>Send to a Worker</strong> for ${[
           settings.receiptAddress,
           settings.invoicesAddress,
@@ -319,12 +347,8 @@ export async function setupParts(
             ' and ',
           )}.</li><li>Send a test from an allowed address and check it arrives.</li><li>Remove the rule for the old address. ${previousInvoicesAddress(env) ? `Mail to <code>${escape(previousInvoicesAddress(env))}</code> still counts as an invoice for ${GRACE_DAYS} days.` : ''}</li></ol></div>`
       : '';
-  const group = (id: Group) => GROUPS.find((g) => g.id === id)!;
-  const top = (id: Group) => `${notice(id)}${groupForm(env, group(id), false)}`;
-  const fold = (id: Group) => {
-    const changed = FIELDS.some((f) => f.group === id && (state.app.has(f.key) || state.invalid.has(f.key)));
-    return `<details class="group" id="setup-${id}"${changed || opened === `setup-${id}` || failureFor(scopeOf(id)) ? ' open' : ''}><summary>${escape(group(id).title)}</summary><div class="body">${notice(id)}${groupForm(env, group(id), false)}</div></details>`;
-  };
+  const sub = (id: Group) =>
+    `<h3 id="setup-${id}">${escape(GROUPS.find((g) => g.id === id)!.title)}</h3><div class="setup-rows">${groupRows(env, id)}</div>`;
   const base = deployEnv(env) as unknown as Record<string, unknown>;
   const shown = (key: string, secret?: boolean): string => {
     const raw = typeof base[key] === 'string' ? (base[key] as string).trim() : '';
@@ -356,36 +380,12 @@ export async function setupParts(
           .join('')}</tbody></table></div>`
       : '<p>Nothing yet.</p>'
   }</div></details>`;
+  void state;
   return {
-    business: top('business'),
-    email: top('email'),
-    accountant: top('accountant'),
-    advanced: `<div class="folds">${fold('review')}${fold('integrations')}${deployOnly}${audit}</div>`,
+    form: settingsForm(env),
+    business: `<div id="setup-business" class="setup-rows">${groupRows(env, 'business')}</div>`,
+    email: `${notice}<div id="setup-email" class="setup-rows">${groupRows(env, 'email')}</div>`,
+    sending: `<div id="setup-accountant" class="setup-rows">${groupRows(env, 'accountant')}</div>`,
+    advanced: `${sub('review')}${sub('integrations')}<div class="folds">${deployOnly}${audit}</div>`,
   };
 }
-
-// ---------- Unsaved changes ----------
-// Each group has its own Save, so the script warns before a change in one group
-// is lost by saving another, and before leaving the page with changes.
-export const SETTINGS_JS = `(() => {
-  const forms = [...document.querySelectorAll('form.setup-form')];
-  if (!forms.length || !window.FormData) return;
-  const snapshot = (form) => JSON.stringify([...new FormData(form)].filter(([key]) => key !== 'revision'));
-  const start = new Map(forms.map((form) => [form, snapshot(form)]));
-  const changed = (except) => forms.filter((form) => form !== except && snapshot(form) !== start.get(form));
-  let leaving = false;
-  document.addEventListener('submit', (event) => {
-    const others = changed(event.target);
-    if (others.length && !confirm('You have changes in another group that are not saved. Continue and lose them?')) {
-      event.preventDefault();
-      return;
-    }
-    leaving = true;
-  });
-  addEventListener('beforeunload', (event) => {
-    if (leaving || !changed(null).length) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
-})();
-`;

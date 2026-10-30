@@ -207,11 +207,9 @@ test('no-ID overlap requires a newly previewed keep or additional decision', asy
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
 });
 
-test('preset storage failure reports successful import separately', async () => {
+test('a layout that cannot be saved never fails the import', async () => {
   const response = await preview(),
     body = confirmForm(await response.text());
-  body.set('preset_name', 'Synthetic preset');
-  body.set('preset_bank', 'Fake Bank');
   const prepare = env.DB.prepare.bind(env.DB),
     spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
       if (sql.startsWith('INSERT INTO bank_presets')) throw new Error('Synthetic D1 failure');
@@ -219,8 +217,7 @@ test('preset storage failure reports successful import separately', async () => 
     });
   try {
     const result = await confirm(body);
-    expect(result.status).toBe(200);
-    expect(await result.text()).toMatch(/Transactions were imported[\s\S]*Preset was not saved/);
+    expect(result.status).toBe(303);
   } finally {
     spy.mockRestore();
   }
@@ -292,4 +289,22 @@ test('a single matching built-in layout is shown as the chosen preset', async ()
   expect(html).toMatch(/<option value="builtin-holvi" selected>/);
   expect(html).toContain('name="current_preset" value="builtin-holvi"');
   expect(html).not.toContain('Several presets match');
+});
+
+test('a refused confirmation shows the preview again, in place, with the reason at the top', async () => {
+  const before = await inventory();
+  const body = confirmForm(await (await preview()).text());
+  body.set('preview_token', 'f'.repeat(64));
+  const refused = await confirm(body);
+  expect(refused.status).toBe(409);
+  const html = await refused.text();
+  expect(html).toContain('Nothing was saved.');
+  expect(html).toContain('The settings changed since you checked the file. Check it again.');
+  expect(html).not.toContain("That didn't work");
+  // A fresh preview, with a token that works.
+  const again = confirmForm(html);
+  expect(again.get('preview_token')).toMatch(/^[a-f0-9]{64}$/);
+  expect(again.get('preview_token')).not.toBe('f'.repeat(64));
+  expect(await inventory()).toEqual(before);
+  expect((await confirm(again)).status).toBe(303);
 });

@@ -73,7 +73,7 @@ test('pages link the manifest, touch icon and worker script, under the base path
   const html = await (await request('/')).text();
   expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">');
   expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
-  expect(html).toContain('<meta name="theme-color" content="#FFFFFF">');
+  expect(html).toContain('<meta name="theme-color" content="#F3EDE2">');
   expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Nuits">');
   expect(html).toContain('<script src="/assets/app.js" defer></script>');
 

@@ -9,7 +9,7 @@ An inbox address is convenient: you forward a receipt and it appears in the app.
 
 ## Gate 1: approved senders
 
-Only mail from an approved sender is read. The list starts from `ALLOWED_SENDER_EMAILS` and you manage it in **Settings** > **Senders**, or with **Allow** in **Review**. With an empty list, nothing is read. That is the default, so a fresh deployment never reads mail from strangers.
+Only mail from an approved sender is read. The list starts from `ALLOWED_SENDER_EMAILS` and you manage it in **Settings** > **Email** > **Email senders**, or with **Allow** in **Receipts To do**. With an empty list, nothing is read. That is the default, so a fresh deployment never reads mail from strangers.
 
 A sender counts as approved when either of these is on the list:
 
@@ -22,14 +22,13 @@ The second case matters for shops and payment services. They often send from a b
 
 Mail from a sender who is not on the list is not read and costs no AI reading. What happens next depends on whether Cloudflare's checks prove who sent it:
 
-- **Proven** (DMARC passed for the From domain, or SPF passed for the envelope sender): the message is stored and shown in **Review** as **Unknown sender**, with who sent it, the subject, when it arrived, the address it was sent to and how many attachments it has. Nothing is read until you act.
+- **Proven** (DMARC passed for the From domain, or SPF passed for the envelope sender): the message is stored and shown at the top of **Receipts To do** as a **New sender** row, with who sent it, the subject, when it arrived, the address it was sent to and how many attachments it has. Nothing is read until you act.
 - **Not proven**: the message is dropped and logged. Nothing is stored.
 
 For each Unknown sender item you can:
 
 - **Allow**: the exact address is added to your allowed senders, and this email plus any others waiting from them are read the normal way. Their future mail is read as soon as it arrives.
 - **Ignore**: their waiting mail is deleted, and future mail from them is logged but not kept. You can undo this in **Settings** > **Senders**.
-- **More** > **Delete email**: removes just this email.
 
 Limits keep a stranger from filling your storage: at most 50 Unknown sender emails wait at once and 10 from one sender, the same email (by Message-ID) is kept once, and the 20 MiB size limit applies. Mail over a limit is logged, not kept. The Worker's log names only the sender's domain, never the full address.
 

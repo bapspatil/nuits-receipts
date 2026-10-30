@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, expect, test } from 'vitest';
 import { getReceipt } from '../src/receipts';
 import { htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 const rule = (fields: Record<string, string> = {}) =>
   new URLSearchParams({
@@ -32,9 +33,9 @@ test('Settings lists vendor rules with an open Add form when there are none', as
   expect(saved.status).toBe(303);
   expect(locationOf(saved)).toBe('/settings?done=ruleSaved#rules');
   const after = await (await request(await signed('/settings?done=ruleSaved'))).text();
-  expect(after).toContain('<p class="banner" role="status">Rule saved.</p>');
+  expect(after).toContain('<p class="banner" id="banner" role="status">Rule saved.</p>');
   // One plain row per rule; it opens its own edit form. The saved section is open.
-  expect(after).toContain('<details class="sect" open><summary><h2>Vendor rules</h2><span class="sum">1</span>');
+  expect(after).toContain('<details class="sect" open><summary><h2>Business</h2>');
   expect(after).toContain('<li><details><summary>Sample Cloud → Hosting, infra · 5</summary>');
   expect(after).toContain('<details class="add"><summary>Add rule</summary>');
 });
@@ -48,7 +49,8 @@ test('a rule made from a receipt goes back to that receipt', async () => {
   form.set('vendor_contains', 'Sample Cloud');
   const saved = await request('/rules', { method: 'POST', body: form });
   expect(saved.status).toBe(303);
-  expect(locationOf(saved)).toBe(`/receipts/${receipt.id}?done=ruleSaved`);
+  // The page posts the list it was opened from (All, for a ready receipt) and keeps it.
+  expect(locationOf(saved)).toBe(`/receipts/${receipt.id}?from=all&done=ruleSaved`);
   // Anything else in return_to is ignored.
   const elsewhere = await post('/rules', rule({ vendor_contains: 'Other', return_to: 'https://evil.example/' }));
   expect(locationOf(elsewhere)).toBe('/settings?done=ruleSaved#rules');
@@ -63,7 +65,7 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   const edit = htmlForm(html, `/rules/${id}`);
   expect(edit.get('vendor_contains')).toBe('Sample Cloud');
   expect(edit.get('product')).toBe('hosting');
-  expect(html).toContain(`<button class="linkbtn" formaction="/rules/${id}/delete">Delete</button>`);
+  expect(html).toContain(button('remove', { attrs: ` formaction="/rules/${id}/delete"` }));
   // Priority 0 is not shown.
   expect(html).toMatch(/<summary>Fake Shop → [^<·]+<\/summary>/);
 
@@ -98,6 +100,13 @@ test('vendor rules can be edited and deleted from Settings, with the same checks
   const deleted = await post(`/rules/${id}/delete`, new URLSearchParams());
   expect(deleted.status).toBe(303);
   expect(locationOf(deleted)).toBe('/settings?done=ruleDeleted#rules');
+  const restoredRule = await request('/undo', {
+    method: 'POST',
+    body: htmlForm(await (await request(deleted.headers.get('Location')!)).text(), '/undo'),
+  });
+  expect(locationOf(restoredRule)).toBe('/settings?done=undone&op=deleteRule&n=1&section=rules#rules');
+  expect((await rules()).map((r) => r.id)).toEqual([id, second!.id].sort((a, b) => Number(a) - Number(b)));
+  await post(`/rules/${id}/delete`, new URLSearchParams());
   expect((await rules()).map((r) => r.id)).toEqual([second!.id]);
   expect(await (await request(await signed('/settings?done=ruleDeleted'))).text()).toContain('Rule deleted.');
 });

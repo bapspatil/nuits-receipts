@@ -1,8 +1,10 @@
 import type { Env } from './env';
+import { isReady, readySql } from './flags';
 import { config } from './config';
 import { parseCsv, inspectCsv, headerFingerprint, originalFromText, validateMapping, type CsvMapping } from './csv';
 import { holviMapping, aliases, type BankPreset } from './presets';
 import type { AccountChoice } from './accounts';
+import { undoAt, withUndo, type UndoAt } from './undo';
 import { AUTO_EXEMPT, clefExemptions, exemptionFor, unclear, type ExemptBy } from './exempt';
 import { chargeLeaders, pairFit, planMatches } from './matcher';
 import {
@@ -173,11 +175,16 @@ export async function transactionIds(rows: ParsedImport['rows']): Promise<string
     }),
   );
 }
-export async function importIdentity(account: string, bytes: Uint8Array): Promise<{ id: string; key: string }> {
+// salt: a second import of the same file (Import anyway) is its own import, with its own Undo.
+export async function importIdentity(
+  account: string,
+  bytes: Uint8Array,
+  salt = '',
+): Promise<{ id: string; key: string }> {
   const digest = await hash(bytes);
   return {
-    id: await hash(account.trim() + ':' + digest),
-    key: `imports/${digest}.csv`,
+    id: await hash(account.trim() + ':' + digest + (salt && ':' + salt)),
+    key: `imports/${digest}${salt && '.' + salt}.csv`,
   };
 }
 export async function collisions(env: Env, parsed: ParsedImport, importId: string): Promise<string[]> {
@@ -219,8 +226,11 @@ export type ImportInput = {
   mapping?: CsvMapping;
   accountChoice?: AccountChoice;
   crossAccountAcknowledged?: boolean;
+  salt?: string;
+  // The time its Undo is logged under; the banner's Undo names it.
+  at?: UndoAt;
 };
-async function transactionsById(env: Env, ids: string[]): Promise<Map<string, Transaction>> {
+export async function transactionsById(env: Env, ids: string[]): Promise<Map<string, Transaction>> {
   const result = new Map<string, Transaction>();
   for (let offset = 0; offset < ids.length; offset += 90) {
     const chunk = ids.slice(offset, offset + 90);
@@ -274,7 +284,7 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
     input.parsed.rows.every((r) => r.account_key === account),
     'Import must use one account',
   );
-  const identity = await importIdentity(account, input.bytes);
+  const identity = await importIdentity(account, input.bytes, input.salt);
   let prior = await env.DB.prepare('SELECT id,account_key,status,snapshot_json FROM imports WHERE original_key=?')
     .bind(identity.key)
     .first<StoredImport>();
@@ -436,9 +446,9 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
     'Stored import contains unexpected rows',
     409,
   );
-  await env.DB.prepare("UPDATE imports SET status='complete' WHERE id=? AND snapshot_json=?")
-    .bind(identity.id, snapshot)
-    .run();
+  await withUndo(env, { at: input.at ?? undoAt(), op: 'import', ids: [identity.id] }, [
+    env.DB.prepare("UPDATE imports SET status='complete' WHERE id=? AND snapshot_json=?").bind(identity.id, snapshot),
+  ]);
   await reconcile(env);
   return identity.id;
 }
@@ -447,12 +457,9 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
 // receipt's flags, and correcting the receipt works the match out again.
 export function matchable(receipt: Receipt): boolean {
   if (receipt.kind !== 'sales') return receipt.status === 'ready' || receipt.status === 'needs_review';
-  return (
-    receipt.status === 'ready' ||
-    (receipt.status === 'needs_review' && receipt.review_reasons_json === '["missing_eur"]')
-  );
+  return isReady(receipt) || (receipt.status === 'needs_review' && receipt.review_reasons_json === '["missing_eur"]');
 }
-export const MATCHABLE_SQL = `(kind='expense' AND status IN ('ready','needs_review') OR status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]'))`;
+export const MATCHABLE_SQL = `(kind='expense' AND status IN ('ready','needs_review') OR ${readySql()} OR (status='needs_review' AND review_reasons_json='["missing_eur"]'))`;
 function samePaymentFacts(receipt: Receipt, transaction: Transaction, tuning: Tuning): boolean {
   return (
     receipt.total_minor !== null &&
@@ -600,15 +607,15 @@ export async function exemptByClef(env: Env, importId: string): Promise<number> 
   );
 }
 // Undo for the automatic marks of one import: the rows need a receipt again,
-// and the choice is the owner's from now on.
-export async function undoExemptions(env: Env, importId: string): Promise<number> {
+// and the choice is the owner's from now on. Returns the payments it changed.
+export async function undoExemptions(env: Env, importId: string): Promise<string[]> {
   const result = await env.DB.prepare(
-    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO}`,
+    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO} RETURNING id`,
   )
     .bind(importId)
-    .run();
+    .all<{ id: string }>();
   await reconcile(env);
-  return result.meta.changes;
+  return result.results.map((r) => r.id);
 }
 // Statements imported before the original amount was read from Holvi's
 // "Currency and amount: USD 10.46" line get it now, once. Rows of a pending
@@ -691,7 +698,7 @@ export function creditFit(r: Receipt, t: Transaction, tuning: Tuning = DEFAULT_T
   if (amount || converted || reference) return 'suggested';
   return null;
 }
-const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (status='ready' OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
+const matchableSales = `SELECT * FROM receipts WHERE kind='sales' AND (${readySql()} OR (status='needs_review' AND review_reasons_json='["missing_eur"]')) AND duplicate_of IS NULL AND discarded_at IS NULL AND id NOT IN (SELECT receipt_id FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE receipt_id IS NOT NULL AND i.status='complete')`;
 export const unmatchedCredits =
   "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.receipt_id IS NULL AND t.amount_minor>0 AND t.receipt_required=1 AND NOT EXISTS (SELECT 1 FROM internal_transfers p WHERE p.credit_id=t.id OR p.debit_id=t.id)";
 export async function openSales(env: Env): Promise<Receipt[]> {
@@ -907,32 +914,42 @@ function eurFrom(row: Receipt, bank: Matched | undefined, rateDate: string | und
 export const SET_REQUIRED_SQL =
   "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')";
 
-// What Bank's Show chip picks within a month, as the page defines it.
-export const BANK_SHOWS = ['all', 'missing', 'auto'] as const;
-export type BankShow = (typeof BANK_SHOWS)[number];
-const SHOW_SQL: Record<BankShow, string> = {
+// Bank's two views of a month. To do is the money out that still needs a receipt; All is every
+// row. Counts, rows, select-all and Match all read the same predicate, month-wide.
+export const BANK_VIEWS = ['todo', 'all'] as const;
+export type BankView = (typeof BANK_VIEWS)[number];
+export const VIEW_SQL: Record<BankView, string> = {
+  todo: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
   all: '1',
-  missing: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
-  auto: "t.receipt_id IS NOT NULL AND t.match_method='automatic'",
 };
 const IN_MONTH =
-  "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
-// How many rows each chip holds across the whole month, not just the page shown.
-export async function showCounts(env: Env, month: string): Promise<Record<BankShow, number>> {
+  "FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
+export const BANK_ORDER = 't.booking_date,t.account_key,t.id';
+// To do renders its first upto rows, and Show more raises it; there is no offset.
+export const BANK_UPTO = 50;
+export function bankUpto(value: string | null, cap: number): number {
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n > 0 ? Math.min(n, cap) : BANK_UPTO;
+}
+export function bankPath(month: string, view: BankView, upto = BANK_UPTO): string {
+  return `/payments?month=${month}&view=${view}${view === 'todo' && upto !== BANK_UPTO ? `&upto=${upto}` : ''}`;
+}
+export async function viewCounts(env: Env, month: string): Promise<Record<BankView, number>> {
   const row = await env.DB.prepare(
-    `SELECT ${BANK_SHOWS.map((s) => `total(${SHOW_SQL[s]}) "${s}"`).join(',')} ${IN_MONTH}`,
+    `SELECT ${BANK_VIEWS.map((v) => `total(${VIEW_SQL[v]}) "${v}"`).join(',')} ${IN_MONTH}`,
   )
     .bind(month)
-    .first<Record<BankShow, number>>();
-  return { all: row?.all ?? 0, missing: row?.missing ?? 0, auto: row?.auto ?? 0 };
+    .first<Record<BankView, number>>();
+  return { todo: row?.todo ?? 0, all: row?.all ?? 0 };
 }
-// The chip's rows in page order, up to limit.
-export async function showRows(env: Env, month: string, show: BankShow, limit: number): Promise<Transaction[]> {
+// The view's rows in Bank's order, up to limit, or the whole month without one.
+export type BankRow = Transaction & { account_name: string; bank_name: string };
+export async function viewRows(env: Env, month: string, view: BankView, limit?: number): Promise<BankRow[]> {
   return (
     await env.DB.prepare(
-      `SELECT t.* ${IN_MONTH} AND ${SHOW_SQL[show]} ORDER BY t.booking_date,t.account_key,t.id LIMIT ?`,
+      `SELECT t.*,a.label AS account_name,a.bank_name ${IN_MONTH} AND ${VIEW_SQL[view]} ORDER BY ${BANK_ORDER} LIMIT ?`,
     )
-      .bind(month, limit)
-      .all<Transaction>()
+      .bind(month, limit ?? -1)
+      .all<BankRow>()
   ).results;
 }

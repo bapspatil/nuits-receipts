@@ -1,6 +1,6 @@
-import { DISCARD_REASONS, type Kind } from './domain';
+import type { Kind } from './domain';
 import { escape } from './ui';
-import { STATUS } from './status';
+import { button, buttonSummary, type ActionKey } from './actions';
 
 // Ids per request, and per all=1 resolution on the server.
 export const BULK_CAP = 500;
@@ -8,10 +8,11 @@ export const BULK_CAP = 500;
 // Per request for the ops that read documents again with the model.
 export const AI_CAP = 10;
 
+// The bar is not a place for a primary: the page's one main action stays the header's. Each action
+// renders from its key in ACTIONS, so its label and icon are the ones every other control shows.
 export type BulkAction = {
   op: string;
-  label: string;
-  tone?: 'primary' | 'danger';
+  key: ActionKey;
   // Shown in a <details> step before the submit button.
   confirm?: string;
   // Trusted HTML for extra inputs inside the step. Avoid `required`: a hidden
@@ -114,22 +115,20 @@ export function bulkCheck(list: BulkList, id: string, name: string): string {
   return `<label class="pick"><input type="checkbox" name="id" value="${escape(id)}" form="${escape(list.form)}"><span class="vh">Select ${escape(name)}</span></label>`;
 }
 
-// `href` is the other mode's URL: ?select=1 to enter, the plain list to leave.
-export function bulkTools(list: BulkList, pageCount: number, selecting: boolean, href: string): string {
+// The select-all box for the page; the script reveals it.
+export function bulkTools(list: BulkList, pageCount: number): string {
   if (!pageCount) return '';
-  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label><a class="linkbtn" href="${escape(href)}" data-bulk-select>${selecting ? 'Done' : 'Select'}</a></div>`;
+  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label></div>`;
 }
 
-const toneClass = (tone: BulkAction['tone']) =>
-  tone === 'primary' ? 'btn primary' : tone === 'danger' ? 'btn danger' : 'btn';
-
 function actionHtml(action: BulkAction): string {
-  const submit = (cls: string) =>
-    `<button name="op" value="${escape(action.op)}" class="${cls}"${action.max ? ` data-max="${action.max}"` : ''}>${escape(action.label)}</button>`;
-  if (!action.confirm && !action.fields) return submit(toneClass(action.tone));
-  return `<details class="bulkstep"><summary class="${toneClass(action.tone)}">${escape(action.label)}</summary><div class="body">${action.fields ?? ''}${
+  const submit = button(action.key, {
+    attrs: ` name="op" value="${escape(action.op)}"${action.max ? ` data-max="${action.max}"` : ''}`,
+  });
+  if (!action.confirm && !action.fields) return submit;
+  return `<details class="bulkstep">${buttonSummary(action.key)}<div class="body">${action.fields ?? ''}${
     action.confirm ? `<p class="ask">${escape(action.confirm)}</p>` : ''
-  }${submit(action.tone === 'danger' ? 'btn danger' : 'btn primary')}</div></details>`;
+  }${submit}</div></details>`;
 }
 
 export function bulkBar(list: BulkList): string {
@@ -138,17 +137,23 @@ export function bulkBar(list: BulkList): string {
     .join('');
   const shown = list.actions.slice(0, 3).map(actionHtml).join('');
   const more = list.actions.slice(3);
-  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p>${
-    list.total <= BULK_CAP
-      ? `<button type="button" class="linkbtn" data-bulk-all hidden>Select all ${list.total} ${escape(list.noun[list.total === 1 ? 0 : 1])}</button>`
-      : ''
-  }<button type="reset" class="linkbtn">Clear</button><div class="bulkacts">${shown}${
+  // Select all acts on the list's first BULK_CAP rows in its order, as the server resolves all=1.
+  const all = Math.min(list.total, BULK_CAP);
+  const noun = escape(list.noun[all === 1 ? 0 : 1]);
+  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-all="${all}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p>${button(
+    'selectAll',
+    {
+      label: all < list.total ? `Select the first ${all} ${noun}` : `Select all ${all} ${noun}`,
+      attrs: ' type="button" data-bulk-all hidden',
+    },
+  )}${button('clear', { attrs: ' type="reset"' })}<div class="bulkacts">${shown}${
     more.length
-      ? `<details class="bulkmore"><summary class="btn">More</summary><div class="body">${more.map(actionHtml).join('')}</div></details>`
+      ? `<details class="bulkmore">${buttonSummary('more')}<div class="body">${more.map(actionHtml).join('')}</div></details>`
       : ''
   }</div><progress hidden max="1" value="0"></progress></form>`;
 }
 
+export const KIND_LOSS = 'Moving clears the client, VAT details, paid date, your corrections and any match.';
 // The receipt lists' actions; src/batch.ts runs each op.
 export type ReceiptOp = 'approve' | 'discard' | 'restore' | 'retry' | 'kind' | 'paid';
 const chip = (name: string, value: string, label: string, on = false) =>
@@ -156,34 +161,26 @@ const chip = (name: string, value: string, label: string, on = false) =>
 export const RECEIPT_ACTIONS = {
   approve: {
     op: 'approve',
-    label: 'Approve',
-    tone: 'primary',
+    key: 'approve',
     confirm: 'Approve the selected receipts as they are?',
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
-  // Radios, not buttons: the submit button has to be the one that carries op.
-  discard: {
-    op: 'discard',
-    label: 'Discard',
-    tone: 'danger',
-    confirm: 'Discard these? Matched ones lose their match.',
-    fields: `<div class="reasons" role="group" aria-label="Reason">${Object.entries(DISCARD_REASONS)
-      .map(([k, v]) => chip('reason', k, v))
-      .join('')}</div>`,
-  },
-  restore: { op: 'restore', label: 'Restore' },
-  retry: { op: 'retry', label: 'Read again', max: AI_CAP },
+  // Undo brings back the receipts and their matches, so it asks nothing.
+  discard: { op: 'discard', key: 'discard' },
+  restore: { op: 'restore', key: 'restore' },
+  retry: { op: 'retry', key: 'reread', max: AI_CAP },
+  // No Undo: the move clears what belongs to the other kind, so it asks first.
   kind: (from: Kind) => ({
     op: 'kind',
-    label: 'Move',
+    key: from === 'expense' ? 'move' : 'moveBack',
     max: AI_CAP,
+    confirm: KIND_LOSS,
     fields: `<div class="reasons" role="group" aria-label="Move to">${chip('to', 'sales', 'Sales invoices', from === 'expense')}${chip('to', 'expense', 'Receipts', from === 'sales')}</div>`,
   }),
   paid: (today: string) => ({
     op: 'paid',
-    label: 'Paid',
-    tone: 'primary',
+    key: 'paid',
     fields: `<label class="bulkfield">Paid on<input type="date" name="paid_outside_on" value="${escape(today)}"></label><label class="bulkfield">How<input type="text" name="paid_outside_note" maxlength="300" placeholder="Stripe payout 14 Oct"></label>`,
   }),
 } as const satisfies Record<
@@ -194,30 +191,24 @@ export const RECEIPT_ACTIONS = {
 // Bank's actions; src/batch.ts runs each op.
 export type PaymentOp = 'match' | 'exempt' | 'require' | 'unmatch';
 export const PAYMENT_ACTIONS = [
-  { op: 'match', label: 'Match', tone: 'primary' },
-  { op: 'exempt', label: STATUS.notPurchase },
-  { op: 'require', label: 'Needs receipt' },
-  {
-    op: 'unmatch',
-    label: 'Remove match',
-    tone: 'danger',
-    confirm: 'Remove the matches of the selected payments? They will not be matched again on their own.',
-  },
+  { op: 'match', key: 'match' },
+  { op: 'exempt', key: 'exempt' },
+  { op: 'require', key: 'needs' },
+  // Undo brings the matches back, so it asks nothing.
+  { op: 'unmatch', key: 'unmatch' },
 ] as const satisfies readonly (BulkAction & { op: PaymentOp })[];
 
 // Unknown senders' held mail by email, and Settings > Senders by address.
-export type SenderOp = 'allow' | 'ignore' | 'delete' | 'remove' | 'unignore';
+export type SenderOp = 'allow' | 'ignore' | 'remove' | 'unignore';
 export const SENDER_ACTIONS = {
-  allow: { op: 'allow', label: 'Allow', tone: 'primary' },
-  ignore: { op: 'ignore', label: 'Ignore' },
-  delete: { op: 'delete', label: 'Delete', tone: 'danger', confirm: 'Delete the selected emails?' },
+  allow: { op: 'allow', key: 'allow' },
+  ignore: { op: 'ignore', key: 'ignore' },
   remove: {
     op: 'remove',
-    label: 'Remove',
-    tone: 'danger',
-    confirm: 'Remove the selected senders? Their next emails wait in Review.',
+    key: 'remove',
+    confirm: 'Remove the selected senders? Their next emails wait in To do.',
   },
-  unignore: { op: 'unignore', label: 'Stop ignoring' },
+  unignore: { op: 'unignore', key: 'unignore' },
 } as const satisfies { [K in SenderOp]: BulkAction & { op: K } };
 
 // Runs once per bar: reducer state, rendering, keys, long-press and posting.
@@ -231,6 +222,7 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const boxes = Array.from(document.querySelectorAll('input[form="' + id + '"][name=id]'));
     if (!wrap || !boxes.length) return;
     const total = Number(form.dataset.total) || boxes.length;
+    const allCount = Number(form.dataset.all) || total;
     const noun = (form.dataset.noun || '|').split('|');
     const count = form.querySelector('[data-bulk-count]');
     const status = form.querySelector('[data-bulk-status]');
@@ -238,7 +230,6 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const allInput = form.querySelector('input[name=all]');
     const progress = form.querySelector('progress');
     const page = wrap.querySelector('[data-bulk-page]');
-    const toggle = wrap.querySelector('[data-bulk-select]');
     const rowOf = (box) => box.closest('li,tr') || box.parentElement;
     const boxIn = (el) => {
       const row = el && el.closest && el.closest('li,tr');
@@ -256,10 +247,10 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     const render = () => {
       const on = new Set(state.picked);
       boxes.forEach((b) => { b.checked = on.has(b.value); });
-      const n = state.all ? total : on.size;
+      const n = state.all ? allCount : on.size;
       form.dataset.count = String(n);
       wrap.dataset.count = String(n);
-      count.textContent = state.all ? 'All ' + n + ' selected' : n + ' selected';
+      count.textContent = state.all ? (allCount < total ? 'First ' : 'All ') + n + ' selected' : n + ' selected';
       allInput.value = state.all ? '1' : '';
       if (page) {
         page.checked = on.size === boxes.length;
@@ -267,7 +258,7 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
       }
       if (allButton) allButton.hidden = state.all || total <= boxes.length || on.size < boxes.length;
       limited.forEach((b) => {
-        const why = capped(state.all, total, Number(b.dataset.max));
+        const why = capped(state.all, allCount, Number(b.dataset.max));
         b.disabled = !!why;
         if (why) {
           b.setAttribute('aria-disabled', 'true');
@@ -284,24 +275,12 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
       say('');
       render();
     };
-    const mode = (on) => {
-      if (on) wrap.dataset.selecting = '';
-      else delete wrap.dataset.selecting;
-      if (toggle) toggle.textContent = on ? 'Done' : 'Select';
-    };
     boxes.forEach((b) => b.addEventListener('click', (e) => apply({ type: 'toggle', id: b.value, range: e.shiftKey })));
     if (page) {
       page.closest('label').hidden = false;
       page.addEventListener('change', () => apply({ type: 'page', on: page.checked }));
     }
     if (allButton) allButton.addEventListener('click', () => apply({ type: 'all' }));
-    if (toggle)
-      toggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        const on = !('selecting' in wrap.dataset);
-        mode(on);
-        if (!on) apply({ type: 'clear' });
-      });
     form.addEventListener('reset', (e) => {
       e.preventDefault();
       apply({ type: 'clear' });
@@ -331,28 +310,6 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
     };
     wrap.addEventListener('keydown', keys);
     form.addEventListener('keydown', keys);
-    let timer = 0;
-    let pressed = false;
-    wrap.addEventListener('touchstart', (e) => {
-      pressed = false;
-      clearTimeout(timer);
-      const box = boxIn(e.target);
-      if (!box || e.touches.length > 1) return;
-      timer = setTimeout(() => {
-        pressed = true;
-        mode(true);
-        apply({ type: 'toggle', id: box.value, range: false });
-      }, 500);
-    }, { passive: true });
-    ['touchmove', 'touchend', 'touchcancel'].forEach((t) => wrap.addEventListener(t, () => clearTimeout(timer), { passive: true }));
-    // The click that ends a long press must not also open the row or flip the box back.
-    wrap.addEventListener('click', (e) => {
-      if (!pressed) return;
-      pressed = false;
-      e.preventDefault();
-      e.stopPropagation();
-    }, true);
-    wrap.addEventListener('contextmenu', (e) => { if (pressed) e.preventDefault(); });
     const busy = (rows, on) => rows.forEach((r) => {
       r.classList.toggle('is-pending', on);
       if (on) r.setAttribute('aria-busy', 'true');
@@ -384,8 +341,9 @@ const CLIENT = `({ select, capped, escapeTo, postChunks }) => {
           body.set('done_before', String(before.n));
           body.set('skipped_before', String(before.skipped));
         }
-        const res = await fetch(form.getAttribute('action'), { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        if (res.redirected) return { url: res.url };
+        const res = await fetch(form.getAttribute('action'), { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin', redirect: 'manual' });
+        // A redirect (a lapsed sign-in) is not followed, so its page is fetched once, by the navigation.
+        if (res.type === 'opaqueredirect') return { url: location.href };
         const type = res.headers.get('Content-Type') || '';
         const json = type.indexOf('json') >= 0 ? await res.json() : null;
         if (res.ok) return json;

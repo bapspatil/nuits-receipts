@@ -1,27 +1,24 @@
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { request } from './helpers';
+import { button } from '../src/actions';
 
-test('with no bank account the import form creates one instead of preselecting an empty choice', async () => {
-  const withAccount = await (await request('/import')).text();
-  expect(withAccount).toContain('The account chosen here');
-  await env.DB.prepare('DELETE FROM accounts').run();
-  const html = await (await request('/import')).text();
-  expect(html).not.toContain('The account chosen here');
-  expect(html).toContain('<input type="hidden" name="account_action" value="new">');
-  expect(html).toContain('<legend>Your bank account</legend>');
-  expect(html).toMatch(/name="account_label"[^>]*required/);
+test('the import form is a file and Import, with or without a bank account', async () => {
+  for (const accounts of [1, 0]) {
+    if (!accounts) await env.DB.prepare('DELETE FROM accounts').run();
+    const html = await (await request('/import')).text();
+    expect(html).toContain('<form action="/import" method="post" enctype="multipart/form-data">');
+    expect(html).toContain('type="file" name="file"');
+    expect(html).toContain(button('importStmt', { tone: 'primary' }));
+    expect(html).not.toContain('name="account');
+  }
 });
 
-test('Settings loads its own script under a policy that allows only same-origin scripts', async () => {
+test('pages load scripts only from this origin', async () => {
   const settings = await request('/settings');
   expect(settings.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
   expect(settings.headers.get('Content-Security-Policy')).not.toContain("unsafe-inline'; script");
-  expect(await settings.text()).toContain('<script src="/assets/settings.js" defer></script>');
-  const script = await request('/assets/settings.js');
-  expect(script.headers.get('Content-Type')).toContain('text/javascript');
-  expect(await script.text()).toContain('beforeunload');
-  for (const path of ['/', '/help', '/review', '/import'])
+  for (const path of ['/', '/help', '/receipts?view=todo', '/import'])
     expect((await request(path)).headers.get('Content-Security-Policy'), path).toContain("script-src 'self';");
 });
 

@@ -260,8 +260,8 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   expect(html).toContain('<b>Match</b><span class="red">No statement</span>');
   expect(html).toContain('<details class="send"><summary>Download anyway</summary>');
   expect(html).toContain('<form action="/month/package.zip" method="get">');
-  expect(html).toContain('Download anyway</button>');
-  expect(html).toContain('>CSV</a>');
+  expect(html).toContain('<span>Download anyway</span></button>');
+  expect(html).toContain('<span>CSV</span></a>');
   await env.DB.batch([
     env.DB.prepare(
       "INSERT INTO imports (id,account_key,original_key,status,row_count,imported_at,snapshot_json) VALUES ('i','holvi','imports/i','complete',1,'2026-10-21','{}')",
@@ -273,9 +273,9 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
   html = await (await request('/?month=2026-10')).text();
   expect(html).toContain('<b>Send</b><span>Ready</span>');
   expect(html).toMatch(
-    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10">Download ZIP \(\d+ KB\)<\/a>/,
+    /<a class="btn primary" href="\/month\/package.zip\?month=2026-10" download><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP \(\d+ KB\)<\/span><\/a>/,
   );
-  expect(html).toContain('<button class="btn secondary">Mark October as sent</button>');
+  expect(html).toContain('<span>Mark October as sent</span></button>');
   expect(html).toContain('<ul class="manifest" aria-label="Files in the package"><li>receipts-2026-10/</li>');
   expect(html.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
   const shownHash = html.match(/name="receipts_hash" value="([a-f0-9]{64})"/)![1]!;

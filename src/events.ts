@@ -5,6 +5,7 @@
 // here; each param is still checked before use, and an Undo is offered only
 // when all of its params are well formed.
 // test/events.test.ts fails when a redirect names an event that isn't here.
+import { isUndoOp, undoOf, type UndoOp } from './undo';
 
 export type Undo = { action: string; fields: Record<string, string>; label?: string };
 export type EventDef = {
@@ -34,6 +35,31 @@ const skipped = (p: URLSearchParams) => (count(p, 'skipped') ? ` ${count(p, 'ski
 // A bulk run that changed no row says so, whatever its message would be.
 const none = (p: URLSearchParams) => p.has('n') && !count(p, 'n');
 const many = (p: URLSearchParams, text: string) => (none(p) ? 'Nothing changed.' : text) + skipped(p);
+// The Undo of an action in the undo log (src/undo.ts), by its time and name, when it changed something.
+// back: the receipt page a match was made or removed on, which its Undo returns to.
+const logged = (p: URLSearchParams): Undo | null => {
+  const action = none(p) ? null : undoOf(p.get('at'), p.get('op'));
+  const back = p.get('back') ?? '';
+  return (
+    action && {
+      action: '/undo',
+      fields: { at: action.at, op: action.op, ...(/^\/receipts\/[a-f0-9]{64}$/.test(back) ? { back } : {}) },
+    }
+  );
+};
+// What an Undo brought back, per action.
+const UNDONE: Record<UndoOp, (n: number) => string> = {
+  approve: (n) => `Approval undone for ${plural(n, 'receipt')}.`,
+  discard: (n) => `Brought back ${plural(n, 'receipt')}.`,
+  exempt: (n) => `${plural(n, 'payment')} need${n === 1 ? 's' : ''} a receipt again.`,
+  require: (n) => `${plural(n, 'payment')} ${n === 1 ? 'is' : 'are'} back as before.`,
+  match: (n) => `Match undone for ${plural(n, 'payment')}.`,
+  unmatch: (n) => `Matched ${plural(n, 'payment')} again.`,
+  paid: (n) => `${plural(n, 'invoice')} ${n === 1 ? 'is' : 'are'} back as before.`,
+  deleteRule: () => 'The rule is back.',
+  settings: () => 'Your settings are back as they were.',
+  import: (n) => `Removed ${plural(n, 'payment')} of that import.`,
+};
 const date = (value: string | null) =>
   value && /^\d{4}-\d\d-\d\d$/.test(value)
     ? new Date(`${value}T00:00:00Z`).toLocaleDateString('en-GB', {
@@ -67,39 +93,12 @@ const NEXT_STEP: Record<
   },
   match: {
     text: (m) => `match ${m}'s payments`,
-    link: (m) => ({ href: `/payments?month=${m}&show=missing`, label: 'Open Bank' }),
+    link: (m) => ({ href: `/payments?month=${m}&view=todo`, label: 'Open Bank' }),
   },
   send: {
     text: (m) => `send ${m} to your accountant`,
     link: (m) => ({ href: `/?month=${m}#send`, label: `Open ${monthWord(m)}` }),
   },
-};
-// The lists a discard, restore or bulk form may send you back to, with the
-// query each one keeps. The path is one of these, so it never leaves the app.
-const BACK_QUERY: Record<string, readonly string[]> = {
-  '/review': ['reason'],
-  '/receipts': ['show', 'month', 'q', 'offset'],
-  '/invoices': ['month', 'show'],
-};
-export function backPath(value: unknown, fallback = '/review'): string {
-  const text = String(value ?? '');
-  if (/^\/receipts\/[a-f0-9]{64}$/.test(text)) return text;
-  if (!text.startsWith('/') || text.length > 300) return fallback;
-  const url = new URL(text, 'http://app.invalid');
-  const keys = BACK_QUERY[url.pathname];
-  if (url.origin !== 'http://app.invalid' || !keys) return fallback;
-  const query = new URLSearchParams();
-  for (const key of keys) {
-    const one = url.searchParams.get(key);
-    if (one) query.set(key, one.slice(0, 100));
-  }
-  const search = query.toString();
-  return search ? `${url.pathname}?${search}` : url.pathname;
-}
-// A receipt page that Match and Remove match send you back to.
-const returnTo = (p: URLSearchParams) => {
-  const back = p.get('back') ?? '';
-  return /^\/receipts\/[a-f0-9]{64}$/.test(back) ? back : null;
 };
 // The Settings section a setup group lives in.
 const GROUP_SECTION: Record<string, string> = {
@@ -117,12 +116,13 @@ const GROUP_WORDS: Record<string, string> = {
   accountant: 'your accountant',
   review: 'review and matching',
   integrations: 'integrations',
+  all: 'your settings',
 };
 const groupWords = (p: URLSearchParams) => GROUP_WORDS[p.get('group') ?? ''];
 
 export const EVENTS = {
   // ---------- Receipts ----------
-  approved: { text: () => 'Approved.' },
+  approved: { text: (p) => (p.get('name') ? `Approved ${words(p, 'name', '')}.` : 'Approved.'), undo: logged },
   // The queue is empty: say so, and point at the step after Check for that month.
   approvedLast: {
     text: (p) => {
@@ -135,10 +135,11 @@ export const EVENTS = {
         next = NEXT_STEP[p.get('step') ?? ''];
       return monthWord(month) && next ? next.link(month) : { href: '/payments', label: 'Open Bank' };
     },
+    undo: logged,
   },
-  skipped: { text: () => 'Skipped. It stays in Review for later.' },
+  skipped: { text: () => 'Skipped. It stays in To do for later.' },
   saved: { text: () => 'Saved.' },
-  movedBack: { text: () => 'Saved. It needs another look, so it moved back to Review.' },
+  movedBack: { text: () => 'Saved. It needs another look, so it moved back to To do.' },
   readAgain: { text: () => 'Reading it again. This can take a minute.' },
   uploaded: { text: () => "Uploaded. We're reading it now." },
   filesAdded: {
@@ -154,17 +155,14 @@ export const EVENTS = {
   },
   paid: {
     text: (p) => (date(p.get('on')) ? `Marked as paid on ${date(p.get('on'))}.` : 'Marked as paid.'),
-    undo: (p) => {
-      const receipt = id(p, 'id');
-      return receipt ? { action: `/receipts/${receipt}/paid`, fields: {} } : null;
-    },
+    undo: logged,
   },
-  // No Undo: re-marking it paid needs the note, which was cleared with the date.
-  notPaid: { text: () => 'Marked as not paid.' },
-  // Bulk actions on a list. No Undo: the inverse is another bulk action.
+  notPaid: { text: () => 'Marked as not paid.', undo: logged },
+  // Bulk actions on a list. Read again and Move have no Undo: they run in chunks and call the model.
   approvedMany: {
     text: (p) =>
       (count(p, 'n') ? `Approved ${plural(count(p, 'n'), 'receipt')}.` : 'Nothing was approved.') + skipped(p),
+    undo: logged,
   },
   readAgainMany: {
     text: (p) => many(p, `Reading ${plural(count(p, 'n'), 'document')} again. This can take a minute.`),
@@ -179,19 +177,26 @@ export const EVENTS = {
         p,
         `Marked ${plural(count(p, 'n'), 'invoice')} as paid${date(p.get('on')) ? ` on ${date(p.get('on'))}` : ''}.`,
       ),
+    undo: logged,
   },
   ruleSaved: { text: () => 'Rule saved.', section: () => 'rules' },
-  ruleDeleted: { text: () => 'Rule deleted.', section: () => 'rules' },
+  ruleDeleted: { text: () => 'Rule deleted.', undo: logged, section: () => 'rules' },
   // ---------- Discard ----------
   discarded: {
     text: (p) => many(p, count(p, 'n') > 1 ? `${count(p, 'n')} discarded.` : 'Discarded.'),
-    undo: (p) => {
-      const at = p.get('at') ?? '',
-        back = p.get('back') ?? '';
-      return !none(p) && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && backPath(back, '') === back
-        ? { action: '/restore', fields: { at, back } }
-        : null;
+    undo: logged,
+  },
+  // Every Undo of the undo log says what came back, and offers no Undo of its own.
+  undone: {
+    text: (p) => {
+      const n = count(p, 'n'),
+        op = p.get('op');
+      // An import's Undo refuses once the owner has decided any of its payments.
+      if (op === 'import' && count(p, 'changed'))
+        return `${count(p, 'changed')} of these payments were changed since; nothing was removed.`;
+      return n && isUndoOp(op) ? UNDONE[op](n) : 'Nothing to undo. It changed since.';
     },
+    section: (p) => (/^[a-z][a-z-]{0,39}$/.test(p.get('section') ?? '') ? p.get('section') : null),
   },
   restored: { text: (p) => many(p, count(p, 'n') > 1 ? `${count(p, 'n')} restored.` : 'Restored.') },
   merged: { text: (p) => `Merged ${plural(count(p, 'n'), 'duplicate')}.` },
@@ -213,16 +218,7 @@ export const EVENTS = {
           (count(p, 'n') ? ` ${plural(count(p, 'n'), 'email')} deleted.` : '')) + skipped(p),
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
-  mailDeleted: {
-    text: (p) =>
-      (p.has('n')
-        ? count(p, 'n')
-          ? `${plural(count(p, 'n'), 'email')} deleted.`
-          : 'Nothing was deleted.'
-        : 'Email deleted.') + skipped(p),
-    section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
-  },
-  // Allow this sender, from Settings > Mail we didn't keep. Undo takes them off the list again.
+  // Allow this sender, from Settings > Email senders. Undo takes them off the list again.
   senderAllowed: {
     text: (p) => {
       const sender = words(p, 'sender', 'The sender');
@@ -236,7 +232,7 @@ export const EVENTS = {
         ? { action: '/senders/remove', fields: { address: sender, back: 'settings' } }
         : null;
     },
-    section: () => 'mail',
+    section: () => 'senders',
   },
   senderRemoved: {
     text: (p) =>
@@ -245,6 +241,7 @@ export const EVENTS = {
           ? `Removed ${plural(count(p, 'n'), 'sender')}.`
           : 'Nothing was removed.'
         : 'Sender removed.') + skipped(p),
+    undo: logged,
     section: () => 'senders',
   },
   senderUnignored: {
@@ -260,37 +257,13 @@ export const EVENTS = {
   matched: {
     text: (p) =>
       `Matched ${words(p, 'name', 'the payment')} to ${p.get('kind') === 'invoice' ? 'an invoice' : 'a receipt'}.`,
-    undo: (p) => {
-      const tx = id(p, 'tx');
-      const back = returnTo(p);
-      return tx
-        ? { action: '/matches', fields: { transaction_id: tx, action: 'unlink', ...(back ? { return_to: back } : {}) } }
-        : null;
-    },
+    undo: logged,
   },
   unmatched: {
     text: (p) => `Removed the match for ${words(p, 'name', 'the payment')}.`,
-    undo: (p) => {
-      const tx = id(p, 'tx'),
-        receipt = id(p, 'rid');
-      const back = returnTo(p);
-      // exc=1 is set by the server only when the pair was matched as an exception in the first place.
-      return tx && receipt
-        ? {
-            action: '/matches',
-            fields: {
-              transaction_id: tx,
-              receipt_id: receipt,
-              action: 'link',
-              ...(p.get('exc') === '1' ? { confirm_exception: 'yes' } : {}),
-              ...(back ? { return_to: back } : {}),
-            },
-          }
-        : null;
-    },
+    undo: logged,
   },
-  // Match all likely: one Undo for the whole batch, found by the time they were all stamped with.
-  // picked=1: from the bulk bar, where skipped also counts rows with no exact likely receipt.
+  // Match all likely. picked=1: from the bulk bar, where skipped also counts rows with no exact likely receipt.
   matchedMany: {
     text: (p) => {
       const n = count(p, 'n'),
@@ -302,40 +275,29 @@ export const EVENTS = {
           : ` ${plural(left, 'payment')} changed since you opened the page and ${left === 1 ? 'was' : 'were'} left alone.`;
       return n ? `Matched ${plural(n, 'payment')}.${changed}` : `Nothing was matched.${changed}`;
     },
-    undo: (p) => {
-      const at = p.get('at') ?? '',
-        month = p.get('month') ?? '';
-      return count(p, 'n') && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at) && MONTH.test(month)
-        ? { action: '/matches/undo', fields: { at, month } }
-        : null;
-    },
+    undo: (p) => (count(p, 'n') ? logged(p) : null),
   },
-  // No Undo: matching them again is the bulk button, which asks again what to accept.
-  unmatchedMany: { text: (p) => many(p, `Removed ${plural(count(p, 'n'), 'match', 'matches')}.`) },
+  unmatchedMany: { text: (p) => many(p, `Removed ${plural(count(p, 'n'), 'match', 'matches')}.`), undo: logged },
   notPurchaseMany: {
     text: (p) =>
       (count(p, 'n') ? `Marked ${plural(count(p, 'n'), 'payment')} as not a purchase.` : 'Nothing changed.') +
       skipped(p),
+    undo: logged,
   },
   needsReceiptMany: {
     text: (p) =>
       (count(p, 'n')
         ? `${plural(count(p, 'n'), 'payment')} need${count(p, 'n') === 1 ? 's' : ''} a receipt again.`
         : 'Nothing changed.') + skipped(p),
+    undo: logged,
   },
   notPurchase: {
     text: (p) => `${words(p, 'name', 'That payment')} is not a purchase, so it no longer needs a receipt.`,
-    undo: (p) => {
-      const tx = id(p, 'tx');
-      return tx ? { action: `/payments/${tx}`, fields: { receipt_required: '1' } } : null;
-    },
+    undo: logged,
   },
   needsReceipt: {
     text: (p) => `${words(p, 'name', 'That payment')} needs a receipt again.`,
-    undo: (p) => {
-      const tx = id(p, 'tx');
-      return tx ? { action: `/payments/${tx}`, fields: { receipt_required: '0' } } : null;
-    },
+    undo: logged,
   },
   transferMade: {
     text: (p) => `${words(p, 'name', 'That payment')} is now a transfer between your own accounts.`,
@@ -346,32 +308,27 @@ export const EVENTS = {
   },
   // No Undo: making the transfer again needs the note typed the first time, which is deleted with it.
   transferUndone: { text: () => 'Transfer undone. Both payments need a receipt again.' },
+  // imp: the import; anyway: its payments with no bank ID that look like ones already in the app;
+  // similar: payments that look like ones in another account (a warning, not a gate).
   imported: {
     text: (p) => {
       const added = count(p, 'inserted'),
         skipped = count(p, 'skipped'),
-        again = count(p, 'replayed');
+        again = count(p, 'replayed'),
+        similar = count(p, 'similar');
       if (again) return `You imported this file before, so nothing changed. It has ${plural(again, 'payment')}.`;
       const tally = p.has('missing')
         ? ` Paid out: ${count(p, 'auto')} matched, ${count(p, 'np')} not a purchase, ${count(p, 'missing')} missing.`
         : '';
-      return `Added ${plural(added, 'payment')}.${tally}${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
-    },
-    // Undo the automatic "Not a purchase" marks of this file.
-    undo: (p) => {
-      const imp = id(p, 'imp'),
-        month = p.get('month') ?? '';
-      return imp && MONTH.test(month)
-        ? { action: `/imports/${imp}/exempt/undo`, fields: { month }, label: 'Undo not a purchase' }
-        : null;
+      return `Added ${plural(added, 'payment')}.${tally}${skipped ? ` Skipped ${skipped} already imported.` : ''}${similar ? ` ${plural(similar, 'payment')} look${similar === 1 ? 's' : ''} like ${similar === 1 ? 'one' : 'ones'} in another account.` : ''}`;
     },
     link: (p) =>
-      count(p, 'auto') && MONTH.test(p.get('month') ?? '')
-        ? { href: `/payments?month=${p.get('month')}&show=auto`, label: 'See them' }
-        : null,
-  },
-  exemptUndone: {
-    text: (p) => `${plural(count(p, 'n'), 'payment')} need${count(p, 'n') === 1 ? 's' : ''} a receipt again.`,
+      count(p, 'anyway') && id(p, 'imp')
+        ? { href: `/import/anyway?import=${id(p, 'imp')}&n=${count(p, 'anyway')}`, label: 'Import anyway' }
+        : count(p, 'auto') && MONTH.test(p.get('month') ?? '')
+          ? { href: `/payments?month=${p.get('month')}&view=all`, label: 'See them' }
+          : null,
+    undo: (p) => (count(p, 'inserted') && !count(p, 'replayed') && p.get('op') === 'import' ? logged(p) : null),
   },
   // ---------- Month ----------
   // Undo drops that one send, so the month is back as it was before: the earlier send, or not sent.
@@ -392,9 +349,14 @@ export const EVENTS = {
       `${count(p, 'n')} of ${count(p, 'of')} uploaded.${count(p, 'wait') ? ` Continue in ${count(p, 'wait')} s.` : ''}`,
   },
   // ---------- Settings ----------
+  // removed: parts the save took away; its Undo puts the whole save back.
   settingsSaved: {
-    text: (p) => (groupWords(p) ? `Saved ${groupWords(p)}.` : 'Saved.'),
-    section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null,
+    text: (p) =>
+      (groupWords(p) ? `Saved ${groupWords(p)}.` : 'Saved.') +
+      (count(p, 'removed') ? ` Removed ${plural(count(p, 'removed'), 'part')}.` : ''),
+    undo: logged,
+    section: (p) =>
+      GROUP_SECTION[p.get('group') ?? ''] ?? (/^setup-[a-z]+$/.test(p.get('section') ?? '') ? p.get('section') : null),
   },
   settingsSame: {
     text: (p) => (groupWords(p) ? `Nothing changed in ${groupWords(p)}.` : 'Nothing changed.'),
@@ -438,6 +400,21 @@ export type Feedback = {
   undo: Undo | null;
   section: string | null;
 };
+// An Undo returns to the list it was offered on: the page's list state rides along in its form,
+// under the names the list URL uses (from, on a receipt page; kind=sales on Invoices), unless the
+// Undo sets them itself. An Undo of Settings names the section to land on.
+const LIST_PARAMS = ['view', 'from', 'month', 'upto', 'show', 'q', 'kind'] as const;
+function onList(undo: Undo | null, params: URLSearchParams, section: string | null): Undo | null {
+  if (!undo) return null;
+  const fields: Record<string, string> = { ...undo.fields };
+  if (section) fields.section = section;
+  for (const key of LIST_PARAMS) {
+    const value = params.get(key);
+    // kind is the list's only as Invoices' kind=sales; a match event's kind=receipt is its own.
+    if (value && !(key in fields) && (key !== 'kind' || value === 'sales')) fields[key] = value.slice(0, 100);
+  }
+  return { ...undo, fields };
+}
 // What the query asks the page to say, if it names an event with a message.
 export function feedback(params: URLSearchParams): Feedback | null {
   const key = params.get('done');
@@ -445,11 +422,12 @@ export function feedback(params: URLSearchParams): Feedback | null {
   const def: EventDef = EVENTS[key];
   const text = def.text(params);
   if (!text) return null;
+  const section = def.section?.(params) ?? null;
   return {
     event: key,
     text,
     link: def.link?.(params) ?? null,
-    undo: def.undo?.(params) ?? null,
-    section: def.section?.(params) ?? null,
+    undo: onList(def.undo?.(params) ?? null, params, section),
+    section,
   };
 }

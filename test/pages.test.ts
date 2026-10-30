@@ -13,9 +13,9 @@ test('every page names a real nav section and carries its label as the title', (
 
 test.each([
   ['/', 'Home', 'Home'],
-  ['/review', 'Review', 'Review'],
+  ['/receipts?view=todo', 'Receipts', 'Receipts'],
   ['/receipts', 'Receipts', 'Receipts'],
-  ['/invoices?month=2026-09', 'Receipts', 'Receipts · Invoices · September 2026'],
+  ['/receipts?view=all&kind=sales&month=2026-09', 'Receipts', 'Receipts · Invoices · September 2026'],
   ['/add', 'Receipts', 'Receipts · Add'],
   ['/payments?month=2026-09', 'Bank', 'Bank · September 2026'],
   ['/import', 'Bank', 'Bank · Import a bank statement'],
@@ -24,5 +24,5 @@ test.each([
   const html = await (await request(path)).text();
   expect(html).toContain(`<title>${title} ·`);
   const current = [...html.matchAll(/<nav class="main"[\s\S]*?<\/nav>/g)][0]![0];
-  expect(current.match(/aria-current="page"[^>]*>([A-Za-z]+)/)![1]).toBe(tab);
+  expect(current.match(/aria-current="page"[^>]*>(?:<svg[\s\S]*?<\/svg>)?([A-Za-z]+)/)![1]).toBe(tab);
 });

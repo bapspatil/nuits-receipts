@@ -7,28 +7,33 @@ import {
   eurValue,
   monthEurValues,
   openSales,
-  showCounts,
+  BANK_UPTO,
+  bankPath,
+  bankUpto,
+  viewCounts,
+  viewRows,
+  type BankRow,
+  type BankView,
   type EurValue,
-  type Transaction,
 } from './banking';
-import { importForm, wizard } from './imports';
+import { importForm } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
-import { config, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts } from './setup';
+import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
+import { FIELD, type SettingKey } from './settings';
+import { saveBar, setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
-import { droppedMail, hasRecentDropped, heldMail, ignoredSenders, reasonAllows, reasonWords } from './inbound';
-import { heldSection } from './all';
-import { matchedIds, mergePlan } from './dedupe';
+import { droppedMail, hasRecentDropped, ignoredSenders, reasonAllows, reasonWords } from './inbound';
 import { readableText } from './receipts';
 import { discardControl, restoreForm } from './discard';
 import {
+  BULK_CAP,
   bulkBar,
   bulkCheck,
   bulkTools,
+  KIND_LOSS,
   PAYMENT_ACTIONS,
-  RECEIPT_ACTIONS,
   SENDER_ACTIONS,
   type BulkAction,
   type BulkList,
@@ -52,21 +57,37 @@ import { TREATMENT_LABELS } from './sales';
 import { VAT_TREATMENTS } from './domain';
 import { connection, progress, redirectUri, type Connection } from './onedrive';
 import {
+  LIST_DEFS,
+  listFields,
+  listParams,
+  listUrl,
+  nextOpen,
+  openPlace,
+  openRows,
+  RECEIPTS_TODO,
+  receiptFields,
+  receiptState,
+  receiptUrl,
+  standing,
+  type ListState,
+  type Params,
+} from './worklist';
+import {
   bodyOf,
   flagCards,
-  flagFor,
   isRequired,
-  matchesFilter,
+  isReady,
+  needsReview,
+  needsReviewSql,
+  optionalReasons,
   reasonCodes,
-  REVIEW_FILTERS,
+  type Flag,
   type FlagField,
-  type ReviewFilter,
 } from './flags';
 import {
   amount,
   day,
   escape,
-  chipRow,
   EXPORT_LINE,
   input,
   MISSING_PAYMENTS,
@@ -87,15 +108,22 @@ import {
   stamp,
   stepWord,
   tag,
+  viewSwitch,
   uploadForm,
   ariaFor,
   chosenReceipt,
   errorId,
+  VIEW_TRANSITION_CSS,
+  BACK_BANK,
+  BACK_HOME,
   errorLine,
+  fieldId,
   matchError,
 } from './ui';
-import { failureFor, kept } from './request';
-import { STATUS, matchStatus } from './status';
+import { failureFor, kept, requestState } from './request';
+import { row, rowList } from './row';
+import { STATUS } from './status';
+import { ACTIONS, button, buttonLink, buttonSummary, statusMark, type ActionKey, type Tone } from './actions';
 import {
   likelyPairs,
   matchableReceipts,
@@ -108,40 +136,14 @@ import {
   type Cell,
 } from './match';
 
-type Payment = Transaction & { account_name: string; bank_name: string };
+type Payment = BankRow;
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
   return INLINE_IMAGES.includes(r.media_type);
 }
 
-const QUEUE_ORDER = 'ORDER BY issue_date IS NOT NULL, issue_date, received_at, id';
-export async function reviewQueue(env: Env): Promise<Receipt[]> {
-  return (
-    await env.DB.prepare(
-      `SELECT * FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${QUEUE_ORDER} LIMIT 500`,
-    ).all<Receipt>()
-  ).results;
-}
-function firstFlag(r: Receipt): string {
-  const code = reasonCodes(r.review_reasons_json)[0];
-  return code ? flagFor(code).title.replace(/\.$/, '') : 'Needs a look';
-}
-// The first problem as one word, for lists. The full question is its tooltip.
-const REASON_WORDS: Record<string, string> = {
-  Seller: 'Seller',
-  Date: 'Date',
-  Amounts: 'Amount',
-  Details: 'Details',
-  'Euro amount': 'Euros',
-  Filing: 'Filing',
-  Duplicate: 'Duplicate',
-  Source: 'File',
-  Other: 'Check',
-};
-function reasonWord(r: Receipt): string {
-  const cards = flagCards(reasonCodes(r.review_reasons_json));
-  const word = REASON_WORDS[cards[0]?.flag.group ?? 'Other'] ?? 'Check';
-  return cards.length > 1 ? `${word} +${cards.length - 1}` : word;
+export function reviewQueue(env: Env, state: ListState = RECEIPTS_TODO): Promise<Receipt[]> {
+  return openRows<Receipt>(env, LIST_DEFS.receipts!, state, BULK_CAP);
 }
 function receiptOption(r: Receipt, selected = false): string {
   return `<option value="${r.id}"${selected ? ' selected' : ''}>${escape(receiptName(r))} · ${escape(day(r.issue_date)) || 'no date'} · ${amount(r.total_minor, r.currency)}</option>`;
@@ -175,7 +177,7 @@ async function monthState(env: Env, selected: string) {
     // Undated receipts belong to no month yet but wait in the same Review, so Check is not done
     // while any is left (a month already sent stays closed).
     env.DB.prepare(
-      "SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND status='needs_review'",
+      `SELECT count(*) n FROM receipts WHERE issue_date IS NULL AND duplicate_of IS NULL AND discarded_at IS NULL AND ${needsReviewSql()}`,
     )
       .first<number>('n')
       .then((n) => n ?? 0),
@@ -194,7 +196,7 @@ async function monthState(env: Env, selected: string) {
     }
     total += BigInt(eur.minor);
     if (eur.source === 'ecb') estimated += BigInt(eur.minor);
-    if (r.status !== 'ready') unchecked += BigInt(eur.minor);
+    if (!isReady(r)) unchecked += BigInt(eur.minor);
     const key = r.product + '\u0000' + r.expense_type;
     matrix.set(key, (matrix.get(key) ?? 0n) + BigInt(eur.minor));
   });
@@ -203,7 +205,7 @@ async function monthState(env: Env, selected: string) {
   let invoiced = 0n;
   for (const eur of all.slice(rows.length)) invoiced += BigInt(eur.minor ?? 0);
   const isReading = (r: Receipt) => r.status === 'pending' || r.status === 'processing';
-  const flagged = [...rows, ...sales].filter((r) => r.status === 'needs_review');
+  const flagged = [...rows, ...sales].filter(needsReview);
   const reading = [...rows, ...sales].filter(isReading);
   const docs = rows.length + sales.length;
   const sent = !!send.last && !send.changed && docs > 0;
@@ -225,7 +227,7 @@ async function monthState(env: Env, selected: string) {
     noEur,
     flagged,
     reading,
-    ready: rows.filter((r) => r.status !== 'needs_review' && !isReading(r)).length,
+    ready: rows.filter((r) => !needsReview(r) && !isReading(r)).length,
     out,
     missing,
     matched: out.filter((t) => t.receipt_id),
@@ -240,82 +242,6 @@ export async function afterLastReview(env: Env, issueDate: string | null): Promi
   const month = issueDate?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
   const s = await monthState(env, month);
   return { month, step: !s.imported ? 'import' : s.missing.length ? 'match' : 'send' };
-}
-
-// ---------- Review queue ----------
-export async function reviewPage(
-  env: Env,
-  filter: ReviewFilter | null,
-  params = new URLSearchParams(),
-): Promise<Response> {
-  // Rows a bank line points at: Discard asks to remove the match too.
-  const known = matchedIds(env);
-  const [all, held, reading, merges, matched] = await Promise.all([
-    reviewQueue(env),
-    heldMail(env),
-    env.DB.prepare(
-      "SELECT count(*) n FROM receipts WHERE status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
-    ).first<number>('n'),
-    mergePlan(env, known),
-    known,
-  ]);
-  const rows = filter ? all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter)) : all;
-  const undated = all.filter((r) => r.issue_date === null).length;
-  const mergeable = merges.length;
-  const merge = mergeable
-    ? `<form class="merge" action="/review/merge" method="post"><button class="btn secondary">Merge ${plural(mergeable, 'duplicate')}</button></form>`
-    : '';
-  const chips = chipRow('Filter', [
-    { href: '/review', label: 'All', count: all.length, current: !filter },
-    ...(Object.keys(REVIEW_FILTERS) as ReviewFilter[]).map((k) => ({
-      href: `/review?reason=${k}`,
-      label: REVIEW_FILTERS[k].label,
-      count: all.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), k)).length,
-      current: k === filter,
-    })),
-  ]);
-  const selecting = params.get('select') === '1';
-  const here = filter ? `/review?reason=${filter}` : '/review';
-  const bulk: BulkList = {
-    form: 'bulk-review',
-    action: '/receipts/bulk',
-    noun: ['receipt', 'receipts'],
-    total: rows.length,
-    // filter, not reason: the discard chips post reason.
-    scope: { list: 'review', ...(filter ? { filter } : {}), back: here },
-    actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
-  };
-  // Row 1 is the next to check: its name is the screen's one primary.
-  const items = rows
-    .map((r, i) => {
-      const name = escape(receiptName(r));
-      const why = `<span class="why" title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`;
-      const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      return `<li>${bulkCheck(bulk, r.id, receiptName(r))}<a${i ? '' : ' class="btn primary"'} href="/receipts/${r.id}">${name}</a>${amt}${why}${discardControl(r.id, { back: '/review', matched: matched.has(r.id), name: receiptName(r) })}</li>`;
-    })
-    .join('');
-  const list = rows.length
-    ? `<div data-bulk-list="${bulk.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, rows.length, selecting, selecting ? here : `${here}${filter ? '&' : '?'}select=1`)}<ul class="list checks">${items}</ul></div>${bulkBar(bulk)}`
-    : all.length
-      ? emptyState('Nothing in this filter.', `<a class="btn primary" href="/review">Show all ${all.length}</a>`)
-      : held.length
-        ? ''
-        : emptyState('Nothing to check.', '<a class="btn primary" href="/receipts">See receipts</a>');
-  return page(
-    'review',
-    `${merge ? `<div class="tools">${merge}</div>` : ''}${heldSection(held, 'review', !rows.length, selecting)}${all.length > 5 || filter ? chips : ''}${reading ? `<p class="banner" role="status">${reading} being read</p>` : ''}${list}`,
-    200,
-    env,
-    {
-      head: pageHead(
-        all.length
-          ? `${all.length} to check${undated ? `, ${undated} undated` : ''}`
-          : held.length
-            ? `${plural(held.length, 'email')} to allow`
-            : 'All checked',
-      ),
-    },
-  );
 }
 
 // ---------- Receipt ----------
@@ -363,29 +289,67 @@ function eurLine(eur: EurValue): string {
   return `EUR ${money(eur.minor)}, ${EUR_SOURCE[eur.source] ?? escape(eur.source)}${eur.rateDate ? ` ${day(eur.rateDate)}` : ''}.`;
 }
 
-// The review queue around one receipt: its place, and the one to open after it.
-export async function queueAround(
-  env: Env,
-  id: string,
-): Promise<{ position: number; total: number; next: string | null }> {
-  const queue = (await reviewQueue(env)).map((q) => q.id);
-  const position = queue.indexOf(id);
-  const next = (position >= 0 ? queue[position + 1] : undefined) ?? queue.find((q) => q !== id) ?? null;
-  return { position, total: queue.length, next };
-}
-
 // The failure scope of the receipt form.
 const RECEIPT = 'receipt';
-export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
+// params: the list it was opened from (?from=todo&month=M), so its count, Next and Skip use that filter.
+// The fragment an Approve lands on for the receipt it moves to: the first field its required flags
+// leave empty, else the page's own start, so focus is never lost to the body.
+const FIELD_COLUMN: Record<string, string> = {
+  net: 'net_minor',
+  vat: 'vat_minor',
+  total: 'total_minor',
+  vat_rate: 'vat_rate_bps',
+};
+export function firstToFill(r: Receipt): string {
+  const row = r as unknown as Record<string, unknown>;
+  for (const { flag } of flagCards(reasonCodes(r.review_reasons_json)))
+    if (isRequired(flag))
+      for (const f of flag.fields) {
+        const v = row[FIELD_COLUMN[f] ?? f];
+        if (f !== 'product' && (v === null || v === undefined || v === '')) return `#f-${f}`;
+      }
+  return '#main';
+}
+export async function receiptPage(env: Env, r: Receipt, params: Params): Promise<Response> {
   const sales = r.kind === 'sales';
-  const eur = await eurValue(env, r);
-  const rules = (await env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100').all<Rule>())
-    .results;
-  const candidateRows = (
-    await env.DB.prepare(
+  const list = receiptState(params, needsReview(r) && !r.discarded_at);
+  const todo = { ...list, view: 'todo' } as const;
+  // Every form on the page posts the list it was opened from, so its return keeps it.
+  const own = receiptFields(list);
+  // Every query the page needs, in one round. The sales payment box waits only on the euro value.
+  const eurQuery = eurValue(env, r);
+  const [eur, rules, candidateRows, place, next, duplicates, files, linked, shown, salesBox] = await Promise.all([
+    eurQuery,
+    env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 100')
+      .all<Rule>()
+      .then((q) => q.results),
+    env.DB.prepare(
       "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND t.receipt_id IS NULL AND t.receipt_required=1 AND t.amount_minor<0",
-    ).all<Payment>()
-  ).results;
+    )
+      .all<Payment>()
+      .then((q) => q.results),
+    openPlace(env, LIST_DEFS.receipts!, todo, r.id),
+    nextOpen(env, LIST_DEFS.receipts!, todo, standing(LIST_DEFS.receipts!, r.id), { wrap: true }),
+    env.DB.prepare(
+      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
+    )
+      .bind(r.id, r.vendor ?? '', r.total_minor ?? -1, r.duplicate_of ?? '')
+      .all<Receipt>()
+      .then((q) => q.results),
+    // Other files of the same charge (the receipt PDF next to the invoice PDF).
+    env.DB.prepare('SELECT id,filename FROM receipts WHERE duplicate_of=? ORDER BY received_at,id LIMIT 20')
+      .bind(r.id)
+      .all<{ id: string; filename: string }>()
+      .then((q) => q.results),
+    env.DB.prepare('SELECT 1 FROM bank_transactions WHERE receipt_id=? LIMIT 1')
+      .bind(r.id)
+      .first()
+      .then((row) => !!row),
+    // The original as text when it isn't an image; its number format is echoed in the hints.
+    previewable(r) ? null : readableText(env, r),
+    sales ? eurQuery.then((e) => paymentBox(env, { ...r, paid_bank_on: e.transaction ? 'linked' : null }, own)) : '',
+  ]);
+  const { position, total } = place;
   const suggestions =
     eur.transaction || sales
       ? []
@@ -399,26 +363,13 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
               a.account_key.localeCompare(b.account_key) ||
               a.id.localeCompare(b.id),
           );
-  const { position, total, next } = await queueAround(env, r.id);
-  const duplicates = (
-    await env.DB.prepare(
-      'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
-    )
-      .bind(r.id, r.vendor ?? '', r.total_minor ?? -1, r.duplicate_of ?? '')
-      .all<Receipt>()
-  ).results;
-
-  // Other files of the same charge (the receipt PDF next to the invoice PDF).
-  const files = (
-    await env.DB.prepare('SELECT id,filename FROM receipts WHERE duplicate_of=? ORDER BY received_at,id LIMIT 20')
-      .bind(r.id)
-      .all<{ id: string; filename: string }>()
-  ).results;
   const codes = reasonCodes(r.review_reasons_json);
   const gone = !!r.discarded_at;
-  const needs = r.status === 'needs_review',
+  const needs = needsReview(r),
     reading = r.status === 'pending' || r.status === 'processing';
-  const cards = needs ? flagCards(codes) : [];
+  const parts = hasParts(env);
+  const aboutPartOnly = (flag: Flag) => flag.fields.length > 0 && flag.fields.every((f) => f === 'product');
+  const cards = needs ? flagCards(codes).filter(({ flag }) => parts || !aboutPartOnly(flag)) : [];
   const unverified = codes.includes('sender_unverified');
   const placed = new Set<string>();
   const money_ = (k: 'net' | 'vat' | 'total') => money(r[`${k}_minor`], r.currency ?? 'EUR');
@@ -436,8 +387,6 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     client_country: r.client_country,
     reference_number: r.reference_number,
   };
-  // The original as text when it isn't an image; its number format is echoed in the hints.
-  const shown = previewable(r) ? null : await readableText(env, r);
   const comma = decimalComma(shown);
   const eg = (n: string) => (comma ? n.replace('.', ',') : n);
   // A value is the reader's while the person hasn't saved the form: a save keeps every field as typed.
@@ -562,13 +511,13 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
   };
   // One row: the label on the left, the control on the right.
   const row = (c: Control, label = escape(c.label), title = '', meta = '') =>
-    `<div class="srow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label>${meta ? `<span class="meta">${meta}</span>` : ''}</div><div class="sc">${c.html}${c.note ? `<p class="meta" id="h-${c.id.slice(2)}">${escape(c.note)}</p>` : ''}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
+    `<div class="frow"><div class="sl"><label class="flabel" for="${c.id}"${title ? ` title="${escape(title)}"` : ''}>${label}</label>${meta ? `<span class="meta">${meta}</span>` : ''}</div><div class="sc">${c.html}${c.note ? `<p class="meta" id="h-${c.id.slice(2)}">${escape(c.note)}</p>` : ''}${errorLine(RECEIPT, c.id.slice(2))}</div></div>`;
   const rows = (name: FlagField | 'due_date') =>
     controls(name)
       .map((c) => row(c))
       .join('');
-  const retryButton = (label: string, kind: 'primary' | 'secondary', outside = false) =>
-    `<button class="btn ${kind}"${outside ? ' form="fix"' : ''} formaction="/receipts/${r.id}/retry">${label}</button>`;
+  const retryButton = (key: 'reread' | 'read', tone: Tone, outside = false) =>
+    button(key, { tone, attrs: `${outside ? ' form="fix"' : ''} formaction="/receipts/${r.id}/retry"` });
   // The flag's own badge: what the person must do about it.
   const badge = (tier: Tier, names: readonly string[]) =>
     tier === 'req' ? (names.some(blank) ? '<span class="warning">Required</span>' : 'Check it') : 'Optional';
@@ -579,16 +528,16 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     .sort((a, b) => Number(isRequired(b.flag)) - Number(isRequired(a.flag)))
     .map(({ flag }, i) => {
       const id = `flag-${i + 1}`;
-      const names = flag.fields.filter((f) => !placed.has(f));
+      const names = flag.fields.filter((f) => !placed.has(f) && (parts || f !== 'product'));
       const tier: Tier = isRequired(flag) ? 'req' : 'opt';
       const body = bodyOf(flag, r);
       const extra =
         flag.action === 'retry' && !unverified
-          ? `<div class="fx">${retryButton('Read again', 'secondary')}</div>`
+          ? `<div class="fx">${retryButton('reread', 'secondary')}</div>`
           : flag.action === 'upload'
             ? `<div class="fx"><a href="/add${sales ? '?kind=sales' : ''}">Upload a copy</a></div>`
             : flag.action === 'move'
-              ? `<div class="fx"><button class="btn secondary" formaction="/receipts/${r.id}/kind" name="kind" value="expense">Move to receipts</button></div>`
+              ? `<details class="fx">${buttonSummary('moveBack')}<div class="body"><p class="ask">${KIND_LOSS}</p>${button('moveBack', { attrs: ` formaction="/receipts/${r.id}/kind" name="kind" value="expense"` })}</div></details>`
               : '';
       if (names.length === 1) {
         const [first, ...more] = controls(names[0]!, tier);
@@ -636,12 +585,15 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     : '';
   const rest = fieldOrder.filter((f) => !placed.has(f)).map(rows);
   const filing = (sales ? (['product'] as const) : (['product', 'expense_type'] as const))
-    .filter((f) => !placed.has(f))
+    .filter((f) => !placed.has(f) && (parts || f !== 'product'))
     .map(rows);
+  const keptPart = parts
+    ? ''
+    : hidden('product', config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct);
   const due = rows('due_date');
   const fx = placed.has('eur_override') ? '' : rows('eur_override');
   const dup = placed.has('duplicate_of') ? '' : rows('duplicate_of');
-  const heading = reading ? STATUS.reading : needs ? `${cards.length} to check` : '';
+  const heading = reading ? STATUS.reading.word : needs ? `${plural(cards.length, 'field')} to fill` : '';
   const note = `<details class="note"${failureFor(RECEIPT)?.field === 'approval_reason' ? ' open' : ''}><summary>Note</summary><div class="body rowlist">${row(
     {
       id: 'f-approval_reason',
@@ -649,50 +601,61 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
       html: `<input name="approval_reason" value="${escape(kept(RECEIPT, 'approval_reason', 'Checked against the original'))}" type="text" id="f-approval_reason"${ariaFor(RECEIPT, 'approval_reason')}>`,
     },
   )}</div></details>`;
-  const ready = r.status === 'ready';
-  const linkedRow = await env.DB.prepare('SELECT match_method FROM bank_transactions WHERE receipt_id=? LIMIT 1')
-    .bind(r.id)
-    .first<{ match_method: 'automatic' | 'manual' | null }>();
-  const linked = !!linkedRow;
+  const ready = isReady(r);
   const status = gone
     ? `<span class="stamp muted">Discarded${r.discard_reason ? ` · ${DISCARD_REASONS[r.discard_reason]}` : ''}</span>`
     : sales
       ? salesStamp({ ...r, paid_bank_on: eur.transaction ? 'linked' : null }, config(env).tuning.paymentTermsDays)
-      : stamp(r, linkedRow ? (linkedRow.match_method ?? 'manual') : null);
+      : stamp(r, linked);
   // A ready receipt opens as its summary; Edit opens every field.
   const summary = ready
-    ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>Payment</dt><dd>${sales ? status : linkedRow ? matchStatus(linkedRow.match_method) : 'Not matched yet'}</dd></div></dl>`
+    ? `<dl class="kv sum"><div><dt>${sales ? 'Client' : 'Seller'}</dt><dd>${escape(receiptName(r))}</dd></div><div><dt>Date</dt><dd>${r.issue_date ? day(r.issue_date) : 'None'}</dd></div><div><dt>Total</dt><dd>${r.total_minor === null ? 'None' : amount(r.total_minor, r.currency)}</dd></div><div><dt>Payment</dt><dd>${sales ? status : linked ? statusMark('matched') : 'Not matched yet'}</dd></div></dl>`
     : '';
+  const quiet = needs
+    ? ''
+    : flagCards(optionalReasons(codes))
+        .filter(({ flag }) => parts || !aboutPartOnly(flag))
+        .map(({ flag }) => flag.title)
+        .join(' ');
+  const quietNote = quiet ? `<p class="meta quiet">Not needed to approve: ${escape(quiet)}</p>` : '';
   const fold = ready ? 'Edit' : needs ? 'Other fields' : 'All fields';
   const verb = needs || reading ? 'approve' : 'save';
   // Enter in a field submits the form's first submit button: the same as the bar's, never Skip or Read again.
-  const enter = `<button class="vh" name="action" value="${verb}" tabindex="-1" aria-hidden="true">${verb === 'approve' ? 'Approve' : 'Save'}</button>`;
-  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}
+  const enter = button(verb, { quiet: true, attrs: ` name="action" value="${verb}" tabindex="-1" aria-hidden="true"` });
+  const form = `<form action="/receipts/${r.id}" method="post" class="fix" id="fix">${enter}${hidden('revision', r.revision)}${own}${keptPart}${errorLine(RECEIPT, '')}${heading ? `<h2 id="fix-h">${heading}</h2>` : ''}${flagList}${readList}${summary}${quietNote}
     <details class="all"${failureFor(RECEIPT) || (!needs && !ready) ? ' open' : ''}><summary>${fold}</summary><div class="body rowlist">${rest.join('')}${filing.join('')}${due}${dup}${fx}${eur.source === 'native' ? '' : `<p class="small">${escape(eurLine(eur))}</p>`}</div></details>
     ${note}</form>`;
   const matches = sales
-    ? await paymentBox(env, { ...r, paid_bank_on: eur.transaction ? 'linked' : null })
+    ? salesBox
     : suggestions.length
       ? `<section aria-labelledby="match-h" class="matchs"><h2 id="match-h">Payment?</h2>${suggestions
           .map((t) => {
             // Only a pair that isn't an exact fit asks for the exception, and says why.
             const facts = pairFacts(r, t, rules, config(env).tuning);
-            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}">${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)} <a href="/help#match-anyway">What is this?</a></p>`}<button class="btn secondary" id="f-confirm-${t.id}" name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>${matchError(t.id)}`;
+            return `<form action="/matches" method="post" class="match"><p><strong>${amount(-t.amount_minor, t.currency)}</strong> to ${escape(t.merchant)}, ${day(t.booking_date, false)} <span class="hint">${escape(t.account_name)}</span></p><input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}"><input type="hidden" name="on_error" value="/receipts/${r.id}"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${facts.exact ? '' : `<input type="hidden" name="confirm_exception" value="yes"><p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`}${button('match', { attrs: ` id="f-confirm-${t.id}" name="action" value="link"` })}</form>${matchError(t.id)}`;
           })
           .join('')}</section>`
       : '';
   const move =
     sales || config(env).invoicesAddress
-      ? `<form action="/receipts/${r.id}/kind" method="post">${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
+      ? `<details>${buttonSummary(sales ? 'moveBack' : 'move')}<div class="body"><form action="/receipts/${r.id}/kind" method="post">${own}${hidden('revision', r.revision)}<p class="ask">${KIND_LOSS}</p>${button(sales ? 'moveBack' : 'move', { attrs: ` name="kind" value="${sales ? 'expense' : 'sales'}"` })}</form></div></details>`
       : '';
   const always = sales
     ? ''
-    : `<details><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type })}<button class="btn secondary">Save rule</button></form></div></details>`;
-  const tech = `<details class="tech"><summary>Technical details</summary><div class="body"><p class="hint">Status <code>${escape(r.status)}</code>. Reason codes:</p><pre tabindex="0">${escape(r.review_reasons_json)}</pre><p class="hint">Euro amount: ${escape(eur.source)}${eur.transaction ? `. Bank transaction <code>${escape(eur.transaction)}</code> · Account ${escape(eur.accountName)}` : '. No bank match.'}</p><pre tabindex="0">${escape(r.ai_json)}\n${escape(r.manual_fields_json)}</pre><p class="hint">Receipt ID <code>${r.id}</code></p></div></details>`;
-  const extras = `<details class="more"><summary>More</summary><div class="body"><form action="/receipts/${r.id}/retry" method="post"><button class="linkbtn">Read again</button></form>${move}<p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>${always}${tech}</div></details>`;
+    : `<details${failureFor(RECEIPT_RULE) ? ' open' : ''}><summary>Always file as</summary><div class="body"><form action="/rules" method="post"><input type="hidden" name="return_to" value="/receipts/${r.id}">${own}${ruleFields(env, { vendor_contains: r.vendor ?? '', product: config(env).products.some((p) => p.id === r.product) ? r.product : config(env).defaultProduct, expense_type: r.expense_type }, failureFor(RECEIPT_RULE) ? RECEIPT_RULE : '')}${button('save', { label: 'Save rule' })}</form></div></details>`;
+  // Two groups: what you can do with the file, and what you can change about the receipt's status
+  // and filing. Discard stays on the bar, one click with Undo.
+  const group = (name: string, inner: string) =>
+    inner ? `<div class="mgrp" role="group" aria-label="${name}"><p class="mh">${name}</p>${inner}</div>` : '';
+  const documentGroup = group(
+    'The document',
+    `<form action="/receipts/${r.id}/retry" method="post">${own}${button('reread')}</form><p><a href="/originals/${r.id}">Download original</a>${r.email_key ? ` · <a href="/originals/${r.id}?variant=email">Source email</a>` : ''}</p>${files.length ? `<p>Files: ${files.map((f) => `<a href="/originals/${f.id}">${escape(f.filename)}</a>`).join(' · ')}</p>` : ''}<details><summary>Upload a copy</summary><div class="body">${uploadForm('', false, r.kind)}</div></details>`,
+  );
+  const statusGroup = group('This receipt', `${move}${always}`);
+  const extras = `<details class="more"${failureFor(RECEIPT_RULE) ? ' open' : ''}>${buttonSummary('more')}<div class="body">${documentGroup}${statusGroup}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
   // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
-  const open = `<p><a class="btn secondary" href="/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}">${pdf ? 'Open PDF' : 'Open original'}</a></p>`;
+  const open = `<p>${buttonLink('original', `/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}`)}</p>`;
   const docTitle = previewable(r)
     ? 'The original'
     : shown
@@ -704,29 +667,27 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
     ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`
     : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
   const back = gone
-    ? '<a href="/receipts?show=discarded">‹ Discarded</a>'
-    : needs
-      ? '<a href="/review">‹ Review</a>'
-      : sales
-        ? `<a href="/invoices${r.issue_date ? `?month=${r.issue_date.slice(0, 7)}` : ''}">‹ Invoices</a>`
-        : '<a href="/receipts">‹ Receipts</a>';
-  const nextLink = !gone && !needs && next ? `<a href="/receipts/${next}">Next to check ›</a>` : '';
+    ? `<a href="${escape(listUrl({ ...list, view: 'all', show: 'discarded' }))}">‹ Discarded</a>`
+    : sales && !needs && list.view === 'all'
+      ? `<a href="${escape(listUrl({ ...list, key: 'invoices', month: r.issue_date?.slice(0, 7) ?? list.month }))}">‹ Invoices</a>`
+      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'To do' : 'Receipts'}</a>`;
+  const nextLink = !gone && !needs && next ? `<a href="${escape(receiptUrl(next, todo))}">Next to check ›</a>` : '';
   const skip =
-    needs && next && next !== r.id
-      ? `<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>`
-      : '';
-  const discard = discardControl(r.id, { back: needs ? 'queue' : '/receipts', matched: linked, revision: r.revision });
-  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true)}</section>`;
+    needs && next && next !== r.id ? button('skip', { attrs: ' form="fix" name="action" value="skip"' }) : '';
+  const discard = discardControl(r.id, { list: own, revision: r.revision });
+  const restore = `<section class="gone" aria-label="Discarded">${restoreForm(r.id, `/receipts/${r.id}`, true, own)}</section>`;
   const primary = reading || unverified ? 'secondary' : 'primary';
   const verbLabel = verb === 'save' ? 'Save' : sales ? 'Approve invoice' : 'Approve receipt';
   // One bar on every width: where you are, the quiet actions, and the one primary.
-  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('Read it', 'primary', true) : ''}${reading ? `<a class="btn primary" href="/receipts/${r.id}">Refresh</a>` : ''}<button class="btn ${primary}" form="fix" name="action" value="${verb}">${verbLabel}</button></div>`;
+  const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('read', 'primary', true) : ''}${reading ? buttonLink('refresh', receiptUrl(r.id, list), { tone: 'primary' }) : ''}${button(verb, { tone: primary, label: verbLabel, attrs: ` form="fix" name="action" value="${verb}"` })}</div>`;
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
     `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>`,
     200,
     env,
     {
+      style: VIEW_TRANSITION_CSS,
+      refresh: reading ? 10 : undefined,
       detail: receiptName(r),
       head: `<div class="crumbs">${back}${nextLink}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
     },
@@ -739,10 +700,10 @@ export async function receiptPage(env: Env, r: Receipt): Promise<Response> {
 async function monthCounts(env: Env, month: string) {
   const [sums, reviewing] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
+      `SELECT count(*) "out",count(t.receipt_id) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND substr(t.booking_date,1,7)=? AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
     ).bind(month),
     env.DB.prepare(
-      "SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE r.status='needs_review' AND substr(t.booking_date,1,7)=?",
+      `SELECT r.id FROM receipts r JOIN bank_transactions t ON t.receipt_id=r.id WHERE ${needsReviewSql('r')} AND substr(t.booking_date,1,7)=?`,
     ).bind(month),
   ]);
   const n = (sums?.results[0] ?? {}) as Record<string, number>;
@@ -750,22 +711,23 @@ async function monthCounts(env: Env, month: string) {
     out: n.out ?? 0,
     matched: n.matched ?? 0,
     exempt: n.exempt ?? 0,
-    missing: n.missing ?? 0,
     reviewing: new Set(((reviewing?.results ?? []) as { id: string }[]).map((r) => r.id)),
   };
 }
+// To do lists the month's open payments, the first upto of them; All lists the whole month.
 // month: the month to show, or the lookup that picks it, so the queries that
 // don't need it start right away.
 export async function payments(
   env: Env,
   month: string | Promise<string>,
-  offset: number,
   params = new URLSearchParams(),
 ): Promise<Response> {
   const chosen = Promise.resolve(month);
-  // One round for everything. The open invoices, the transfer credits and the
-  // receipts still in Review are needed only for some months, but loading them
-  // every time is cheaper than waiting a second round for them.
+  const view: BankView = params.get('view') === 'all' ? 'all' : 'todo';
+  const upto = bankUpto(params.get('upto'), BULK_CAP);
+  // One round for everything. The open invoices, the transfer credits, the
+  // receipts still in Review and the month's state are needed only for some
+  // months, but loading them every time is cheaper than waiting a second round.
   const [
     selected,
     rows,
@@ -775,20 +737,14 @@ export async function payments(
     transfers,
     allCredits,
     counts,
-    showTotals,
+    views,
     elsewhere,
     droppedRecently,
-    history,
+    importButton,
+    state,
   ] = await Promise.all([
     chosen,
-    chosen.then((m) =>
-      env.DB.prepare(
-        "SELECT t.*,a.label AS account_name,a.bank_name FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=? ORDER BY t.booking_date,t.account_key,t.id LIMIT 100 OFFSET ?",
-      )
-        .bind(m, offset)
-        .all<Payment>()
-        .then((r) => r.results),
-    ),
+    chosen.then((m) => viewRows(env, m, view, view === 'todo' ? BULK_CAP : undefined)),
     matchableReceipts(env),
     openSales(env),
     env.DB.prepare('SELECT * FROM vendor_rules')
@@ -801,10 +757,10 @@ export async function payments(
     )
       .all<Payment>()
       .then((r) => r.results),
-    // The whole month in numbers, whichever page of it is shown, and the
+    // The whole month in numbers, however many rows are shown, and the
     // matched receipts that still need a look.
     chosen.then((m) => monthCounts(env, m)),
-    chosen.then((m) => showCounts(env, m)),
+    chosen.then((m) => viewCounts(env, m)),
     chosen.then((m) =>
       env.DB.prepare(
         `SELECT substr(t.booking_date,1,7) m, count(*) n ${MISSING_PAYMENTS} AND substr(t.booking_date,1,7)<>? GROUP BY m ORDER BY m DESC LIMIT 12`,
@@ -814,7 +770,8 @@ export async function payments(
         .then((r) => r.results),
     ),
     hasRecentDropped(env),
-    statements(env),
+    importLink(env),
+    chosen.then((m) => monthState(env, m)),
   ]);
   const invoices = rows.some((t) => t.amount_minor > 0 && !t.receipt_id) ? allInvoices : [];
   const paired = new Map(
@@ -830,6 +787,7 @@ export async function payments(
     ? allCredits.filter((t) => !paired.has(t.id))
     : [];
   const unmatched = (t: Payment) => !paired.has(t.id) && t.amount_minor < 0 && !!t.receipt_required && !t.receipt_id;
+  // The month's open payments (up to BULK_CAP in To do), so Match all never depends on upto.
   const open = rows.filter(unmatched);
   // Which account a payment came from matters only when there is more than one.
   const accounts = new Set(rows.map((t) => t.account_key));
@@ -842,122 +800,134 @@ export async function payments(
     return found.length === 1 ? found[0] : undefined;
   };
   const { likely: likelyOf, exact: bulk } = likelyPairs(open, receipts, rules, tuning);
-  const isMissing = unmatched;
-  const missing = open;
-  // Missing first: it is the only thing Bank asks of you.
-  const automatic = rows.filter((t) => t.receipt_id && t.match_method === 'automatic');
-  const show =
-    params.get('show') === 'auto' && automatic.length
-      ? 'auto'
-      : params.get('show') === 'all' || (params.get('show') !== 'missing' && !missing.length)
-        ? 'all'
-        : 'missing';
-  const firstMissing = missing[0]?.id;
-  const firstTransfer = rows.find((t) => paired.has(t.id))?.id;
-  const shown = show === 'missing' ? missing : show === 'auto' ? automatic : rows;
-  const selecting = params.get('select') === '1';
-  const here = `/payments?month=${selected}&show=${show}${offset ? `&offset=${offset}` : ''}`;
+  const shown = view === 'todo' ? rows.slice(0, upto) : rows;
+  const here: ListState = { ...RECEIPTS_TODO, key: 'bank', view, month: selected, upto };
   const bar: BulkList = {
     form: 'bulk-payments',
     action: '/payments/bulk',
     noun: ['payment', 'payments'],
-    total: showTotals[show],
-    scope: { month: selected, show, ...(offset ? { offset: String(offset) } : {}) },
+    total: views[view],
+    scope: listParams(here),
     actions: [...PAYMENT_ACTIONS],
   };
+  // Every row form posts the list it is on, so its return keeps the view and lands on the next row.
+  const fields = listFields(here);
   const dayIn = (value: string | null, other: string) =>
     value ? day(value, value.slice(0, 4) !== other.slice(0, 4)) : 'None';
   // Name, Date and Amount side by side, each marked in words, with the one button under it.
-  const likelyForm = (t: Payment, r: Receipt, noun: string, primary: boolean) => {
+  const likelyForm = (t: Payment, r: Receipt, noun: string) => {
     const facts = pairFacts(r, t, rules, tuning);
     const scope = `match:${t.id}`;
     const line = (label: string, bank: string, other: string, cell: Cell) =>
       `<tr><th scope="row">${label}</th><td${cell.same ? '' : ' data-l="Bank"'}>${bank}</td><td${cell.same ? ' class="dup"' : ` data-l="${noun}"`}>${other}</td><td class="${cell.same ? 'same' : 'diff'}">${escape(cell.text)}</td></tr>`;
-    const why = facts.exact
-      ? ''
-      : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)} <a href="/help#match-anyway">What is this?</a></p>`;
+    const why = facts.exact ? '' : `<p class="likely__why" id="e-why-${t.id}">${escape(facts.reason)}</p>`;
     const described = [
       facts.exact ? '' : `e-why-${t.id}`,
       failureFor(scope)?.field === 'confirm_exception' ? errorId(scope) : '',
     ]
       .filter(Boolean)
       .join(' ');
-    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}<button class="btn ${primary ? 'primary' : 'secondary'}" id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link">${facts.exact ? 'Match' : 'Match anyway'}</button></form>`;
+    return `<form action="/matches" method="post" class="likely" aria-labelledby="lk-${t.id}"><p class="likely__head"><strong id="lk-${t.id}">Likely: ${escape(receiptName(r))}, ${dayIn(r.issue_date, t.booking_date)}, ${amount(r.total_minor, r.currency)}</strong></p><table class="cmp"><thead><tr><th scope="col"><span class="vh">Field</span></th><th scope="col">Bank</th><th scope="col">${noun}</th><th scope="col">Compared</th></tr></thead><tbody>${line('Name', escape(t.merchant), escape(receiptName(r)), facts.name)}${line('Date', day(t.booking_date, false), dayIn(r.issue_date, t.booking_date), facts.date)}${line('Amount', amount(t.amount_minor, t.currency), amount(r.total_minor, r.currency), facts.amount)}</tbody></table>${why}${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">${facts.exact ? '' : '<input type="hidden" name="confirm_exception" value="yes">'}${button('match', { attrs: ` id="f-confirm-${t.id}"${described ? ` aria-describedby="${described}"` : ''} name="action" value="link"` })}</form>`;
   };
   // The search box: type a seller, a date or an amount, or pick from the list.
   const picker = (t: Payment, listId: string, noun: string) => {
     const typed = chosenReceipt(t.id);
-    return `<form action="/matches" method="post" class="pmatch"><input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}><button class="btn secondary" name="action" value="link">Match</button></form>`;
+    return `<form action="/matches" method="post" class="pmatch">${fields}<input type="hidden" name="transaction_id" value="${t.id}"><input name="receipt_id" list="${listId}" autocomplete="off" aria-label="${noun}" placeholder="Seller, date or amount" value="${ID.test(typed) ? '' : escape(typed)}"${ariaFor(`match:${t.id}`, 'receipt_id')}>${button('match', { attrs: ' name="action" value="link"' })}</form>`;
   };
-  // A likely pair first, the search box behind it; no pair, the search box alone.
+  // A likely pair first, with the search box left to More; no pair, the search box alone.
   const matchControls = (
     t: Payment,
     pool: Receipt[],
     listId: string,
     noun: string,
     likely: Receipt | undefined,
-    primary: boolean,
-  ) => {
+  ): { main: string; rest: string } => {
     const lower = noun.toLowerCase();
     const pair = chosenOf(t, pool) ?? likely;
     return pair
-      ? `${likelyForm(t, pair, noun, primary)}<details${failureFor(`match:${t.id}`)?.field === 'receipt_id' ? ' open' : ''}><summary>Pick another ${lower}</summary><div class="body">${picker(t, listId, noun)}</div></details>`
-      : `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'receipt'} fits.</p>${picker(t, listId, noun)}${lower === 'invoice' ? '' : `<a class="btn ${primary ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`}`;
+      ? {
+          main: likelyForm(t, pair, noun),
+          rest: `<p class="hint">Pick another ${lower}</p>${picker(t, listId, noun)}`,
+        }
+      : {
+          main: `<p class="none">No ${lower === 'invoice' ? 'open invoice' : 'receipt'} fits.</p>${picker(t, listId, noun)}`,
+          rest: '',
+        };
   };
   const items = shown
     .map((t) => {
       const pair = paired.get(t.id);
       const extra: string[] = [];
-      let status: string,
+      let status = '',
+        meta = '',
         controls = '';
       if (pair) {
-        status = tag(
+        meta = tag(
           t.id === pair.debit_id
             ? `Transfer to ${escape(pair.credit_account_name)}`
             : `Transfer from ${escape(pair.debit_account_name)}`,
         );
         extra.push(
-          `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
+          `<form action="/transfers/${pair.debit_id}/undo" method="post">${fields}${button('undo', { label: 'Undo transfer' })}</form>`,
         );
       } else if (t.receipt_id) {
-        status = `${tag(matchStatus(t.match_method), true, t.match_method === 'automatic')} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>${counts.reviewing.has(t.receipt_id) ? ` <a class="stamp needs" href="/receipts/${t.receipt_id}">${STATUS.needs}</a>` : ''}`;
+        // One stamp per row: a matched receipt that still needs checking says so in its link.
+        const doc = t.amount_minor > 0 ? 'Invoice' : 'Receipt';
+        status = `${statusMark('matched')} <a class="tag" href="/receipts/${t.receipt_id}">${counts.reviewing.has(t.receipt_id) ? `Check the ${doc.toLowerCase()}` : doc}</a>`;
         extra.push(
-          `<form action="/matches" method="post"><input type="hidden" name="transaction_id" value="${t.id}"><button class="linkbtn" name="action" value="unlink">Remove match</button></form>`,
+          `<form action="/matches" method="post">${fields}<input type="hidden" name="transaction_id" value="${t.id}">${button('unmatch', { attrs: ' name="action" value="unlink"' })}</form>`,
         );
       } else if (t.amount_minor >= 0) {
-        status = tag('Money in');
+        meta = tag('Money in');
         const likely = invoices.find((r) => creditFit(r, t, tuning) !== null);
-        if (invoices.length && t.amount_minor > 0 && t.receipt_required)
-          controls = `${matchControls(t, invoices, 'pick-invoices', 'Invoice', likely, false)}${matchError(t.id)}`;
+        if (invoices.length && t.amount_minor > 0 && t.receipt_required) {
+          const found = matchControls(t, invoices, 'pick-invoices', 'Invoice', likely);
+          controls = `${found.main}${matchError(t.id)}`;
+          if (found.rest) extra.push(found.rest);
+        }
       } else if (!t.receipt_required) {
         const by = t.exempt_by && t.exempt_by !== 'owner' ? EXEMPT_LABELS[t.exempt_by] : '';
-        status = `${tag(STATUS.notPurchase)}${by ? ` <span class="tag">${by}</span>` : ''}`;
+        status = statusMark('notPurchase');
+        meta = by ? tag(by) : '';
         extra.push(
-          `<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="1">Needs a receipt</button></form>`,
+          `<form action="/payments/${t.id}" method="post">${fields}${button('needs', { attrs: ' name="receipt_required" value="1"' })}</form>`,
         );
       } else {
-        const first = t.id === firstMissing;
         const likely = likelyOf.get(t.id);
-        status = `<span class="stamp missing">${STATUS.missing}</span>`;
-        const find = receipts.length
-          ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely, first)
-          : `<p class="none">No receipt found yet.</p><a class="btn ${first ? 'primary' : 'secondary'}" href="/add">Add receipt</a>`;
+        status = statusMark('missing');
+        const found = receipts.length
+          ? matchControls(t, receipts, 'pick-receipts', 'Receipt', likely)
+          : { main: '<p class="none">No receipt found yet.</p>', rest: '' };
         const dropped =
           droppedRecently && !likely
-            ? `<p class="small"><a href="/settings?open=mail#mail">Check mail we didn't keep</a></p>`
+            ? `<p class="small"><a href="/settings?open=senders#mail">Check mail we didn't keep</a></p>`
             : '';
-        controls = `<div class="fixrow">${find}<form action="/payments/${t.id}" method="post"><button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
-        if (receipts.length && likely) extra.push('<p><a href="/add">Add a receipt</a></p>');
+        controls = `<div class="fixrow">${found.main}<form action="/payments/${t.id}" method="post">${fields}${button('exempt', { attrs: ' name="receipt_required" value="0"' })}</form></div>${dropped}${matchError(t.id)}`;
+        if (found.rest) extra.push(found.rest);
+        extra.push('<p><a href="/add">Add a receipt</a></p>');
         const sides = credits.filter(
           (c) => c.account_key !== t.account_key && c.currency === t.currency && c.amount_minor === -t.amount_minor,
         );
         if (sides.length)
           extra.push(
-            `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
+            `<form action="/transfers" method="post" class="transfer">${fields}<input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required value="${escape(kept(transferScope(t.id), 'reason', ''))}"${ariaFor(transferScope(t.id), 'reason')}>${button('ownTransfer')}${errorLine(transferScope(t.id))}</form>`,
           );
       }
       // No bulk action applies to a transfer side.
-      return `<li class="pay${isMissing(t) ? ' missing' : ''}"${t.id === firstTransfer ? ' id="transfers"' : ''}>${pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`)}<div class="line"><span class="who">${escape(t.merchant)}</span><span class="amt">${amount(t.amount_minor, t.currency)}</span><span class="meta"><span class="when">${day(t.booking_date, false)}${accounts.size > 1 ? ` <span class="hint">${escape(t.account_name)}</span>` : ''}</span> <span class="st">${status}</span></span>${extra.length ? more(extra.join(''), escape(t.merchant)) : ''}</div>${controls}</li>`;
+      const account = accounts.size > 1 ? escape(t.account_name) : '';
+      return row({
+        key: t.id,
+        pick: pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`),
+        date: day(t.booking_date, false),
+        title: escape(t.merchant),
+        meta: [account, meta].filter(Boolean).join(' · '),
+        status,
+        amount: amount(t.amount_minor, t.currency),
+        actions: extra.length
+          ? more(extra.join(''), escape(t.merchant), failureFor(`match:${t.id}`)?.field === 'receipt_id')
+          : '',
+        below: controls,
+      });
     })
     .join('');
   const datalistOptions = (pool: Receipt[]) =>
@@ -965,65 +935,73 @@ export async function payments(
   const lists = `${items.includes('list="pick-receipts"') ? `<datalist id="pick-receipts">${datalistOptions(receipts)}</datalist>` : ''}${items.includes('list="pick-invoices"') ? `<datalist id="pick-invoices">${datalistOptions(invoices)}</datalist>` : ''}`;
   // What Match all will accept, pair by pair with its reason, before it is pressed.
   const matchAll = bulk.length
-    ? `<form action="/matches/bulk" method="post" class="matchall"><input type="hidden" name="month" value="${selected}"><details open><summary>Will match ${plural(bulk.length, 'payment')}</summary><ul>${bulk
+    ? `<form action="/matches/bulk" method="post" class="matchall">${fields}<details open><summary>Will match ${plural(bulk.length, 'payment')}</summary><ul>${bulk
         .map(
           ({ t, r, facts }) =>
             `<li>${escape(t.merchant)}, ${day(t.booking_date, false)}, ${amount(t.amount_minor, t.currency)} to ${escape(receiptName(r))}<span>${escape(whyLikely(facts))}</span></li>`,
         )
         .join(
           '',
-        )}</ul></details>${bulk.map(({ t, r }) => `<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">`).join('')}<button class="btn secondary">${matchAllLabel(bulk.length)}</button></form>`
+        )}</ul></details>${bulk.map(({ t, r }) => `<input type="hidden" name="transaction_id" value="${t.id}"><input type="hidden" name="receipt_id" value="${r.id}">`).join('')}${button('matchAll', { label: matchAllLabel(bulk.length) })}</form>`
     : '';
   const picks = shown.filter((t) => !paired.has(t.id)).length;
-  const table = `<div class="pays-h" aria-hidden="true"><span>Date</span><span>Paid to</span><span>Amount</span><span>State</span></div><ol class="pays">${items}</ol>`;
+  const table = rowList([items]);
   const others = elsewhere.length
-    ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="/payments?month=${e.m}&show=missing">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
+    ? `<p class="small">Also missing: ${elsewhere.map((e) => `<a href="${bankPath(e.m, 'todo')}">${escape(monthName(e.m))} (${e.n})</a>`).join(', ')}</p>`
     : '';
-  const filter = chipRow('Show', [
-    { href: `/payments?month=${selected}&show=all`, label: 'All', count: rows.length, current: show === 'all' },
-    {
-      href: `/payments?month=${selected}&show=missing`,
-      label: STATUS.missing,
-      count: counts.missing,
-      current: show === 'missing',
-    },
-    {
-      href: `/payments?month=${selected}&show=auto`,
-      label: STATUS.matchedAuto,
-      count: automatic.length,
-      current: show === 'auto',
-    },
-  ]);
-  const body = rows.length
-    ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.toLowerCase()}, <span${counts.missing ? ' class="red"' : ''}>${counts.missing} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.toLowerCase()}` : ''}</span></p>${filter}${
-        open.length ? '' : await settled(env, selected)
-      }${matchAll}${shown.length ? `${picks ? `<div data-bulk-list="${bar.form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bar, picks, selecting, selecting ? here : `${here}&select=1`)}${table}</div>${bulkBar(bar)}` : table}${lists}` : ''}${
-        offset > 0 || rows.length === 100
-          ? `<p>${offset > 0 ? `<a href="/payments?month=${selected}&show=${show}&offset=${Math.max(0, offset - 100)}">Earlier</a>` : ''}${offset > 0 && rows.length === 100 ? ' · ' : ''}${rows.length === 100 ? `<a href="/payments?month=${selected}&show=${show}&offset=${offset + 100}">Later</a>` : ''}</p>`
-          : ''
-      }`
+  const switcher = viewSwitch((v) => bankPath(selected, v), views, view);
+  const left = views.todo - shown.length;
+  const head =
+    view === 'todo'
+      ? `<p class="listhead">${left > 0 ? `${shown.length} of ${views.todo}` : views.todo} to do</p>`
+      : '';
+  const showMore =
+    view === 'todo' && left > 0 && upto < BULK_CAP
+      ? `<p>${buttonLink('showMore', bankPath(selected, 'todo', Math.min(upto + BANK_UPTO, BULK_CAP)), { label: `Show ${Math.min(left, BANK_UPTO)} more` })}</p>`
+      : '';
+  const list = `<div data-list="bank-${view}" data-total="${views[view]}"${picks ? ` data-bulk-list="${bar.form}"` : ''}>${
+    shown.length
+      ? `${head}${picks ? bulkTools(bar, picks) : ''}${table}`
+      : view === 'todo'
+        ? settled(state, selected)
+        : ''
+  }</div>`;
+  const body = views.all
+    ? `<p class="summary"><span>${counts.out} out, ${counts.matched} matched, ${counts.exempt} ${STATUS.notPurchase.word.toLowerCase()}, <span${views.todo ? ' class="red"' : ''}>${views.todo} missing</span>${counts.reviewing.size ? `, ${counts.reviewing.size} ${STATUS.needs.word.toLowerCase()}` : ''}</span></p>${switcher}${matchAll}${list}${picks ? bulkBar(bar) : ''}${lists}${showMore}`
     : emptyState(
         `No statement for ${escape(monthName(selected))} yet.`,
-        '<a class="btn primary" href="/import">Import statement</a>',
+        buttonLink('importStmt', '/import', { tone: 'primary' }),
       );
-  return page('bank', `${others}${body}${history}`, 200, env, {
+  return page('bank', `${others}${body}${importButton}`, 200, env, {
+    style: VIEW_TRANSITION_CSS,
     detail: monthName(selected),
-    head: monthHead('/payments', selected),
+    // The one primary, as on Receipts To do: the first open payment, not a button on its row.
+    head: monthHead(
+      '/payments',
+      selected,
+      open[0]
+        ? buttonLink('startMatching', `${bankPath(selected, 'todo')}#row-${open[0].id}`, {
+            label: `Start matching (${views.todo})`,
+          })
+        : '',
+    ),
   });
 }
 
 // Bank when every payment has a receipt: say so, and offer the month's next step as the one
 // primary. Once the month is sent there is none, and a quiet link back to it.
-async function settled(env: Env, selected: string): Promise<string> {
-  const s = await monthState(env, selected);
+function settled(s: MonthState, selected: string): string {
   const short = escape(monthName(selected, false));
   const step = nextStep(s, selected);
   const action = s.sent
-    ? `<p>${tag(`${short} is ${STATUS.sent.toLowerCase()}`, true)} <a href="/?month=${selected}#send">Open ${short}</a></p>`
+    ? `<p>${statusMark('sent', { after: short })} <a href="/?month=${selected}#send">Open ${short}</a></p>`
     : step
-      ? `<a class="btn primary" href="${step.href}">${step.label}</a>`
+      ? buttonLink(step.key, step.href, { tone: 'primary' })
       : s.docs
-        ? `<a class="btn primary" href="/?month=${selected}#send">Send ${short}</a>`
+        ? buttonLink('zip', `/?month=${selected}#send`, {
+            tone: 'primary',
+            label: `Send ${monthName(selected, false)}`,
+          })
         : '';
   return emptyState('Every payment has a receipt.', action);
 }
@@ -1043,11 +1021,11 @@ function lacks(s: MonthState, undated = 0): string {
 }
 // The next step of a month and its place, shared by Home and Bank so both offer the same one primary action.
 // Null when nothing is left to do (the month is sent) or nothing can be sent yet.
-function nextStep(s: MonthState, selected: string): { label: string; href: string } | null {
-  if (s.docs === 0) return { label: 'Add receipts', href: '/add' };
-  if (!s.done.review) return { label: 'Check receipts', href: '/review' };
-  if (!s.imported) return { label: 'Import statement', href: '/import' };
-  if (!s.done.match) return { label: 'Find receipts', href: `/payments?month=${selected}&show=missing` };
+function nextStep(s: MonthState, selected: string): { key: ActionKey; href: string } | null {
+  if (s.docs === 0) return { key: 'addReceipt', href: '/add' };
+  if (!s.done.review) return { key: 'start', href: listUrl({ ...RECEIPTS_TODO, month: selected }) };
+  if (!s.imported) return { key: 'importStmt', href: '/import' };
+  if (!s.done.match) return { key: 'startMatching', href: bankPath(selected, 'todo') };
   return null;
 }
 
@@ -1081,11 +1059,13 @@ export async function home(env: Env, requested: string | null, params = new URLS
     );
   const selected = requested ?? arrival!.month;
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
+  const todo = escape(listUrl(RECEIPTS_TODO));
   const alert = overdue.length
-    ? `<a href="/invoices?month=${selected}&show=overdue">${plural(overdue.length, 'invoice')} overdue ›</a>`
+    ? `<a href="${todo}">${plural(overdue.length, 'invoice')} overdue ›</a>`
     : unverified
-      ? `<a href="/review?reason=sender">${plural(unverified, 'email')} not verified ›</a>`
+      ? `<a href="${todo}">${plural(unverified, 'email')} not verified ›</a>`
       : '';
+  const checkHref = escape(listUrl({ ...RECEIPTS_TODO, month: selected }));
   const undated = s.undated;
   const short = monthName(selected, false);
   const empty = s.docs === 0;
@@ -1100,24 +1080,25 @@ export async function home(env: Env, requested: string | null, params = new URLS
   const check = empty
     ? row(1, 'Check', 'Nothing yet', '/add')
     : s.flagged.length
-      ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, '/review', true)
+      ? row(1, 'Check', `${s.flagged.length} to check${undated ? `, ${undated} undated` : ''}`, checkHref, true)
       : undated
-        ? row(1, 'Check', `${undated} undated`, '/review', true)
-        : row(1, 'Check', 'All checked', `/receipts?month=${selected}`, false, true);
+        ? row(1, 'Check', `${undated} undated`, checkHref, true)
+        : row(
+            1,
+            'Check',
+            'All checked',
+            escape(listUrl({ ...RECEIPTS_TODO, view: 'all', month: selected })),
+            false,
+            true,
+          );
   const match = !s.imported
     ? row(2, 'Match', 'No statement', '/import', current === 2)
     : s.missing.length
-      ? row(2, 'Match', `${s.missing.length} missing`, `/payments?month=${selected}&show=missing`, true)
+      ? row(2, 'Match', `${s.missing.length} missing`, bankPath(selected, 'todo'), true)
       : row(2, 'Match', 'All matched', `/payments?month=${selected}`, false, true);
   const send = await sendStep(env, s, selected, current, params, undatedDocs);
   const step = nextStep(s, selected);
-  const next = step && current < 3 ? `<a class="btn primary" href="${step.href}">${step.label}</a>` : '';
-  const dated = [
-    s.rows.length ? plural(s.rows.length, 'receipt') : '',
-    s.sales.length ? plural(s.sales.length, 'invoice') : '',
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const next = step && current < 3 ? buttonLink(step.key, step.href, { tone: 'primary' }) : '';
   // Why Home opened here, when it is not the current month.
   const why =
     arrival && arrival.month !== arrival.current
@@ -1125,7 +1106,7 @@ export async function home(env: Env, requested: string | null, params = new URLS
       : '';
   return page(
     'home',
-    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}${next ? `<div class="next">${next}</div>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${send.body ? `<div id="send">${send.body}</div>` : ''}${dated ? `<p class="dated"><a href="/receipts?month=${selected}">${dated} dated ${escape(short)} ›</a></p>` : ''}`,
+    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}${next ? `<div class="next">${next}</div>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${send.body ? `<div id="send">${send.body}</div>` : ''}`,
     200,
     env,
     { detail: monthName(selected), head: monthHead('/', selected) },
@@ -1177,13 +1158,14 @@ async function sendStep(
   const drive = conn?.folder_item_id ? conn : null;
   const upload = drive && !empty ? await progress(env, drive, selected, chosen) : null;
   const folder = escape(drive?.folder_name ?? '');
-  const csv = `<a class="linkbtn" href="/export.csv?month=${selected}">CSV</a>`;
-  const zip = (o: Partial<PackageOptions>, text: string, cls = 'secondary') =>
-    `<a class="btn ${cls}" href="/month/package.zip?${query(selected, o)}">${text}</a>`;
-  const uploadForm = (o: Partial<PackageOptions>, text: string, cls = 'secondary') =>
-    `<form action="/month/onedrive-upload" method="post">${optionFields(selected, o)}<button class="btn ${cls}">${text}</button></form>`;
-  const short = escape(monthName(selected, false));
-  const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}<button class="btn secondary">Mark ${short} as sent</button></form>`;
+  // A file is a plain same-origin link that says it is a download, so an installed app, which has
+  // no address bar, saves it instead of trying to show it.
+  const csv = buttonLink('csv', `/export.csv?month=${selected}`, { attrs: ' download' });
+  const zip = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
+    buttonLink('zip', `/month/package.zip?${query(selected, o)}`, { label: text, tone, attrs: ' download' });
+  const uploadForm = (o: Partial<PackageOptions>, text: string, tone: Tone = 'secondary') =>
+    `<form action="/month/onedrive-upload" method="post">${optionFields(selected, o)}${button('oneDrive', { label: text, tone })}</form>`;
+  const markSent = `<form action="/month/sent" method="post">${hidden('month', selected)}${hidden('receipts_hash', s.send.hash)}${button('sent', { label: `Mark ${monthName(selected, false)} as sent` })}</form>`;
   // A download can't redirect, so the question sits next to the button for as long as the month is ready to send.
   const didSend = `<div class="sentq"><h3>Did you send it?</h3>${markSent}</div>`;
   const line = `<p class="small">${escape(EXPORT_LINE)}</p>`;
@@ -1204,20 +1186,21 @@ async function sendStep(
     ? `<details><summary>In the ZIP</summary><div class="body"><ul class="manifest" aria-label="Files in the package"><li>${escape(plan.folder)}/</li><li>00-index-${selected}.csv</li>${plan.files.some((f) => f.receipt.kind === 'sales') ? `<li>00-sales-index-${selected}.csv</li>` : ''}${s.missing.length ? `<li>00-missing-receipts-${selected}.csv</li>` : ''}${shown.map((f) => `<li>${escape(f.path)}</li>`).join('')}${plan.files.length > shown.length ? `<li class="more">… ${plan.files.length - shown.length} more</li>` : ''}</ul><p class="small">${plural(plan.files.length, 'file')}${sized ? `, ${size(bytes)}` : ''}</p></div></details>`
     : '';
   const rowsByKey = [...s.matrix].filter(([, v]) => v !== 0n);
-  const parts = rowsByKey.length
-    ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
-        .map(([key, v]) => {
-          const [product = '', type = ''] = key.split('\u0000');
-          return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
-        })
-        .join(
-          '',
-        )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
-    : '';
+  const byPart =
+    rowsByKey.length && hasParts(env)
+      ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
+          .map(([key, v]) => {
+            const [product = '', type = ''] = key.split('\u0000');
+            return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
+          })
+          .join(
+            '',
+          )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
+      : '';
   const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
-    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${parts}</div>`;
+    `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${byPart}</div>`;
 
   if (changed) {
     const what = [
@@ -1242,7 +1225,7 @@ async function sendStep(
   if (s.sent) {
     const next = shiftMonth(selected, 1);
     return {
-      status: `${STATUS.sent} ${escape(sentOn)}`,
+      status: `${STATUS.sent.word} ${escape(sentOn)}`,
       body: `<div class="card">${s.send.last!.method === 'onedrive' ? '<p class="small">Via OneDrive</p>' : ''}<p><a href="/?month=${next}">On to ${escape(monthName(next, false))} ›</a></p><div class="btns">${zip({ anyway: !ready }, 'Download again')}${csv}</div></div>`,
     };
   }
@@ -1252,18 +1235,19 @@ async function sendStep(
       upload && upload.pending.length
         ? `${uploadForm(chosen, upload.plan.files.length - upload.pending.length ? 'Continue upload' : `Upload to ${folder}`, kind)}${zip(chosen, download)}`
         : zip(chosen, download, kind);
-    return { status: STATUS.ready, body: panel(buttons, destination) };
+    return { status: STATUS.ready.word, body: panel(buttons, destination) };
   }
   // Not ready: download anyway, behind one fold.
   const undated = plan.undated
     ? `<label class="check"><input type="checkbox" name="undated" value="1">Add ${plural(plan.undated, 'undated receipt')}</label>`
     : '';
-  const anyway = `<form action="/month/package.zip" method="get">${hidden('month', selected)}${hidden('anyway', 1)}${undated}<button class="btn secondary">Download anyway</button></form>${
+  // A GET form, not a link, because it carries the undated choice; the response is an attachment either way.
+  const anyway = `<form action="/month/package.zip" method="get">${hidden('month', selected)}${hidden('anyway', 1)}${undated}${button('downloadAnyway')}</form>${
     upload && upload.pending.length ? uploadForm({ anyway: true }, 'Upload anyway') : ''
   }`;
   return {
     status: 'Not ready',
-    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${line}${didSend}${manifest}${parts}</div></details>`,
+    body: `<details class="send"${uploading ? ' open' : ''}><summary>Download anyway</summary><div class="body">${spent}${plan.unchecked ? `<p class="small">Unchecked ones go in check-these/.</p>` : ''}${destination}<div class="btns">${anyway}${csv}</div>${line}${didSend}${manifest}${byPart}</div></details>`,
   };
 }
 
@@ -1273,25 +1257,19 @@ function ruleFields(
   rule: Partial<
     Pick<Rule, 'vendor_contains' | 'context_contains' | 'bank_alias' | 'product' | 'expense_type' | 'priority'>
   > = {},
+  // The form's name when it was the one refused (rule:new, rule:<id>, rule:receipt), so what was
+  // typed comes back and the message sits at the field. Forms that were not refused stay plain.
+  scope = '',
 ): string {
-  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"' })}${productSelect(env, 'product', rule.product ?? config(env).defaultProduct, 'Part')}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"' })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"' })}</div>`;
+  const own = (name: string) => (scope ? { scope, id: fieldId(scope, name) } : {});
+  return `<div class="fields">${input('vendor_contains', rule.vendor_contains ?? '', 'text', 'Seller contains', { attrs: ' required maxlength="200"', ...own('vendor_contains') })}${hasParts(env) ? productSelect(env, 'product', kept(scope, 'product', rule.product ?? config(env).defaultProduct), 'Part') : `<input type="hidden" name="product" value="${escape(config(env).defaultProduct)}">`}${select('expense_type', EXPENSE_TYPES, rule.expense_type ?? EXPENSE_TYPES[0], 'Kind', scope, scope ? fieldId(scope, 'expense_type') : '')}${input('context_contains', rule.context_contains ?? '', 'text', 'Also mentions', { attrs: ' maxlength="200" placeholder="Optional"', ...own('context_contains') })}${input('bank_alias', rule.bank_alias ?? '', 'text', 'Bank name', { attrs: ' maxlength="200" placeholder="Optional"', ...own('bank_alias') })}${input('priority', rule.priority ?? 0, 'number', 'Priority', { attrs: ' title="Higher wins when rules overlap"', ...own('priority') })}</div>${scope ? errorLine(scope, '') : ''}`;
 }
 
-// ---------- Bank: statements imported ----------
-// Under the month's payments once any statement is in: a closed list and Import.
-async function statements(env: Env): Promise<string> {
-  const history = (
-    await env.DB.prepare(
-      "SELECT i.*,a.label AS account_name,a.bank_name FROM imports i JOIN accounts a ON a.id=i.account_key WHERE i.status='complete' ORDER BY i.imported_at DESC,i.id LIMIT 20",
-    ).all<{ account_name: string; bank_name: string; imported_at: string; row_count: number }>()
-  ).results;
-  if (!history.length) return '';
-  return `<div class="stmts" id="imports"><details><summary>Statements (${history.length})</summary><ul class="list">${history
-    .map(
-      (i) =>
-        `<li><span class="who">${escape(i.account_name)}${i.bank_name ? ` · ${escape(i.bank_name)}` : ''}</span><span class="amt">${i.row_count}</span><span class="ok">${escape(day(i.imported_at))}</span></li>`,
-    )
-    .join('')}</ul></details><a class="btn secondary" href="/import">Import statement</a></div>`;
+// ---------- Bank: import ----------
+// Under the month's payments once any statement is in.
+async function importLink(env: Env): Promise<string> {
+  const any = await env.DB.prepare("SELECT EXISTS(SELECT 1 FROM imports WHERE status='complete') n").first<number>('n');
+  return any ? `<div class="stmts" id="imports">${buttonLink('importStmt', '/import')}</div>` : '';
 }
 
 // ---------- Settings ----------
@@ -1301,54 +1279,76 @@ async function statements(env: Env): Promise<string> {
 function sect(id: string, title: string, summary: string, body: string, open = false): string {
   return `<details class="sect"${open ? ' open' : ''}><summary><h2>${title}</h2>${summary ? `<span class="sum">${summary}</span>` : ''}</summary><div class="body" id="${id}">${body}</div></details>`;
 }
+// A part of a section with its own heading and anchor. Links from banners and Undo still name it.
+function sub(id: string, title: string, body: string): string {
+  return `<div class="sectpart" id="${id}"><h3>${title}</h3>${body}</div>`;
+}
+// Which of the five sections holds a part, by the anchor it goes by.
+const SECTION_OF: Record<string, string> = {
+  'setup-business': 'business',
+  rules: 'business',
+  'setup-email': 'email',
+  senders: 'email',
+  mail: 'email',
+  accounts: 'bank',
+  'setup-accountant': 'sending',
+  onedrive: 'sending',
+  'setup-review': 'advanced',
+  'setup-integrations': 'advanced',
+  'setup-deploy': 'advanced',
+  'setup-history': 'advanced',
+  about: 'advanced',
+};
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
-async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<string> {
+async function oneDrivePart(env: Env, origin: string): Promise<string> {
   const settings = config(env);
   const docs = settings.sourceRepository
     ? `<a href="${escape(settings.sourceRepository)}/blob/main/docs/ENVIRONMENT.md#onedrive-upload-optional">docs/ENVIRONMENT.md</a>`
     : '<code>docs/ENVIRONMENT.md</code>';
   if (!settings.oneDrive)
     return settings.oneDriveIncomplete
-      ? sect(
+      ? sub(
           'onedrive',
           'OneDrive',
-          'Not set up',
           `<p class="warning"><code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing. See ${docs}.</p>`,
-          open,
         )
       : '';
   const conn = await connection(env);
   const tech = `<details class="tech"><summary>Redirect URI for Microsoft Entra</summary><div class="body"><p>Microsoft sends you back to this app after you sign in. Add this address to your Microsoft Entra app, under Authentication, as a Web redirect URI.</p><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
-    return sect(
+    return sub(
       'onedrive',
       'OneDrive',
-      'Not connected',
-      `<p class="cta"><a class="btn secondary" href="/settings/onedrive/connect">Connect</a></p>${tech}`,
-      open,
+      `<p class="cta">${buttonLink('connect', '/settings/onedrive/connect')}</p>${tech}`,
     );
-  const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"' })}</div><button class="btn secondary">Use folder</button></form>`;
+  const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true, scope: FOLDER_SCOPE })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"', scope: FOLDER_SCOPE })}</div>${errorLine(FOLDER_SCOPE, '')}${button('save', { label: 'Use folder' })}</form>`;
   const folder = conn.folder_item_id
     ? `<a href="${escape(conn.folder_web_url ?? '')}"><strong>${escape(conn.folder_name)}</strong></a>`
     : '<span class="warning">Not chosen</span>';
-  return sect(
+  return sub(
     'onedrive',
     'OneDrive',
-    escape(conn.account_email ?? conn.account_name),
     `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
-      conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
-    }<form action="/settings/onedrive/disconnect" method="post" class="cta"><button class="linkbtn">Disconnect</button></form>${tech}`,
-    open,
+      conn.folder_item_id
+        ? `<details class="why"${failureFor(FOLDER_SCOPE) ? ' open' : ''}><summary>Change folder</summary>${folderForm}</details>`
+        : folderForm
+    }<details class="cta">${buttonSummary('disconnect')}<div class="body"><form action="/settings/onedrive/disconnect" method="post"><p class="ask">Delete this app's sign-in to your Microsoft account? Uploads stop until you connect again.</p>${button('disconnect')}</form></div></details>${tech}`,
   );
 }
 
-// Settings > Senders: who is read automatically and who is ignored.
-async function sendersPart(env: Env, open: boolean, selecting: boolean): Promise<string> {
+// Settings > Email senders: who is read automatically, who is ignored, and the
+// mail we didn't keep, as one list.
+async function sendersPart(env: Env): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
-  const ignored = await ignoredSenders(env);
-  const here = '/settings?open=senders#senders';
-  const list = (form: string, action: BulkAction, addresses: readonly string[], button: string, path: string) => {
+  const [ignored, log] = await Promise.all([ignoredSenders(env), mailLog(env)]);
+  const list = (
+    form: string,
+    action: BulkAction,
+    addresses: readonly string[],
+    key: 'remove' | 'unignore',
+    path: string,
+  ) => {
     const bulk: BulkList = {
       form,
       action: '/senders/bulk',
@@ -1357,30 +1357,34 @@ async function sendersPart(env: Env, open: boolean, selecting: boolean): Promise
       scope: { back: 'settings' },
       actions: [action],
     };
-    return `<div data-bulk-list="${form}"${selecting ? ' data-selecting' : ''}>${bulkTools(bulk, addresses.length, selecting, selecting ? here : '/settings?open=senders&select=1#senders')}<ul class="plain rowlist">${addresses.map((a) => row(bulk, a, path, button)).join('')}</ul></div>${bulkBar(bulk)}`;
+    return `<div data-bulk-list="${form}">${bulkTools(bulk, addresses.length)}${rowList(addresses.map((a) => sender(bulk, a, path, key)))}</div>${bulkBar(bulk)}`;
   };
-  const row = (bulk: BulkList, address: string, action: string, button: string) =>
-    `<li class="srow">${bulkCheck(bulk, address, address)}<div class="sl"><span class="flabel">${escape(address)}</span></div><form class="sc" action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings"><button class="linkbtn" aria-label="${button} ${escape(address)}">${button}</button></form></li>`;
+  const sender = (bulk: BulkList, address: string, action: string, key: 'remove' | 'unignore') =>
+    row({
+      pick: bulkCheck(bulk, address, address),
+      title: escape(address),
+      actions: `<form action="${action}" method="post"><input type="hidden" name="address" value="${escape(address)}"><input type="hidden" name="back" value="settings">${button(key, { attrs: ` aria-label="${ACTIONS[key].label} ${escape(address)}"` })}</form>`,
+    });
   const approved = allowed.length
-    ? list('bulk-allowed', SENDER_ACTIONS.remove, allowed, 'Remove', '/senders/remove')
-    : '<p class="warning">None yet. All mail waits in Review.</p>';
+    ? list('bulk-allowed', SENDER_ACTIONS.remove, allowed, 'remove', '/senders/remove')
+    : '<p class="warning">None yet. All mail waits in To do.</p>';
   const ignoredList = ignored.length
     ? `<h3>Ignored</h3>${list(
         'bulk-ignored',
         SENDER_ACTIONS.unignore,
         ignored.map((i) => i.address),
-        'Stop ignoring',
+        'unignore',
         '/senders/unignore',
       )}`
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
-  const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
+  const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address" id="f-address" value="${escape(kept(NEW_SENDER, 'address', ''))}"${ariaFor(NEW_SENDER, 'address')}>${button('add', { attrs: full ? ' disabled' : '' })}${errorLine(NEW_SENDER)}</form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
+  return sub('senders', 'Email senders', `${approved}${add}${ignoredList}${log}`);
 }
 
-// Settings > Mail we didn't keep: what reached the app and was not read, from
-// the log that is already stored. Never the message itself.
-async function mailLogPart(env: Env, open: boolean): Promise<string> {
+// Mail we didn't keep: what reached the app and was not read, from the log that
+// is already stored. Never the message itself.
+async function mailLog(env: Env): Promise<string> {
   const rows = await droppedMail(env);
   const allowed = config(env).allowedSenders;
   const item = (m: (typeof rows)[number]) => {
@@ -1388,87 +1392,111 @@ async function mailLogPart(env: Env, open: boolean): Promise<string> {
     const offer =
       reasonAllows(m.reason) && !allowed.has(m.sender) && m.sender.includes('@') && !/[\s<>]/.test(m.sender);
     const action = offer
-      ? `<form class="sc" action="/senders/approve" method="post"><input type="hidden" name="address" value="${escape(m.sender)}"><input type="hidden" name="back" value="mail"><button class="linkbtn" aria-label="Allow ${escape(m.sender)}">Allow this sender</button></form>`
+      ? `<form action="/senders/approve" method="post"><input type="hidden" name="address" value="${escape(m.sender)}"><input type="hidden" name="back" value="mail">${button('allow', { attrs: ` aria-label="Allow ${escape(m.sender)}"` })}</form>`
       : '';
-    return `<li class="srow"><div class="sl"><span class="flabel">${escape(m.sender)}</span><span class="meta">${escape(when)}${m.subject ? ` · ${escape(m.subject)}` : ''}</span><span class="meta">${escape(reasonWords(m.reason))}</span></div>${action}</li>`;
+    return row({
+      date: escape(when),
+      title: escape(m.sender),
+      meta: `${m.subject ? `${escape(m.subject)} · ` : ''}${escape(reasonWords(m.reason))}`,
+      actions: action,
+    });
   };
   const body = rows.length
-    ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
+    ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p>${rowList(rows.map(item))}`
     : '<p>Every email that reached the app was kept.</p>';
-  return sect('mail', "Mail we didn't keep", rows.length ? String(rows.length) : 'None', body, open);
+  return `<h3 id="mail">Mail we didn't keep</h3>${body}`;
 }
 
+// The OneDrive folder form.
+export const FOLDER_SCOPE = 'onedrive:folder';
+// The form that adds an allowed sender in Settings.
+export const NEW_SENDER = 'sender:new';
+// An account's rename form.
+export const renameScope = (id: string) => `rename:${id}`;
+// The own-account transfer form on a payment, as a failure scope names it.
+export const transferScope = (tx: string) => `transfer:${tx}`;
+// The forms that add a vendor rule in Settings and on a receipt, as failure scopes name them.
+export const NEW_RULE = 'rule:new';
+export const RECEIPT_RULE = 'rule:receipt';
 // The form that adds a bank account in Settings, as a failure scope names it.
 export const NEW_ACCOUNT = 'account:new';
 export async function settingsPage(env: Env, params = new URLSearchParams(), origin = ''): Promise<Response> {
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
   const open = params.get('open');
-  const opened = feedback(params)?.section ?? (open === 'mail' || open === 'senders' ? open : '');
+  const anchor = feedback(params)?.section ?? (open === 'senders' ? open : '');
+  // A refused form opens the section it is in, so the message is on screen.
+  const refused = requestState.getStore()?.failure;
+  const refusedIn = refused?.scope.startsWith('setup')
+    ? SECTION_OF[`setup-${FIELD.get(refused.field as SettingKey)?.group ?? 'business'}`]
+    : refused
+      ? ({ rule: 'business', sender: 'email', account: 'bank', rename: 'bank', onedrive: 'sending' } as const)[
+          refused.scope.split(':')[0] as 'rule'
+        ]
+      : undefined;
+  const opened = new Set([SECTION_OF[anchor], params.has('routing') ? 'email' : '', refusedIn]);
   // The sections don't depend on each other, so they all load at once.
-  const [oneDrive, setup, accounts, rules, senders, mailLog] = await Promise.all([
-    oneDrivePart(env, opened === 'onedrive', origin),
-    setupParts(env, params, opened),
+  const [oneDrive, setup, accounts, rules, senders] = await Promise.all([
+    oneDrivePart(env, origin),
+    setupParts(env, params),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
-    sendersPart(env, opened === 'senders', params.get('select') === '1'),
-    mailLogPart(env, opened === 'mail'),
+    sendersPart(env),
   ]);
-  const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
-  const accountsPart = sect(
+  const accountsPart = sub(
     'accounts',
     'Bank accounts',
-    String(accounts.length),
     `${
       accounts.length
-        ? `<ul class="plain rowlist">${accounts
-            .map(
-              (a, i) =>
-                `<li class="srow"><div class="sl"><span class="flabel">${escape(a.label)}</span><span class="meta">${escape(a.bank_name) || 'No bank'} · ${escape(a.default_currency)}</span></div><form class="sc inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="acct-${i}">New name for ${escape(a.label)}</label><input id="acct-${i}" name="label" value="${escape(a.label)}"><button class="btn secondary" aria-label="Rename ${escape(a.label)}">Rename</button></form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}</li>`,
-            )
-            .join('')}</ul>`
+        ? rowList(
+            accounts.map((a) =>
+              row({
+                title: escape(a.label),
+                meta: `${escape(a.bank_name) || 'No bank'} · ${escape(a.default_currency)}`,
+                actions: `<form class="inline-edit" action="/accounts/${encodeURIComponent(a.id)}" method="post"><label class="vh" for="${fieldId(renameScope(a.id), 'label')}">New name for ${escape(a.label)}</label><input id="${fieldId(renameScope(a.id), 'label')}" name="label" value="${escape(kept(renameScope(a.id), 'label', a.label))}"${ariaFor(renameScope(a.id), 'label')}>${button('edit', { label: 'Rename', attrs: ` aria-label="Rename ${escape(a.label)}"` })}${errorLine(renameScope(a.id))}</form>${more(`<p class="hint">ID <code>${escape(a.id)}</code></p>`, escape(a.label))}`,
+              }),
+            ),
+          )
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
-    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div><button class="btn secondary">Create</button></form></div></details><p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>`,
-    opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
+    }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div>${button('add')}</form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>`,
   );
-  const rulesPart = sect(
+  const rulesPart = sub(
     'rules',
     'Vendor rules',
-    String(rules.results.length),
     `${
       rules.results.length
-        ? `<ul class="plain rowlist rules">${rules.results
-            .map(
-              (rule) =>
-                `<li><details><summary>${escape(rule.vendor_contains)} → ${escape(productLabel(env, rule.product))}, ${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule)}<div class="btns"><button class="btn secondary">Save</button><button class="linkbtn" formaction="/rules/${rule.id}/delete">Delete</button></div></form></div></details></li>`,
-            )
+        ? `<ul class="list rules">${rules.results
+            .map((rule) => {
+              const scope = `rule:${rule.id}`;
+              return `<li><details${failureFor(scope) ? ' open' : ''}><summary>${escape(rule.vendor_contains)} → ${hasParts(env) ? `${escape(productLabel(env, rule.product))}, ` : ''}${escape(rule.expense_type)}${rule.priority ? ` · ${rule.priority}` : ''}</summary><div class="body"><form action="/rules/${rule.id}" method="post">${ruleFields(env, rule, failureFor(scope) ? scope : '')}<div class="btns">${button('save')}${button('remove', { attrs: ` formaction="/rules/${rule.id}/delete"` })}</div></form></div></details></li>`;
+            })
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
-    }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}<button class="btn secondary">Add</button></form></div></details>`,
-    opened === 'rules',
+    }<details class="add"${rules.results.length && !failureFor(NEW_RULE) ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env, {}, failureFor(NEW_RULE) ? NEW_RULE : '')}${button('add')}</form></div></details>`,
   );
-  const parts = settings.products.length;
+  const names = settings.sellerNames[0] ?? settings.appName;
+  const section = (id: string, title: string, summary: string, inner: string) =>
+    sect(id, title, summary, inner, opened.has(id));
   const body = [
-    sect(
-      'setup-business',
+    section(
+      'business',
       'Business',
-      `${escape(settings.sellerNames[0] ?? settings.appName)}, ${plural(parts, 'part')}`,
-      setup.business,
-      opens('business'),
+      `${escape(names)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
+      `${setup.business}${rulesPart}`,
     ),
-    sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    senders,
-    mailLog,
-    accountsPart,
-    rulesPart,
-    sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
-    oneDrive,
-    sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
-    sect('about', 'About', '', aboutBody(env)),
+    section(
+      'email',
+      'Email',
+      `${escape(settings.receiptAddress || 'Off')}, ${settings.allowedSenders.size} allowed`,
+      `${setup.email}${senders}`,
+    ),
+    section('bank', 'Bank', plural(accounts.length, 'account'), accountsPart),
+    section('sending', 'Sending', escape(settings.accountantLabel), `${setup.sending}${oneDrive}`),
+    section('advanced', 'Advanced', '', `${setup.advanced}${sub('about', 'About', aboutBody(env))}`),
   ].join('');
   return page(
     'settings',
-    `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
+    `<div class="settings">${setup.form}${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p>${saveBar()}</div>`,
     200,
     env,
     { head: pageHead('Settings', signOutLink(env)) },
@@ -1477,13 +1505,13 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
 
 // ---------- Help ----------
 export async function helpPage(env: Env): Promise<Response> {
-  return page('help', helpBody(), 200, env, { head: pageHead('Help') });
+  return page('help', helpBody(), 200, env, { head: pageHead('Help', '', BACK_HOME) });
 }
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
-  return page('import', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
+  return page('import', `<div class="card">${await importForm()}</div>`, 200, env, {
     detail: 'Import a bank statement',
-    head: pageHead('Import a bank statement'),
+    head: pageHead('Import a bank statement', '', BACK_BANK),
   });
 }

@@ -9,6 +9,7 @@ import { allRows, PAGE_SIZE } from '../src/all';
 import { MAX_ALLOWED_SENDERS } from '../src/config';
 import type { Env } from '../src/env';
 import { authorization, locationOf, request, signed } from './helpers';
+import { button, buttonLink, statusMark } from '../src/actions';
 
 // What Cloudflare prepends to a mail service's message: DMARC passes for the
 // From domain while the envelope is a per-message bounce address.
@@ -105,16 +106,16 @@ test('an unknown sender is held with its facts, never read, and only the domain 
   expect(logged).toContain('"reason":"sender_not_allowed"');
   expect(logged).toContain('"domain":"link.com"');
   expect(logged).not.toContain('notifications@');
-  // Review shows it with Allow, Ignore and (under More) Delete, named for screen readers; the nav badge counts it.
-  const html = await (await request('/review')).text();
+  // To do shows it with Allow, and Ignore behind a confirm, named for screen readers; the badge counts it.
+  const html = await (await request('/receipts?view=todo')).text();
   expect(html).toContain('notifications@link.com');
   expect(html).toContain('Your receipt from Example');
-  expect(html).toContain('<button class="btn primary" aria-label="Allow notifications@link.com">Allow</button>');
-  expect(html).toContain('<button class="linkbtn" aria-label="Ignore notifications@link.com">Ignore</button>');
+  expect(html).toContain(button('allow', { attrs: ' aria-label="Allow notifications@link.com"' }));
   expect(html).toMatch(
-    /<details class="more"><summary aria-label="More for notifications@link.com">More<\/summary><div class="body">[\s\S]*?Delete email<\/button>/,
+    /<details class="more"><summary class="btn ghost" aria-label="Ignore notifications@link.com">[\s\S]*?<\/summary><div class="body"><form method="post" action="\/senders\/ignore">[\s\S]*?<span>Ignore and delete<\/span><\/button>/,
   );
-  expect(html).toMatch(/Review <span class="count">1/);
+  expect(html).not.toContain('Delete email');
+  expect(html).toMatch(/Receipts <span class="count">1/);
 });
 
 test('the same Message-ID is held once; the pending limits log the rest', async () => {
@@ -161,7 +162,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a2@amazonses.com>', subject: 'Second' }, 'vendor: Other Shop'));
   const response = await post('/senders/approve', { address: 'Notifications@Link.com' });
   expect(response.status).toBe(303);
-  expect(locationOf(response)).toBe('/review?done=mailAllowed&n=2');
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailAllowed&n=2');
   expect(await receipts()).toBe(2);
   expect(await held()).toHaveLength(0);
   const saved = await env.DB.prepare("SELECT value_json FROM settings WHERE key='ALLOWED_SENDER_EMAILS'").first<string>(
@@ -179,14 +180,14 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a3@amazonses.com>' }, 'vendor: Third Shop'));
   expect(await receipts()).toBe(3);
   expect(await held()).toHaveLength(0);
-  expect(await (await request(await signed('/review?done=mailAllowed&n=2'))).text()).toContain(
+  expect(await (await request(await signed('/receipts?view=todo&done=mailAllowed&n=2'))).text()).toContain(
     'Allowed. Reading 2 emails.',
   );
   // Settings lists it next to the defaults, with no source badges.
   const settings = await (await request('/settings')).text();
-  expect(settings).toMatch(/notifications@link\.com<\/span><\/div>/);
-  expect(settings).toMatch(/owner@example\.com<\/span><\/div>/);
-  expect(settings).toContain('<span class="sum">4 allowed</span>');
+  expect(settings).toMatch(/notifications@link\.com<\/p>/);
+  expect(settings).toMatch(/owner@example\.com<\/p>/);
+  expect(settings).toContain('4 allowed</span>');
 });
 
 test('the approved list stops at the cap with a clear message', async () => {
@@ -208,7 +209,7 @@ test('Ignore sender deletes their waiting mail and keeps none of it later', asyn
   await deliver(mail({ id: '<a2@amazonses.com>' }));
   expect((await env.ORIGINALS.list()).objects.length).toBeGreaterThan(0);
   const response = await post('/senders/ignore', { address: 'notifications@link.com' });
-  expect(locationOf(response)).toBe('/review?done=mailIgnored&n=2');
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailIgnored&n=2');
   expect(await held()).toHaveLength(0);
   expect((await env.ORIGINALS.list()).objects).toHaveLength(0);
   await deliver(mail({ id: '<a3@amazonses.com>' }));
@@ -225,15 +226,11 @@ test('Ignore sender deletes their waiting mail and keeps none of it later', asyn
   expect(await held()).toHaveLength(1);
 });
 
-test('Delete removes one email; Remove takes a sender off the list', async () => {
+test('Delete email is gone, Ignore covers it; Remove takes a sender off the list', async () => {
   await deliver(mail());
-  await deliver(mail({ id: '<a2@amazonses.com>' }, 'different body'));
   const [first] = await held();
-  const response = await post('/senders/delete', { id: String(first!.id) });
-  expect(locationOf(response)).toBe('/review?done=mailDeleted');
-  expect(await held()).toHaveLength(1);
-  expect(await env.ORIGINALS.get(String(first!.email_key))).toBeNull();
   expect((await post('/senders/delete', { id: String(first!.id) })).status).toBe(404);
+  expect(await held()).toHaveLength(1);
 
   const removed = await post('/senders/remove', { address: 'sender@example.net', back: 'settings' });
   expect(locationOf(removed)).toBe('/settings?done=senderRemoved&from=settings#senders');
@@ -266,10 +263,10 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   const dup = await receipt(4, '2026-10-06T10:00:00Z', { status: 'ready', duplicate_of: ready });
   await deliver(mail());
   const ids = async (query: Partial<Parameters<typeof allRows>[1]>) =>
-    (await allRows(env, { show: null, month: null, q: '', offset: 0, ...query })).map((r) => r.id);
+    (await allRows(env, { show: null, month: null, q: '', before: null, ...query })).map((r) => r.id);
   const all = await ids({});
   expect(all.slice(1)).toEqual([dup, needs, ready]);
-  expect((await allRows(env, { show: null, month: null, q: '', offset: 0 }))[0]!.type).toBe('mail');
+  expect((await allRows(env, { show: null, month: null, q: '', before: null }))[0]!.type).toBe('mail');
   expect(await ids({ show: 'ready' })).toEqual([sales, ready]);
   expect(await ids({ show: 'needs' })).toEqual([needs]);
   expect(await ids({ show: 'duplicate' })).toEqual([dup]);
@@ -286,37 +283,47 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(await ids({ q: 'link.com' })).toHaveLength(1);
   expect(await ids({ q: '%' })).toEqual([]);
 
-  const html = await (await request('/receipts')).text();
+  const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h1>Receipts</h1>');
-  expect(html).toContain(`href="/receipts/${needs}"`);
-  expect(html).toContain('<span class="stamp needs">Needs you</span> 30 Aug');
+  expect(html).toContain(`href="/receipts/${needs}?from=all"`);
+  expect(html).toContain('<span class="date">30 Aug</span>');
+  expect(html).toContain(`<span class="rs">${statusMark('needs')}</span>`);
   // Rows show the document date only; held mail is Review's, with no mail log here.
   expect(html).not.toContain('Received ');
   expect(html).not.toContain('Recent mail');
-  const september = await (await request('/receipts?month=2026-09')).text();
+  const september = await (await request('/receipts?view=all&month=2026-09')).text();
   expect(september).toContain('<h1>September 2026</h1>');
-  expect(september).toContain(`href="/receipts/${ready}"`);
-  expect(september).not.toContain(`href="/receipts/${needs}"`);
+  expect(september).toContain(`href="/receipts/${ready}?from=all&amp;month=2026-09"`);
+  expect(september).not.toContain(`href="/receipts/${needs}?`);
   expect(html.indexOf(`/receipts/${dup}`)).toBeLessThan(html.indexOf(`/receipts/${ready}`));
-  expect((await request('/receipts?month=2026-13')).status).toBe(422);
+  expect((await request('/receipts?view=all&month=2026-13')).status).toBe(422);
 
-  // Paging.
+  // Paging: Older is a cursor at the last row shown, never an offset.
   for (let i = 10; i < 10 + PAGE_SIZE; i++) await receipt(i, `2026-08-01T00:00:${String(i % 60).padStart(2, '0')}Z`);
-  const first = await (await request('/receipts')).text();
-  expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
-  const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
-  expect(second).toContain('Newer');
-  expect([...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}"/g)]).toHaveLength(
-    4,
-  );
+  const first = await (await request('/receipts?view=all')).text();
+  expect(first).not.toContain('offset=');
+  const older = first.match(
+    /<a class="btn secondary" href="(\/receipts\?view=all&amp;before=[^"]+)"><svg[^>]*><use href="#i-chevrons-right"\/><\/svg><span>Older<\/span><\/a>/,
+  )?.[1];
+  expect(older).toBeDefined();
+  const second = await (await request(older!.replaceAll('&amp;', '&'))).text();
+  expect(second).toContain('Newest');
+  expect(second).not.toContain('>Older<');
+  expect([
+    ...second.matchAll(
+      /<li class="row"><label class="pick">.*?<\/label>(?:<span class="date">[^<]*<\/span>)?<div class="rb"><p class="rt"><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g,
+    ),
+  ]).toHaveLength(4);
 });
 
 test('Receipts empty states: one line and one action', async () => {
-  const html = await (await request('/receipts')).text();
+  const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h2>No receipts yet. Forward to <code>receipts@example.com</code>.</h2>');
-  expect(await (await request('/receipts?month=2026-09')).text()).toContain('<h2>Nothing dated September.</h2>');
+  expect(await (await request('/receipts?view=all&month=2026-09')).text()).toContain(
+    '<h2>Nothing dated September.</h2>',
+  );
   const search = await (await request('/receipts?q=xyz')).text();
   expect(search).toContain(
-    '<h2>Nothing matches &#8220;xyz&#8221;.</h2><a class="btn primary" href="/receipts">Clear search</a>',
+    `<h2>Nothing matches &#8220;xyz&#8221;.</h2>${buttonLink('clearSearch', '/receipts?view=all', { tone: 'primary' })}`,
   );
 });

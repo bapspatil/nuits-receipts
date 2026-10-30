@@ -13,32 +13,36 @@ import {
   type Receipt,
   type Rule,
 } from './domain';
-import { BANK_SHOWS, cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, showRows, type BankShow } from './banking';
+import { cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, viewRows } from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
-import { discardReason, discardReceipts, restoreReceipts } from './discard';
-import {
-  approveSenders,
-  deleteHeldMail,
-  heldSenders,
-  ignoreSenders,
-  removeSenders,
-  senderAddress,
-  unignoreSenders,
-} from './inbound';
+import { discardReceipts, restoreReceipts } from './discard';
+import { approveSenders, heldSenders, ignoreSenders, removeSenders, senderAddress, unignoreSenders } from './inbound';
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
-import { backPath, withDone, type EventKey } from './events';
+import { withDone, type EventKey } from './events';
+import { undoAt, withUndo, type UndoAt, type UndoOp } from './undo';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { matchesFilter, reasonCodes, REVIEW_FILTERS, type ReviewFilter } from './flags';
-import { reviewQueue } from './views';
-import { filterIds, parseQuery } from './all';
+import { filterIds, parseQuery, SHOW } from './all';
+import {
+  cursorFor,
+  landing,
+  LIST_DEFS,
+  listUrl,
+  openRows,
+  parseReturn,
+  postedState,
+  RECEIPTS_TODO,
+  type ListState,
+} from './worklist';
 import { invoiceRows, invoiceShow } from './invoices';
 import { month } from './ui';
 
 // skipped: rows the op left alone, when that is not simply the ids it did not change.
+// The banner's Undo of an op that went through the undo log names it by its time and name.
+const undone = (at: UndoAt, op: UndoOp) => ({ at, op });
 type Done = { n: number; skipped?: number; event: EventKey; params?: Record<string, string | number | null> };
 export type Caller = { who: string; ctx: Pick<ExecutionContext, 'waitUntil'> };
-// back: the list to land on, which Undo returns to as well. id: parses one
+// back: the list to land on. id: parses one
 // posted id, when the op's rows differ from the endpoint's.
 type Op = {
   max?: number;
@@ -46,12 +50,12 @@ type Op = {
   run: (env: Env, ids: string[], form: FormData, back: string, caller: Caller) => Promise<Done>;
 };
 // One bulk route: its ops, the shape of its ids, every row of the list's
-// filter for all=1 (refused without), and the list it lands on.
+// filter for all=1 (refused without), and the list it lands on, or a fixed place that isn't a list.
 type Endpoint = {
   ops: Record<string, Op>;
   id: (value: string) => string;
   all?: (env: Env, form: FormData) => Promise<string[]>;
-  back: (form: FormData) => string;
+  to: (form: FormData) => ListState | string;
 };
 export type BulkResult = { location: string; n: number; skipped: number };
 const ROW_ID = /^[a-f0-9]{64}$/;
@@ -87,14 +91,16 @@ const OPS: Record<ReceiptOp, Op> = {
       const reason = text(form, 'approval_reason');
       requireInput(reason.length > 0, 'Approval needs a reason', 422, 'approval_reason');
       requireInput(reason.length <= 1000, 'Field too long', 422, 'approval_reason');
-      const now = new Date().toISOString();
+      const now = undoAt();
       const todo = (await rowsOf(env, ids)).filter(
         (r) => r.status === 'needs_review' && !r.discarded_at && complete(r),
       );
       if (!todo.length) return { n: 0, event: 'approvedMany' };
       const pick = (r: Receipt, keys: object) =>
         Object.fromEntries(Object.keys(keys).map((k) => [k, r[k as keyof Receipt]]));
-      const results = await env.DB.batch(
+      const results = await withUndo(
+        env,
+        { at: now, op: 'approve', ids: todo.map((r) => r.id) },
         todo.map((r) =>
           env.DB.prepare(
             "UPDATE receipts SET status='ready',manual_fields_json=?,review_reasons_json='[]',reviewed_at=?,revision=revision+1,attempt_id=NULL,lease_until=NULL WHERE id=? AND revision=? AND status='needs_review' AND discarded_at IS NULL",
@@ -121,13 +127,13 @@ const OPS: Record<ReceiptOp, Op> = {
         if (r.fx_eur_minor === null || r.fx_requested_date !== r.issue_date)
           await cacheFx(env, { ...r, status: 'ready', review_reasons_json: '[]', revision: r.revision + 1 });
       if (approved.length) await reconcile(env);
-      return { n: approved.length, event: 'approvedMany' };
+      return { n: approved.length, event: 'approvedMany', params: undone(now, 'approve') };
     },
   },
   discard: {
-    run: async (env, ids, form, back) => {
-      const { at, n } = await discardReceipts(env, ids, { reason: discardReason(form.get('reason')), unmatch: true });
-      return { n, event: 'discarded', params: { at, back } };
+    run: async (env, ids) => {
+      const { at, n } = await discardReceipts(env, ids);
+      return { n, event: 'discarded', params: undone(at, 'discard') };
     },
   },
   restore: {
@@ -167,83 +173,75 @@ const OPS: Record<ReceiptOp, Op> = {
     run: async (env, ids, form) => {
       const { on, note } = paidFields(form);
       requireInput(on.length > 0, 'Choose the day it was paid', 422, 'paid_outside_on');
-      const result = await env.DB.prepare(
-        "UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE kind='sales' AND id IN (SELECT value FROM json_each(?))",
-      )
-        .bind(on, note, JSON.stringify(ids))
-        .run();
-      return { n: result.meta.changes ?? 0, event: 'paidMany', params: { on } };
+      const at = undoAt();
+      const [result] = await withUndo(env, { at, op: 'paid', ids }, [
+        env.DB.prepare(
+          "UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE kind='sales' AND id IN (SELECT value FROM json_each(?))",
+        ).bind(on, note, JSON.stringify(ids)),
+      ]);
+      return { n: result?.meta.changes ?? 0, event: 'paidMany', params: { on, ...undone(at, 'paid') } };
     },
   },
 };
 
-// Every row of a list's filter, the way its page picks them. Refused over the cap.
-const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
-  review: async (env, form) => {
-    const filter = text(form, 'filter');
-    requireInput(!filter || Object.hasOwn(REVIEW_FILTERS, filter), 'Invalid filter', 400);
-    const rows = await reviewQueue(env);
-    return (
-      filter ? rows.filter((r) => matchesFilter(reasonCodes(r.review_reasons_json), filter as ReviewFilter)) : rows
-    ).map((r) => r.id);
-  },
-  receipts: (env, form) => {
-    const params = new URLSearchParams();
-    for (const key of ['show', 'month', 'q']) if (text(form, key)) params.set(key, text(form, key));
-    return filterIds(env, parseQuery(params), BULK_CAP + 1);
-  },
-  invoices: async (env, form) =>
-    (await invoiceRows(env, month(text(form, 'month') || null), invoiceShow(form.get('show')))).shown.map((r) => r.id),
-};
-const HOME: Record<string, string> = { review: '/review', receipts: '/receipts', invoices: '/invoices' };
+// The list a receipt bar posts from, Receipts or Invoices, with its whole state.
+function receiptList(form: FormData): ListState {
+  const list = text(form, 'list');
+  requireInput(list === 'receipts' || list === 'invoices', 'This page is out of date. Reload it and try again.', 400);
+  return list === 'invoices'
+    ? postedState(form, 'invoices', (show) => invoiceShow(show) === show)
+    : postedState(form, 'receipts', (show) => Object.hasOwn(SHOW, show));
+}
+// The rows of a list's filter, the way its page picks and orders them: the first BULK_CAP, as the
+// bar's "Select the first 500" offers.
+async function allOf(env: Env, s: ListState): Promise<string[]> {
+  if (s.key === 'invoices')
+    return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.slice(0, BULK_CAP).map((r) => r.id);
+  if (s.view === 'todo')
+    return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP)).map((r) => r.id);
+  return filterIds(
+    env,
+    parseQuery(new URLSearchParams({ show: s.show ?? '', month: s.month ?? '', q: s.q })),
+    BULK_CAP,
+  );
+}
 const RECEIPTS: Endpoint = {
   ops: OPS,
   id: rowId,
-  all: (env, form) => {
-    const list = text(form, 'list');
-    requireInput(Object.hasOwn(LISTS, list), 'Invalid list', 400);
-    return LISTS[list]!(env, form);
-  },
-  back: (form) => backPath(form.get('back'), HOME[text(form, 'list')] ?? '/receipts'),
+  all: (env, form) => allOf(env, receiptList(form)),
+  to: receiptList,
 };
 
 // ---------- Bank ----------
-// The month, Show chip and page the bar was drawn for.
-function bankScope(form: FormData): { month: string; show: BankShow; offset: number } {
-  const month = text(form, 'month'),
-    show = text(form, 'show'),
-    offset = Number(text(form, 'offset') || 0);
-  requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
-  requireInput(
-    BANK_SHOWS.some((s) => s === show),
-    'Invalid filter',
-    400,
-  );
-  requireInput(Number.isSafeInteger(offset) && offset >= 0, 'Invalid page', 400);
-  return { month, show: show as BankShow, offset };
+// The month, view and rows shown that the bar was drawn for.
+function bankScope(form: FormData): ListState {
+  const state = postedState(form, 'bank', () => false);
+  requireInput(state.month, 'This page is out of date. Reload it and try again.', 400);
+  return state;
 }
-// Not a purchase (0) and Needs receipt (1): only money out that is not that already.
-const required = (to: 0 | 1, event: EventKey): Op => ({
+// Not a purchase (0) and Needs receipt (1): only money out that is not that already. A matched
+// row is left alone, since SET_REQUIRED_SQL would drop its match without a word.
+const required = (to: 0 | 1, op: 'exempt' | 'require', event: EventKey): Op => ({
   run: async (env, ids) => {
-    const result = await env.DB.prepare(
-      `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=?`,
-    )
-      .bind(to, JSON.stringify(ids), 1 - to)
-      .run();
-    const n = result.meta.changes ?? 0;
+    const at = undoAt();
+    const [result] = await withUndo(env, { at, op, ids }, [
+      env.DB.prepare(
+        `${SET_REQUIRED_SQL} AND id IN (SELECT value FROM json_each(?)) AND amount_minor<0 AND receipt_required=? AND receipt_id IS NULL`,
+      ).bind(to, JSON.stringify(ids), 1 - to),
+    ]);
+    const n = result?.meta.changes ?? 0;
     if (n) await reconcile(env);
-    return { n, event };
+    return { n, event, params: undone(at, op) };
   },
 });
 const PAYMENT_OPS: Record<PaymentOp, Op> = {
-  // Only the exact likely pairs Bank shows for the month, as Match all takes them;
-  // one time on all of them, so the banner's Undo finds them.
+  // Only the exact likely pairs Bank shows for the month, as Match all takes them.
   match: {
     run: async (env, ids, form) => {
-      const { month } = bankScope(form);
+      const month = bankScope(form).month!;
       const tuning = config(env).tuning;
       const [open, receipts, rules] = await Promise.all([
-        showRows(env, month, 'missing', BULK_CAP),
+        viewRows(env, month, 'todo', BULK_CAP),
         matchableReceipts(env),
         env.DB.prepare('SELECT * FROM vendor_rules')
           .all<Rule>()
@@ -254,20 +252,20 @@ const PAYMENT_OPS: Record<PaymentOp, Op> = {
         .exact.filter(({ t }) => picked.has(t.id))
         .map(({ t, r }) => [t.id, r.id] as const);
       requireInput(pairs.length <= BULK_MAX, `Up to ${BULK_MAX} matches at a time. Narrow the filter.`, 400);
-      const at = new Date().toISOString();
-      const { matched } = pairs.length ? await matchLikely(env, pairs, rules, tuning, at) : { matched: 0 };
+      const at = undoAt();
+      const { matched } = await matchLikely(env, pairs, rules, tuning, at);
       if (matched) await clearBankReview(env);
-      // The Undo reads the month from the Bank address it lands on.
-      return { n: matched, event: 'matchedMany', params: { at: matched ? at : null, picked: 1 } };
+      return { n: matched, event: 'matchedMany', params: { ...undone(at, 'match'), picked: 1 } };
     },
   },
-  exempt: required(0, 'notPurchaseMany'),
-  require: required(1, 'needsReceiptMany'),
+  exempt: required(0, 'exempt', 'notPurchaseMany'),
+  require: required(1, 'require', 'needsReceiptMany'),
   unmatch: {
     run: async (env, ids) => {
-      const n = await unlinkMatches(env, ids);
+      const at = undoAt();
+      const n = await unlinkMatches(env, ids, at);
       if (n) await clearBankReview(env);
-      return { n, event: 'unmatchedMany' };
+      return { n, event: 'unmatchedMany', params: undone(at, 'unmatch') };
     },
   },
 };
@@ -275,17 +273,13 @@ const PAYMENTS: Endpoint = {
   ops: PAYMENT_OPS,
   id: rowId,
   all: async (env, form) => {
-    const { month, show } = bankScope(form);
-    return (await showRows(env, month, show, BULK_CAP + 1)).map((t) => t.id);
+    const { month, view } = bankScope(form);
+    return (await viewRows(env, month!, view, BULK_CAP)).map((t) => t.id);
   },
-  back: (form) => {
-    const { month, show, offset } = bankScope(form);
-    return `/payments?month=${month}&show=${show}${offset ? `&offset=${offset}` : ''}`;
-  },
+  to: bankScope,
 };
 
 // ---------- Unknown senders and Settings > Senders ----------
-const BACK_TO: Record<string, string> = { settings: '/settings#senders', receipts: '/receipts' };
 // Settings opens its Senders section for the mail events too.
 const from = (back: string) => ({ from: back.startsWith('/settings') ? 'settings' : null });
 const SENDER_OPS: Record<SenderOp, Op> = {
@@ -317,16 +311,12 @@ const SENDER_OPS: Record<SenderOp, Op> = {
       };
     },
   },
-  delete: {
-    run: async (env, ids, _form, back) => ({
-      n: await deleteHeldMail(env, ids),
-      event: 'mailDeleted',
-      params: from(back),
-    }),
-  },
   remove: {
     id: senderAddress,
-    run: async (env, ids, _form, _back, { who }) => ({ n: await removeSenders(env, ids, who), event: 'senderRemoved' }),
+    run: async (env, ids, _form, _back, { who }) => {
+      const at = undoAt();
+      return { n: await removeSenders(env, ids, who, at), event: 'senderRemoved', params: undone(at, 'settings') };
+    },
   },
   unignore: {
     id: senderAddress,
@@ -339,7 +329,11 @@ const SENDERS: Endpoint = {
     requireInput(/^[0-9a-f-]{36}$/.test(value), 'Invalid email', 400);
     return value;
   },
-  back: (form) => BACK_TO[text(form, 'back')] ?? '/review',
+  // Settings, or the list the held mail is on. No row anchor: the mail sits above the list's rows.
+  to: (form) =>
+    text(form, 'back') === 'settings'
+      ? '/settings#senders'
+      : (parseReturn(text(form, 'back')) ?? listUrl(RECEIPTS_TODO)),
 };
 
 // The checked ids: at least one, at most max, each of the list's shape.
@@ -373,12 +367,18 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
   } else ids = bulkIds(form.getAll('id'), max, op.id ?? endpoint.id);
   const before = progress(form, 'done_before'),
     skippedBefore = progress(form, 'skipped_before');
-  const back = endpoint.back(form);
+  const to = endpoint.to(form);
+  const back = typeof to === 'string' ? to : listUrl(to);
+  const cursor = typeof to === 'string' ? null : await cursorFor(env, to, ids);
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
     skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
+  const params = { n, ...done.params, skipped: skipped || null };
   return {
-    location: withDone(done.event, back, { n, ...done.params, skipped: skipped || null }),
+    location:
+      typeof to === 'string'
+        ? withDone(done.event, to, params)
+        : await landing(env, to, cursor, { event: done.event, params }),
     n,
     skipped,
   };

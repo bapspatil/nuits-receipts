@@ -62,7 +62,7 @@ export const journeys = [
       );
       await rec.click(page.locator('main .setup a', { hasText: /accountant/i }));
       await rec.fill(page.locator('[name=ACCOUNTANT_LABEL]'), 'Example Accounting Oy');
-      await rec.click(page.locator('form:has([name=ACCOUNTANT_LABEL]) button.btn'));
+      await rec.click(page.locator('.sbar button.btn'));
       rec.note(`Saved: ${(await page.locator('main [role=status]').first().innerText()).trim()}`);
     },
   },
@@ -78,9 +78,9 @@ export const journeys = [
       await rec.goto('/');
       const home = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
       rec.note(`Home on arrival (oldest month not sent): ${home.slice(0, 200)}`);
-      await rec.click(page.locator('main .steps a[href="/review"]'));
+      await rec.click(page.locator('main .steps a[href^="/receipts?view=todo"]'));
       const queue = await page.locator('main a[href^="/receipts/"]').count();
-      rec.note(`Review lists ${queue} receipts.`);
+      rec.note(`Receipts To do lists ${queue} receipts.`);
       await rec.click(page.locator('main a.btn.primary[href^="/receipts/"]'));
       const approved = [];
       for (let i = 0; i < 10 && /\/receipts\/[a-f0-9]{64}/.test(page.url()); i++)
@@ -96,15 +96,18 @@ export const journeys = [
       await rec.click(nav(page, '/payments'));
       await rec.click(link(page, 'Import statement'));
       await rec.upload(page.locator('input[name=file]'), file);
-      await rec.click(button(page, 'Check the file'));
-      await rec.click(page.getByRole('button', { name: /^Import \d+ payments$/ }));
+      await rec.click(button(page, 'Import statement'));
       rec.note(`After import: ${(await page.locator('main p.summary').first().innerText()).trim()}`);
-      rec.note(`Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`);
-      const row = (merchant) => page.locator('li.pay', { hasText: merchant });
+      rec.note(
+        `Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`,
+      );
+      const row = (merchant) => page.locator('li.row', { hasText: merchant });
       // A likely pair is one button: "Match", or "Match anyway" when the names differ.
       const likely = row('DOMAINDESK').getByRole('button', { name: /^Match( anyway)?$/ });
       if (await likely.count()) {
-        rec.note(`DOMAINDESK offers: ${(await likely.innerText()).trim()}. ${(await row('DOMAINDESK').locator('.likely__why').innerText()).trim()}`);
+        rec.note(
+          `DOMAINDESK offers: ${(await likely.innerText()).trim()}. ${(await row('DOMAINDESK').locator('.likely__why').innerText()).trim()}`,
+        );
         await rec.click(likely);
       }
       if (await row('Sample Missing Vendor').getByRole('button', { name: 'Not a purchase' }).count())
@@ -128,22 +131,25 @@ export const journeys = [
         'total: 125.50',
       ]);
       await rec.click(nav(page, '/receipts'));
-      await rec.click(page.locator('main nav.seg a[href^="/invoices"]'));
+      // Receipts opens on To do; the kind tabs are in All.
+      await rec.click(page.locator('main a[data-view="all"]'));
+      await rec.click(page.locator('main nav.seg a[href*="kind=sales"]'));
       await rec.click(link(page, 'Add invoice'));
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
       await rec.upload(page.locator('input[name=file]'), file);
-      await rec.click(button(page, 'Add files'));
+      await rec.click(button(page, 'Upload'));
       await page.waitForTimeout(2000);
       rec.note(
         `After upload: ${new URL(page.url()).pathname} says "${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 160)}"`,
       );
       if (await button(page, approve).count()) await fixAndApprove(page, rec);
       await rec.click(nav(page, '/payments'));
-      if (!(await page.locator('main h1', { hasText: 'September' }).count())) await rec.click(page.locator('main a[href$="month=2026-09"]'));
-      if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
-        await rec.click(page.locator('main a[href*="show=all"]'));
-      const money = page.locator('li.pay', { hasText: 'Sample Client Oy' });
+      if (!(await page.locator('main h1', { hasText: 'September' }).count()))
+        await rec.click(page.locator('main a[href$="month=2026-09"]'));
+      if (!(await page.locator('li.row', { hasText: 'Sample Client Oy' }).count()))
+        await rec.click(page.locator('main a[href*="view=all"]'));
+      const money = page.locator('li.row', { hasText: 'Sample Client Oy' });
       rec.note(`Money-in row: ${(await money.innerText()).replace(/\s+/g, ' ').trim()}`);
       if (await money.locator('select').count()) {
         await rec.select(money.locator('select'), { index: 1 });
@@ -155,7 +161,9 @@ export const journeys = [
     name: 'c. September closed and marked sent',
     async run(page, rec) {
       await rec.click(nav(page, '/'));
-      rec.note(`Home on arrival (September, the oldest month not sent): ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`);
+      rec.note(
+        `Home on arrival (September, the oldest month not sent): ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`,
+      );
       const download = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
       const zip = page
         .getByRole('link', { name: /ZIP|Download/ })
@@ -171,11 +179,11 @@ export const journeys = [
 ];
 
 // Screens to photograph and axe-check after the journeys, with real ids.
-// A keyboard-only run from Review to the first receipt: Tab to it, open it, Tab into a field, type,
+// A keyboard-only run from Receipts To do to the first receipt: Tab to Start checking, open it, Tab into a field, type,
 // and press Enter. Enter must approve (this receipt is incomplete, so the refusal comes back in
 // place); Skip, Discard or Read again would redirect or post elsewhere.
 async function keyboardCheck(page, base) {
-  await page.goto(base + '/review');
+  await page.goto(base + '/receipts?view=todo');
   for (
     let i = 0;
     i < 40 && !(await page.evaluate(() => document.activeElement?.matches('main a.btn.primary[href^="/receipts/"]')));
@@ -196,14 +204,14 @@ async function keyboardCheck(page, base) {
   ]);
   if (post.status() !== 422 || !(await page.locator('main [role=alert]').innerText()).includes('Nothing was saved'))
     throw new Error(`Enter in a field did not approve (status ${post.status()}, now at ${page.url()})`);
-  console.log('keyboard: Review to first receipt, fill a field, Enter approves');
+  console.log('keyboard: Receipts To do to first receipt, fill a field, Enter approves');
 }
 
 // Put three payments back to "Missing" so Bank shows likely pairs, a Match all and a payment nothing fits.
 async function unsettleBank(page, base) {
-  const bank = () => page.goto(base + '/payments?month=2026-09&show=all');
+  const bank = () => page.goto(base + '/payments?month=2026-09&view=all');
   const open = async (merchant, button) => {
-    const row = page.locator('li.pay', { hasText: merchant });
+    const row = page.locator('li.row', { hasText: merchant });
     await row.locator('summary', { hasText: 'More' }).click();
     await row.getByRole('button', { name: button }).click();
     await page.waitForLoadState('load');
@@ -213,24 +221,21 @@ async function unsettleBank(page, base) {
   // First, so its reconcile cannot match the others again.
   await open('Sample Missing Vendor', 'Needs a receipt');
   for (const merchant of ['Sample Cloud Lantern Oy', 'DOMAINDESK', 'Sample Train Line'])
-    await open(merchant, 'Remove match');
+    await open(merchant, 'Unmatch');
 }
 
-// Settings runs one same-origin script under its own policy. The audit contexts bypass CSP, so
-// this check runs in the main context, where the policy applies: saving one group while another
-// has unsaved edits asks first.
+// Settings is one form with one Save: an edit in one section and one in another go out together,
+// so there is nothing to warn about. Typing in two sections and saving once keeps both.
 async function unsavedCheck(page, base) {
   await page.goto(base + '/settings#f-ACCOUNTANT_LABEL');
   await page.locator('[name=ACCOUNTANT_LABEL]').fill('Unsaved Accounting Oy');
-  await page.locator('details.sect:has(> .body#setup-business) > summary').click();
-  let said = '';
-  page.once('dialog', (dialog) => {
-    said = dialog.message();
-    void dialog.dismiss();
-  });
-  await page.locator('#setup-business button.btn').click();
-  if (!said.includes('not saved')) throw new Error('Settings did not warn about unsaved changes in another group');
-  console.log('settings: saving one group warns about unsaved changes in another');
+  const saves = await page.locator('main button.btn.primary, main .sbar button.btn').count();
+  if (saves !== 1) throw new Error(`Settings should have one Save, found ${saves}`);
+  await page.locator('.sbar button.btn').click();
+  await page.waitForLoadState('load');
+  if ((await page.locator('[name=ACCOUNTANT_LABEL]').inputValue()) !== 'Unsaved Accounting Oy')
+    throw new Error('Settings did not keep the edit after the one Save');
+  console.log('settings: one Save keeps the edit');
 }
 
 // Put the accountant back to unset, so Home shows the setup checklist with one step left.
@@ -257,14 +262,18 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     receiptHtml({ vendor: 'Sample Unknown Shop', issue_date: '2026-09-22' }),
   );
   await page.waitForTimeout(1000);
-  await page.goto(base + '/review');
-  await page.getByRole('button', { name: 'Ignore billing@unknown-shop.example', exact: true }).click();
+  await page.goto(base + '/receipts?view=todo');
+  const ignore = page.locator('details', {
+    has: page.locator('summary[aria-label="Ignore billing@unknown-shop.example"]'),
+  });
+  await ignore.locator('summary').click();
+  await ignore.getByRole('button', { name: 'Ignore and delete' }).click();
   await page.waitForLoadState('load');
-  await page.goto(base + '/review');
+  await page.goto(base + '/receipts?view=todo');
   const flagged = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
-  await page.goto(base + '/invoices?month=2026-09');
+  await page.goto(base + '/receipts?view=all&kind=sales&month=2026-09');
   const invoice = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
-  await page.goto(base + '/receipts?month=2026-09');
+  await page.goto(base + '/receipts?view=all&month=2026-09');
   const ready = await page
     .locator('main a[href^="/receipts/"]')
     .evaluateAll(
@@ -278,20 +287,204 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'home-sep', path: '/?month=2026-09' },
     { name: 'home-arrival', path: '/' },
     { name: 'home-oct', path: `/?month=${new Date().toISOString().slice(0, 7)}` },
-    { name: 'review', path: '/review' },
-    { name: 'receipts', path: '/receipts?month=2026-09' },
+    { name: 'receipts-todo', path: '/receipts?view=todo' },
+    { name: 'receipts', path: '/receipts?view=all&month=2026-09' },
     { name: 'receipt-ready', path: ready },
     { name: 'invoice-paid', path: invoice },
-    { name: 'bank', path: '/payments?month=2026-09&show=all' },
+    { name: 'bank', path: '/payments?month=2026-09&view=all' },
     { name: 'import', path: '/import' },
     { name: 'add', path: '/add' },
-    { name: 'invoices', path: '/invoices?month=2026-09' },
+    { name: 'invoices', path: '/receipts?view=all&kind=sales&month=2026-09' },
     { name: 'settings', path: '/settings' },
-    { name: 'settings-mail', path: '/settings?open=mail#mail' },
+    { name: 'settings-mail', path: '/settings?open=senders#mail' },
     // Last: it undoes the matches, so the screens above keep the settled month.
-    { name: 'bank-likely', path: '/payments?month=2026-09&show=missing', prepare: () => unsettleBank(page, base) },
+    { name: 'bank-likely', path: '/payments?month=2026-09&view=todo', prepare: () => unsettleBank(page, base) },
     { name: 'help', path: '/help' },
     { name: 'help-flags', path: '/help#flag-missing_vendor' },
     { name: 'home-setup', path: '/?month=2026-09', prepare: () => unsetAccountant(page, base) },
   ];
 }
+
+// ---------- Journey f: the owner's month close on a busy month ----------
+// Runs last, on its own month (see BUSY_MONTH in ux-journeys.mjs), so a-e keep their small data.
+// It reads docs/app-v4/CONTRACT.md. A part of the contract the app does not have yet is a missed
+// check, never a crash, so the same journey baselines main and proves each later PR.
+const OPEN_PAYMENTS = 60;
+const rowIds = (page) =>
+  page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-row]')].map((e) => e.dataset.row);
+    const boxes = [...document.querySelectorAll('input[name=id][type=checkbox]')].map((e) => e.value);
+    return (rows.length ? rows : boxes).filter((id) => /^[a-f0-9]{64}$/.test(id));
+  });
+
+// The list holding the bar that runs op: the contract's container, or today's data-bulk-list wrapper.
+async function selectPage(page, rec, op) {
+  const bar = page.locator(`form[data-bulk]:has(button[name=op][value=${op}])`).first();
+  const scope = page.locator(`[data-list], [data-bulk-list="${await bar.getAttribute('id')}"]`).first();
+  const toggle = scope.locator('a[data-bulk-select]');
+  if (await toggle.first().isVisible()) await rec.click(toggle);
+  await scope.locator('input[data-bulk-page]').first().check();
+  rec.clicks++;
+}
+async function bulkClick(page, rec, selector) {
+  await Promise.all([
+    page.waitForURL((u) => u.searchParams.has('done'), { timeout: 10000 }),
+    page.locator(selector).first().click(),
+  ]);
+  rec.clicks++;
+  await page.waitForLoadState('load');
+  rec.screen();
+}
+const section = async (rec, name, run) => {
+  try {
+    await run();
+  } catch (error) {
+    rec.check(false, `${name} could not be driven: ${String(error.message).split('\n')[0]}`);
+  }
+};
+
+async function bankTodo(page, rec, month) {
+  await rec.goto(`/payments?month=${month}&view=todo`);
+  const contract = await page.locator('[data-list="bank-todo"]').count();
+  rec.check(contract === 1, 'Bank has a To do list (data-list="bank-todo")');
+  if (!contract) await rec.goto(`/payments?month=${month}&view=todo`);
+  const total = contract ? Number(await page.locator('[data-list="bank-todo"]').getAttribute('data-total')) : null;
+  rec.check(total === OPEN_PAYMENTS, `Bank To do counts all ${OPEN_PAYMENTS} open payments (data-total=${total})`);
+  const first = await rowIds(page);
+  rec.check(
+    first.length === 50,
+    `Bank To do shows the first 50 of ${OPEN_PAYMENTS} open payments (shows ${first.length})`,
+  );
+  await selectPage(page, rec, 'exempt');
+  const acted = await rowIds(page);
+  await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.4)));
+  // Where the first resolved row still on screen stands, in the viewport. The row that takes its
+  // place should stand about there: the list moved up, the person's eye did not.
+  const anchorTop = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-row]')].filter((r) => r.querySelector('input[name=id]:checked'));
+    const seen = rows.find((r) => r.getBoundingClientRect().bottom > 0);
+    return seen ? Math.round(seen.getBoundingClientRect().top) : null;
+  });
+  await bulkClick(page, rec, 'form[data-bulk] button[name=op][value=exempt]');
+  const remaining = OPEN_PAYMENTS - acted.length;
+  const after = await rowIds(page);
+  rec.note(`Bank To do: ${acted.length} selected, ${after.length} rows after, ${remaining} still open.`);
+  rec.check(
+    after.length === Math.min(50, remaining),
+    `Bank To do refills to ${Math.min(50, remaining)} rows after ${acted.length} are resolved (shows ${after.length})`,
+  );
+  rec.check(!after.some((id) => acted.includes(id)), 'No resolved payment is still listed');
+  const text = await page.locator('main').innerText();
+  rec.check(
+    !/Every payment has a receipt/.test(text),
+    `Bank does not say every payment has a receipt while ${remaining} are open`,
+  );
+  const nextTop = await page.evaluate(() => {
+    const row = document.querySelector(':target') ?? document.activeElement?.closest?.('[data-row]');
+    return row ? Math.round(row.getBoundingClientRect().top) : null;
+  });
+  const drift = anchorTop === null || nextTop === null ? null : nextTop - anchorTop;
+  rec.check(
+    drift !== null && Math.abs(drift) <= 200,
+    `Scroll stays put (the next row is ${drift} px from where the first resolved row was)`,
+  );
+  const focused = await page.evaluate(() => document.activeElement?.closest?.('[data-row]')?.dataset.row ?? null);
+  rec.check(focused !== null && !acted.includes(focused), 'Focus is inside the next open row');
+}
+
+async function receiptsTodo(page, rec, month, { busyReceipts, isComplete, isTodo }) {
+  await rec.goto('/receipts?view=todo');
+  const contract = await page.locator('[data-list="receipts-todo"]').count();
+  rec.check(contract === 1, 'Receipts has a To do list (data-list="receipts-todo")');
+  const seeded = new Set(
+    busyReceipts(month)
+      .filter((r) => isTodo(r) && isComplete(r))
+      .map((r) => r.id),
+  );
+  await selectPage(page, rec, 'approve');
+  const acted = (await rowIds(page)).filter((id) => seeded.has(id));
+  rec.check(
+    acted.length === seeded.size,
+    `Receipts To do lists all ${seeded.size} approvable receipts (lists ${acted.length})`,
+  );
+  const approve = page.locator('form[data-bulk] button[name=op][value=approve]').first();
+  if (!(await approve.isVisible()))
+    await page.locator('form[data-bulk] details:has(button[value=approve]) > summary').first().click();
+  await bulkClick(page, rec, 'form[data-bulk] button[name=op][value=approve]');
+  const after = await rowIds(page);
+  rec.check(!after.some((id) => acted.includes(id)), `The ${acted.length} approved receipts are gone from To do`);
+  const undo = page.locator('[role=status] form[action$="/undo"] button').first();
+  const offered = (await undo.count()) > 0;
+  rec.check(offered, 'The banner offers Undo');
+  if (!offered) return;
+  await Promise.all([page.waitForLoadState('load'), undo.click()]);
+  rec.clicks++;
+  rec.screen();
+  const back = await rowIds(page);
+  rec.check(
+    acted.every((id) => back.includes(id)),
+    'Undo brings the approved receipts back into To do',
+  );
+}
+
+// The keyboard pass: j, j, x and ? on Receipts To do, and the same keys doing nothing on a phone.
+async function keyboardPass(page, rec, { BASE, credentials }) {
+  await rec.goto('/receipts?view=todo');
+  const rows = await rowIds(page);
+  rec.check(rows.length >= 2, 'Receipts To do has two rows to move between');
+  if (rows.length < 2) return;
+  const focused = () => page.evaluate(() => document.activeElement?.dataset?.row ?? null);
+  const sheetOpen = () => page.evaluate(() => document.getElementById('keys-sheet')?.open ?? null);
+  rec.check((await sheetOpen()) === false, 'The shortcut sheet is closed on load');
+  await page.keyboard.press('j');
+  await page.keyboard.press('j');
+  rec.check((await focused()) === rows[1], 'j, j moves focus to the second row');
+  await page.keyboard.press('x');
+  rec.check(await page.locator(`[data-row="${rows[1]}"] input[name=id]`).isChecked(), 'x checks the focused row');
+  rec.check(
+    !(await page.locator(`[data-row="${rows[0]}"] input[name=id]`).isChecked()),
+    'x leaves the first row alone',
+  );
+  await page.keyboard.press('?');
+  rec.check((await sheetOpen()) === true, '? opens the shortcut sheet');
+  await page.keyboard.press('Escape');
+  rec.check((await sheetOpen()) === false, 'Escape closes the shortcut sheet');
+
+  const phone = await page
+    .context()
+    .browser()
+    .newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      httpCredentials: credentials,
+    });
+  try {
+    const small = await phone.newPage();
+    await small.goto(BASE + '/receipts?view=todo');
+    for (const key of ['j', 'j', 'x', '?']) await small.keyboard.press(key);
+    const state = await small.evaluate(() => ({
+      row: document.activeElement?.dataset?.row ?? null,
+      open: document.getElementById('keys-sheet')?.open ?? null,
+      checked: document.querySelectorAll('input[name=id]:checked').length,
+    }));
+    rec.check(
+      state.row === null && state.open === false && state.checked === 0,
+      'On a 390 px touch device j, x and ? do nothing',
+    );
+  } finally {
+    await phone.close();
+  }
+}
+
+export const busyJourney = {
+  name: 'f. Busy month',
+  async run(page, rec, helpers) {
+    page.setDefaultTimeout(5000);
+    const month = helpers.BUSY_MONTH;
+    const seed = await import('./busy-month.mjs');
+    await section(rec, 'Bank To do', () => bankTodo(page, rec, month));
+    await section(rec, 'Receipts To do', () => receiptsTodo(page, rec, month, seed));
+    await section(rec, 'Keyboard', () => keyboardPass(page, rec, helpers));
+  },
+};

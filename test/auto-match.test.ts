@@ -9,7 +9,7 @@ import type { Env } from '../src/env';
 import { CLEF_MAX_ROWS, clefExemptions, exemptionFor, unclear } from '../src/exempt';
 import { amountFit, nameScore, planMatches } from '../src/matcher';
 import { suggestMappings } from '../src/presets';
-import { confirmationForm, locationOf, request, uploadPdf, idFrom } from './helpers';
+import { confirmationForm, htmlForm, locationOf, request, uploadPdf, idFrom } from './helpers';
 import { feedback } from '../src/events';
 
 let n = 0;
@@ -249,8 +249,8 @@ const row = (merchant: string) =>
     .bind(merchant)
     .first();
 
-test('an import marks non-purchases by rule, an owner choice sticks, and Undo brings them back', async () => {
-  const id = await importText(
+test('an import marks non-purchases by rule, an owner choice sticks, and its Undo brings the mark back', async () => {
+  await importText(
     statement(
       'a;2026-09-07;-500,00;EUR;Verohallinto;RF55FAKE / tax\nb;2026-09-08;-5,00;EUR;Fakebank service fee;fee\nc;2026-09-09;-40,00;EUR;ATM 01234 FAKE STREET;cash\nd;2026-09-10;-12,00;EUR;Fake Corner Shop;card\n',
     ),
@@ -259,7 +259,7 @@ test('an import marks non-purchases by rule, an owner choice sticks, and Undo br
   expect(await row('Fakebank service fee')).toMatchObject({ receipt_required: 0, exempt_by: 'fee' });
   expect(await row('ATM 01234 FAKE STREET')).toMatchObject({ receipt_required: 0, exempt_by: 'cash' });
   expect(await row('Fake Corner Shop')).toMatchObject({ receipt_required: 1, exempt_by: null });
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toContain('<span class="tag">Tax</span>');
   expect(bank).toContain('4 out, 0 matched, 3 not a purchase, <span class="red">1 missing</span>');
   // The owner says the fee needs a receipt: no rule marks it again.
@@ -269,17 +269,24 @@ test('an import marks non-purchases by rule, an owner choice sticks, and Undo br
   await request('/payments/' + fee, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) });
   await reconcile(env);
   expect(await row('Fakebank service fee')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
-  // Undo for the import: every automatic mark of that file needs a receipt again.
-  const undone = await request(`/imports/${id}/exempt/undo`, {
+  // Undoing an owner choice puts back the rule's own mark, not the owner's.
+  const tax = (await env.DB.prepare("SELECT id FROM bank_transactions WHERE merchant='Verohallinto'").first<{
+    id: string;
+  }>())!.id;
+  const changed = await request('/payments/' + tax, {
     method: 'POST',
-    body: new URLSearchParams({ month: '2026-09' }),
+    body: new URLSearchParams({ receipt_required: '1', month: '2026-09', view: 'all' }),
   });
-  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=2$/);
   expect(await row('Verohallinto')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
-  expect(await row('ATM 01234 FAKE STREET')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
+  const landed = await (await request(changed.headers.get('Location')!)).text();
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undone)).toMatch(
+    /^\/payments\?month=2026-09&view=all&done=undone&op=require&n=1(#row-[0-9a-f]{64})?$/,
+  );
+  expect(await row('Verohallinto')).toMatchObject({ receipt_required: 0, exempt_by: 'tax' });
 });
 
-test('the import banner reports matched, not a purchase and missing, with Clef in mock mode and an Undo', async () => {
+test('the import banner reports matched, not a purchase and missing, with Clef in mock mode', async () => {
   await uploadPdf();
   const text = statement(
     'a;2026-09-05;-125,50;EUR;Sample Cloud Lantern Oy;card\nb;2026-09-06;-50,00;EUR;Verohallinto;RF55FAKE / tax\nc;2026-09-07;-30,00;EUR;Jane Fakeperson;RF12FAKE / Payment sent to Jane Fakeperson\nd;2026-09-08;-9,99;EUR;Fake Corner Shop;card\n',
@@ -291,7 +298,8 @@ test('the import banner reports matched, not a purchase and missing, with Clef i
   const done = await request('/imports/csv/confirm', { method: 'POST', body: confirmationForm(await preview.text()) });
   const said = feedback(new URL(locationOf(done), 'https://x.example').searchParams)!;
   expect(said.text).toBe('Added 4 payments. Paid out: 1 matched, 2 not a purchase, 1 missing.');
-  expect(said.undo).toMatchObject({ label: 'Undo not a purchase', fields: { month: '2026-09' } });
+  // The import's own Undo comes with the one-step import; each mark has Needs receipt and its Undo.
+  expect(said.undo).toBeNull();
   expect(await row('Jane Fakeperson')).toMatchObject({ receipt_required: 0, exempt_by: 'clef' });
   expect(said.text).not.toMatch(/[\u2013\u2014]/);
 });
@@ -320,8 +328,8 @@ test('food delivery is marked by rule; Uber rides and restaurants are not', () =
     expect(rule(merchant)).toBeNull();
 });
 
-test('a delivery mark shows its label, Undo brings it back, and an owner choice is never overridden', async () => {
-  const id = await importText(
+test('a delivery mark shows its label, and an owner choice is never overridden', async () => {
+  await importText(
     statement(
       'a;2026-09-11;-23,50;EUR;UBER * EATS PENDING;card\nb;2026-09-12;-18,90;EUR;WOLT FAKE KITCHEN;card\nc;2026-09-13;-14,20;EUR;UBER *TRIP;card\nd;2026-09-14;-42,00;EUR;Fake Bistro Oy;card\n',
     ),
@@ -330,7 +338,7 @@ test('a delivery mark shows its label, Undo brings it back, and an owner choice 
   expect(await row('WOLT FAKE KITCHEN')).toMatchObject({ receipt_required: 0, exempt_by: 'delivery' });
   expect(await row('UBER *TRIP')).toMatchObject({ receipt_required: 1, exempt_by: null });
   expect(await row('Fake Bistro Oy')).toMatchObject({ receipt_required: 1, exempt_by: null });
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toContain('<span class="tag">Delivery</span>');
   // The owner says the Wolt order needs a receipt: no rule marks it again.
   const wolt = (await env.DB.prepare("SELECT id FROM bank_transactions WHERE merchant='WOLT FAKE KITCHEN'").first<{
@@ -339,14 +347,7 @@ test('a delivery mark shows its label, Undo brings it back, and an owner choice 
   await request('/payments/' + wolt, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) });
   await reconcile(env);
   expect(await row('WOLT FAKE KITCHEN')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
-  const undone = await request(`/imports/${id}/exempt/undo`, {
-    method: 'POST',
-    body: new URLSearchParams({ month: '2026-09' }),
-  });
-  expect(locationOf(undone)).toMatch(/done=exemptUndone&n=1$/);
-  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
-  await reconcile(env);
-  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 1, exempt_by: 'owner' });
+  expect(await row('UBER * EATS PENDING')).toMatchObject({ receipt_required: 0, exempt_by: 'delivery' });
 });
 
 test('matching runs again for every month when a receipt arrives, and a removed match stays removed', async () => {
@@ -368,10 +369,13 @@ test('matching runs again for every month when a receipt arrives, and a removed 
 
 test('a restored receipt is matched again, and a receipt for a row a rule marked wins', async () => {
   const id = idFrom(await uploadPdf());
-  await request('/discard', { method: 'POST', body: new URLSearchParams({ id, back: '/review', reason: 'other' }) });
+  await request('/discard', {
+    method: 'POST',
+    body: new URLSearchParams({ id, back: '/receipts?view=todo', reason: 'other' }),
+  });
   await importText(statement('a;2026-09-05;-125,50;EUR;Sample Cloud Lantern Oy service fee;fee\n'));
   expect(await row('Sample Cloud Lantern Oy service fee')).toMatchObject({ receipt_required: 0, exempt_by: 'fee' });
-  await request('/restore', { method: 'POST', body: new URLSearchParams({ id, back: '/review' }) });
+  await request('/restore', { method: 'POST', body: new URLSearchParams({ id, back: '/receipts?view=todo' }) });
   expect(await row('Sample Cloud Lantern Oy service fee')).toMatchObject({
     receipt_id: id,
     receipt_required: 1,

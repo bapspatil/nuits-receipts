@@ -26,11 +26,11 @@ test('a read starts anywhere, a write on the primary, and a bookmark carries on 
 
 test('with a real session, pages render and hand the browser a bookmark cookie', async () => {
   vi.restoreAllMocks();
-  const response = await get('/review');
+  const response = await get('/receipts?view=todo');
   expect(response.status).toBe(200);
   const cookie = response.headers.get('Set-Cookie') ?? '';
   expect(cookie).toMatch(/^__Host-d1=[0-9a-f-]+; Path=\/; Secure; HttpOnly; SameSite=Lax$/i);
   // The bookmark sent back starts the next request's session.
-  const again = await get('/review', cookie.split(';')[0]);
+  const again = await get('/receipts?view=todo', cookie.split(';')[0]);
   expect(again.status).toBe(200);
 });

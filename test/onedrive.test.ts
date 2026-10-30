@@ -7,6 +7,7 @@ import type { Env } from '../src/env';
 import { hash } from '../src/domain';
 import { authorization, locationOf, signed } from './helpers';
 import { seed, unzip } from './package-helpers';
+import { buttonLink } from '../src/actions';
 
 // Synthetic app registration and key; nothing here talks to Microsoft.
 const CLIENT_ID = '11111111-2222-3333-4444-555555555555';
@@ -195,7 +196,7 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
   expect((await at('/app/settings/onedrive/connect', {}, {}, plain)).status).toBe(404);
   const half = { ...plain, MS_CLIENT_ID: CLIENT_ID } as Env;
   const note = await (await at('/app/settings', {}, {}, half)).text();
-  expect(note).toContain('<h2>OneDrive</h2><span class="sum">Not set up</span>');
+  expect(note).toContain('<div class="sectpart" id="onedrive"><h3>OneDrive</h3><p class="warning">');
   expect(note).toContain('<code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing.');
   expect(note).not.toContain('onedrive/connect');
   expect(ms.calls).toHaveLength(0);
@@ -203,12 +204,11 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
 
 test('connect sends PKCE S256 and a sealed state cookie; the callback stores the token encrypted', async () => {
   const settings = await (await at('/app/settings')).text();
-  expect(settings).toContain('<a class="btn secondary" href="/app/settings/onedrive/connect">Connect</a>');
+  expect(settings).toContain(buttonLink('connect', '/app/settings/onedrive/connect'));
   expect(settings).toContain(`${ORIGIN}/app/settings/onedrive/callback`);
-  expect(settings).toContain(
-    '<h2>OneDrive</h2><span class="sum">Not connected</span></summary><div class="body" id="onedrive">',
-  );
-  expect(settings.match(/class="[^"]*\bbtn primary\b/g)).toBeNull();
+  expect(settings).toContain('<div class="sectpart" id="onedrive"><h3>OneDrive</h3><p class="cta">');
+  // The page's one Save is its only filled button; Connect is not.
+  expect(settings.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
 
   const start = await at('/app/settings/onedrive/connect');
   expect(start.status).toBe(303);
@@ -285,9 +285,7 @@ test('connect sends PKCE S256 and a sealed state cookie; the callback stores the
   expect(after).toContain('Microsoft account connected.');
   expect(after).toContain('<dd>Synthetic Owner (owner@example.com)</dd>');
   // The section the callback returns to is open, its summary names the account.
-  expect(after).toContain(
-    '<details class="sect" open><summary><h2>OneDrive</h2><span class="sum">owner@example.com</span>',
-  );
+  expect(after).toContain('<details class="sect" open><summary><h2>Sending</h2>');
   expect(after).toContain('action="/app/settings/onedrive/folder"');
 });
 
@@ -308,7 +306,12 @@ test('a folder link resolves through /shares, and other folders and failures are
   ms.shares = Response.json({ id: 'f', name: 'invoice.pdf', file: {}, parentReference: { driveId: 'd' } });
   const file = await post('/app/settings/onedrive/folder', { folder_link: link });
   expect(file.status).toBe(422);
-  expect(await file.text()).toContain('That link opens a file, not a folder.');
+  // Refused in place: Settings again, the link still in its box, the message beside it.
+  const refusedHtml = await file.text();
+  expect(refusedHtml).toContain('That link opens a file, not a folder.');
+  expect(refusedHtml).toContain('<h1>Settings</h1>');
+  expect(refusedHtml).toMatch(/id="f-folder_link" aria-invalid="true" aria-describedby="e-onedrive-folder"/);
+  expect(refusedHtml).toContain(`value="${link}"`);
 
   // Another organisation: /shares fails, "Shared with me" finds it by name.
   ms.shares = Response.json({ error: { code: 'itemNotFound' } }, { status: 404 });
@@ -375,7 +378,7 @@ test('upload puts small files, chunked large files and the index in the month fo
   const [small, large] = await readyMonth(1, true);
   const page = await (await at('/app/?month=2026-10')).text();
   expect(page).toContain('action="/app/month/onedrive-upload"');
-  expect(page).toContain('>Upload anyway</button>');
+  expect(page).toContain('<span>Upload anyway</span></button>');
   expect(page).toContain('href="/app/settings#onedrive">Change</a>');
 
   const first = await post('/app/month/onedrive-upload', { month: '2026-10' });
@@ -445,7 +448,8 @@ test('uploads run in batches of ten and continue without JavaScript', async () =
   const page = await (await at(await signed('/app/?month=2026-10&anyway=1&done=driveMore&n=10&of=12', '/app'))).text();
   expect(page).toContain('10 of 12 uploaded.');
   expect(page).toContain('<input type="hidden" name="anyway" value="1">');
-  expect(page).not.toMatch(/http-equiv|<script(?! src="[^"]*\/assets\/app\.js")/);
+  // No refresh and no script the flow depends on; keys.js and app.js only enhance the page.
+  expect(page).not.toMatch(/http-equiv|<script(?! src="\/app\/assets\/(keys|app)\.js")/);
   const second = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
   expect(locationOf(second)).toBe('/app/?month=2026-10&anyway=1&done=driveDone&n=12&of=12#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(12);
@@ -507,6 +511,10 @@ test('upload and disconnect need the same origin, a folder, and the config', asy
     (await post('/app/month/onedrive-upload', { month: '2026-10' }, { Origin: 'https://evil.example' })).status,
   ).toBe(403);
   expect((await post('/app/settings/onedrive/disconnect', {}, { Origin: 'https://evil.example' })).status).toBe(403);
+  // Disconnect deletes the sign-in and has no Undo, so it asks first.
+  expect(await (await at('/app/settings')).text()).toMatch(
+    /<details class="cta"><summary class="btn ghost"><svg[^>]*><use href="#i-unplug"\/><\/svg><span>Disconnect<\/span><\/summary><div class="body"><form action="\/app\/settings\/onedrive\/disconnect" method="post"><p class="ask">/,
+  );
   const gone = await post('/app/settings/onedrive/disconnect', {});
   expect(locationOf(gone)).toBe('/app/settings?done=oneDriveDisconnected#onedrive');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_connection').first('n')).toBe(0);
