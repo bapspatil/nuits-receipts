@@ -280,7 +280,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:500 var(
 .setup{margin:0 0 var(--space-5)}.setup h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-3);margin:0 0 var(--space-2)}.setup h2 span{font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}
 .setup .steps{display:block;margin-bottom:var(--space-2);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-lg)}
 .setup .steps>.step,.setup .steps>.step.now{border:0;border-radius:0;box-shadow:none;background:none}
-.setup details.finished{background:none;border:0;margin:0 0 var(--space-2)}.setup details.finished>summary{display:flex;align-items:center;min-height:44px;padding:0 var(--space-1);font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}.setup details.finished[open]>summary{margin-bottom:var(--space-1)}
+.setup details.finished{background:none;border:0;margin:0 0 var(--space-2)}.setup details.finished>summary{display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}.setup details.finished[open]>summary{margin-bottom:var(--space-1)}
 .setup .steps>.step+.step{border-top:1px solid var(--border)}
 .setup .steps .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .setup .steps a{grid-template-columns:16px minmax(0,1fr) auto;row-gap:0;align-items:center;padding:var(--space-2) var(--space-4)}
