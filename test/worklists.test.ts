@@ -3,7 +3,7 @@
 // that makes it true flips it to test() by name. Every name and amount is invented.
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
-import { showCounts } from '../src/banking';
+import { viewCounts } from '../src/banking';
 import { seedBusyMonth, MONTH, type Busy } from './busy-month';
 import { htmlForm, locationOf, request } from './helpers';
 
@@ -36,10 +36,8 @@ function post(path: string, fields: Record<string, string | string[]>) {
   for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one);
   return request(path, { method: 'POST', body });
 }
-// Today's bulk Bank route refuses a post without show; the PR that drops it deletes this.
-const today = { show: 'all' };
 const bankState = { view: 'todo', month: MONTH, upto: '50' };
-const bulkBank = (op: string, ids: string[]) => post('/payments/bulk', { ...today, ...bankState, op, id: ids });
+const bulkBank = (op: string, ids: string[]) => post('/payments/bulk', { ...bankState, op, id: ids });
 const bulkApprove = (ids: string[], more: Record<string, string> = {}) =>
   post('/receipts/bulk', { op: 'approve', approval_reason: 'Checked', view: 'todo', upto: '50', id: ids, ...more });
 
@@ -82,8 +80,7 @@ async function formFor(id: string, action: string, more: Record<string, string>)
   };
 }
 
-// Today: no data-list yet, and Missing shows 25 of the 60 (the first 100 rows' share), 35 behind Later.
-test.fails('inv1: Bank To do shows min(upto, missing) rows, including ones past row 100', async () => {
+test('inv1: Bank To do shows min(upto, missing) rows, including ones past row 100', async () => {
   const b = await seedBusyMonth();
   expect(b.missing).toHaveLength(60);
   expect(b.missingPast100).toHaveLength(35);
@@ -96,7 +93,7 @@ test.fails('inv1: Bank To do shows min(upto, missing) rows, including ones past 
   expect(list(await get(`/payments?month=${MONTH}&view=todo&upto=10`)).rows).toEqual(b.missing.slice(0, 10));
 });
 
-test.fails('inv2: bulk Not a purchase on every visible missing row refills the page', async () => {
+test('inv2: bulk Not a purchase on every visible missing row refills the page', async () => {
   const b = await seedBusyMonth();
   const response = await bulkBank('exempt', b.missing.slice(0, 50));
   expect(response.status).toBe(303);
@@ -114,19 +111,28 @@ test.fails('inv2: bulk Not a purchase on every visible missing row refills the p
   expect(done).toBe(50);
 });
 
-// Today: no data-list yet, and the All chip counts the page (100), not the month (220).
-test.fails('inv3: chip counts equal showCounts and the bulk total equals the rendered to do count', async () => {
-  const b = await seedBusyMonth();
-  const counts = await showCounts(env, MONTH);
-  expect(counts).toEqual({ all: 220, missing: 60, auto: 0 });
+test('inv3: chip counts equal viewCounts and the bulk total equals the rendered to do count', async () => {
+  await seedBusyMonth();
+  const counts = await viewCounts(env, MONTH);
+  expect(counts).toEqual({ todo: 60, all: 220 });
   for (const upto of [10, 50]) {
     const page = list(await get(`/payments?month=${MONTH}&view=todo&upto=${upto}`));
-    expect(page.total).toBe(counts.missing);
+    expect(page.total).toBe(counts.todo);
     expect(page.rows).toHaveLength(upto);
-    expect(page.todoChip).toBe(counts.missing);
+    expect(page.todoChip).toBe(counts.todo);
     expect(page.allChip).toBe(counts.all);
     expect(page.barTotal).toBe(page.total);
   }
+  const all = list(await get(`/payments?month=${MONTH}&view=all`));
+  expect(all.name).toBe('bank-all');
+  expect(all.total).toBe(counts.all);
+  expect(all.rows).toHaveLength(counts.all);
+  expect(all.barTotal).toBe(all.total);
+});
+
+// Today: Receipts has no To do list yet.
+test.fails('inv3 (Receipts): the bulk total equals the rendered to do count', async () => {
+  const b = await seedBusyMonth();
   const receipts = list(await get('/receipts?view=todo'));
   expect(receipts.name).toBe('receipts-todo');
   expect(receipts.total).toBe(b.todo.length);
@@ -248,7 +254,7 @@ test.fails('inv9: a resolved id never renders in To do and the order is stable',
   for (const page of first) expect(page.anchors).toEqual(page.rows);
 });
 
-test.fails('inv10: bulk Not a purchase never drops a match silently', async () => {
+test('inv10: bulk Not a purchase never drops a match silently', async () => {
   const b = await seedBusyMonth();
   const matched = b.matched.map((m) => m.id);
   const open = b.missing.slice(0, 3);
