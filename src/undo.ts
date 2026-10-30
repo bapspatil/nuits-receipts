@@ -238,10 +238,13 @@ export async function undo(
 
 // An import's Undo deletes its payments, with the transfer pairs, automatic marks and match
 // rejections that hang on them, and the import itself, so the same file imports afresh. It
-// refuses when the owner has since decided any of them: a hand match or an own choice of Not a
-// purchase. The deletes carry the same check, so a decision made between the count and the
-// batch still stops them.
-const DECIDED = `EXISTS(SELECT 1 FROM bank_transactions WHERE import_id=?1 AND (match_method='manual' OR exempt_by='owner'))`;
+// refuses when the owner has since decided any of them: a hand match, an own choice of Not a
+// purchase, or a transfer paired with a payment of another import (deleting one leg would leave
+// the other settled with no pair; a pair inside the import goes with it). The deletes carry the
+// same check, so a decision made between the count and the batch still stops them.
+const BY_HAND = `bank_transactions WHERE import_id=?1 AND (match_method='manual' OR exempt_by='owner')`;
+const ACROSS = `internal_transfers t JOIN bank_transactions d ON d.id=t.debit_id JOIN bank_transactions c ON c.id=t.credit_id WHERE (d.import_id=?1)<>(c.import_id=?1)`;
+const DECIDED = `(EXISTS(SELECT 1 FROM ${BY_HAND}) OR EXISTS(SELECT 1 FROM ${ACROSS}))`;
 const ROWS = '(SELECT id FROM bank_transactions WHERE import_id=?1)';
 async function undoImport(env: Env, at: UndoAt): Promise<{ ids: string[]; refused?: number }> {
   const logged = await env.DB.prepare("SELECT row_id FROM undo_log WHERE at=? AND op='import' AND tbl='imports'")
@@ -250,9 +253,7 @@ async function undoImport(env: Env, at: UndoAt): Promise<{ ids: string[]; refuse
   if (!logged) return { ids: [] };
   const id = logged.row_id;
   const refused = Number(
-    await env.DB.prepare(
-      "SELECT count(*) n FROM bank_transactions WHERE import_id=? AND (match_method='manual' OR exempt_by='owner')",
-    )
+    await env.DB.prepare(`SELECT (SELECT count(*) FROM ${BY_HAND}) + (SELECT count(*) FROM ${ACROSS}) n`)
       .bind(id)
       .first('n'),
   );

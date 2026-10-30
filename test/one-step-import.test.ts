@@ -232,6 +232,28 @@ test.each([
   expect(await count('bank_transactions')).toBe(rows);
   expect(await count('imports')).toBe(1);
 });
+test('Undo refuses once a payment was paired as a transfer with one of another import', async () => {
+  await only('holvi');
+  await upload(NO_ID(['2026-09-01;-10,00;Fake Merchant']), { account: 'holvi' });
+  const done = await upload(NO_ID(['2026-09-02;10,00;Fake Merchant']), { account: 'holvi' });
+  const [out, back] = (
+    await env.DB.prepare('SELECT id FROM bank_transactions ORDER BY booking_date').all<{ id: string }>()
+  ).results;
+  await env.DB.prepare(
+    "INSERT INTO internal_transfers(debit_id,credit_id,reason,confirmed_at) VALUES (?,?,'x','2026-10-01')",
+  )
+    .bind(out!.id, back!.id)
+    .run();
+  const undone = await request('/undo', {
+    method: 'POST',
+    body: new URLSearchParams({ at: params(done).get('at')!, op: 'import' }),
+  });
+  expect(undone.status).toBe(303);
+  expect(said(undone).text).toBe('1 of these payments were changed since; nothing was removed.');
+  expect(await count('bank_transactions')).toBe(2);
+  expect(await count('internal_transfers')).toBe(1);
+  expect(await count('imports')).toBe(2);
+});
 test('an automatic mark does not stop the Undo', async () => {
   await only('holvi');
   const done = await upload(text(holvi));
