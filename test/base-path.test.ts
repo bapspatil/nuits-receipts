@@ -76,9 +76,10 @@ test('Review and Invoices answer 302 to Receipts under the base path, keeping th
     expect(response.status, from).toBe(302);
     expect(response.headers.get('Location'), from).toBe(to);
   }
-  const merge = await at('/app/review/merge', { method: 'POST' });
-  expect(merge.status).toBe(302);
-  expect(merge.headers.get('Location')).toBe('/app/receipts?view=todo');
+  // An old Review page's Merge still merges, then lands on To do.
+  const merge = await at('/app/review/merge', { method: 'POST', body: new URLSearchParams() });
+  expect(merge.status).toBe(303);
+  expect(merge.headers.get('Location')).toMatch(/^\/app\/receipts\?view=todo&done=merged&n=0&/);
   // The pages they point at render, with the To do | All switch under the base path.
   const todo = await (await at('/app/receipts?view=todo&month=2026-09')).text();
   expect(todo).toContain('data-list="receipts-todo"');

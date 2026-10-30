@@ -231,7 +231,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (read && path === '/month') return moved('/', url.search);
   if (read && path === '/more') return moved('/settings');
   // Review is Receipts To do now, and Invoices is the Invoices tab of Receipts All.
-  if (path === '/review' || path === '/review/merge')
+  if (read && (path === '/review' || path === '/review/merge'))
     return moved(listUrl(listState(url.searchParams, { ...RECEIPTS_TODO, view: 'todo' })));
   if (read && path === '/invoices')
     return moved(listUrl(listState(url.searchParams, { ...RECEIPTS_TODO, key: 'invoices', view: 'all' })));
@@ -281,7 +281,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const cursor = before ?? (await cursorFor(env, state, ids, { at: true }));
     return redirect(await landing(env, state, cursor, { event: 'restored', params: { n } }));
   }
-  if (request.method === 'POST' && path === '/receipts/merge') {
+  // The old Review form still merges, so a page left open does not post into a redirect.
+  if (request.method === 'POST' && (path === '/receipts/merge' || path === '/review/merge')) {
     // Back to the To do it was offered on, under its month; the merged rows leave it, so no anchor.
     const state = listState(await formData(request, 4096), RECEIPTS_TODO);
     return redirect(listUrl(state, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));

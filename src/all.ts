@@ -277,7 +277,6 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
     })
     .join('');
   const everything = total + heldTotal;
-  const shown = rows.length + held.length;
   const left = total - rows.length;
   const more =
     left > 0 && state.upto < BULK_CAP
@@ -302,8 +301,9 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
   const month = state.month
     ? `<p class="small">${escape(monthName(state.month))} and undated only. <a href="${escape(listUrl({ ...state, month: null }))}">Every month</a></p>`
     : '';
-  const head = everything
-    ? `<p class="listhead">${shown < everything ? `${shown} of ${everything}` : everything} to do</p>`
+  // The header counts the list it heads, as the switch does; the mail section carries its own count.
+  const head = total
+    ? `<p class="listhead">${rows.length < total ? `${rows.length} of ${total}` : total} to do</p>`
     : '';
   // The one primary: the first open row, which Approve then walks on from.
   const start = rows[0]
