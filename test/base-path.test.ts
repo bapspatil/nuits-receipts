@@ -3,7 +3,8 @@ import { expect, test } from 'vitest';
 import worker, { withBase } from '../src/index';
 import { parseConfig } from '../src/config';
 import type { Env } from '../src/env';
-import { authorization, locationOf, pdfBytes, signed } from './helpers';
+import { authorization, htmlForm, locationOf, pdfBytes, signed } from './helpers';
+import { MONTH, seedBusyMonth } from './busy-month';
 
 const based = { ...env, APP_BASE_PATH: '/app' } as Env;
 function at(path: string, init: RequestInit = {}, headers: Record<string, string> = {}) {
@@ -84,4 +85,65 @@ test('the feedback banner and its Undo form carry the base path', async () => {
   const html = await (await at(await signed(`/app/review?done=notPurchase&tx=${tx}&name=Acme`, '/app'))).text();
   expect(html).toContain(`<form method="post" action="/app/payments/${tx}">`);
   expect(html).toContain('Acme is not a purchase');
+});
+
+test('every list return keeps its list and its next open row under the base path', async () => {
+  const b = await seedBusyMonth();
+  const post = (path: string, fields: Record<string, string | string[]>) => {
+    const body = new FormData();
+    for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one);
+    return at('/app' + path, { method: 'POST', body });
+  };
+  const to = async (path: string, fields: Record<string, string | string[]>) => locationOf(await post(path, fields));
+  const bank = { view: 'todo', month: MONTH, upto: '50' };
+  const onBank = `^/app/payments\\?month=${MONTH}&view=todo&done=`;
+  const [m0, m1, m2, m3, m4] = b.missing as [string, string, string, string, string];
+  expect(await to(`/payments/${m0}`, { receipt_required: '0', ...bank })).toMatch(
+    new RegExp(`${onBank}notPurchase&.*#row-${m1}$`),
+  );
+  expect(await to('/payments/bulk', { ...bank, op: 'exempt', id: [m1, m2] })).toMatch(
+    new RegExp(`${onBank}notPurchaseMany&n=2#row-${m3}$`),
+  );
+  expect(await to('/matches/bulk', { ...bank, transaction_id: m3, receipt_id: b.earlier[0]! })).toMatch(
+    new RegExp(`${onBank}matchedMany&n=0&skipped=1#row-${m4}$`),
+  );
+  expect(await to('/matches/undo', { ...bank, at: '2026-09-01T00:00:00.000Z' })).toMatch(
+    new RegExp(`${onBank}unmatchedMany&n=0#row-${m3}$`),
+  );
+  expect(await to(`/imports/${'b'.repeat(64)}/exempt/undo`, bank)).toMatch(
+    new RegExp(`${onBank}exemptUndone&n=0#row-${m3}$`),
+  );
+  expect(await to('/matches', { ...bank, transaction_id: b.matched[0]!.id, action: 'unlink' })).toMatch(
+    new RegExp(`${onBank}unmatched&.*#row-[0-9a-f]{64}$`),
+  );
+
+  const month = b.earlierMonth;
+  const todo = { view: 'todo', month, upto: '50' };
+  const onTodo = `^/app/receipts\\?view=todo&month=${month}&done=`;
+  const [e0, e1, e2] = b.earlier as [string, string, string];
+  const list = await (await at(`/app/receipts?view=todo&month=${month}`)).text();
+  expect(list).toContain(`data-row="${e2}" id="row-${e2}"`);
+  expect(list).toContain(`href="/app/receipts/${e2}?from=todo&amp;month=${month}"`);
+  const page = await (await at(`/app/receipts/${e2}?from=todo&month=${month}`)).text();
+  expect(page).toContain(`<a href="/app/receipts?view=todo&amp;month=${month}">`);
+  const skip = htmlForm(page, `/app/receipts/${e2}`);
+  skip.set('action', 'skip');
+  expect(locationOf(await at(`/app/receipts/${e2}`, { method: 'POST', body: skip }))).toMatch(
+    new RegExp(`${onTodo}skipped#row-[0-9a-f]{64}$`),
+  );
+  expect(await to('/receipts/bulk', { ...todo, op: 'discard', id: e0 })).toMatch(
+    new RegExp(`${onTodo}discarded&.*#row-${e1}$`),
+  );
+  expect(await to('/discard', { ...todo, id: e1 })).toMatch(new RegExp(`${onTodo}discarded&.*#row-${e2}$`));
+  expect(await to('/restore', { id: e1, back: `/receipts?view=todo&month=${month}` })).toMatch(
+    new RegExp(`${onTodo}restored&n=1#row-[0-9a-f]{64}$`),
+  );
+  expect(await to('/discard', { id: e1, from: 'todo', month })).toMatch(
+    new RegExp(`^/app/receipts/[0-9a-f]{64}\\?from=todo&month=${month}&done=discarded&`),
+  );
+  expect(await to('/review/merge', {})).toBe('/app/receipts?view=todo&done=merged&n=0');
+  const back = `/receipts?view=todo&month=${month}`;
+  expect(await to('/senders/ignore', { address: 'nobody@example.com', back })).toMatch(
+    new RegExp(`${onTodo}mailIgnored`),
+  );
 });
