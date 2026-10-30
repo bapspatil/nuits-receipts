@@ -99,12 +99,16 @@ export const journeys = [
       await rec.click(button(page, 'Check the file'));
       await rec.click(page.getByRole('button', { name: /^Import \d+ payments$/ }));
       rec.note(`After import: ${(await page.locator('main p.summary').first().innerText()).trim()}`);
-      rec.note(`Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`);
+      rec.note(
+        `Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`,
+      );
       const row = (merchant) => page.locator('li.pay', { hasText: merchant });
       // A likely pair is one button: "Match", or "Match anyway" when the names differ.
       const likely = row('DOMAINDESK').getByRole('button', { name: /^Match( anyway)?$/ });
       if (await likely.count()) {
-        rec.note(`DOMAINDESK offers: ${(await likely.innerText()).trim()}. ${(await row('DOMAINDESK').locator('.likely__why').innerText()).trim()}`);
+        rec.note(
+          `DOMAINDESK offers: ${(await likely.innerText()).trim()}. ${(await row('DOMAINDESK').locator('.likely__why').innerText()).trim()}`,
+        );
         await rec.click(likely);
       }
       if (await row('Sample Missing Vendor').getByRole('button', { name: 'Not a purchase' }).count())
@@ -140,7 +144,8 @@ export const journeys = [
       );
       if (await button(page, approve).count()) await fixAndApprove(page, rec);
       await rec.click(nav(page, '/payments'));
-      if (!(await page.locator('main h1', { hasText: 'September' }).count())) await rec.click(page.locator('main a[href$="month=2026-09"]'));
+      if (!(await page.locator('main h1', { hasText: 'September' }).count()))
+        await rec.click(page.locator('main a[href$="month=2026-09"]'));
       if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
         await rec.click(page.locator('main a[href*="show=all"]'));
       const money = page.locator('li.pay', { hasText: 'Sample Client Oy' });
@@ -155,7 +160,9 @@ export const journeys = [
     name: 'c. September closed and marked sent',
     async run(page, rec) {
       await rec.click(nav(page, '/'));
-      rec.note(`Home on arrival (September, the oldest month not sent): ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`);
+      rec.note(
+        `Home on arrival (September, the oldest month not sent): ${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 200)}`,
+      );
       const download = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
       const zip = page
         .getByRole('link', { name: /ZIP|Download/ })
@@ -295,3 +302,124 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'home-setup', path: '/?month=2026-09', prepare: () => unsetAccountant(page, base) },
   ];
 }
+
+// ---------- Journey f: the owner's month close on a busy month ----------
+// Runs last, on its own month (see BUSY_MONTH in ux-journeys.mjs), so a-e keep their small data.
+// It reads docs/app-v4/CONTRACT.md. A part of the contract the app does not have yet is a missed
+// check, never a crash, so the same journey baselines main and proves each later PR.
+const OPEN_PAYMENTS = 60;
+const rowIds = (page) =>
+  page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-row]')].map((e) => e.dataset.row);
+    const boxes = [...document.querySelectorAll('input[name=id][type=checkbox]')].map((e) => e.value);
+    return (rows.length ? rows : boxes).filter((id) => /^[a-f0-9]{64}$/.test(id));
+  });
+
+// The list holding the bar that runs op: the contract's container, or today's data-bulk-list wrapper.
+async function selectPage(page, rec, op) {
+  const bar = page.locator(`form[data-bulk]:has(button[name=op][value=${op}])`).first();
+  const scope = page.locator(`[data-list], [data-bulk-list="${await bar.getAttribute('id')}"]`).first();
+  const toggle = scope.locator('a[data-bulk-select]');
+  if (await toggle.first().isVisible()) await rec.click(toggle);
+  await scope.locator('input[data-bulk-page]').first().check();
+  rec.clicks++;
+}
+async function bulkClick(page, rec, selector) {
+  await Promise.all([
+    page.waitForURL((u) => u.searchParams.has('done'), { timeout: 10000 }),
+    page.locator(selector).first().click(),
+  ]);
+  rec.clicks++;
+  await page.waitForLoadState('load');
+  rec.screen();
+}
+const section = async (rec, name, run) => {
+  try {
+    await run();
+  } catch (error) {
+    rec.check(false, `${name} could not be driven: ${String(error.message).split('\n')[0]}`);
+  }
+};
+
+async function bankTodo(page, rec, month) {
+  await rec.goto(`/payments?month=${month}&view=todo`);
+  const contract = await page.locator('[data-list="bank-todo"]').count();
+  rec.check(contract === 1, 'Bank has a To do list (data-list="bank-todo")');
+  if (!contract) await rec.goto(`/payments?month=${month}&show=missing`);
+  const total = contract ? Number(await page.locator('[data-list="bank-todo"]').getAttribute('data-total')) : null;
+  rec.check(total === OPEN_PAYMENTS, `Bank To do counts all ${OPEN_PAYMENTS} open payments (data-total=${total})`);
+  const first = await rowIds(page);
+  rec.check(
+    first.length === 50,
+    `Bank To do shows the first 50 of ${OPEN_PAYMENTS} open payments (shows ${first.length})`,
+  );
+  await selectPage(page, rec, 'exempt');
+  const acted = await rowIds(page);
+  await page.evaluate(() => window.scrollTo(0, Math.round(document.documentElement.scrollHeight * 0.4)));
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  await bulkClick(page, rec, 'form[data-bulk] button[name=op][value=exempt]');
+  const remaining = OPEN_PAYMENTS - acted.length;
+  const after = await rowIds(page);
+  rec.note(`Bank To do: ${acted.length} selected, ${after.length} rows after, ${remaining} still open.`);
+  rec.check(
+    after.length === Math.min(50, remaining),
+    `Bank To do refills to ${Math.min(50, remaining)} rows after ${acted.length} are resolved (shows ${after.length})`,
+  );
+  rec.check(!after.some((id) => acted.includes(id)), 'No resolved payment is still listed');
+  const text = await page.locator('main').innerText();
+  rec.check(
+    !/Every payment has a receipt/.test(text),
+    `Bank does not say every payment has a receipt while ${remaining} are open`,
+  );
+  const scrollAfter = await page.evaluate(() => window.scrollY);
+  rec.check(Math.abs(scrollAfter - scrollBefore) <= 200, `Scroll stays put (${scrollBefore} to ${scrollAfter} px)`);
+  const focused = await page.evaluate(() => document.activeElement?.closest?.('[data-row]')?.dataset.row ?? null);
+  rec.check(focused !== null && !acted.includes(focused), 'Focus is inside the next open row');
+}
+
+async function receiptsTodo(page, rec, month, { busyReceipts, isComplete }) {
+  await rec.goto('/receipts?view=todo');
+  const contract = await page.locator('[data-list="receipts-todo"]').count();
+  rec.check(contract === 1, 'Receipts has a To do list (data-list="receipts-todo")');
+  if (!contract) await rec.goto('/review');
+  const seeded = new Set(
+    busyReceipts(month)
+      .filter((r) => r.status === 'needs_review' && isComplete(r))
+      .map((r) => r.id),
+  );
+  await selectPage(page, rec, 'approve');
+  const acted = (await rowIds(page)).filter((id) => seeded.has(id));
+  rec.check(
+    acted.length === seeded.size,
+    `Receipts To do lists all ${seeded.size} approvable receipts (lists ${acted.length})`,
+  );
+  const approve = page.locator('form[data-bulk] button[name=op][value=approve]').first();
+  if (!(await approve.isVisible()))
+    await page.locator('form[data-bulk] details:has(button[value=approve]) > summary').first().click();
+  await bulkClick(page, rec, 'form[data-bulk] button[name=op][value=approve]');
+  const after = await rowIds(page);
+  rec.check(!after.some((id) => acted.includes(id)), `The ${acted.length} approved receipts are gone from To do`);
+  const undo = page.locator('[role=status] form[action$="/undo"] button').first();
+  const offered = (await undo.count()) > 0;
+  rec.check(offered, 'The banner offers Undo');
+  if (!offered) return;
+  await Promise.all([page.waitForLoadState('load'), undo.click()]);
+  rec.clicks++;
+  rec.screen();
+  const back = await rowIds(page);
+  rec.check(
+    acted.every((id) => back.includes(id)),
+    'Undo brings the approved receipts back into To do',
+  );
+}
+
+export const busyJourney = {
+  name: 'f. Busy month',
+  async run(page, rec, helpers) {
+    page.setDefaultTimeout(5000);
+    const month = helpers.BUSY_MONTH;
+    const seed = await import('./busy-month.mjs');
+    await section(rec, 'Bank To do', () => bankTodo(page, rec, month));
+    await section(rec, 'Receipts To do', () => receiptsTodo(page, rec, month, seed));
+  },
+};

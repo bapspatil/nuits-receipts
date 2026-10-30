@@ -1,0 +1,30 @@
+{
+  "fonts": ["Instrument Sans", "Bricolage", "ui-monospace"],
+  "fontSizes": [12, 13, 15, 16, 18, 24, 26, 32],
+  "typeRules": [
+    { "selector": "h1", "sizes": [24, 26, 32] },
+    { "selector": "h2", "sizes": [18] },
+    { "selector": "h3", "sizes": [15, 16] },
+    { "selector": "button, [role=button], .btn", "sizes": [13, 15, 16] }
+  ],
+  "minControlGap": 8,
+  "minControlInset": 8,
+  "minLayoutGap": 8,
+  "viewports": [
+    { "width": 390, "height": 844 },
+    { "width": 1440, "height": 900 }
+  ],
+  "colorSchemes": ["light"],
+  "exceptions": [
+    {
+      "selector": ".vh, .skip:not(:focus)",
+      "rules": ["content-clipping", "text-contrast"],
+      "reason": "Visually hidden on purpose."
+    },
+    {
+      "selector": "details:not([open]) *",
+      "rules": ["control-inset", "text-contrast"],
+      "reason": "Closed disclosure content has no box."
+    }
+  ]
+}
