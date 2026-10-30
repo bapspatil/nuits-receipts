@@ -180,14 +180,18 @@ export function moved(location: string, search = ''): Response {
 function bankList(form: FormData, row: { booking_date: string }): ListState {
   return listState(form, { ...RECEIPTS_TODO, key: 'bank', month: row.booking_date.slice(0, 7) });
 }
-// The first transfer row on Bank, in the month the money left, and who was paid.
-async function transferRow(env: Env, debitId: string): Promise<{ to: string; name: string }> {
-  const row = await env.DB.prepare('SELECT booking_date,merchant FROM bank_transactions WHERE id=?')
-    .bind(debitId)
-    .first<{ booking_date: string; merchant: string }>();
-  // All, since a transfer leg is never in To do.
-  const all: ListState = { ...RECEIPTS_TODO, key: 'bank', view: 'all', month: row?.booking_date.slice(0, 7) ?? null };
-  return { to: listUrl(all, { next: debitId }), name: row?.merchant ?? '' };
+// The payment money left from, read before a transfer is made or undone: the list the form came
+// from (the month it left in unless the form names one), who was paid, and where it stands in
+// Bank's order. Making the pair moves on past it; undoing it lands on it, as it needs a receipt again.
+async function transferFrom(env: Env, form: FormData, debitId: string, o: { at: boolean }) {
+  const [row, cursor] = await Promise.all([
+    env.DB.prepare('SELECT booking_date,merchant FROM bank_transactions WHERE id=?')
+      .bind(debitId)
+      .first<{ booking_date: string; merchant: string }>(),
+    cursorOf(env, LIST_DEFS.bank!, [debitId], o),
+  ]);
+  // A payment that isn't there is refused by the write itself, with its own message.
+  return { state: row && bankList(form, row), cursor, name: row?.merchant ?? '' };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 // Where this browser's last request left the database (see fetch).
@@ -404,20 +408,25 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/transfers') {
     const form = await formData(request, 4096);
     const debit = String(form.get('debit_id') ?? '');
+    const from = await transferFrom(env, form, debit, { at: false });
     await confirmTransfer(env.DB, {
       debit_id: debit,
       credit_id: String(form.get('credit_id') ?? ''),
       reason: String(form.get('reason') ?? ''),
     });
-    const { to, name } = await transferRow(env, debit);
-    return redirect(withDone('transferMade', to, { tx: debit, name }));
+    requireInput(from.state, 'Payment not found', 404);
+    return redirect(
+      await landing(env, from.state, from.cursor, { event: 'transferMade', params: { tx: debit, name: from.name } }),
+    );
   }
   const transfer = path.match(/^\/transfers\/([a-f0-9]{64})\/undo$/);
   if (request.method === 'POST' && transfer?.[1]) {
+    const form = await formData(request, 4096);
+    const from = await transferFrom(env, form, transfer[1], { at: true });
     await undoTransfer(env.DB, transfer[1]);
     await reconcile(env);
-    const { to } = await transferRow(env, transfer[1]);
-    return redirect(withDone('transferUndone', to));
+    requireInput(from.state, 'Payment not found', 404);
+    return redirect(await landing(env, from.state, from.cursor, { event: 'transferUndone' }));
   }
   const retry = path.match(/^\/receipts\/([a-f0-9]{64})\/retry$/);
   if (request.method === 'POST' && retry?.[1]) {

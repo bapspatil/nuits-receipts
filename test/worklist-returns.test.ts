@@ -2,6 +2,7 @@
 // many rows it really has. Each test here was a reviewer's repro on PR 5. Names are invented.
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
+import { importBankCsv, parsePreset } from '../src/banking';
 import { seedBusyMonth, type Busy } from './busy-month';
 import { htmlForm, locationOf, request } from './helpers';
 
@@ -278,4 +279,46 @@ test('H: a receipt opened from a searched All list keeps the search on the way b
   expect(back).toBe(listPath);
   const res = await request('/discard', { method: 'POST', body: htmlForm(page, '/discard') });
   expect(locationOf(res).split('&done=')[0]).toBe(listPath);
+});
+
+test('E: Own transfer returns to the Bank view it was made on, at the next open payment', async () => {
+  for (const [id, label] of [
+    ['account-a', 'Fake Main'],
+    ['account-b', 'Fake Savings'],
+  ])
+    await env.DB.prepare('INSERT INTO accounts(id,label,bank_name,default_currency,created_at) VALUES (?,?,?,?,?)')
+      .bind(id, label, 'Fake Bank', 'EUR', '2026-10-20')
+      .run();
+  const imp = (key: string, text: string) =>
+    importBankCsv(env, {
+      bytes: new TextEncoder().encode(text),
+      parsed: parsePreset(text, key, 'EUR'),
+      collision: '',
+      crossAccountAcknowledged: true,
+    });
+  const head = 'Transaction ID;Date;Amount;Currency;Payee\n';
+  await imp(
+    'account-a',
+    head +
+      'a;2026-09-07;-50,00;EUR;Fake own transfer\nb;2026-09-08;-20,00;EUR;Fake Shop\nc;2026-09-09;-30,00;EUR;Fake Cafe\n',
+  );
+  await imp('account-b', head + 'd;2026-09-07;50,00;EUR;Fake own transfer\n');
+  const todo = '/payments?month=2026-09&view=todo';
+  const html = await get(todo);
+  const rows = [...html.matchAll(/data-row="([0-9a-f]{64})"/g)].map((m) => m[1]!);
+  expect(rows).toHaveLength(3);
+  const form = htmlForm(html, '/transfers');
+  form.set('reason', 'Fake own transfer');
+  const made = await request('/transfers', { method: 'POST', body: form });
+  expect(locationOf(made)).toMatch(new RegExp(`^${todo.replace('?', '\\?')}&done=transferMade&.*#row-${rows[1]}$`));
+
+  // Every form on Bank posts its view, the transfer's Undo included, and Undo lands on the payment.
+  const all = await get('/payments?month=2026-09&view=all');
+  for (const m of all.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g))
+    if (/action="\/(transfers|payments|matches)/.test(m[1]!)) expect(m[2], m[1]).toContain('name="view" value="all"');
+  const undo = await request(`/transfers/${rows[0]}/undo`, {
+    method: 'POST',
+    body: htmlForm(all, `/transfers/${rows[0]}/undo`),
+  });
+  expect(locationOf(undo)).toBe(`/payments?month=2026-09&view=all&done=transferUndone#row-${rows[0]}`);
 });

@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset, reconcile, eurValue } from '../src/banking';
 import { getReceipt } from '../src/receipts';
-import { idFrom, locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
 async function account(id: string, label: string) {
   await env.DB.prepare('INSERT INTO accounts(id,label,bank_name,default_currency,created_at) VALUES (?,?,?, ?,?)')
     .bind(id, label, 'Fake Bank', 'EUR', '2026-10-20')
@@ -92,12 +92,18 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
     credit = rows[1]!.id;
   const paired = await request('/transfers', {
     method: 'POST',
-    body: new URLSearchParams({ debit_id: debit, credit_id: credit, reason: 'Fake own transfer' }),
+    body: new URLSearchParams({
+      debit_id: debit,
+      credit_id: credit,
+      reason: 'Fake own transfer',
+      view: 'all',
+      month: '2026-09',
+    }),
   });
   expect(paired.status).toBe(303);
-  // Transfers live on Bank now, in the month the money left.
+  // Back to the Bank list it was made on; no payment is left open to land on.
   expect(locationOf(paired)).toMatch(
-    new RegExp(`^/payments\\?month=2026-09&view=all&done=transferMade&tx=${debit}&name=[^&#]+#row-${debit}$`),
+    new RegExp(`^/payments\\?month=2026-09&view=all&done=transferMade&tx=${debit}&name=[^&#]+$`),
   );
   const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Both legs say where the money went; Undo is in each row's More.
@@ -114,8 +120,12 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
     (await request('/payments/' + debit, { method: 'POST', body: new URLSearchParams({ receipt_required: '1' }) }))
       .status,
   ).toBe(409);
-  const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
+  const undone = await request('/transfers/' + debit + '/undo', {
+    method: 'POST',
+    body: htmlForm(page, `/transfers/${debit}/undo`),
+  });
   expect(undone.status).toBe(303);
+  // It lands on the payment it opened again.
   expect(locationOf(undone)).toBe(`/payments?month=2026-09&view=all&done=transferUndone#row-${debit}`);
   // Unpaired again: the debit is missing, and its More offers the pair once more.
   const again = await (await request('/payments?month=2026-09')).text();

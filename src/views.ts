@@ -929,7 +929,7 @@ export async function payments(
             : `Transfer from ${escape(pair.debit_account_name)}`,
         );
         extra.push(
-          `<form action="/transfers/${pair.debit_id}/undo" method="post"><button class="linkbtn">Undo transfer</button></form>`,
+          `<form action="/transfers/${pair.debit_id}/undo" method="post">${fields}<button class="linkbtn">Undo transfer</button></form>`,
         );
       } else if (t.receipt_id) {
         status = `${tag(STATUS.matched, true)} <a class="tag" href="/receipts/${t.receipt_id}">${t.amount_minor > 0 ? 'Invoice' : 'Receipt'}</a>${counts.reviewing.has(t.receipt_id) ? ` <a class="stamp needs" href="/receipts/${t.receipt_id}">${STATUS.needs}</a>` : ''}`;
@@ -969,7 +969,7 @@ export async function payments(
         );
         if (sides.length)
           extra.push(
-            `<form action="/transfers" method="post" class="transfer"><input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
+            `<form action="/transfers" method="post" class="transfer">${fields}<input type="hidden" name="debit_id" value="${t.id}"><select name="credit_id" aria-label="Arrived in">${sides.map((c) => `<option value="${c.id}">${escape(c.account_name)} · ${escape(day(c.booking_date, false))}</option>`).join('')}</select><input name="reason" aria-label="Note" placeholder="Note" maxlength="500" required><button class="btn secondary">Own transfer</button></form>`,
           );
       }
       // No bulk action applies to a transfer side.
