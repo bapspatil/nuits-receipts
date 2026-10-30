@@ -1,0 +1,462 @@
+{
+  "results": [
+    {
+      "checked": 0,
+      "misses": [],
+      "journey": "d. First run to first receipt read",
+      "clicks": 5,
+      "edits": 2,
+      "screens": [
+        "/",
+        "/receipts/:id?done=uploaded",
+        "/",
+        "/settings",
+        "/settings?done=settingsSaved&group=accountant"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "Welcome screen says: Welcome Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare The",
+        "Landed on /receipts/:id with title \"Sample Cloud Lantern Oy\"",
+        "Home after the first receipt: Finish setting up 1 of 5 done DONE: Business name added So invoices you send are told apart from receipts. NEXT: Confirm Email Routing in Cloudflare Then forward one receipt to check it. Any email that reaches the app co",
+        "Saved: Saved your accountant."
+      ]
+    },
+    {
+      "checked": 0,
+      "misses": [],
+      "journey": "a. Mail arrives, every receipt approved",
+      "clicks": 6,
+      "edits": 9,
+      "screens": [
+        "/",
+        "/review",
+        "/receipts/:id",
+        "/receipts/:id?done=approved",
+        "/review?done=approvedLast&month=2026-09&step=import"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "Home on arrival (oldest month not sent): ‹ Aug 2026 September 2026 Oct 2026 › Finish setting up 3 of 5 done DONE: Business name added So invoices you send are told apart from receipts. DONE: Email Routing confirmed An email reached the app, ",
+        "Review lists 3 receipts.",
+        "Approved 3: Sample Coffee Corner, Sample Train Line, Sample Print Shop. Ended on /review."
+      ]
+    },
+    {
+      "checked": 0,
+      "misses": [],
+      "journey": "b. Bank statement imported, every payment settled",
+      "clicks": 5,
+      "edits": 1,
+      "screens": [
+        "/payments",
+        "/import",
+        "/imports/csv",
+        "/payments?month=2026-09&done=imported&inserted=6&skipped=0&replayed=0&auto=4&np=0&missing=1",
+        "/payments?month=2026-09&done=notPurchase&tx=:id&name=Sample+Missing+Vendor"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "After import: 5 out, 4 matched, 0 not a purchase, 1 missing",
+        "Import banner: Added 6 payments. Paid out: 4 matched, 0 not a purchase, 1 missing. See them",
+        "Finally: 5 out, 4 matched, 1 not a purchase, 0 missing"
+      ]
+    },
+    {
+      "checked": 0,
+      "misses": [],
+      "journey": "e. Sales invoice added, money in matched",
+      "clicks": 5,
+      "edits": 1,
+      "screens": [
+        "/receipts",
+        "/invoices",
+        "/add?kind=sales",
+        "/payments"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "After upload: /add says \"Add receipts or invoices 1 of 1 added. They are being read now. What are these? Receipts and bills Things the business paid for Invoices you sent Money clients \"",
+        "Money-in row: Select Sample Client Oy, 25 Sep Sample Client Oy EUR 125.50 25 Sep Matched automatically Invoice More"
+      ]
+    },
+    {
+      "checked": 0,
+      "misses": [],
+      "journey": "c. September closed and marked sent",
+      "clicks": 3,
+      "edits": 0,
+      "screens": [
+        "/",
+        "/?month=2026-09&done=sent&at=2026-10-30T09%3A22%3A44.185Z"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "Home on arrival (September, the oldest month not sent): ‹ Aug 2026 September 2026 Oct 2026 › September isn't sent yet. It is ready to send. · Go to October DONE: Check All checked DONE: Match All matched NEXT: Send Ready Spent EUR 250.22 Download ZIP (4 KB",
+        "Downloaded receipts-2026-09.zip"
+      ]
+    },
+    {
+      "checked": 12,
+      "misses": [
+        "Bank has a To do list (data-list=\"bank-todo\")",
+        "Bank To do counts all 60 open payments (data-total=null)",
+        "Bank To do shows the first 50 of 60 open payments (shows 25)",
+        "Bank To do refills to 35 rows after 25 are resolved (shows 0)",
+        "Bank does not say every payment has a receipt while 35 are open",
+        "Scroll stays put (2546 to 0 px)",
+        "Focus is inside the next open row",
+        "Receipts has a To do list (data-list=\"receipts-todo\")",
+        "The banner offers Undo"
+      ],
+      "journey": "f. Busy month",
+      "clicks": 8,
+      "edits": 0,
+      "screens": [
+        "/payments?month=2026-08&view=todo",
+        "/payments?month=2026-08&show=missing",
+        "/payments?month=2026-08&show=missing&done=notPurchaseMany&n=25",
+        "/receipts?view=todo",
+        "/review",
+        "/review?done=approvedMany&n=19&skipped=22"
+      ],
+      "silentPosts": [],
+      "deadEnds": [],
+      "inlineErrors": [],
+      "notes": [
+        "Bank To do: 25 selected, 0 rows after, 35 still open."
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "name": "receipt-flagged",
+      "path": "/receipts/c42a8d8a99bf00264da9a8f8f18927f3ec020414b6995f9b0e9b9208aa7a3df3",
+      "viewport": "1440",
+      "viewports": 1.45,
+      "file": "screens/receipt-flagged-1440.png",
+      "axe": []
+    },
+    {
+      "name": "receipt-flagged",
+      "path": "/receipts/c42a8d8a99bf00264da9a8f8f18927f3ec020414b6995f9b0e9b9208aa7a3df3",
+      "viewport": "390",
+      "viewports": 2.15,
+      "file": "screens/receipt-flagged-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-sep",
+      "path": "/?month=2026-09",
+      "viewport": "1440",
+      "viewports": 1.16,
+      "file": "screens/home-sep-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-sep",
+      "path": "/?month=2026-09",
+      "viewport": "390",
+      "viewports": 1.49,
+      "file": "screens/home-sep-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-arrival",
+      "path": "/",
+      "viewport": "1440",
+      "viewports": 1.2,
+      "file": "screens/home-arrival-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-arrival",
+      "path": "/",
+      "viewport": "390",
+      "viewports": 1.57,
+      "file": "screens/home-arrival-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-oct",
+      "path": "/?month=2026-10",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/home-oct-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-oct",
+      "path": "/?month=2026-10",
+      "viewport": "390",
+      "viewports": 1,
+      "file": "screens/home-oct-390.png",
+      "axe": []
+    },
+    {
+      "name": "review",
+      "path": "/review",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/review-1440.png",
+      "axe": []
+    },
+    {
+      "name": "review",
+      "path": "/review",
+      "viewport": "390",
+      "viewports": 1,
+      "file": "screens/review-390.png",
+      "axe": []
+    },
+    {
+      "name": "receipts",
+      "path": "/receipts?month=2026-09",
+      "viewport": "1440",
+      "viewports": 1.38,
+      "file": "screens/receipts-1440.png",
+      "axe": []
+    },
+    {
+      "name": "receipts",
+      "path": "/receipts?month=2026-09",
+      "viewport": "390",
+      "viewports": 1.57,
+      "file": "screens/receipts-390.png",
+      "axe": []
+    },
+    {
+      "name": "receipt-ready",
+      "path": "/receipts/b1b1fd2e7724f34564168696d79536c6a691f678569bd60f03d1d83968e17753",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/receipt-ready-1440.png",
+      "axe": []
+    },
+    {
+      "name": "receipt-ready",
+      "path": "/receipts/b1b1fd2e7724f34564168696d79536c6a691f678569bd60f03d1d83968e17753",
+      "viewport": "390",
+      "viewports": 1.27,
+      "file": "screens/receipt-ready-390.png",
+      "axe": []
+    },
+    {
+      "name": "invoice-paid",
+      "path": "/receipts/cd5249a9990701e0f16e96e706e97dc549ef3f9109bd6f8bc171edd3c091a993",
+      "viewport": "1440",
+      "viewports": 1.02,
+      "file": "screens/invoice-paid-1440.png",
+      "axe": []
+    },
+    {
+      "name": "invoice-paid",
+      "path": "/receipts/cd5249a9990701e0f16e96e706e97dc549ef3f9109bd6f8bc171edd3c091a993",
+      "viewport": "390",
+      "viewports": 1.67,
+      "file": "screens/invoice-paid-390.png",
+      "axe": []
+    },
+    {
+      "name": "bank",
+      "path": "/payments?month=2026-09&show=all",
+      "viewport": "1440",
+      "viewports": 1.33,
+      "file": "screens/bank-1440.png",
+      "axe": []
+    },
+    {
+      "name": "bank",
+      "path": "/payments?month=2026-09&show=all",
+      "viewport": "390",
+      "viewports": 1.57,
+      "file": "screens/bank-390.png",
+      "axe": []
+    },
+    {
+      "name": "import",
+      "path": "/import",
+      "viewport": "1440",
+      "viewports": 1.03,
+      "file": "screens/import-1440.png",
+      "axe": []
+    },
+    {
+      "name": "import",
+      "path": "/import",
+      "viewport": "390",
+      "viewports": 1.44,
+      "file": "screens/import-390.png",
+      "axe": []
+    },
+    {
+      "name": "add",
+      "path": "/add",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/add-1440.png",
+      "axe": []
+    },
+    {
+      "name": "add",
+      "path": "/add",
+      "viewport": "390",
+      "viewports": 1.08,
+      "file": "screens/add-390.png",
+      "axe": []
+    },
+    {
+      "name": "invoices",
+      "path": "/invoices?month=2026-09",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/invoices-1440.png",
+      "axe": []
+    },
+    {
+      "name": "invoices",
+      "path": "/invoices?month=2026-09",
+      "viewport": "390",
+      "viewports": 1,
+      "file": "screens/invoices-390.png",
+      "axe": []
+    },
+    {
+      "name": "settings",
+      "path": "/settings",
+      "viewport": "1440",
+      "viewports": 1,
+      "file": "screens/settings-1440.png",
+      "axe": []
+    },
+    {
+      "name": "settings",
+      "path": "/settings",
+      "viewport": "390",
+      "viewports": 1.04,
+      "file": "screens/settings-390.png",
+      "axe": []
+    },
+    {
+      "name": "settings-mail",
+      "path": "/settings?open=mail#mail",
+      "viewport": "1440",
+      "viewports": 1.16,
+      "file": "screens/settings-mail-1440.png",
+      "axe": []
+    },
+    {
+      "name": "settings-mail",
+      "path": "/settings?open=mail#mail",
+      "viewport": "390",
+      "viewports": 1.31,
+      "file": "screens/settings-mail-390.png",
+      "axe": []
+    },
+    {
+      "name": "bank-likely",
+      "path": "/payments?month=2026-09&show=missing",
+      "viewport": "1440",
+      "viewports": 2.61,
+      "file": "screens/bank-likely-1440.png",
+      "axe": []
+    },
+    {
+      "name": "bank-likely",
+      "path": "/payments?month=2026-09&show=missing",
+      "viewport": "390",
+      "viewports": 2.76,
+      "file": "screens/bank-likely-390.png",
+      "axe": []
+    },
+    {
+      "name": "help",
+      "path": "/help",
+      "viewport": "1440",
+      "viewports": 1.58,
+      "file": "screens/help-1440.png",
+      "axe": []
+    },
+    {
+      "name": "help",
+      "path": "/help",
+      "viewport": "390",
+      "viewports": 2.24,
+      "file": "screens/help-390.png",
+      "axe": []
+    },
+    {
+      "name": "help-flags",
+      "path": "/help#flag-missing_vendor",
+      "viewport": "1440",
+      "viewports": 1.78,
+      "file": "screens/help-flags-1440.png",
+      "axe": []
+    },
+    {
+      "name": "help-flags",
+      "path": "/help#flag-missing_vendor",
+      "viewport": "390",
+      "viewports": 2.55,
+      "file": "screens/help-flags-390.png",
+      "axe": []
+    },
+    {
+      "name": "home-setup",
+      "path": "/?month=2026-09",
+      "viewport": "1440",
+      "viewports": 1.6,
+      "file": "screens/home-setup-1440.png",
+      "axe": []
+    },
+    {
+      "name": "home-setup",
+      "path": "/?month=2026-09",
+      "viewport": "390",
+      "viewports": 2.01,
+      "file": "screens/home-setup-390.png",
+      "axe": []
+    },
+    {
+      "name": "busy-receipts-todo",
+      "path": "/receipts?view=todo",
+      "viewport": "1440",
+      "viewports": 5.16,
+      "file": "screens/busy-receipts-todo-1440.png",
+      "axe": []
+    },
+    {
+      "name": "busy-receipts-todo",
+      "path": "/receipts?view=todo",
+      "viewport": "390",
+      "viewports": 5.52,
+      "file": "screens/busy-receipts-todo-390.png",
+      "axe": []
+    },
+    {
+      "name": "busy-bank-todo",
+      "path": "/payments?month=2026-08&view=todo",
+      "viewport": "1440",
+      "viewports": 6.99,
+      "file": "screens/busy-bank-todo-1440.png",
+      "axe": []
+    },
+    {
+      "name": "busy-bank-todo",
+      "path": "/payments?month=2026-08&view=todo",
+      "viewport": "390",
+      "viewports": 7.85,
+      "file": "screens/busy-bank-todo-390.png",
+      "axe": []
+    }
+  ]
+}

@@ -1,0 +1,1553 @@
+{
+  "base": "http://127.0.0.1:8795",
+  "total": 86,
+  "budget": 0,
+  "byRule": {
+    "content-inset": 80,
+    "font-size": 2,
+    "text-contrast": 4
+  },
+  "unfinished": 0,
+  "groups": [
+    {
+      "rule": "text-contrast",
+      "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+      "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+      "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+      "where": [
+        "/payments @ 390x844",
+        "/payments?view=todo @ 390x844",
+        "/import @ 390x844"
+      ],
+      "count": 3
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(5) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(6) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(7) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(8) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(9) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(10) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(11) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(12) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(13) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(14) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(15) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(16) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(17) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(18) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(19) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(20) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(21) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(22) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(23) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(24) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(25) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(26) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(27) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(28) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(29) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(30) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(31) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(32) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(33) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(34) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(35) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(36) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(37) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(38) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(39) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "content-inset",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(40) > details:nth-of-type(1) > summary:nth-of-type(1)",
+      "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+      "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+      "where": [
+        "/review @ 390x844",
+        "/review @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "font-size",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+      "message": "Expected one of 18px. Found 13px.",
+      "fix": "Use a configured size for this text role.",
+      "where": [
+        "/ @ 390x844",
+        "/ @ 1440x900"
+      ],
+      "count": 2
+    },
+    {
+      "rule": "text-contrast",
+      "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+      "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+      "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+      "where": [
+        "/review @ 390x844"
+      ],
+      "count": 1
+    }
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "font-size",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected one of 18px. Found 13px.",
+          "actual": "13px",
+          "expected": "one of 18px",
+          "fix": "Use a configured size for this text role.",
+          "documentUrl": "http://127.0.0.1:8795/",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/review",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(5) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(5) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(6) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(6) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(7) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(7) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(8) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(8) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(9) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(9) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(10) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(10) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(11) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(11) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(12) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(12) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(13) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(13) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(14) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(14) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(15) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(15) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(16) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(16) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(17) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(17) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(18) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(18) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(19) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(19) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(20) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(20) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(21) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(21) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(22) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(22) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(23) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(23) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(24) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(24) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(25) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(25) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(26) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(26) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(27) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(27) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(28) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(28) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(29) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(29) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(30) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(30) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(31) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(31) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(32) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(32) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(33) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(33) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(34) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(34) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(35) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(35) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(36) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(36) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(37) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(37) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(38) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(38) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(39) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(39) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(40) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(40) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "text-contrast",
+          "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+          "actual": "contrast could not be measured: Element's background color could not be determined due to a pseudo element",
+          "expected": "text contrast of at least 4.5:1",
+          "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+          "status": "unresolved",
+          "requiredContrastRatio": 4.5,
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/receipts",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=todo",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/invoices",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/payments",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "text-contrast",
+          "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+          "actual": "contrast could not be measured: Element's background color could not be determined due to a pseudo element",
+          "expected": "text contrast of at least 4.5:1",
+          "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+          "status": "unresolved",
+          "requiredContrastRatio": 4.5,
+          "documentUrl": "http://127.0.0.1:8795/payments",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/payments?view=todo",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "text-contrast",
+          "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+          "actual": "contrast could not be measured: Element's background color could not be determined due to a pseudo element",
+          "expected": "text contrast of at least 4.5:1",
+          "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+          "status": "unresolved",
+          "requiredContrastRatio": 4.5,
+          "documentUrl": "http://127.0.0.1:8795/payments?view=todo",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/settings",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/import",
+      "viewport": "390x844",
+      "findings": [
+        {
+          "rule": "text-contrast",
+          "selector": "html > body:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected text contrast of at least 4.5:1. Found contrast could not be measured: Element's background color could not be determined due to a pseudo element.",
+          "actual": "contrast could not be measured: Element's background color could not be determined due to a pseudo element",
+          "expected": "text contrast of at least 4.5:1",
+          "fix": "Use a measurable background or review the text and background. Record a scoped exception with a reason after review.",
+          "status": "unresolved",
+          "requiredContrastRatio": 4.5,
+          "documentUrl": "http://127.0.0.1:8795/import",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/add",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/help",
+      "viewport": "390x844",
+      "findings": []
+    },
+    {
+      "path": "/",
+      "viewport": "1440x900",
+      "findings": [
+        {
+          "rule": "font-size",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(1) > h2:nth-of-type(1) > span:nth-of-type(1)",
+          "message": "Expected one of 18px. Found 13px.",
+          "actual": "13px",
+          "expected": "one of 18px",
+          "fix": "Use a configured size for this text role.",
+          "documentUrl": "http://127.0.0.1:8795/",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/review",
+      "viewport": "1440x900",
+      "findings": [
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(5) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(5) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(6) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(6) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(7) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(7) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(8) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(8) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(9) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(9) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(10) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(10) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(11) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(11) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(12) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(12) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(13) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(13) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(14) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(14) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(15) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(15) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(16) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(16) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(17) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(17) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(18) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(18) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(19) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(19) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(20) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(20) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(21) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(21) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(22) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(22) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(23) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(23) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(24) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(24) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(25) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(25) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(26) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(26) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(27) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(27) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(28) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(28) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(29) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(29) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(30) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(30) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(31) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(31) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(32) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(32) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(33) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(33) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(34) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(34) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(35) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(35) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(36) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(36) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(37) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(37) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(38) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(38) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(39) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(39) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        },
+        {
+          "rule": "content-inset",
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(40) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "message": "Expected at least 8px from the container's inner right edge. Found right inset 0px.",
+          "actual": "right inset 0px",
+          "expected": "at least 8px from the container's inner right edge",
+          "fix": "Add content padding or correct the content position. Borders do not count as padding.",
+          "relatedSelector": "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(40) > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "documentUrl": "http://127.0.0.1:8795/review",
+          "framePath": "main"
+        }
+      ]
+    },
+    {
+      "path": "/receipts",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/receipts?view=todo",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/invoices",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/payments",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/payments?view=todo",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/settings",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/import",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/add",
+      "viewport": "1440x900",
+      "findings": []
+    },
+    {
+      "path": "/help",
+      "viewport": "1440x900",
+      "findings": []
+    }
+  ]
+}
