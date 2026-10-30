@@ -205,6 +205,7 @@ function cookie(request: Request, name: string): string | null {
   return null;
 }
 // Pages that always render the tab bar, so their counts can start early.
+const RECEIPT_PAGE = /^\/receipts\/[a-f0-9]{64}$/;
 const TAB_PAGES = new Set([
   '/',
   '/add',
@@ -230,8 +231,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
         });
   const url = new URL(request.url),
     path = url.pathname;
-  // Start the tab counts now, so they load alongside the page's own queries.
-  if (request.method === 'GET' && TAB_PAGES.has(path)) void navCounts(env);
+  // Start the tab counts now, so they load alongside the page's own queries. A receipt page shows
+  // the tabs too; its counts join the getReceipt wave, which stays first because the page's own
+  // queries need the receipt's facts (kind, vendor, amount, status).
+  if (request.method === 'GET' && (TAB_PAGES.has(path) || RECEIPT_PAGE.test(path))) void navCounts(env);
   if (!['GET', 'HEAD'].includes(request.method)) {
     requireInput(request.method === 'POST', 'Method not allowed', 405);
     requireInput(request.headers.get('Origin') === url.origin, 'Origin does not match', 403);

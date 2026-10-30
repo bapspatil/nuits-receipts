@@ -4,7 +4,8 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset } from '../src/banking';
 import { seedBusyMonth, type Busy } from './busy-month';
-import { htmlForm, locationOf, request } from './helpers';
+import worker from '../src/index';
+import { authorization, htmlForm, locationOf, request } from './helpers';
 
 const get = async (path: string) => (await request(path)).text();
 function post(path: string, fields: Record<string, string | string[]>) {
@@ -330,4 +331,65 @@ test('G: Merge duplicates returns to the month-filtered To do it was offered on'
   const html = await get(path);
   const res = await request('/review/merge', { method: 'POST', body: htmlForm(html, '/review/merge') });
   expect(locationOf(res)).toBe(`${path}&done=merged&n=1`);
+});
+
+// The D1 calls a request makes, each with when it started and ended, through a DB that records them.
+function recorded() {
+  const calls: { start: number; end: number }[] = [];
+  const track = <T>(run: () => Promise<T>) => {
+    const call = { start: performance.now(), end: Infinity };
+    calls.push(call);
+    return run().finally(() => (call.end = performance.now()));
+  };
+  type Statement = Record<string | symbol, unknown>;
+  const statement = (st: Statement): Statement =>
+    new Proxy(st, {
+      get(t, k) {
+        const v = t[k] as (...a: unknown[]) => unknown;
+        if (k === 'bind') return (...a: unknown[]) => statement(v.apply(t, a) as Statement);
+        if (['first', 'all', 'run', 'raw'].includes(String(k)))
+          return (...a: unknown[]) => track(() => v.apply(t, a) as Promise<unknown>);
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+  const db = env.DB as unknown as Statement;
+  const session = {
+    prepare: (sql: string) => statement((db.prepare as (s: string) => Statement).call(db, sql)),
+    batch: (list: unknown[]) => track(() => (db.batch as (l: unknown[]) => Promise<unknown>).call(db, list)),
+    getBookmark: () => null,
+  };
+  const DB = new Proxy(db, {
+    get(t, k) {
+      if (k === 'withSession') return () => session;
+      if (k === 'prepare' || k === 'batch') return session[k];
+      const v = t[k];
+      return typeof v === 'function' ? (v as () => unknown).bind(t) : v;
+    },
+  });
+  return { env: { ...env, DB } as unknown as typeof env, calls };
+}
+// Waves: calls that overlap run in one; a call that starts after every earlier one ended opens the next.
+function waves(calls: { start: number; end: number }[]): number {
+  let n = 0,
+    end = -1;
+  for (const c of [...calls].sort((a, b) => a.start - b.start)) {
+    if (c.start >= end) n++;
+    end = Math.max(end, c.end);
+  }
+  return n;
+}
+test('I: a receipt page loads in three D1 waves: settings, the receipt with the tab counts, the page', async () => {
+  const b = await seedBusyMonth();
+  for (const id of [b.earlier[1]!, b.sales[0]!, b.ready[0]!]) {
+    const { env: counted, calls } = recorded();
+    const res = await worker.fetch(
+      new Request(`http://localhost/receipts/${id}?from=todo&month=${b.earlierMonth}`, {
+        headers: { Authorization: authorization, Origin: 'http://localhost' },
+      }),
+      counted,
+    );
+    await res.text();
+    expect(res.status).toBe(200);
+    expect(waves(calls), id).toBe(3);
+  }
 });
