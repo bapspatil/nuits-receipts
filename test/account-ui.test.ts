@@ -27,8 +27,8 @@ test('account picker and create/rename forms use immutable IDs and generic label
   expect(await (await request('/?month=2026-09')).text()).not.toContain('action="/imports/csv"');
   const page = await (await request('/import')).text();
   expect(page).toContain('Import a bank statement');
-  expect(page).toContain('value="default-account"');
-  expect(page).toContain('account_label');
+  expect(page).toContain('action="/import"');
+  expect(page).not.toContain('account_label');
   const created = await request('/accounts', {
     method: 'POST',
     body: new URLSearchParams({ label: 'Fake Savings', bank_name: 'Fake Bank', default_currency: 'EUR' }),

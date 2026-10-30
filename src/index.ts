@@ -33,6 +33,7 @@ import { candidatesFor, fits, linkMatch, matchLikely, receiptName, resolvePick, 
 import { signer, type Signer } from './signing';
 import { createAccount, renameAccount, confirmTransfer, undoTransfer } from './accounts';
 import { importPreview, confirmImport } from './imports';
+import { anywayPage, importAnyway, importOneStep } from './one-step';
 import type { Rule } from './domain';
 import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } from './config';
 import { verifyAccessJwt } from './access';
@@ -140,6 +141,7 @@ const UNDO_PLACE: Record<UndoOp, 'receipts' | 'bank' | 'settings'> = {
   unmatch: 'bank',
   deleteRule: 'settings',
   settings: 'settings',
+  import: 'bank',
 };
 // The fields of a vendor rule, checked the same way for a new rule and an edit.
 function ruleFrom(env: Env, form: FormData): [string, string | null, string | null, string, string, number] {
@@ -294,8 +296,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/undo') {
     const form = await formData(request, 4096);
     const { at, op } = parseUndo(form.get('at'), form.get('op'));
-    const { ids } = await undo(env, at, op, who);
-    const done = { event: 'undone', params: { op, n: ids.length } } as const;
+    const { ids, refused } = await undo(env, at, op, who);
+    const done = { event: 'undone', params: { op, n: ids.length, ...(refused ? { changed: refused } : {}) } } as const;
+    if (op === 'import') return redirect(withDone(done.event, '/payments', done.params));
     const place = UNDO_PLACE[op];
     if (place === 'settings') {
       const section = String(form.get('section') ?? '');
@@ -409,6 +412,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
       url.searchParams.has('month') ? month(url.searchParams.get('month')) : arrivalMonth(env).then((a) => a.month),
       url.searchParams,
     );
+  if (request.method === 'POST' && path === '/import')
+    return importOneStep(env, await formData(request, Math.ceil((MAX_CSV_BYTES * 4) / 3) + 64 * 1024));
+  if (request.method === 'GET' && path === '/import/anyway') return anywayPage(env, url.searchParams);
+  if (request.method === 'POST' && path === '/import/anyway') return importAnyway(env, await formData(request, 4096));
   if (request.method === 'POST' && path === '/imports/csv')
     return importPreview(env, await formData(request, MAX_CSV_BYTES + 64 * 1024));
   if (request.method === 'POST' && path === '/imports/csv/preview')
@@ -876,7 +883,7 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
                   new URLSearchParams({ month: row.booking_date.slice(0, 7), view: 'all' }),
                 ),
         );
-    } else if (url.pathname === '/imports/csv' && form.get('file') instanceof File)
+    } else if (['/imports/csv', '/import'].includes(url.pathname) && form.get('file') instanceof File)
       shown = requestState.run(refused('import'), () => importPage(env));
     else if (url.pathname === '/settings/setup' && error.status === 422)
       shown = requestState.run(

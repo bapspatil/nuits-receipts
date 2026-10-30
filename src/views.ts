@@ -16,7 +16,7 @@ import {
   type BankView,
   type EurValue,
 } from './banking';
-import { importForm, wizard } from './imports';
+import { importForm } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
@@ -1396,7 +1396,7 @@ export async function helpPage(env: Env): Promise<Response> {
 
 // ---------- Import, step 1 ----------
 export async function importPage(env: Env): Promise<Response> {
-  return page('import', `${wizard(1)}<div class="card">${await importForm(env)}</div>`, 200, env, {
+  return page('import', `<div class="card">${await importForm()}</div>`, 200, env, {
     detail: 'Import a bank statement',
     head: pageHead('Import a bank statement'),
   });

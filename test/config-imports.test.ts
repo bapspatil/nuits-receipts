@@ -85,14 +85,12 @@ test('configured owner imports into a new account and retains products, notices 
   expect(await csv.text()).toMatch(/matched_account_id,matched_account_name[\s\S]*Synthetic operating account/);
 });
 
-test('invalid preview and successful import with preset failure retain configured branding and notices', async () => {
+test('invalid preview retains configured branding and notices, and a layout that cannot be saved does not fail the import', async () => {
   const invalid = await preview('invalid');
   expect(invalid.status).toBe(422);
   expectBranding(await invalid.text());
   const valid = await preview();
   const body = confirmationForm(await valid.text());
-  body.set('preset_name', 'Synthetic saved layout');
-  body.set('preset_bank', 'Synthetic Bank');
   const prepare = env.DB.prepare.bind(env.DB);
   const spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
     if (sql.startsWith('INSERT INTO bank_presets')) throw new Error('Synthetic preset failure');
@@ -100,10 +98,7 @@ test('invalid preview and successful import with preset failure retain configure
   });
   try {
     const response = await request('/imports/csv/confirm', body);
-    expect(response.status).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('Transactions were imported. Preset was not saved.');
-    expectBranding(html);
+    expect(response.status).toBe(303);
   } finally {
     spy.mockRestore();
   }

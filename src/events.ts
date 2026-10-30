@@ -58,6 +58,7 @@ const UNDONE: Record<UndoOp, (n: number) => string> = {
   paid: (n) => `${plural(n, 'invoice')} ${n === 1 ? 'is' : 'are'} back as before.`,
   deleteRule: () => 'The rule is back.',
   settings: () => 'Your settings are back as they were.',
+  import: (n) => `Removed ${plural(n, 'payment')} of that import.`,
 };
 const date = (value: string | null) =>
   value && /^\d{4}-\d\d-\d\d$/.test(value)
@@ -189,6 +190,9 @@ export const EVENTS = {
     text: (p) => {
       const n = count(p, 'n'),
         op = p.get('op');
+      // An import's Undo refuses once the owner has decided any of its payments.
+      if (op === 'import' && count(p, 'changed'))
+        return `${count(p, 'changed')} of these payments were changed since; nothing was removed.`;
       return n && isUndoOp(op) ? UNDONE[op](n) : 'Nothing to undo. It changed since.';
     },
     section: (p) => (/^[a-z][a-z-]{0,39}$/.test(p.get('section') ?? '') ? p.get('section') : null),
@@ -303,21 +307,27 @@ export const EVENTS = {
   },
   // No Undo: making the transfer again needs the note typed the first time, which is deleted with it.
   transferUndone: { text: () => 'Transfer undone. Both payments need a receipt again.' },
+  // imp: the import; anyway: its payments with no bank ID that look like ones already in the app;
+  // similar: payments that look like ones in another account (a warning, not a gate).
   imported: {
     text: (p) => {
       const added = count(p, 'inserted'),
         skipped = count(p, 'skipped'),
-        again = count(p, 'replayed');
+        again = count(p, 'replayed'),
+        similar = count(p, 'similar');
       if (again) return `You imported this file before, so nothing changed. It has ${plural(again, 'payment')}.`;
       const tally = p.has('missing')
         ? ` Paid out: ${count(p, 'auto')} matched, ${count(p, 'np')} not a purchase, ${count(p, 'missing')} missing.`
         : '';
-      return `Added ${plural(added, 'payment')}.${tally}${skipped ? ` ${plural(skipped, 'payment')} ${skipped === 1 ? 'was' : 'were'} already in the app and ${skipped === 1 ? 'was' : 'were'} left out.` : ''}`;
+      return `Added ${plural(added, 'payment')}.${tally}${skipped ? ` Skipped ${skipped} already imported.` : ''}${similar ? ` ${plural(similar, 'payment')} look${similar === 1 ? 's' : ''} like ${similar === 1 ? 'one' : 'ones'} in another account.` : ''}`;
     },
     link: (p) =>
-      count(p, 'auto') && MONTH.test(p.get('month') ?? '')
-        ? { href: `/payments?month=${p.get('month')}&view=all`, label: 'See them' }
-        : null,
+      count(p, 'anyway') && id(p, 'imp')
+        ? { href: `/import/anyway?import=${id(p, 'imp')}&n=${count(p, 'anyway')}`, label: 'Import anyway' }
+        : count(p, 'auto') && MONTH.test(p.get('month') ?? '')
+          ? { href: `/payments?month=${p.get('month')}&view=all`, label: 'See them' }
+          : null,
+    undo: (p) => (count(p, 'inserted') && !count(p, 'replayed') && p.get('op') === 'import' ? logged(p) : null),
   },
   // ---------- Month ----------
   // Undo drops that one send, so the month is back as it was before: the earlier send, or not sent.

@@ -14,7 +14,14 @@ import { emptyFacts, emptySales, requireInput, type Receipt, type Rule } from '.
 import type { Transaction } from './banking';
 
 type Setting = { key: string; value_json: string; updated_at: string; updated_by: string };
-type Rows = { receipts: Receipt; bank_transactions: Transaction; vendor_rules: Rule; settings: Setting };
+type Imported = { id: string; status: string };
+type Rows = {
+  receipts: Receipt;
+  bank_transactions: Transaction;
+  vendor_rules: Rule;
+  settings: Setting;
+  imports: Imported;
+};
 type Table = keyof Rows;
 type Column<T extends Table> = Extract<keyof Rows[T], string>;
 
@@ -42,6 +49,7 @@ const TABLES: Record<Table, { pk?: string; intKey?: true; guard?: string; absent
   bank_transactions: { guard: RELINK },
   vendor_rules: { intKey: true },
   settings: { pk: 'key', absent: true },
+  imports: {},
 };
 const pk = (c: Change) => TABLES[c.tbl].pk ?? 'id';
 
@@ -93,6 +101,9 @@ const CHANGES = {
   deleteRule: [{ tbl: 'vendor_rules', by: 'id', cols: RULE_COLUMNS, deletes: true }],
   // A Settings save that takes a sender or a part away; ids are the setting keys it writes.
   settings: [{ tbl: 'settings', by: 'key', cols: ['value_json'] }],
+  // A bank import's completion; ids is its id. Undo does not restore the status: it removes the
+  // import's rows (undoImport).
+  import: [{ tbl: 'imports', by: 'id', cols: ['status'] }],
 } satisfies Record<string, readonly [Change, ...Change[]]>;
 export type UndoOp = keyof typeof CHANGES;
 export type UndoAt = string & { readonly __brand: 'UndoAt' };
@@ -206,7 +217,15 @@ const FIRST: Partial<Record<UndoOp, string>> = {
 // Puts back every row the action changed that nothing has changed since, in
 // one batch, and forgets the action. ids: the rows of its first table put back.
 // who: the person undoing, for the Settings audit.
-export async function undo(env: Env, at: UndoAt, op: UndoOp, who = 'owner'): Promise<{ ids: string[] }> {
+// refused: how many of an import's payments the owner has since matched by hand or marked, which
+// stops its Undo.
+export async function undo(
+  env: Env,
+  at: UndoAt,
+  op: UndoOp,
+  who = 'owner',
+): Promise<{ ids: string[]; refused?: number }> {
+  if (op === 'import') return undoImport(env, at);
   const first = FIRST[op] ? [env.DB.prepare(FIRST[op]).bind(at, op)] : [];
   const results = await env.DB.batch([
     ...first,
@@ -215,4 +234,39 @@ export async function undo(env: Env, at: UndoAt, op: UndoOp, who = 'owner'): Pro
   ]);
   const put = (results[first.length]?.results ?? []) as { id: string | number }[];
   return { ids: put.map((r) => String(r.id)) };
+}
+
+// An import's Undo deletes its payments, with the transfer pairs, automatic marks and match
+// rejections that hang on them, and the import itself, so the same file imports afresh. It
+// refuses when the owner has since decided any of them: a hand match or an own choice of Not a
+// purchase. The deletes carry the same check, so a decision made between the count and the
+// batch still stops them.
+const DECIDED = `EXISTS(SELECT 1 FROM bank_transactions WHERE import_id=?1 AND (match_method='manual' OR exempt_by='owner'))`;
+const ROWS = '(SELECT id FROM bank_transactions WHERE import_id=?1)';
+async function undoImport(env: Env, at: UndoAt): Promise<{ ids: string[]; refused?: number }> {
+  const logged = await env.DB.prepare("SELECT row_id FROM undo_log WHERE at=? AND op='import' AND tbl='imports'")
+    .bind(at)
+    .first<{ row_id: string }>();
+  if (!logged) return { ids: [] };
+  const id = logged.row_id;
+  const refused = Number(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM bank_transactions WHERE import_id=? AND (match_method='manual' OR exempt_by='owner')",
+    )
+      .bind(id)
+      .first('n'),
+  );
+  if (refused) return { ids: [], refused };
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      `DELETE FROM internal_transfers WHERE (debit_id IN ${ROWS} OR credit_id IN ${ROWS}) AND NOT ${DECIDED}`,
+    ).bind(id),
+    env.DB.prepare(`DELETE FROM match_rejections WHERE transaction_id IN ${ROWS} AND NOT ${DECIDED}`).bind(id),
+    env.DB.prepare(`DELETE FROM bank_transactions WHERE import_id=?1 AND NOT ${DECIDED} RETURNING id`).bind(id),
+    env.DB.prepare(
+      'DELETE FROM imports WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM bank_transactions WHERE import_id=?1)',
+    ).bind(id),
+    env.DB.prepare('DELETE FROM undo_log WHERE at=? AND op=?').bind(at, 'import'),
+  ]);
+  return { ids: ((results[2]?.results ?? []) as { id: string }[]).map((r) => r.id) };
 }
