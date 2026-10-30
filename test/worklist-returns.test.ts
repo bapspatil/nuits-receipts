@@ -29,21 +29,25 @@ const attr = (html: string, tag: RegExp, name: string) =>
 
 test('B: over 500 open rows, totals are true and select-all takes exactly the first 500 in list order', async () => {
   const b = await seedBusyMonth();
-  const last = b.todo[b.todo.length - 1]!;
+  // To do holds the receipts to check and the overdue invoices; the clones are receipts to check.
+  const last = b.todo.filter((id) => !b.overdue.includes(id)).at(-1)!;
   await clone('receipts', last, 520, 'original_key');
   const open = (
     await env.DB.prepare(
-      "SELECT id FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY issue_date IS NOT NULL,coalesce(issue_date,''),received_at,id",
-    ).all<{ id: string }>()
+      "SELECT id FROM receipts WHERE (status='needs_review' OR id IN (SELECT value FROM json_each(?))) AND duplicate_of IS NULL AND discarded_at IS NULL ORDER BY issue_date IS NOT NULL,coalesce(issue_date,''),received_at,id",
+    )
+      .bind(JSON.stringify(b.overdue))
+      .all<{ id: string }>()
   ).results
     .map((r) => r.id)
     .filter((id) => b.todo.includes(id) || !b.needsReview.includes(id));
   expect(open.length).toBe(b.todo.length + 520);
   const html = await get('/receipts?view=todo');
   expect(attr(html, /<div data-list="receipts-todo"[^>]*>/, 'data-total')).toBe(String(open.length));
-  expect(attr(html, /<form id="bulk-review"[^>]*>/, 'data-total')).toBe(String(open.length));
+  expect(attr(html, /<form id="bulk-todo"[^>]*>/, 'data-total')).toBe(String(open.length));
   expect(html).toContain('>Select the first 500 receipts</button>');
-  expect(html).toContain(`<h1>${open.length} to check`);
+  expect(html).toContain(`Start checking (${open.length})</a>`);
+  expect(html).toContain(`<p class="listhead">50 of ${open.length} to do</p>`);
   expect([...html.matchAll(/data-row="/g)].length).toBe(50);
   const page = await get(`/receipts/${open[0]}?from=todo`);
   expect(page).toContain(`<span class="prog">1 of ${open.length} to check</span>`);
@@ -134,10 +138,16 @@ test('C: Approve while typing a date moves on from where the receipt stood, not 
 test('F: Undo of a Discard lands on the receipt it brought back', async () => {
   const b = await seedBusyMonth();
   const month = b.earlierMonth;
-  const listHtml = await get(`/receipts?view=todo&month=${month}`);
   const [, e1] = b.earlier as [string, string];
-  const row = listHtml.slice(listHtml.indexOf(`id="row-${e1}"`));
-  const discarded = await request('/discard', { method: 'POST', body: htmlForm(row, '/discard') });
+  // To do discards from its bulk bar, whose Undo restores by time.
+  const discarded = await post('/receipts/bulk', {
+    op: 'discard',
+    list: 'receipts',
+    view: 'todo',
+    month,
+    upto: '50',
+    id: e1,
+  });
   const landed = await get(discarded.headers.get('Location')!);
   const undone = await request('/restore', { method: 'POST', body: htmlForm(landed, '/restore') });
   expect(locationOf(undone)).toBe(`/receipts?view=todo&month=${month}&done=restored&n=1#row-${e1}`);
@@ -329,7 +339,7 @@ test('G: Merge duplicates returns to the month-filtered To do it was offered on'
   await clone('receipts', b.earlier[0]!, 1, 'original_key');
   const path = `/receipts?view=todo&month=${b.earlierMonth}`;
   const html = await get(path);
-  const res = await request('/review/merge', { method: 'POST', body: htmlForm(html, '/review/merge') });
+  const res = await request('/receipts/merge', { method: 'POST', body: htmlForm(html, '/receipts/merge') });
   expect(locationOf(res)).toBe(`${path}&done=merged&n=1`);
 });
 
