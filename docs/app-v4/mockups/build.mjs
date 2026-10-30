@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Builds native.html and paper.html from one data set and one set of markup
-// functions, so the two directions differ only in tokens and CSS. It also
+// Builds native.html, paper.html and mix.html from one data set and one set of markup
+// functions, so the directions differ only in tokens and CSS. It also
 // measures every declared text/background pair and writes the contrast tables
 // into README.md between the <!-- contrast:NAME --> markers.
 //
@@ -402,9 +402,10 @@ ${theme.css}
 ${sprite()}
 <div class="mockbar">
   <p><b>${theme.title}</b> mockup, UX v4. Static, busy September 2026.</p>
-  <p class="mb-links"><a href="?">Desktop</a> <a href="?phone">Phone, 390 px</a> <a href="${name === 'native' ? 'paper' : 'native'}.html">${
-    name === 'native' ? 'Warm paper' : 'Native app'
-  } direction</a></p>
+  <p class="mb-links"><a href="?">Desktop</a> <a href="?phone">Phone, 390 px</a> ${Object.entries(THEMES)
+    .filter(([k]) => k !== name)
+    .map(([k, t]) => `<a href="${k}.html">${t.title}</a>`)
+    .join(' ')}</p>
 </div>
 ${SCREENS.map(([id, label, fn]) => `<section class="screen" id="s-${id}" aria-label="${label}"><p class="mocklabel">${label}</p>\n${fn()}\n</section>`).join('\n')}
 <section class="screen" id="s-specimen" aria-label="Controls"><p class="mocklabel">4. Controls, statuses and icons</p>${specimen()}</section>

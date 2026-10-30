@@ -554,8 +554,256 @@ const paperPairs = [
   ['onBarOutline', 'accentHover', 'ui', 'Bulk Discard outline, 55% paper on petrol950'],
 ];
 
+// ---------------------------------------------- Mix: paper look, native layout
+const M = { ...P, segTrack: P.sunken, current: P.accentTint, darkest: P.accentHover, lightest: P.field };
+
+// Glass is measured before blur, as the flat tint over the darkest and the
+// lightest colour that can sit under it. Blur only averages the backdrop
+// towards its mean, so the flat case bounds the real one. The tint takes the
+// lowest opacity, in steps of .01, at which every label on glass passes AA.
+const lumOf = (h) => {
+  const c = rgb(h).map((x) => x / 255).map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const contrast = (a, b) => {
+  const [x, y] = [lumOf(a), lumOf(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+const glassLabels = ['ink', 'muted', 'accent', 'success'];
+const glassUnder = [M.darkest, M.ink, M.accent, M.lightest, M.page];
+let glassAlpha = 0.5;
+while (!glassUnder.every((u) => glassLabels.every((f) => contrast(M[f], over(M.sheet, glassAlpha, u)) >= 4.5))) {
+  glassAlpha = Math.round((glassAlpha + 0.01) * 100) / 100;
+}
+export const GLASS = { tint: M.sheet, alpha: glassAlpha, blur: 24, saturate: 170 };
+Object.assign(M, {
+  glassOverDarkest: over(M.sheet, glassAlpha, M.darkest),
+  glassOverInk: over(M.sheet, glassAlpha, M.ink),
+  glassOverLightest: over(M.sheet, glassAlpha, M.lightest),
+  thumbOverTrack: over(M.sheet, glassAlpha, M.segTrack),
+});
+
+const mixCss = `
+:root{
+  --page:${M.page};--sheet:${M.sheet};--sunken:${M.sunken};--ink:${M.ink};--muted:${M.muted};--rule:${M.rule};--rule-strong:${M.ruleStrong};
+  --accent:${M.accent};--accent-hover:${M.accentHover};--accent-tint:${M.accentTint};--on-accent:${M.onAccent};--field:${M.field};
+  --success:${M.success};--success-bg:${M.successBg};--warn:${M.warn};--warn-bg:${M.warnBg};--info:${M.info};--info-bg:${M.infoBg};--danger:${M.danger};--danger-bg:${M.dangerBg};
+  --seg-track:${M.segTrack};
+  --glass:${rgba(GLASS.tint, GLASS.alpha)};--glass-filter:blur(${GLASS.blur}px) saturate(${GLASS.saturate}%);
+  --glass-edge:inset 0 1px 0 rgb(255 255 255 / .8),inset 0 -1px 0 rgb(33 28 22 / .08);
+  --glass-shadow:0 1px 2px rgb(33 28 22 / .1),0 12px 32px -8px rgb(33 28 22 / .24);
+  --glass-border:rgb(133 120 97 / .3);--glass-r:22px;
+  --font:"Instrument Sans",system-ui,sans-serif;--display:"Bricolage","Arial Narrow",system-ui,sans-serif;--num:"DM Mono",ui-monospace,Menlo,monospace;
+  --r-sm:8px;--r-md:10px;--r-lg:14px;--tabbar:calc(76px + env(safe-area-inset-bottom));
+  --t-body:15px;--t-meta:13px;--t-title:34px;
+}
+@media (max-width:879px){:root{--t-body:16px;--t-meta:13.5px;--t-title:30px}}
+.app{background:var(--page) ${grain};color:var(--ink);font:400 var(--t-body)/1.45 var(--font)}
+.amt,.date,.n,.count,.tally,.pos,.listfoot,.stepper,.unit,.badge,.chip,.month p,.input[inputmode=decimal]{font-family:var(--num)}
+
+/* glass: navigation and floating controls only; content stays solid paper */
+.appnav,.actionbar,.bulkbar,.banner:not(.err),.seg [aria-current]{background:var(--glass);-webkit-backdrop-filter:var(--glass-filter);backdrop-filter:var(--glass-filter);border:1px solid var(--glass-border);box-shadow:var(--glass-edge),var(--glass-shadow)}
+.actionbar .btn,.bulkbar .btn,.banner .btn{border-radius:999px}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass:var(--sheet);--glass-filter:none}}
+@media (prefers-reduced-transparency:reduce){:root{--glass:var(--sheet);--glass-filter:none}}
+@media (prefers-contrast:more){:root{--glass:var(--sheet);--glass-filter:none;--glass-border:var(--ink);--glass-edge:0 0 0 transparent}}
+.amt{font-weight:500;letter-spacing:-.01em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* source list on desktop, frosted tab bar on phone */
+.appnav .brand{display:block;font:800 19px/1 var(--display);letter-spacing:-.01em;text-decoration:none;color:var(--ink);padding:24px 20px 20px}
+.appnav a{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.appnav a .i{color:var(--accent);--icon:19px}
+.appnav [aria-current]{font-weight:600;color:var(--accent)}
+.count{display:inline-grid;place-items:center;min-width:26px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:11.5px;font-weight:500}
+@media (min-width:880px){
+  .app{grid-template-columns:260px minmax(0,1fr)}
+  .appnav{position:sticky;top:12px;align-self:start;margin:12px 0 12px 12px;border-radius:var(--glass-r);min-height:calc(min(100vh,880px) - 24px);z-index:6}
+  .appnav ul{display:grid;gap:2px;padding:0 10px}
+  .appnav a{padding:9px 10px;border-radius:var(--r-sm);font-size:14.5px}
+  .appnav [aria-current]{background:var(--accent-tint)}
+  .appnav .count{margin-left:auto}
+  main{padding:28px 36px 44px;max-width:1140px;width:100%;gap:16px}
+}
+@media (max-width:879px){
+  .appnav{bottom:calc(10px + env(safe-area-inset-bottom));margin:0 10px;border-radius:32px;padding:0 4px}
+  .appnav a{height:64px;gap:3px;font-size:11.5px;font-weight:500;color:var(--muted)}
+  .appnav a .i{color:inherit;--icon:23px}
+  .appnav [aria-current]{color:var(--accent);font-weight:600}
+  .appnav .count{height:17px;min-width:20px;font-size:10.5px;padding:0 5px}
+  main{padding:16px 16px 24px;gap:14px}
+}
+
+h1{font:800 var(--t-title)/1.05 var(--display);letter-spacing:-.015em}
+h2{font:500 11px/1.2 var(--num);text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+
+/* controls: five shapes, each with its own outline */
+.btn{min-height:40px;padding:0 15px;border-radius:var(--r-md);font-size:14.5px;font-weight:600;border:1px solid transparent;--icon:17px}
+.btn.sm{min-height:34px;padding:0 11px;font-size:13.5px;--icon:16px}
+.btn.primary{background:var(--accent);color:var(--on-accent);box-shadow:inset 0 -2px 0 rgb(0 0 0 / .28),0 1px 2px rgb(33 28 22 / .2)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.secondary{background:var(--field);color:var(--ink);border-color:var(--rule-strong);box-shadow:0 1px 0 var(--rule-strong)}
+.btn.secondary .i{color:var(--accent)}
+.btn.secondary:hover{background:var(--sheet);border-color:var(--ink)}
+.btn.ghost{background:transparent;color:var(--accent);padding-inline:9px}
+.btn.ghost span{text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px}
+.btn.ghost:hover span{text-decoration-color:currentColor}
+.btn.danger{background:var(--danger);color:var(--on-accent);box-shadow:inset 0 -2px 0 rgb(0 0 0 / .25)}
+.seg{background:var(--seg-track);border-radius:11px;padding:3px;gap:2px}
+.seg a{padding:6px 14px;border-radius:8px;font-size:14.5px;font-weight:500;color:var(--ink);min-height:34px}
+.seg a{border:1px solid transparent}
+.seg [aria-current]{color:var(--accent);font-weight:600;box-shadow:var(--glass-edge),0 1px 3px rgb(33 28 22 / .18)}
+.seg .n{color:var(--muted);font-size:12.5px}
+.chip{min-height:34px;padding:0 12px;border-radius:999px;border:1px dashed var(--rule-strong);background:transparent;font-size:12.5px;--icon:14px}
+.input{min-height:46px;padding:0 14px;border:1px solid var(--rule-strong);border-bottom:2px solid var(--ink);border-radius:var(--r-md) var(--r-md) 0 0;background:var(--field);font-size:16px;font-weight:500}
+.input:focus{outline:0;border-bottom-color:var(--accent);box-shadow:0 2px 0 var(--accent)}
+.pick{appearance:none;-webkit-appearance:none;width:21px;height:21px;margin:0;border-radius:5px;border:1.5px solid var(--rule-strong);background:var(--field);cursor:pointer}
+.pick:checked{background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FBF8F2' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/14px no-repeat;border-color:var(--accent)}
+
+.badge{padding:3px 8px;border-radius:3px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;border:1px solid}
+.badge.warn{background:var(--warn-bg);color:var(--warn);border-color:${M.warn}55}
+.badge.info{background:var(--info-bg);color:var(--info);border-color:${M.info}55}
+.banner{color:var(--success);border-radius:var(--glass-r);padding:6px 6px 6px 16px;font-weight:600;--icon:19px}
+.banner.err{background:var(--danger-bg);color:var(--danger);border-radius:var(--r-lg);padding:10px 14px}
+.banner .btn.ghost{color:var(--success)}
+.selall{font-size:14px}
+.tally{font-size:12.5px;color:var(--muted)}
+
+/* grouped inset list on a paper sheet */
+.colhead{display:none !important}
+.rows{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r-lg);overflow:hidden;box-shadow:0 1px 0 var(--rule),0 2px 6px rgb(33 28 22 / .05)}
+.row{padding:12px 14px 12px 16px;min-height:62px}
+.row + .row::before{content:"";position:absolute;top:0;left:53px;right:0;border-top:1px solid var(--rule)}
+.row.is-picked{background:var(--accent-tint);box-shadow:inset 3px 0 0 var(--accent)}
+.row .title{font-weight:600;color:var(--ink)}
+.row .meta{font-size:var(--t-meta);color:var(--muted)}
+.row .meta .kind{font-family:var(--num);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-right:6px}
+.row .date{font-size:13px;color:var(--muted)}
+.row .amt{font-size:15.5px}
+.amt .cur{font-size:.72em;color:var(--muted);letter-spacing:.04em}
+.amt.none{width:1px}
+.likely{margin-top:6px;padding:7px 10px;border-radius:var(--r-sm);font-size:12.5px;background:var(--page);border:1px dashed var(--rule-strong);--icon:15px}
+.likely b{font-weight:600;color:var(--accent)}
+.likely .i{color:var(--accent)}
+.likely .why{color:var(--muted)}
+.lede{color:var(--muted)}
+.lede b{color:var(--ink);font-family:var(--num);font-weight:500}
+.listfoot{color:var(--muted);padding:4px 4px 0}
+.listfoot b{color:var(--ink);font-weight:500}
+.month{gap:2px}
+.month p{font-size:14px;min-width:9.5em;text-align:center}
+.mocknote{border-radius:var(--r-lg)}
+@media (min-width:880px){.row .date{order:-1}}
+
+.bulkbar{color:var(--ink);border-radius:var(--glass-r);padding:8px 8px 8px 20px;min-width:min(100%,27rem);font-family:var(--num)}
+.bulkbar b{font-weight:500}
+.bulkbar p{white-space:nowrap}
+.btn.onbar-primary{background:var(--accent);color:var(--on-accent);font-family:var(--font);box-shadow:inset 0 -2px 0 rgb(0 0 0 / .28)}
+.btn.onbar{background:var(--field);color:var(--ink);border-color:var(--rule-strong);font-family:var(--font)}
+.btn.onbar .i{color:var(--accent)}
+
+/* review */
+.reviewhead{gap:8px 12px}
+.back{color:var(--accent);font-weight:600;font-size:14px;margin-left:-4px}
+.stepper{gap:2px;color:var(--muted);font-size:14px}
+.stepper b{color:var(--ink);font-weight:500}
+.iconbtn{border-radius:var(--r-md);color:var(--accent)}
+.iconbtn:hover{background:var(--sunken)}
+.doc{background:var(--sunken) ${grain};border-radius:var(--r-lg);padding:28px 16px 16px}
+.slip{font-family:var(--num);color:#2A2520;background:#FFFEFB}
+.group{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r-lg);padding:16px 18px;display:grid;gap:16px}
+.group.need{border-color:var(--warn);box-shadow:inset 0 0 0 .5px var(--warn)}
+.group.need h2{color:var(--warn)}
+.field label{font-weight:600}
+.hint{font-size:13.5px;color:var(--warn)}
+.hint.quiet{color:var(--muted)}
+.unit{color:var(--muted);font-size:12px}
+.rf{padding:9px 0;border-top:1px dotted var(--rule-strong)}
+.rf:first-child{border-top:0}
+.rf dt{color:var(--muted);font-size:14px}
+.rf dd{font-weight:500}
+.actionbar{border-radius:var(--glass-r);padding:8px 8px 8px 18px}
+.actionbar .pos{color:var(--muted);font-size:14px}
+.actionbar .pos b{color:var(--ink);font-weight:500}
+@media (max-width:879px){
+  .actionbar{bottom:calc(var(--tabbar) + 8px);margin:0 -6px;padding:6px}
+  .ab-acts{gap:6px}
+  .ab-acts .btn{flex-direction:column;gap:2px;min-height:52px;padding:4px 2px;font-size:12px;--icon:20px}
+  .ab-acts .btn.primary{flex-direction:row;font-size:16px;gap:6px}
+  .row .acts .btn.sm{min-height:38px}
+  .row{padding:12px 12px 10px 14px}
+  .row + .row::before{left:51px}
+}
+
+.specimen{background:var(--page) ${grain};color:var(--ink);font:400 15px/1.45 var(--font)}
+.specimen h2{margin-top:8px}
+.iconkey li{font-size:14px}
+.iconkey .i{color:var(--accent)}
+${motion('p-strike .2s ease-out forwards,row-collapse .2s .26s cubic-bezier(.2,0,0,1) forwards')}
+@media (prefers-reduced-motion:no-preference){
+  .row.is-leaving::after{content:"";position:absolute;left:53px;right:16px;top:50%;border-top:2px solid var(--accent);transform-origin:left;animation:p-line .2s ease-out forwards}
+  @keyframes p-line{from{transform:scaleX(0)}}
+  @keyframes p-strike{to{background:var(--accent-tint)}}
+}
+`;
+
+const mixPairs = [
+  ['ink', 'page', 'text', 'Body text on the page'],
+  ['ink', 'sheet', 'text', 'Row titles on a grouped list'],
+  ['muted', 'page', 'text', 'Meta, tally and lede on the page'],
+  ['muted', 'sheet', 'text', 'Meta line and date in a row'],
+  ['muted', 'sunken', 'text', 'Muted text on the document panel'],
+  ['ink', 'accentTint', 'text', 'Row title on a selected row'],
+  ['muted', 'accentTint', 'text', 'Meta on a selected row'],
+  ['accent', 'page', 'text', 'Ghost buttons and links on the page'],
+  ['accent', 'sheet', 'text', 'Ghost buttons in a row, current segment label'],
+  ['ink', 'field', 'text', 'Secondary button label, input text'],
+  ['muted', 'field', 'text', 'Unit inside an input'],
+  ['onAccent', 'accent', 'text', 'Primary button, nav count'],
+  ['onAccent', 'accentHover', 'text', 'Primary while hovered'],
+  ['onAccent', 'danger', 'text', 'Delete forever (permanent delete only)'],
+  ['warn', 'warnBg', 'text', 'Needs you, Missing, Overdue stamps'],
+  ['warn', 'sheet', 'text', 'Hint under a flagged field, flagged group heading'],
+  ['info', 'infoBg', 'text', 'Reading, New sender stamps'],
+  ['danger', 'dangerBg', 'text', 'Error banner'],
+  ['ink', 'segTrack', 'text', 'Segmented control, unselected segment'],
+  ['muted', 'segTrack', 'text', 'Segment count, unselected'],
+  ['ink', 'glassOverDarkest', 'text', 'Glass: sidebar items, bulk bar count, over petrol950, the darkest content'],
+  ['muted', 'glassOverDarkest', 'text', 'Glass: tab bar labels, position in the action bar, over petrol950, the darkest content'],
+  ['accent', 'glassOverDarkest', 'text', 'Glass: current tab, ghost buttons on a bar, over petrol950, the darkest content'],
+  ['success', 'glassOverDarkest', 'text', 'Glass: Undo banner and its Undo button, over petrol950, the darkest content'],
+  ['ink', 'glassOverInk', 'text', 'Glass: sidebar items, bulk bar count, over ink text'],
+  ['muted', 'glassOverInk', 'text', 'Glass: tab bar labels, position in the action bar, over ink text'],
+  ['accent', 'glassOverInk', 'text', 'Glass: current tab, ghost buttons on a bar, over ink text'],
+  ['success', 'glassOverInk', 'text', 'Glass: Undo banner and its Undo button, over ink text'],
+  ['ink', 'glassOverLightest', 'text', 'Glass: sidebar items, bulk bar count, over the lightest paper'],
+  ['muted', 'glassOverLightest', 'text', 'Glass: tab bar labels, position in the action bar, over the lightest paper'],
+  ['accent', 'glassOverLightest', 'text', 'Glass: current tab, ghost buttons on a bar, over the lightest paper'],
+  ['success', 'glassOverLightest', 'text', 'Glass: Undo banner and its Undo button, over the lightest paper'],
+  ['accent', 'glassOverDarkest', 'ui', 'Glass: tab and sidebar icons, focus ring, worst case'],
+  ['accent', 'thumbOverTrack', 'text', 'Glass segment thumb: selected segment label'],
+  ['muted', 'thumbOverTrack', 'text', 'Glass segment thumb: its count'],
+  ['accent', 'current', 'text', 'Current sidebar item on its solid petrol tint'],
+  ['ink', 'field', 'text', 'Bulk Discard: solid paper capsule on glass'],
+  ['ruleStrong', 'sheet', 'ui', 'Input, chip, checkbox and secondary button outline'],
+  ['ruleStrong', 'page', 'ui', 'Chip outline on the page'],
+  ['ruleStrong', 'accentTint', 'ui', 'Unchecked checkbox on a selected row'],
+  ['ink', 'field', 'ui', 'Input baseline'],
+  ['accent', 'page', 'ui', 'Focus ring, current tab icon'],
+  ['accent', 'segTrack', 'ui', 'Focus ring on the segment track'],
+  ['warn', 'sheet', 'ui', 'Flagged group outline'],
+  ['onAccent', 'accent', 'ui', 'Checked checkbox tick'],
+];
+
 const fontFace = (family, url, weight) =>
   `@font-face{font-family:"${family}";src:url("${url}") format("woff2");font-weight:${weight};font-display:swap}`;
+
+const paperFonts = [
+  fontFace('Bricolage', '../../../site/public/fonts/bricolage.woff2', '600 800'),
+  fontFace('Instrument Sans', '../../../site/public/fonts/instrument-sans.woff2', '400 700'),
+  fontFace('DM Mono', 'fonts/dm-mono-latin-400-normal.woff2', 400),
+  fontFace('DM Mono', 'fonts/dm-mono-latin-500-normal.woff2', 500),
+].join('\n');
 
 export const THEMES = {
   native: {
@@ -569,12 +817,14 @@ export const THEMES = {
     title: 'Warm paper',
     colors: P,
     pairs: paperPairs,
-    fontFaces: [
-      fontFace('Bricolage', '../../../site/public/fonts/bricolage.woff2', '600 800'),
-      fontFace('Instrument Sans', '../../../site/public/fonts/instrument-sans.woff2', '400 700'),
-      fontFace('DM Mono', 'fonts/dm-mono-latin-400-normal.woff2', 400),
-      fontFace('DM Mono', 'fonts/dm-mono-latin-500-normal.woff2', 500),
-    ].join('\n'),
+    fontFaces: paperFonts,
     css: BASE + paperCss,
+  },
+  mix: {
+    title: 'Mix: paper look, native layout',
+    colors: M,
+    pairs: mixPairs,
+    fontFaces: paperFonts,
+    css: BASE + mixCss,
   },
 };

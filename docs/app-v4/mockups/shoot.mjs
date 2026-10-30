@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Screenshots both mockups at 1440 and 390 and checks them in the browser:
+// Screenshots every mockup at 1440 and 390 and checks them in the browser:
 // axe (WCAG 2.x A and AA, contrast included), every button carries an icon and
 // a text label, no row holds a primary, and nothing scrolls sideways.
 // Usage: node docs/app-v4/mockups/shoot.mjs   (exits non-zero on any miss)
@@ -40,6 +40,11 @@ function chromePath() {
   throw new Error('No Chromium found. Set CHROME, or run `npx playwright install chromium`.');
 }
 
+// Viewport shots, scrolled so content passes under the sticky glass bars.
+const GLASS_SHOTS = {
+  mix: { 390: { height: 844, center: '#row-r4' }, 1440: { height: 760, center: '#f-vat' } },
+};
+
 const out = join(here, 'screens');
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ executablePath: chromePath() });
@@ -49,7 +54,7 @@ const miss = (msg) => {
   console.error(`MISS ${msg}`);
 };
 
-for (const name of ['native', 'paper']) {
+for (const name of ['native', 'paper', 'mix']) {
   for (const width of [1440, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: width < 600 ? 2 : 1 });
     await page.goto(pathToFileURL(join(here, `${name}.html`)).href);
@@ -81,6 +86,12 @@ for (const name of ['native', 'paper']) {
     for (const v of axe) miss(`${name}-${width}: axe ${v.id} x${v.n} at ${v.first}\n  ${v.why}`);
     await page.screenshot({ path: join(out, `${name}-${width}.png`), fullPage: true });
     console.log(`${name}-${width}: axe ${axe.length} violations, fonts ${fonts.join(', ') || 'system only'}`);
+    const glass = GLASS_SHOTS[name]?.[width];
+    if (glass) {
+      await page.setViewportSize({ width, height: glass.height });
+      await page.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), glass.center);
+      await page.screenshot({ path: join(out, `${name}-${width}-glass.png`) });
+    }
     await page.close();
   }
 }
