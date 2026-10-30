@@ -20,6 +20,10 @@ One Cloudflare Worker with server-rendered HTML. No SPA, ORM, cron triggers or q
 
 `src/bulk.ts` renders the one shared select component (row tick boxes, the select tools and the action bar) and the action labels for each list, and builds the client script served at `/assets/bulk.js`. The script embeds the pure selection reducer `select` from the same file, so the tests and the browser run the same code. `src/batch.ts` holds the server side: a registry of ops per route (`/receipts/bulk`, `/payments/bulk`, `/senders/bulk`), one id parser per route at the boundary, and the same per-row guards as the single actions. With `all=1` the server resolves the ids from the list's own filter instead of trusting the page. `BULK_CAP` is 500 ids per request and per `all=1`; ops that call the model (Read again, Move) take `AI_CAP` (10) per request, and the script sends them in chunks. Without JavaScript the tick boxes and bar are a plain form. App pages now send `script-src 'self'`; scripts are files, never inline.
 
+## Service worker
+
+`/sw.js` exists so the app can be installed and show an offline page. It caches no app data and only answers two things: a navigation while the device is offline, and an Android share POST to `/share`, whose files it stashes in Cache Storage for the Add page (which fills the form but never submits). Online requests never pass through it, because a worker in the navigation path can swallow the Basic challenge or the Access redirect. The manifest and worker stay behind sign-in; only the icons and `/favicon.svg` answer without it. If a share POST reaches the Worker instead, it is redirected to `/add` unread.
+
 ## Data rules
 
 - Every original is stored once, keyed by its SHA-256, before any processing. Retry re-reads the stored original.

@@ -65,6 +65,16 @@ Email is optional. It needs a domain on Cloudflare DNS with Email Routing and a 
 
 Add receipts, review what was read, import a bank CSV, check the suggested matches, then download the month for your accountant and press the "I've sent" button. [Your first month](https://receipts.nuits.net/docs/tutorials/your-first-month/) walks through it once with sample files; the [how-to guides](https://receipts.nuits.net/docs/how-to/) cover each step.
 
+### Install it on your phone or computer
+
+The app installs as its own window with its own icon, and needs no app store.
+
+- **iPhone or iPad (Safari):** open the app, tap Share, then Add to Home Screen.
+- **Mac (Safari):** File, then Add to Dock.
+- **Android or desktop Chrome and Edge:** open the app, then use the menu's Install app (or Add to Home screen).
+
+The installed app still needs a connection: offline it only shows a "You're offline" page, and it keeps nothing on the device. On Android, you can also share receipt PDFs and photos to the installed app from other apps. They open on the Add page, and nothing is uploaded until you choose what they are and press Add.
+
 ## Marketing site
 
 The project's home page and `/privacy/` live in `site/`, a static Vite build with its own `package.json` and an assets-only `site/wrangler.jsonc` that also serves the demo video. You do not need it to run the app. To preview it: `cd site && bun install && bun run build && bun run preview`. The routes in `site/wrangler.jsonc` are the maintainer's domain, so change or remove them before deploying your own copy.
