@@ -598,15 +598,15 @@ export async function exemptByClef(env: Env, importId: string): Promise<number> 
   );
 }
 // Undo for the automatic marks of one import: the rows need a receipt again,
-// and the choice is the owner's from now on.
-export async function undoExemptions(env: Env, importId: string): Promise<number> {
+// and the choice is the owner's from now on. Returns the payments it changed.
+export async function undoExemptions(env: Env, importId: string): Promise<string[]> {
   const result = await env.DB.prepare(
-    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO}`,
+    `UPDATE bank_transactions SET receipt_required=1,exempt_by='owner' WHERE import_id=? AND receipt_required=0 AND receipt_id IS NULL AND exempt_by IN ${AUTO} RETURNING id`,
   )
     .bind(importId)
-    .run();
+    .all<{ id: string }>();
   await reconcile(env);
-  return result.meta.changes;
+  return result.results.map((r) => r.id);
 }
 // Statements imported before the original amount was read from Holvi's
 // "Currency and amount: USD 10.46" line get it now, once. Rows of a pending

@@ -199,13 +199,14 @@ export async function matchLikely(
   return { matched, skipped: Math.min(pairs.length, BULK_MAX) - matched };
 }
 // Undo for the bulk match: only rows still carrying that batch's time, and only by-you matches.
-export async function unmatchLikely(env: Env, at: string): Promise<number> {
+// Returns the payments it unmatched.
+export async function unmatchLikely(env: Env, at: string): Promise<string[]> {
   const result = await env.DB.prepare(
-    "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE matched_at=? AND match_method='manual'",
+    "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE matched_at=? AND match_method='manual' RETURNING id",
   )
     .bind(at)
-    .run();
-  return result.meta.changes;
+    .all<{ id: string }>();
+  return result.results.map((r) => r.id);
 }
 // Takes the matches off these payments. Taken apart by the owner, so the
 // matcher never links the same pair again on its own. Returns how many it unmatched.

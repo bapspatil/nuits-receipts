@@ -143,7 +143,7 @@ export type ListDef = {
   table: string;
   alias: string;
   open: string;
-  order: string;
+  order: readonly string[];
   // The views whose rows render in this order, each with its #row-<id> anchor.
   views: readonly View[];
   where: (s: ListState) => { sql: string; binds: unknown[] };
@@ -154,7 +154,7 @@ const RECEIPTS: ListDef = {
   alias: 'r',
   open: `${needsReviewSql('r')} AND r.duplicate_of IS NULL AND r.discarded_at IS NULL`,
   // Undated first, as they wait on a date before anything else.
-  order: "r.issue_date IS NOT NULL,coalesce(r.issue_date,''),r.received_at,r.id",
+  order: ['r.issue_date IS NOT NULL', "coalesce(r.issue_date,'')", 'r.received_at', 'r.id'],
   views: ['todo'],
   // An undated receipt belongs to no month yet, so it stays in every month's To do.
   where: (s) =>
@@ -167,7 +167,7 @@ const BANK: ListDef = {
   table: 'bank_transactions t',
   alias: 't',
   open: `i.status='complete' AND ${VIEW_SQL.todo}`,
-  order: BANK_ORDER,
+  order: BANK_ORDER.split(','),
   views: ['todo', 'all'],
   where: (s) => (s.month ? { sql: 'substr(t.booking_date,1,7)=?', binds: [s.month] } : { sql: '1', binds: [] }),
 };
@@ -178,24 +178,67 @@ export function openDef(state: ListState): ListDef | null {
   return def?.views.includes(state.view) ? def : null;
 }
 
-// The order key of the first of ids, in the list's order.
+const orderOf = (def: ListDef) => def.order.join(',');
+// The order key of the first of ids, in the list's order, as the rows stand now.
 const current = (def: ListDef) =>
-  `(SELECT ${def.order} FROM ${def.table} WHERE ${def.alias}.id IN (SELECT value FROM json_each(?)) ORDER BY ${def.order} LIMIT 1)`;
-// After a save: the first open row after the acted-on ones (the first of them in list order),
-// else, when it wraps, the first open row. One query, run after the write.
+  `(SELECT ${orderOf(def)} FROM ${def.table} WHERE ${def.alias}.id IN (SELECT value FROM json_each(?)) ORDER BY ${orderOf(def)} LIMIT 1)`;
+// A place in a list's order to look on from: after the acted-on row, or at it (a restore lands on
+// what it brought back). sql is a row value, with its binds.
+export type Cursor = { sql: string; binds: readonly unknown[]; at: boolean };
+// The first of ids in list order, its key read now. An action reads it before its write, since the
+// write can move the row (a date typed on an undated receipt) and Next means next from where it was.
+export async function cursorOf(
+  env: Env,
+  def: ListDef,
+  ids: readonly string[],
+  { at = false }: { at?: boolean } = {},
+): Promise<Cursor | null> {
+  if (!ids.length) return null;
+  const order = orderOf(def);
+  const [key] = await env.DB.prepare(
+    `SELECT ${order} FROM ${def.table} WHERE ${def.alias}.id IN (SELECT value FROM json_each(?)) ORDER BY ${order} LIMIT 1`,
+  )
+    .bind(JSON.stringify(ids))
+    .raw();
+  return key ? { sql: `(${key.map(() => '?').join(',')})`, binds: key, at } : null;
+}
+// The cursor in the list an action came from, or null when that view has no rows to land on.
+export function cursorFor(
+  env: Env,
+  state: ListState,
+  ids: readonly string[],
+  o?: { at?: boolean },
+): Promise<Cursor | null> {
+  const def = openDef(state);
+  return def ? cursorOf(env, def, ids, o) : Promise.resolve(null);
+}
+// A row as it stands, for a page that writes nothing, so its Next needs no query of its own.
+export const standing = (def: ListDef, id: string): Cursor => ({
+  sql: current(def),
+  binds: [JSON.stringify([id])],
+  at: false,
+});
+// The first open row after the cursor (at it, for a restore), else, when it wraps or there is no
+// cursor, the first open row. One query, run after the write.
 export async function nextOpen(
   env: Env,
   def: ListDef,
   state: ListState,
-  ids: readonly string[],
+  cursor: Cursor | null,
   { wrap }: { wrap: boolean },
 ): Promise<string | null> {
   const where = def.where(state);
-  const after = `(${def.order})>${current(def)}`;
+  const order = orderOf(def);
+  const select = `SELECT ${def.alias}.id AS id FROM ${def.from} WHERE ${def.open} AND ${where.sql}`;
+  if (!cursor)
+    return env.DB.prepare(`${select} ORDER BY ${order} LIMIT 1`)
+      .bind(...where.binds)
+      .first<string>('id');
+  const after = `(${order})${cursor.at ? '>=' : '>'}${cursor.sql}`;
   return env.DB.prepare(
-    `SELECT ${def.alias}.id AS id FROM ${def.from} WHERE ${def.open} AND ${where.sql}${wrap ? '' : ` AND ${after}`} ORDER BY ${wrap ? `${after} DESC,` : ''}${def.order} LIMIT 1`,
+    wrap ? `${select} ORDER BY ${after} DESC,${order} LIMIT 1` : `${select} AND ${after} ORDER BY ${order} LIMIT 1`,
   )
-    .bind(...where.binds, JSON.stringify(ids))
+    .bind(...where.binds, ...cursor.binds)
     .first<string>('id');
 }
 // Where one row stands in the open list: its place from 0 (-1 when it isn't open) and the count.
@@ -207,7 +250,7 @@ export async function openPlace(
 ): Promise<{ position: number; total: number }> {
   const where = def.where(state);
   const row = await env.DB.prepare(
-    `SELECT count(*) total,total((${def.order})<${current(def)}) before,total(${def.alias}.id=?) here FROM ${def.from} WHERE ${def.open} AND ${where.sql}`,
+    `SELECT count(*) total,total((${orderOf(def)})<${current(def)}) before,total(${def.alias}.id=?) here FROM ${def.from} WHERE ${def.open} AND ${where.sql}`,
   )
     .bind(JSON.stringify([id]), id, ...where.binds)
     .first<{ total: number; before: number; here: number }>();
@@ -218,14 +261,15 @@ export async function openRows<T>(env: Env, def: ListDef, state: ListState, limi
   const where = def.where(state);
   return (
     await env.DB.prepare(
-      `SELECT ${def.alias}.* FROM ${def.from} WHERE ${def.open} AND ${where.sql} ORDER BY ${def.order} LIMIT ?`,
+      `SELECT ${def.alias}.* FROM ${def.from} WHERE ${def.open} AND ${where.sql} ORDER BY ${orderOf(def)} LIMIT ?`,
     )
       .bind(...where.binds, limit)
       .all<T>()
   ).results;
 }
-// The return after an action: the list it came from, at its next open row when it has one.
-export async function landing(env: Env, state: ListState, ids: readonly string[], done: Done): Promise<string> {
+// The return after an action: the list it came from, at its next open row when it has one. The
+// cursor is cursorFor on the same state, read before the write.
+export async function landing(env: Env, state: ListState, cursor: Cursor | null, done: Done): Promise<string> {
   const def = openDef(state);
-  return listUrl(state, { done, next: def ? await nextOpen(env, def, state, ids, { wrap: true }) : null });
+  return listUrl(state, { done, next: def ? await nextOpen(env, def, state, cursor, { wrap: true }) : null });
 }

@@ -77,15 +77,15 @@ export async function restoreReceipts(env: Env, ids: readonly string[]): Promise
     .run();
   return result.meta.changes ?? 0;
 }
-// Undo: everything discarded in one action shares its timestamp.
-export async function restoreBatch(env: Env, at: string): Promise<number> {
+// Undo: everything discarded in one action shares its timestamp. Returns the rows it brought back.
+export async function restoreBatch(env: Env, at: string): Promise<string[]> {
   requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Invalid undo', 400);
   const result = await env.DB.prepare(
-    'UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at=?',
+    'UPDATE receipts SET discarded_at=NULL,discard_reason=NULL,revision=revision+1 WHERE discarded_at=? RETURNING id',
   )
     .bind(at)
-    .run();
-  return result.meta.changes ?? 0;
+    .all<{ id: string }>();
+  return result.results.map((r) => r.id);
 }
 
 // ---------- UI ----------

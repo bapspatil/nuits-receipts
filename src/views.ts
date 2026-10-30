@@ -70,6 +70,7 @@ import {
   receiptFields,
   receiptState,
   receiptUrl,
+  standing,
   type ListState,
   type Params,
 } from './worklist';
@@ -393,7 +394,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
       .all<Payment>()
       .then((q) => q.results),
     openPlace(env, LIST_DEFS.receipts!, todo, r.id),
-    nextOpen(env, LIST_DEFS.receipts!, todo, [r.id], { wrap: true }),
+    nextOpen(env, LIST_DEFS.receipts!, todo, standing(LIST_DEFS.receipts!, r.id), { wrap: true }),
     env.DB.prepare(
       'SELECT * FROM receipts WHERE id<>? AND duplicate_of IS NULL AND discarded_at IS NULL AND (lower(vendor)=lower(?) OR total_minor=? OR id=?) ORDER BY issue_date DESC,id LIMIT 50',
     )

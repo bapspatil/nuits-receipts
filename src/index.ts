@@ -46,6 +46,8 @@ import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
 import { withDone, type EventKey } from './events';
 import {
+  cursorFor,
+  cursorOf,
   landing,
   LIST_DEFS,
   listFrom,
@@ -250,28 +252,34 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     // to the list it came from.
     const page = form.has('from') && ids.length === 1;
     const state = page ? receiptState(form, true) : listState(form, RECEIPTS_TODO);
+    const cursor = await cursorFor(env, state, ids);
     const { at } = await discardReceipts(env, ids, {
       unmatch: form.get('unmatch') === '1',
       revision: revision === null ? null : Number(revision),
     });
     const done = { event: 'discarded', params: { n: ids.length, at, back: listUrl(state) } } as const;
     const next =
-      page && state.view === 'todo' ? await nextOpen(env, LIST_DEFS.receipts!, state, ids, { wrap: true }) : null;
+      page && state.view === 'todo' ? await nextOpen(env, LIST_DEFS.receipts!, state, cursor, { wrap: true }) : null;
     return redirect(
-      next ? withDone(done.event, receiptUrl(next, state), done.params) : await landing(env, state, ids, done),
+      next ? withDone(done.event, receiptUrl(next, state), done.params) : await landing(env, state, cursor, done),
     );
   }
   if (request.method === 'POST' && path === '/restore') {
     const form = await formData(request, 16 * 1024);
     const at = form.get('at');
-    const ids = at ? [] : receiptIds(form.getAll('id'));
-    const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, ids);
-    if (n) await reconcile(env);
     // Back to the receipt page it was restored on, or to the list it was discarded from.
     const back = parseReturn(form.get('back'));
-    if (back?.startsWith('/receipts/')) return redirect(withDone('restored', back, { n }));
     const state = (back ? listFrom(back) : null) ?? RECEIPTS_TODO;
-    return redirect(await landing(env, state, ids, { event: 'restored', params: { n } }));
+    // It lands on what it brought back. A restore moves no row in the order, so the cursor of an
+    // Undo, whose ids are known only once restored, is read after it.
+    let ids = at ? [] : receiptIds(form.getAll('id'));
+    const before = await cursorFor(env, state, ids, { at: true });
+    if (at) ids = await restoreBatch(env, String(at));
+    const n = at ? ids.length : await restoreReceipts(env, ids);
+    if (n) await reconcile(env);
+    if (back?.startsWith('/receipts/')) return redirect(withDone('restored', back, { n }));
+    const cursor = before ?? (await cursorFor(env, state, ids, { at: true }));
+    return redirect(await landing(env, state, cursor, { event: 'restored', params: { n } }));
   }
   if (request.method === 'POST' && path === '/review/merge')
     return redirect(listUrl(RECEIPTS_TODO, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));
@@ -442,22 +450,23 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const id = receipt[1];
     const form = await formData(request, 64 * 1024);
     const action = String(form.get('action') ?? '');
-    const before = await getReceipt(env, id);
+    // Where it stood in To do before the save, which may give it a date and move it.
+    const [before, cursor] = await Promise.all([getReceipt(env, id), cursorOf(env, LIST_DEFS.receipts!, [id])]);
     const state = receiptState(form, needsReview(before));
     await correctReceipt(env, id, form);
-    // Approve and Skip move on through To do under the page's filter, from after the save: Approve
+    // Approve and Skip move on through To do under the page's filter, from where it stood: Approve
     // wraps to the first open one, Skip doesn't. With none left they land on the list.
     const moving = needsReview(before) && (action === 'approve' || action === 'skip');
     const [after, next] = await Promise.all([
       getReceipt(env, id),
       moving
-        ? nextOpen(env, LIST_DEFS.receipts!, { ...state, view: 'todo' }, [id], { wrap: action === 'approve' })
+        ? nextOpen(env, LIST_DEFS.receipts!, { ...state, view: 'todo' }, cursor, { wrap: action === 'approve' })
         : null,
     ]);
     if (moving) {
       const event = action === 'approve' ? 'approved' : 'skipped';
       if (next) return redirect(withDone(event, receiptUrl(next, state)));
-      if (action === 'skip') return redirect(await landing(env, state, [id], { event }));
+      if (action === 'skip') return redirect(await landing(env, state, cursor, { event }));
       const last = await afterLastReview(env, state.month ?? after.issue_date);
       return redirect(listUrl(state, { done: { event: 'approvedLast', params: last } }));
     }
@@ -497,11 +506,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const form = await formData(request, 4096),
       required = form.get('receipt_required');
     requireInput(required === '0' || required === '1', 'Invalid exemption');
-    const transaction = await env.DB.prepare(
-      "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
-    )
-      .bind(payment[1])
-      .first<Transaction>();
+    const [transaction, cursor] = await Promise.all([
+      env.DB.prepare(
+        "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
+      )
+        .bind(payment[1])
+        .first<Transaction>(),
+      cursorOf(env, LIST_DEFS.bank!, [payment[1]]),
+    ]);
     requireInput(transaction, 'Payment not found', 404);
     const changed = await env.DB.prepare(`${SET_REQUIRED_SQL} AND id=?`).bind(Number(required), transaction.id).run();
     requireInput(
@@ -511,7 +523,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     await reconcile(env);
     return redirect(
-      await landing(env, bankList(form, transaction), [transaction.id], {
+      await landing(env, bankList(form, transaction), cursor, {
         event: required === '0' ? 'notPurchase' : 'needsReceipt',
         params: { tx: transaction.id, name: transaction.merchant },
       }),
@@ -520,11 +532,14 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'POST' && path === '/matches') {
     const form = await formData(request, 4096),
       id = String(form.get('transaction_id'));
-    const transaction = await env.DB.prepare(
-      "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
-    )
-      .bind(id)
-      .first<Transaction>();
+    const [transaction, cursor] = await Promise.all([
+      env.DB.prepare(
+        "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
+      )
+        .bind(id)
+        .first<Transaction>(),
+      cursorOf(env, LIST_DEFS.bank!, [id]),
+    ]);
     requireInput(transaction, 'Payment not found', 404);
     const unlink = form.get('action') === 'unlink';
     // Remembered for the banner's Undo and its message.
@@ -609,7 +624,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return redirect(
       onReceipt
         ? withDone(done.event, back, done.params)
-        : await landing(env, bankList(form, transaction), [transaction.id], done),
+        : await landing(env, bankList(form, transaction), cursor, done),
     );
   }
   // Match all likely: each pair is checked again here and skipped if it changed or is no longer an exact fit.
@@ -620,7 +635,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     requireInput(payments.length > 0 && payments.length === receipts.length, 'Nothing to match');
     const selected = month(String(form.get('month') ?? '') || null),
       at = new Date().toISOString();
-    const rules = (await env.DB.prepare('SELECT * FROM vendor_rules').all<Rule>()).results;
+    const [rules, cursor] = await Promise.all([
+      env.DB.prepare('SELECT * FROM vendor_rules')
+        .all<Rule>()
+        .then((r) => r.results),
+      cursorOf(env, LIST_DEFS.bank!, payments),
+    ]);
     const { matched, skipped } = await matchLikely(
       env,
       payments.map((id, i) => [id, receipts[i]!] as const),
@@ -630,7 +650,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     await clearBankReview(env);
     return redirect(
-      await landing(env, bankList(form, { booking_date: selected }), payments, {
+      await landing(env, bankList(form, { booking_date: selected }), cursor, {
         event: 'matchedMany',
         params: { n: matched, skipped, at: matched ? at : null },
       }),
@@ -639,21 +659,20 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const exemptUndo = path.match(/^\/imports\/([a-f0-9]{64})\/exempt\/undo$/);
   if (request.method === 'POST' && exemptUndo?.[1]) {
     const form = await formData(request, 4096);
-    const selected = month(String(form.get('month') ?? '') || null);
-    const n = await undoExemptions(env, exemptUndo[1]);
-    return redirect(
-      await landing(env, bankList(form, { booking_date: selected }), [], { event: 'exemptUndone', params: { n } }),
-    );
+    const state = bankList(form, { booking_date: month(String(form.get('month') ?? '') || null) });
+    // An Undo lands on the first row it brought back; their order key doesn't change.
+    const ids = await undoExemptions(env, exemptUndo[1]);
+    const cursor = await cursorFor(env, state, ids, { at: true });
+    return redirect(await landing(env, state, cursor, { event: 'exemptUndone', params: { n: ids.length } }));
   }
   if (request.method === 'POST' && path === '/matches/undo') {
     const form = await formData(request, 4096),
       at = String(form.get('at') ?? '');
     requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Nothing to match');
-    const selected = month(String(form.get('month') ?? '') || null);
-    const n = await unmatchLikely(env, at);
-    return redirect(
-      await landing(env, bankList(form, { booking_date: selected }), [], { event: 'unmatchedMany', params: { n } }),
-    );
+    const state = bankList(form, { booking_date: month(String(form.get('month') ?? '') || null) });
+    const ids = await unmatchLikely(env, at);
+    const cursor = await cursorFor(env, state, ids, { at: true });
+    return redirect(await landing(env, state, cursor, { event: 'unmatchedMany', params: { n: ids.length } }));
   }
   if (request.method === 'POST' && path === '/rules') {
     const form = await formData(request, 4096);

@@ -40,6 +40,7 @@ import { withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
 import { filterIds, parseQuery } from './all';
 import {
+  cursorFor,
   landing,
   LIST_DEFS,
   listState,
@@ -385,6 +386,7 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
     skippedBefore = progress(form, 'skipped_before');
   const to = endpoint.to(form);
   const back = typeof to === 'string' ? to : listUrl(to);
+  const cursor = typeof to === 'string' ? null : await cursorFor(env, to, ids);
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
     skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
@@ -393,7 +395,7 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
     location:
       typeof to === 'string'
         ? withDone(done.event, to, params)
-        : await landing(env, to, ids, { event: done.event, params }),
+        : await landing(env, to, cursor, { event: done.event, params }),
     n,
     skipped,
   };
