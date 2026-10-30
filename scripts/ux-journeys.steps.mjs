@@ -147,7 +147,7 @@ export const journeys = [
       if (!(await page.locator('main h1', { hasText: 'September' }).count()))
         await rec.click(page.locator('main a[href$="month=2026-09"]'));
       if (!(await page.locator('li.pay', { hasText: 'Sample Client Oy' }).count()))
-        await rec.click(page.locator('main a[href*="show=all"]'));
+        await rec.click(page.locator('main a[href*="view=all"]'));
       const money = page.locator('li.pay', { hasText: 'Sample Client Oy' });
       rec.note(`Money-in row: ${(await money.innerText()).replace(/\s+/g, ' ').trim()}`);
       if (await money.locator('select').count()) {
@@ -208,7 +208,7 @@ async function keyboardCheck(page, base) {
 
 // Put three payments back to "Missing" so Bank shows likely pairs, a Match all and a payment nothing fits.
 async function unsettleBank(page, base) {
-  const bank = () => page.goto(base + '/payments?month=2026-09&show=all');
+  const bank = () => page.goto(base + '/payments?month=2026-09&view=all');
   const open = async (merchant, button) => {
     const row = page.locator('li.pay', { hasText: merchant });
     await row.locator('summary', { hasText: 'More' }).click();
@@ -289,14 +289,14 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'receipts', path: '/receipts?month=2026-09' },
     { name: 'receipt-ready', path: ready },
     { name: 'invoice-paid', path: invoice },
-    { name: 'bank', path: '/payments?month=2026-09&show=all' },
+    { name: 'bank', path: '/payments?month=2026-09&view=all' },
     { name: 'import', path: '/import' },
     { name: 'add', path: '/add' },
     { name: 'invoices', path: '/invoices?month=2026-09' },
     { name: 'settings', path: '/settings' },
     { name: 'settings-mail', path: '/settings?open=mail#mail' },
     // Last: it undoes the matches, so the screens above keep the settled month.
-    { name: 'bank-likely', path: '/payments?month=2026-09&show=missing', prepare: () => unsettleBank(page, base) },
+    { name: 'bank-likely', path: '/payments?month=2026-09&view=todo', prepare: () => unsettleBank(page, base) },
     { name: 'help', path: '/help' },
     { name: 'help-flags', path: '/help#flag-missing_vendor' },
     { name: 'home-setup', path: '/?month=2026-09', prepare: () => unsetAccountant(page, base) },
@@ -345,7 +345,7 @@ async function bankTodo(page, rec, month) {
   await rec.goto(`/payments?month=${month}&view=todo`);
   const contract = await page.locator('[data-list="bank-todo"]').count();
   rec.check(contract === 1, 'Bank has a To do list (data-list="bank-todo")');
-  if (!contract) await rec.goto(`/payments?month=${month}&show=missing`);
+  if (!contract) await rec.goto(`/payments?month=${month}&view=todo`);
   const total = contract ? Number(await page.locator('[data-list="bank-todo"]').getAttribute('data-total')) : null;
   rec.check(total === OPEN_PAYMENTS, `Bank To do counts all ${OPEN_PAYMENTS} open payments (data-total=${total})`);
   const first = await rowIds(page);
