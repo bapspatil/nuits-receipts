@@ -2,11 +2,11 @@
 
 Paper look on the Native layout, with glass from our own CSS. The shots come from the busy dev seed, with a few rows ticked so the bulk bar shows.
 
-| Screen          | 1440                                                 | 390                                                |
-| --------------- | ---------------------------------------------------- | -------------------------------------------------- |
-| Receipts, To do | [receipts-todo-1440](screens/receipts-todo-1440.png) | [receipts-todo-390](screens/receipts-todo-390.png) |
-| A receipt       | [receipt-1440](screens/receipt-1440.png)             | [receipt-390](screens/receipt-390.png)             |
-| Bank, To do     | [bank-todo-1440](screens/bank-todo-1440.png)         | [bank-todo-390](screens/bank-todo-390.png)         |
+| Screen          | 1440                                              | 390                                             |
+| --------------- | ------------------------------------------------- | ----------------------------------------------- |
+| Receipts, To do | [receipts-todo-1440](look/receipts-todo-1440.png) | [receipts-todo-390](look/receipts-todo-390.png) |
+| A receipt       | [receipt-1440](look/receipt-1440.png)             | [receipt-390](look/receipt-390.png)             |
+| Bank, To do     | [bank-todo-1440](look/bank-todo-1440.png)         | [bank-todo-390](look/bank-todo-390.png)         |
 
 ui-lint: 2 findings, down from 86 in the baseline. Text contrast: 0. Details are in [ui-lint.json](ui-lint.json).
 
