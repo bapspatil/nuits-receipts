@@ -62,7 +62,7 @@ for (const name of ['native', 'paper']) {
         overflow: document.documentElement.scrollWidth - innerWidth,
         bare: buttons.filter((b) => !b.querySelector('svg.i use') || !b.textContent.trim()).map((b) => b.outerHTML.slice(0, 80)),
         rowPrimary: document.querySelectorAll('.row .primary').length,
-        dashes: /[–—]/.test(document.documentElement.outerHTML),
+        dashes: /[\u2013\u2014]/.test(document.documentElement.outerHTML),
       };
     });
     if (facts.overflow > 0) miss(`${name}-${width}: scrolls sideways by ${facts.overflow}px`);

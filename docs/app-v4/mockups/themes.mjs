@@ -181,7 +181,7 @@ const nativeCss = `
 @media (max-width:879px){:root{--t-body:17px;--t-meta:15px;--t-title:32px}}
 .app{background:var(--page);color:var(--text);font:400 var(--t-body)/1.38 var(--font);font-feature-settings:"tnum";-webkit-font-smoothing:antialiased;letter-spacing:-.006em}
 .amt,.n,.count,.tally,.pos,.listfoot,.date,.stepper,.unit{font-variant-numeric:tabular-nums}
-:focus-visible{outline:3px solid ${rgba(N.accent, 0.55)};outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* sidebar on desktop, translucent tab bar on phone */
 .appnav{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
