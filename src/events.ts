@@ -192,7 +192,7 @@ export const EVENTS = {
           (count(p, 'n') ? ` ${plural(count(p, 'n'), 'email')} deleted.` : '')) + skipped(p),
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
-  // Allow this sender, from Settings > Mail we didn't keep. Undo takes them off the list again.
+  // Allow this sender, from Settings > Email senders. Undo takes them off the list again.
   senderAllowed: {
     text: (p) => {
       const sender = words(p, 'sender', 'The sender');
@@ -206,7 +206,7 @@ export const EVENTS = {
         ? { action: '/senders/remove', fields: { address: sender, back: 'settings' } }
         : null;
     },
-    section: () => 'mail',
+    section: () => 'senders',
   },
   senderRemoved: {
     text: (p) =>

@@ -65,7 +65,9 @@ test('Allow this sender names them in a signed banner with Undo, and the Bank li
   ).text();
   expect(banner).toContain('Allowed shop@elsewhere.example. Their next emails will be read.');
   expect(banner).toContain('action="/senders/remove"');
-  expect(banner).toMatch(/<details class="sect" open><summary><h2>Mail we didn't keep/);
+  expect(banner).toMatch(
+    /<details class="sect" open><summary><h2>Email senders<\/h2>[\s\S]*<h3 id="mail">Mail we didn't keep/,
+  );
   expect((await droppedMail(env)).length).toBe(1);
 });
 

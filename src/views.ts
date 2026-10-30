@@ -861,7 +861,7 @@ export async function payments(
           : { main: '<p class="none">No receipt found yet.</p>', rest: '' };
         const dropped =
           droppedRecently && !likely
-            ? `<p class="small"><a href="/settings?open=mail#mail">Check mail we didn't keep</a></p>`
+            ? `<p class="small"><a href="/settings?open=senders#mail">Check mail we didn't keep</a></p>`
             : '';
         controls = `<div class="fixrow">${found.main}<form action="/payments/${t.id}" method="post">${fields}<button class="linkbtn" name="receipt_required" value="0">${STATUS.notPurchase}</button></form></div>${dropped}${matchError(t.id)}`;
         if (found.rest) extra.push(found.rest);
@@ -1259,10 +1259,11 @@ async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<st
   );
 }
 
-// Settings > Senders: who is read automatically and who is ignored.
+// Settings > Email senders: who is read automatically, who is ignored, and the
+// mail we didn't keep, as one list.
 async function sendersPart(env: Env, open: boolean): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
-  const ignored = await ignoredSenders(env);
+  const [ignored, log] = await Promise.all([ignoredSenders(env), mailLog(env)]);
   const list = (form: string, action: BulkAction, addresses: readonly string[], button: string, path: string) => {
     const bulk: BulkList = {
       form,
@@ -1290,12 +1291,12 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
   const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address"><button class="btn secondary"${full ? ' disabled' : ''}>Add</button></form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  return sect('senders', 'Senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}`, open);
+  return sect('senders', 'Email senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}${log}`, open);
 }
 
-// Settings > Mail we didn't keep: what reached the app and was not read, from
-// the log that is already stored. Never the message itself.
-async function mailLogPart(env: Env, open: boolean): Promise<string> {
+// Mail we didn't keep: what reached the app and was not read, from the log that
+// is already stored. Never the message itself.
+async function mailLog(env: Env): Promise<string> {
   const rows = await droppedMail(env);
   const allowed = config(env).allowedSenders;
   const item = (m: (typeof rows)[number]) => {
@@ -1310,7 +1311,7 @@ async function mailLogPart(env: Env, open: boolean): Promise<string> {
   const body = rows.length
     ? `<p class="meta">Emails that reached the app but were not read, newest first. Only the sender, subject and reason are kept.</p><ul class="plain rowlist">${rows.map(item).join('')}</ul>`
     : '<p>Every email that reached the app was kept.</p>';
-  return sect('mail', "Mail we didn't keep", rows.length ? String(rows.length) : 'None', body, open);
+  return `<h3 id="mail">Mail we didn't keep</h3>${body}`;
 }
 
 // The form that adds a bank account in Settings, as a failure scope names it.
@@ -1319,15 +1320,14 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
   const open = params.get('open');
-  const opened = feedback(params)?.section ?? (open === 'mail' || open === 'senders' ? open : '');
+  const opened = feedback(params)?.section ?? (open === 'senders' ? open : '');
   // The sections don't depend on each other, so they all load at once.
-  const [oneDrive, setup, accounts, rules, senders, mailLog] = await Promise.all([
+  const [oneDrive, setup, accounts, rules, senders] = await Promise.all([
     oneDrivePart(env, opened === 'onedrive', origin),
     setupParts(env, params, opened),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
     sendersPart(env, opened === 'senders'),
-    mailLogPart(env, opened === 'mail'),
   ]);
   const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
   const accountsPart = sect(
@@ -1372,7 +1372,6 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     ),
     sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
     senders,
-    mailLog,
     accountsPart,
     rulesPart,
     sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),

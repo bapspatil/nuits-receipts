@@ -294,7 +294,7 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'add', path: '/add' },
     { name: 'invoices', path: '/invoices?month=2026-09' },
     { name: 'settings', path: '/settings' },
-    { name: 'settings-mail', path: '/settings?open=mail#mail' },
+    { name: 'settings-mail', path: '/settings?open=senders#mail' },
     // Last: it undoes the matches, so the screens above keep the settled month.
     { name: 'bank-likely', path: '/payments?month=2026-09&view=todo', prepare: () => unsettleBank(page, base) },
     { name: 'help', path: '/help' },
