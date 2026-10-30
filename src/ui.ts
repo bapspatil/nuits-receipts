@@ -360,7 +360,7 @@ details.sect>summary h2{margin:0}
 details.sect>summary .sum{color:var(--text-muted);font-weight:400;font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere}
 details.sect>.body{padding:var(--space-2) var(--space-4) var(--space-5);border-top:1px solid var(--border);scroll-margin-top:72px}
 details.sect>.body>.banner,details.sect>.body>.warning,details.sect>.body>.alert{margin:0 0 var(--space-3)}
-@supports selector(:has(a)){.setup-form .confirm{display:none}.setup-form .frow:has(:invalid) .confirm{display:flex}}
+@supports selector(:has(a)){.settings .confirm{display:none}.settings .frow:has(:invalid) .confirm{display:flex}}
 .rules>li>details{background:none;border:0;border-radius:0;margin:0}.rules summary{font-weight:600;padding:var(--space-2) 0}
 .add-row{margin:var(--space-3) 0}
 .frow{display:grid;grid-template-columns:minmax(0,14rem) minmax(0,1fr);gap:var(--space-2) var(--space-5);padding:var(--space-3) 0;border-bottom:1px solid var(--border);align-items:start}
@@ -371,7 +371,8 @@ details.sect>.body>.banner,details.sect>.body>.warning,details.sect>.body>.alert
 .sc>p{margin:0;max-width:64ch}
 .inline-edit{display:flex;gap:var(--space-2);align-items:center;margin:0}
 .inline-edit input{flex:1;min-width:0}
-.setup-form textarea{resize:vertical;min-height:64px}
+.settings textarea{resize:vertical;min-height:64px}
+.sectpart,.setup-rows+h3{margin-top:var(--space-5)}
 .frow.bad input,.frow.bad textarea,.frow.bad select{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
 .meta{font-size:var(--text-sm);color:var(--text-muted);line-height:1.5}
 .meta code{font-size:var(--text-xs);padding:1px var(--space-1)}

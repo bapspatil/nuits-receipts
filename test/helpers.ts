@@ -73,3 +73,36 @@ export function unsigned(location: string | null): string {
 // that undoes reads them from the page the redirect lands on.
 export const locationOf = (response: Response) =>
   unsigned(response.headers.get('Location')).replace(/&at=[^&#]*&op=[^&#]*/, '');
+
+// Like a browser: every control that names a form by id (form="…"), wherever it sits on the page.
+// Settings is one form whose controls are spread over its sections.
+export function formById(html: string, id: string): FormData {
+  const decode = (s: string) =>
+    s
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;|&#x27;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  const attr = (tag: string, name: string) => {
+    const m = tag.match(new RegExp(`\\b${name}="([^"]*)"`));
+    return m ? decode(m[1]!) : null;
+  };
+  const form = new FormData();
+  const mine = (tag: string) => attr(tag, 'form') === id;
+  for (const [tag] of html.matchAll(/<input\b[^>]*>/g)) {
+    const name = attr(tag, 'name');
+    if (!name || !mine(tag) || (['checkbox', 'radio'].includes(attr(tag, 'type') ?? '') && !/\bchecked\b/.test(tag)))
+      continue;
+    form.append(name, attr(tag, 'value') ?? '');
+  }
+  for (const m of html.matchAll(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/g))
+    if (mine(m[1]!)) form.append(attr(m[1]!, 'name')!, decode(m[2]!));
+  for (const m of html.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/g)) {
+    if (!mine(m[1]!)) continue;
+    const options = [...m[2]!.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g)];
+    const picked = options.find((o) => /\bselected\b/.test(o[1]!)) ?? options[0]!;
+    form.append(attr(m[1]!, 'name')!, attr(picked[1]!, 'value') ?? decode(picked[2]!));
+  }
+  return form;
+}

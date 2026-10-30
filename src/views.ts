@@ -20,7 +20,8 @@ import { importForm } from './imports';
 import { listAccounts, listTransfers } from './accounts';
 import type { Env } from './env';
 import { config, hasParts, MAX_ALLOWED_SENDERS } from './config';
-import { setupParts } from './setup';
+import { FIELD, type SettingKey } from './settings';
+import { saveBar, setupParts, SETUP_SCOPE } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, ignoredSenders, reasonAllows, reasonWords } from './inbound';
@@ -1259,51 +1260,65 @@ async function importLink(env: Env): Promise<string> {
 function sect(id: string, title: string, summary: string, body: string, open = false): string {
   return `<details class="sect"${open ? ' open' : ''}><summary><h2>${title}</h2>${summary ? `<span class="sum">${summary}</span>` : ''}</summary><div class="body" id="${id}">${body}</div></details>`;
 }
+// A part of a section with its own heading and anchor. Links from banners and Undo still name it.
+function sub(id: string, title: string, body: string): string {
+  return `<div class="sectpart" id="${id}"><h3>${title}</h3>${body}</div>`;
+}
+// Which of the five sections holds a part, by the anchor it goes by.
+const SECTION_OF: Record<string, string> = {
+  'setup-business': 'business',
+  rules: 'business',
+  'setup-email': 'email',
+  senders: 'email',
+  mail: 'email',
+  accounts: 'bank',
+  'setup-accountant': 'sending',
+  onedrive: 'sending',
+  'setup-review': 'advanced',
+  'setup-integrations': 'advanced',
+  'setup-deploy': 'advanced',
+  'setup-history': 'advanced',
+  about: 'advanced',
+};
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
-async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<string> {
+async function oneDrivePart(env: Env, origin: string): Promise<string> {
   const settings = config(env);
   const docs = settings.sourceRepository
     ? `<a href="${escape(settings.sourceRepository)}/blob/main/docs/ENVIRONMENT.md#onedrive-upload-optional">docs/ENVIRONMENT.md</a>`
     : '<code>docs/ENVIRONMENT.md</code>';
   if (!settings.oneDrive)
     return settings.oneDriveIncomplete
-      ? sect(
+      ? sub(
           'onedrive',
           'OneDrive',
-          'Not set up',
           `<p class="warning"><code>MS_CLIENT_SECRET</code> or <code>ONEDRIVE_TOKEN_KEY</code> is missing. See ${docs}.</p>`,
-          open,
         )
       : '';
   const conn = await connection(env);
   const tech = `<details class="tech"><summary>Redirect URI for Microsoft Entra</summary><div class="body"><p>Microsoft sends you back to this app after you sign in. Add this address to your Microsoft Entra app, under Authentication, as a Web redirect URI.</p><pre tabindex="0">${escape(redirectUri(origin, ''))}</pre><p>Steps: ${docs}.</p></div></details>`;
   if (!conn)
-    return sect(
+    return sub(
       'onedrive',
       'OneDrive',
-      'Not connected',
       `<p class="cta">${buttonLink('connect', '/settings/onedrive/connect')}</p>${tech}`,
-      open,
     );
   const folderForm = `<form action="/settings/onedrive/folder" method="post"><div class="fields">${input('folder_link', '', 'url', 'Shared folder link', { attrs: ' required autocomplete="off" inputmode="url" placeholder="Share > Copy link"', wide: true })}${input('folder_name', '', 'text', 'Folder name', { attrs: ' autocomplete="off" placeholder="Optional"' })}</div>${button('save', { label: 'Use folder' })}</form>`;
   const folder = conn.folder_item_id
     ? `<a href="${escape(conn.folder_web_url ?? '')}"><strong>${escape(conn.folder_name)}</strong></a>`
     : '<span class="warning">Not chosen</span>';
-  return sect(
+  return sub(
     'onedrive',
     'OneDrive',
-    escape(conn.account_email ?? conn.account_name),
     `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
       conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
     }<details class="cta">${buttonSummary('disconnect')}<div class="body"><form action="/settings/onedrive/disconnect" method="post"><p class="ask">Delete this app's sign-in to your Microsoft account? Uploads stop until you connect again.</p>${button('disconnect')}</form></div></details>${tech}`,
-    open,
   );
 }
 
 // Settings > Email senders: who is read automatically, who is ignored, and the
 // mail we didn't keep, as one list.
-async function sendersPart(env: Env, open: boolean): Promise<string> {
+async function sendersPart(env: Env): Promise<string> {
   const allowed = [...config(env).allowedSenders].sort();
   const [ignored, log] = await Promise.all([ignoredSenders(env), mailLog(env)]);
   const list = (
@@ -1343,7 +1358,7 @@ async function sendersPart(env: Env, open: boolean): Promise<string> {
     : '';
   const full = allowed.length >= MAX_ALLOWED_SENDERS;
   const add = `<p class="meta">Add an address you want read, for example billing@example.com.</p><form action="/senders/approve" method="post" class="inline-edit add-row"><input type="hidden" name="back" value="settings"><input name="address" type="email" required maxlength="254" autocomplete="off" aria-label="Sender address">${button('add', { attrs: full ? ' disabled' : '' })}</form>${full ? `<p class="warning">${MAX_ALLOWED_SENDERS} is the most. Remove one first.</p>` : ''}`;
-  return sect('senders', 'Email senders', `${allowed.length} allowed`, `${approved}${add}${ignoredList}${log}`, open);
+  return sub('senders', 'Email senders', `${approved}${add}${ignoredList}${log}`);
 }
 
 // Mail we didn't keep: what reached the app and was not read, from the log that
@@ -1377,20 +1392,25 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
   const settings = config(env);
   // The section the last action touched opens; the rest stay folded.
   const open = params.get('open');
-  const opened = feedback(params)?.section ?? (open === 'senders' ? open : '');
+  const anchor = feedback(params)?.section ?? (open === 'senders' ? open : '');
+  const refused = failureFor(SETUP_SCOPE);
+  const opened = new Set([
+    SECTION_OF[anchor],
+    params.has('routing') ? 'email' : '',
+    refused ? SECTION_OF[`setup-${FIELD.get(refused.field as SettingKey)?.group ?? 'business'}`] : '',
+    failureFor(NEW_ACCOUNT) ? 'bank' : '',
+  ]);
   // The sections don't depend on each other, so they all load at once.
   const [oneDrive, setup, accounts, rules, senders] = await Promise.all([
-    oneDrivePart(env, opened === 'onedrive', origin),
-    setupParts(env, params, opened),
+    oneDrivePart(env, origin),
+    setupParts(env, params),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
-    sendersPart(env, opened === 'senders'),
+    sendersPart(env),
   ]);
-  const opens = (group: string) => opened === `setup-${group}` || (group === 'email' && params.has('routing'));
-  const accountsPart = sect(
+  const accountsPart = sub(
     'accounts',
     'Bank accounts',
-    String(accounts.length),
     `${
       accounts.length
         ? rowList(
@@ -1404,12 +1424,10 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
           )
         : '<p>No bank accounts yet. Importing a statement creates one.</p>'
     }<details class="add"${accounts.length && !failureFor(NEW_ACCOUNT) ? '' : ' open'}><summary>Add account</summary><div class="body">${errorLine(NEW_ACCOUNT, '')}<form action="/accounts" method="post"><div class="fields">${input('label', '', 'text', 'Name', { hint: 'For example Main account', scope: NEW_ACCOUNT })}${input('bank_name', '', 'text', 'Bank', { scope: NEW_ACCOUNT })}${select('default_currency', Object.keys(EXPONENTS), settings.defaultCurrency, 'Currency', NEW_ACCOUNT)}</div>${button('add')}</form></div></details><p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p><p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments?view=all">Bank</a>.</p>`,
-    opened === 'accounts' || !!failureFor(NEW_ACCOUNT),
   );
-  const rulesPart = sect(
+  const rulesPart = sub(
     'rules',
     'Vendor rules',
-    String(rules.results.length),
     `${
       rules.results.length
         ? `<ul class="list rules">${rules.results
@@ -1420,28 +1438,30 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
             .join('')}</ul>`
         : '<p>No rules yet.</p>'
     }<details class="add"${rules.results.length ? '' : ' open'}><summary>Add rule</summary><div class="body"><form action="/rules" method="post">${ruleFields(env)}${button('add')}</form></div></details>`,
-    opened === 'rules',
   );
+  const names = settings.sellerNames[0] ?? settings.appName;
+  const section = (id: string, title: string, summary: string, inner: string) =>
+    sect(id, title, summary, inner, opened.has(id));
   const body = [
-    sect(
-      'setup-business',
+    section(
+      'business',
       'Business',
-      `${escape(settings.sellerNames[0] ?? settings.appName)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
-      setup.business,
-      opens('business'),
+      `${escape(names)}${hasParts(env) ? `, ${plural(settings.products.length, 'part')}` : ''}`,
+      `${setup.business}${rulesPart}`,
     ),
-    sect('setup-email', 'Email', escape(settings.receiptAddress || 'Off'), setup.email, opens('email')),
-    senders,
-    accountsPart,
-    rulesPart,
-    sect('setup-accountant', 'Export', escape(settings.accountantLabel), setup.accountant, opens('accountant')),
-    oneDrive,
-    sect('advanced', 'Advanced', '', setup.advanced, opened === 'setup-review' || opened === 'setup-integrations'),
-    sect('about', 'About', '', aboutBody(env)),
+    section(
+      'email',
+      'Email',
+      `${escape(settings.receiptAddress || 'Off')}, ${settings.allowedSenders.size} allowed`,
+      `${setup.email}${senders}`,
+    ),
+    section('bank', 'Bank', plural(accounts.length, 'account'), accountsPart),
+    section('sending', 'Sending', escape(settings.accountantLabel), `${setup.sending}${oneDrive}`),
+    section('advanced', 'Advanced', '', `${setup.advanced}${sub('about', 'About', aboutBody(env))}`),
   ].join('');
   return page(
     'settings',
-    `<div class="settings">${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p></div><script src="/assets/settings.js" defer></script>`,
+    `<div class="settings">${setup.form}${body}<p class="small"><a href="/help">What do these words mean? Open Help</a></p>${saveBar()}</div>`,
     200,
     env,
     { head: pageHead('Settings', signOutLink(env)) },

@@ -200,8 +200,8 @@ test('each work screen has exactly one primary button, empty or busy', async () 
   const matched = await (await request('/payments?month=2026-09')).text();
   expect(primaries(matched)).toBe(1);
   expect(matched).toContain('Every payment has a receipt.');
-  // Settings is a list of sections with no filled button.
-  expect(primaries(await (await request('/settings')).text())).toBe(0);
+  // Settings is five sections and one Save, which is the page's one filled button.
+  expect(primaries(await (await request('/settings')).text())).toBe(1);
 });
 
 test('empty screens say what is missing and offer one next step', async () => {
@@ -692,7 +692,7 @@ test('public template: no deployment names hardcoded in pages', async () => {
     ).text();
     expect(html).toContain('Synthetic Books');
     // Settings > About names the upstream project in its licence and trademark lines, by design.
-    const about = /<div class="body" id="about">[\s\S]*?<\/div><\/details>/;
+    const about = /<div class="sectpart" id="about">[\s\S]*?<\/div><\/div><\/details>/;
     expect(html.replace(FOOTER_NOTICE, '').replace(about, '')).not.toMatch(/Nuits|Baps/);
   }
 });

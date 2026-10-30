@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { hash } from '../src/domain';
 import { importBankCsv, parsePreset } from '../src/banking';
 import worker from '../src/index';
-import { authorization, htmlForm, idFrom, request, uploadPdf } from './helpers';
+import { authorization, formById, htmlForm, idFrom, request, uploadPdf } from './helpers';
 import { buttonLink, statusMark } from '../src/actions';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
@@ -206,9 +206,8 @@ test('Settings hides Parts and Default part with one part, and Add a part makes 
   expect(one).not.toContain('Default part');
   expect(one).toContain('<label for="part-new">Add a part</label>');
   expect(one).not.toMatch(/\d+ parts?</);
-  const form = htmlForm(one, '/settings/setup');
+  const form = formById(one, 'settings-form');
   expect(form.getAll('product_id')).toEqual(['general']);
-  form.set('group', 'business');
   form.set('product_new', 'Consulting');
   expect((await requestWith(ONE_PART, '/settings/setup', form)).status).toBe(303);
   const stored = await env.DB.prepare("SELECT value_json FROM settings WHERE key='PRODUCTS_JSON'").first<{

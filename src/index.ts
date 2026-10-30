@@ -53,7 +53,7 @@ import { approveSender, ignoreSender, removeApproved, senderAddress, unignoreSen
 import { allReceiptsPage, todoPage } from './all';
 import { discardReceipts, receiptIds, restoreReceipts } from './discard';
 import { parseUndo, undo, undoAt, withUndo, type UndoAt, type UndoOp } from './undo';
-import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
+import { resetSetting, saveSetup, SETUP_SCOPE } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
 import { withDone, type EventKey } from './events';
@@ -400,10 +400,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     });
   if (request.method === 'GET' && path === '/assets/bulk.js')
     return new Response(BULK_JS, {
-      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
-    });
-  if (request.method === 'GET' && path === '/assets/settings.js')
-    return new Response(SETTINGS_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   if (request.method === 'GET' && path === '/export-sales.csv')
@@ -912,18 +908,16 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
     } else if (['/imports/csv', '/import'].includes(url.pathname) && form.get('file') instanceof File)
       shown = requestState.run(refused('import'), () => importPage(env));
     else if (url.pathname === '/settings/setup' && error.status === 422)
-      shown = requestState.run(
-        refused(`setup:${String(form.get('group') ?? '')}`, error.field === 'product_new' ? 'part-new' : undefined),
-        () => settingsPage(env, new URLSearchParams(), url.origin + base),
+      shown = requestState.run(refused(SETUP_SCOPE, error.field === 'product_new' ? 'part-new' : undefined), () =>
+        settingsPage(env, new URLSearchParams(), url.origin + base),
       );
     else if (url.pathname === '/accounts')
       shown = requestState.run(refused(NEW_ACCOUNT, 'f-label'), () =>
         settingsPage(env, new URLSearchParams(), url.origin + base),
       );
     else if (url.pathname === '/settings/setup/reset') {
-      const group = FIELD.get(String(form.get('reset') ?? '') as SettingKey)?.group;
-      if (group)
-        shown = requestState.run(refused(`setup:${group}`), () =>
+      if (FIELD.has(String(form.get('reset') ?? '') as SettingKey))
+        shown = requestState.run(refused(SETUP_SCOPE), () =>
           settingsPage(env, new URLSearchParams(), url.origin + base),
         );
     }

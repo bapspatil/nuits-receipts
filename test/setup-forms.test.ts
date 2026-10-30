@@ -14,14 +14,10 @@ test('the import form is a file and Import, with or without a bank account', asy
   }
 });
 
-test('Settings loads its own script under a policy that allows only same-origin scripts', async () => {
+test('pages load scripts only from this origin', async () => {
   const settings = await request('/settings');
   expect(settings.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
   expect(settings.headers.get('Content-Security-Policy')).not.toContain("unsafe-inline'; script");
-  expect(await settings.text()).toContain('<script src="/assets/settings.js" defer></script>');
-  const script = await request('/assets/settings.js');
-  expect(script.headers.get('Content-Type')).toContain('text/javascript');
-  expect(await script.text()).toContain('beforeunload');
   for (const path of ['/', '/help', '/receipts?view=todo', '/import'])
     expect((await request(path)).headers.get('Content-Security-Policy'), path).toContain("script-src 'self';");
 });

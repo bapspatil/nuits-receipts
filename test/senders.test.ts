@@ -187,7 +187,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   const settings = await (await request('/settings')).text();
   expect(settings).toMatch(/notifications@link\.com<\/p>/);
   expect(settings).toMatch(/owner@example\.com<\/p>/);
-  expect(settings).toContain('<span class="sum">4 allowed</span>');
+  expect(settings).toContain('4 allowed</span>');
 });
 
 test('the approved list stops at the cap with a clear message', async () => {

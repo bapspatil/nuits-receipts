@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { hash } from '../src/domain';
 import { importBankCsv, parsePreset } from '../src/banking';
-import { htmlForm, idFrom, request, uploadPdf } from './helpers';
+import { formById, htmlForm, idFrom, request, uploadPdf } from './helpers';
 
 const post = (path: string, body: URLSearchParams | FormData) => request(path, { method: 'POST', body });
 
@@ -137,16 +137,14 @@ test('the import form names the file field when the file cannot be read', async 
 
 test('a refused Settings save re-renders Settings with the typed value and the field marked', async () => {
   const settings = await (await request('/settings')).text();
-  const form = htmlForm(settings, '/settings/setup');
-  const group = form.get('group');
-  expect(group).toBeTruthy();
+  const form = formById(settings, 'settings-form');
   const key = [...form.keys()].find((k) => /^[A-Z_]+$/.test(k) && !['AUTH_USERNAME'].includes(k))!;
   form.set(key, 'x'.repeat(1500));
   const refused = await post('/settings/setup', form);
   expect(refused.status).toBe(422);
   const html = await refused.text();
   expect(alertOf(html)).toContain(`<a href="#f-${key}">Go to it</a>`);
-  expect(html).toContain(`id="f-${key}" aria-invalid="true" aria-describedby="e-setup-${group}"`);
+  expect(html).toContain(`id="f-${key}" form="settings-form" aria-invalid="true" aria-describedby="e-setup"`);
   expect(html).toContain('x'.repeat(1500));
 });
 

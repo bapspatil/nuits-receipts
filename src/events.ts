@@ -116,6 +116,7 @@ const GROUP_WORDS: Record<string, string> = {
   accountant: 'your accountant',
   review: 'review and matching',
   integrations: 'integrations',
+  all: 'your settings',
 };
 const groupWords = (p: URLSearchParams) => GROUP_WORDS[p.get('group') ?? ''];
 
@@ -354,7 +355,8 @@ export const EVENTS = {
       (groupWords(p) ? `Saved ${groupWords(p)}.` : 'Saved.') +
       (count(p, 'removed') ? ` Removed ${plural(count(p, 'removed'), 'part')}.` : ''),
     undo: logged,
-    section: (p) => GROUP_SECTION[p.get('group') ?? ''] ?? null,
+    section: (p) =>
+      GROUP_SECTION[p.get('group') ?? ''] ?? (/^setup-[a-z]+$/.test(p.get('section') ?? '') ? p.get('section') : null),
   },
   settingsSame: {
     text: (p) => (groupWords(p) ? `Nothing changed in ${groupWords(p)}.` : 'Nothing changed.'),
