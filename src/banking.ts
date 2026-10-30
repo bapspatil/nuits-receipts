@@ -4,6 +4,7 @@ import { config } from './config';
 import { parseCsv, inspectCsv, headerFingerprint, originalFromText, validateMapping, type CsvMapping } from './csv';
 import { holviMapping, aliases, type BankPreset } from './presets';
 import type { AccountChoice } from './accounts';
+import { undoAt, withUndo, type UndoAt } from './undo';
 import { AUTO_EXEMPT, clefExemptions, exemptionFor, unclear, type ExemptBy } from './exempt';
 import { chargeLeaders, pairFit, planMatches } from './matcher';
 import {
@@ -174,11 +175,16 @@ export async function transactionIds(rows: ParsedImport['rows']): Promise<string
     }),
   );
 }
-export async function importIdentity(account: string, bytes: Uint8Array): Promise<{ id: string; key: string }> {
+// salt: a second import of the same file (Import anyway) is its own import, with its own Undo.
+export async function importIdentity(
+  account: string,
+  bytes: Uint8Array,
+  salt = '',
+): Promise<{ id: string; key: string }> {
   const digest = await hash(bytes);
   return {
-    id: await hash(account.trim() + ':' + digest),
-    key: `imports/${digest}.csv`,
+    id: await hash(account.trim() + ':' + digest + (salt && ':' + salt)),
+    key: `imports/${digest}${salt && '.' + salt}.csv`,
   };
 }
 export async function collisions(env: Env, parsed: ParsedImport, importId: string): Promise<string[]> {
@@ -220,8 +226,11 @@ export type ImportInput = {
   mapping?: CsvMapping;
   accountChoice?: AccountChoice;
   crossAccountAcknowledged?: boolean;
+  salt?: string;
+  // The time its Undo is logged under; the banner's Undo names it.
+  at?: UndoAt;
 };
-async function transactionsById(env: Env, ids: string[]): Promise<Map<string, Transaction>> {
+export async function transactionsById(env: Env, ids: string[]): Promise<Map<string, Transaction>> {
   const result = new Map<string, Transaction>();
   for (let offset = 0; offset < ids.length; offset += 90) {
     const chunk = ids.slice(offset, offset + 90);
@@ -275,7 +284,7 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
     input.parsed.rows.every((r) => r.account_key === account),
     'Import must use one account',
   );
-  const identity = await importIdentity(account, input.bytes);
+  const identity = await importIdentity(account, input.bytes, input.salt);
   let prior = await env.DB.prepare('SELECT id,account_key,status,snapshot_json FROM imports WHERE original_key=?')
     .bind(identity.key)
     .first<StoredImport>();
@@ -437,9 +446,9 @@ export async function importBankCsv(env: Env, input: ImportInput): Promise<strin
     'Stored import contains unexpected rows',
     409,
   );
-  await env.DB.prepare("UPDATE imports SET status='complete' WHERE id=? AND snapshot_json=?")
-    .bind(identity.id, snapshot)
-    .run();
+  await withUndo(env, { at: input.at ?? undoAt(), op: 'import', ids: [identity.id] }, [
+    env.DB.prepare("UPDATE imports SET status='complete' WHERE id=? AND snapshot_json=?").bind(identity.id, snapshot),
+  ]);
   await reconcile(env);
   return identity.id;
 }

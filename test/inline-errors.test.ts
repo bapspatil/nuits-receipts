@@ -122,22 +122,16 @@ test('a bad value on the receipt form comes back in place, marked, with what was
   );
 });
 
-test('the import form keeps its choices and names the new account field that is missing', async () => {
+test('the import form names the file field when the file cannot be read', async () => {
   const body = new FormData();
-  body.set('file', new File(['a;b\n1;2\n'], 'bank.csv', { type: 'text/csv' }));
-  body.set('account_action', 'new');
-  body.set('account_label', '');
-  body.set('bank_name', 'Typed Bank');
-  body.set('encoding', 'auto');
-  const refused = await post('/imports/csv', body);
+  body.set('file', new File([new Uint8Array([0x50, 0x4b, 3, 4, 1, 2, 3])], 'bank.xlsx'));
+  const refused = await post('/import', body);
   expect(refused.status).toBe(422);
   const html = await refused.text();
-  expect(alertOf(html)).toContain('<a href="#f-account_label">Go to it</a>');
+  expect(alertOf(html)).toContain('<a href="#f-file">Go to it</a>');
   expect(html).toMatch(
-    /<input name="account_label"[^>]* id="f-account_label" aria-invalid="true" aria-describedby="e-import"/,
+    /<input type="file" name="file"[^>]* id="f-file" aria-invalid="true" aria-describedby="e-import"/,
   );
-  expect(html).toContain('name="bank_name" value="Typed Bank"');
-  expect(html).toContain('<option value="new" selected>');
   expect(html.match(/aria-invalid="true"/g)).toHaveLength(1);
 });
 

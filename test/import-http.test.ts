@@ -207,11 +207,9 @@ test('no-ID overlap requires a newly previewed keep or additional decision', asy
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
 });
 
-test('preset storage failure reports successful import separately', async () => {
+test('a layout that cannot be saved never fails the import', async () => {
   const response = await preview(),
     body = confirmForm(await response.text());
-  body.set('preset_name', 'Synthetic preset');
-  body.set('preset_bank', 'Fake Bank');
   const prepare = env.DB.prepare.bind(env.DB),
     spy = vi.spyOn(env.DB, 'prepare').mockImplementation((sql) => {
       if (sql.startsWith('INSERT INTO bank_presets')) throw new Error('Synthetic D1 failure');
@@ -219,8 +217,7 @@ test('preset storage failure reports successful import separately', async () => 
     });
   try {
     const result = await confirm(body);
-    expect(result.status).toBe(200);
-    expect(await result.text()).toMatch(/Transactions were imported[\s\S]*Preset was not saved/);
+    expect(result.status).toBe(303);
   } finally {
     spy.mockRestore();
   }

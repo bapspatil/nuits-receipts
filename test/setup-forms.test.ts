@@ -2,15 +2,15 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { request } from './helpers';
 
-test('with no bank account the import form creates one instead of preselecting an empty choice', async () => {
-  const withAccount = await (await request('/import')).text();
-  expect(withAccount).toContain('The account chosen here');
-  await env.DB.prepare('DELETE FROM accounts').run();
-  const html = await (await request('/import')).text();
-  expect(html).not.toContain('The account chosen here');
-  expect(html).toContain('<input type="hidden" name="account_action" value="new">');
-  expect(html).toContain('<legend>Your bank account</legend>');
-  expect(html).toMatch(/name="account_label"[^>]*required/);
+test('the import form is a file and Import, with or without a bank account', async () => {
+  for (const accounts of [1, 0]) {
+    if (!accounts) await env.DB.prepare('DELETE FROM accounts').run();
+    const html = await (await request('/import')).text();
+    expect(html).toContain('<form action="/import" method="post" enctype="multipart/form-data">');
+    expect(html).toContain('type="file" name="file"');
+    expect(html).toContain('<button class="btn primary">Import</button>');
+    expect(html).not.toContain('name="account');
+  }
 });
 
 test('Settings loads its own script under a policy that allows only same-origin scripts', async () => {

@@ -136,6 +136,11 @@ export const MESSAGES: Readonly<Record<string, string>> = {
 
   // imports
   'Choose CSV': 'Choose a CSV file first.',
+  'Account unavailable. Choose the file again.': 'That account is no longer there. Choose the file again.',
+  'Import not found': 'We could not find that import.',
+  'This import cannot be repeated. Choose the file again.':
+    'We no longer have that file to read again. Choose it again to import it.',
+  'Nothing was skipped in that import': 'Nothing was left out of that import, so there is nothing to add.',
   'Read file before decoding': 'Something went wrong with the file. Choose it again.',
   'Invalid CSV preview data': 'We lost track of the file. Choose it again.',
   'Invalid preview settings': "Those settings aren't valid. Check the file again.",

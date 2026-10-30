@@ -1,8 +1,16 @@
 import { EXPONENTS, hash, InputError, MAX_CSV_BYTES, minor, money, requireInput } from './domain';
 import type { Env } from './env';
-import { config } from './config';
-import { listAccounts, validateAccountChoice, type AccountChoice } from './accounts';
-import { parseCsv, validateMapping, inspectCsv, statedTotals, DATE_FORMATS, type CsvMapping } from './csv';
+import { validateAccountChoice, type AccountChoice } from './accounts';
+import {
+  parseCsv,
+  validateMapping,
+  inspectCsv,
+  statedTotals,
+  headerFingerprint,
+  DATE_FORMATS,
+  type CsvMapping,
+} from './csv';
+import { undoAt, type UndoAt } from './undo';
 import { suggestMappings } from './presets';
 import { columnSample, suggestColumns } from './ai';
 import { isXlsx, xlsxToCsv } from './xlsx';
@@ -22,7 +30,7 @@ import { ariaFor, day, errorLine, escape, input, page, pageHead, select, stepWor
 import { failureFor, kept } from './request';
 import { withDone } from './events';
 
-function hidden(name: string, value: unknown): string {
+export function hidden(name: string, value: unknown): string {
   return `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`;
 }
 // Plain labels for the CSV fields. Names and values are unchanged.
@@ -70,45 +78,9 @@ export function presetLabel(p: { id: string; bank_name: string; name: string }):
 }
 // The first step's form, as the failure scope names it.
 export const IMPORT = 'import';
-export async function importForm(env: Env): Promise<string> {
+export async function importForm(): Promise<string> {
   const refused = failureFor(IMPORT);
-  const accounts = await listAccounts(env.DB);
-  return `<form action="/imports/csv" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX, CSV or PDF)<input type="file" name="file" accept=".xlsx,.csv,.pdf,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label>${
-    accounts.length
-      ? `${options(
-          'account',
-          accounts.map((a) => ({ value: a.id, label: `${a.label}${a.bank_name ? ' · ' + a.bank_name : ''}` })),
-          accounts[0]?.id,
-        )}${options(
-          'account_action',
-          [
-            { value: 'existing', label: 'The account chosen here' },
-            { value: 'new', label: 'A new account (fill in below)' },
-          ],
-          'existing',
-        )}`
-      : '<input type="hidden" name="account_action" value="new">'
-  }</div><fieldset><legend>${accounts.length ? 'Only for a new account' : 'Your bank account'}</legend>${accounts.length ? '' : '<p class="small">You have no bank account yet. It is created when you import this file.</p>'}<div class="fields">${input(
-    'account_label',
-    '',
-    'text',
-    'Account name',
-    {
-      scope: IMPORT,
-      attrs: accounts.length ? '' : ' required',
-      hint: accounts.length ? '' : 'For example Main account',
-    },
-  )}${input('bank_name', '', 'text', 'Bank', { scope: IMPORT })}${select('account_currency', Object.keys(EXPONENTS), accounts[0]?.default_currency ?? config(env).defaultCurrency, 'Currency', IMPORT)}</div></fieldset><details><summary>File options</summary><div class="body">${options(
-    'encoding',
-    [
-      { value: 'auto', label: 'Detect BOM or UTF-8' },
-      { value: 'utf-8', label: 'UTF-8' },
-      { value: 'utf-16le', label: 'UTF-16 LE' },
-      { value: 'utf-16be', label: 'UTF-16 BE' },
-      { value: 'windows-1252', label: 'Windows-1252 / ISO-8859-1' },
-    ],
-    'auto',
-  )}</div></details><p class="small">Booked payments only. Existing accounts keep their currency.</p><button class="btn primary">Check the file</button></form>`;
+  return `<form action="/import" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX, CSV or PDF)<input type="file" name="file" accept=".xlsx,.csv,.pdf,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label></div><p class="small">Booked payments only. We find the account and the columns, and skip what you imported before.</p><button class="btn primary">Import</button></form>`;
 }
 export function wizard(step: 1 | 2 | 3): string {
   return `<ol class="wizard" aria-label="Import steps">${['Choose file', 'Check', 'Import']
@@ -137,7 +109,7 @@ function bytesFromForm(form: FormData): Uint8Array {
     throw new InputError('Invalid CSV preview data');
   }
 }
-async function readBytes(env: Env, form: FormData): Promise<Uint8Array> {
+export async function readBytes(env: Env, form: FormData): Promise<Uint8Array> {
   const file = form.get('file');
   if (file instanceof File) {
     requireInput(file.size <= MAX_CSV_BYTES, 'CSV too large', 413, 'file');
@@ -319,7 +291,7 @@ async function currentState(env: Env, parsed: ParsedImport, bytes: Uint8Array): 
     otherAccounts: await otherAccountCandidates(env, parsed),
   };
 }
-function encodedBytes(bytes: Uint8Array): string {
+export function encodedBytes(bytes: Uint8Array): string {
   return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 }
 async function signature(env: Env, form: FormData, bytes: Uint8Array): Promise<string> {
@@ -527,7 +499,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
       account.kind === 'new'
         ? account.label
         : await env.DB.prepare('SELECT label FROM accounts WHERE id=?').bind(account.id).first('label');
-    confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><details><summary>Save this layout for next time</summary><div class="body"><div class="fields">${input('preset_bank', savedAccount.bank_name, 'text', 'Bank')}${input('preset_name', '', 'text', 'Layout name', { hint: 'Optional. Used for files with the same columns.' })}</div></div></details><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
+    confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
   }
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${unmapped ? editor : `${table}${exclusions}${confirm}${editor}`}</form>`;
   return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {
@@ -580,7 +552,7 @@ export function totalsProblems(
   }
   return problems;
 }
-function fallbackMapping(currency: string): CsvMapping {
+export function fallbackMapping(currency: string): CsvMapping {
   return {
     version: 1,
     encoding: 'utf-8',
@@ -642,6 +614,7 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
       'Import conflicts changed. Preview again.',
       409,
     );
+  const at = undoAt();
   const importedId = await importBankCsv(env, {
     bytes,
     parsed,
@@ -649,56 +622,86 @@ export async function confirmImport(env: Env, form: FormData): Promise<Response>
     accountChoice: account,
     collision: String(form.get('collision') ?? ''),
     crossAccountAcknowledged: form.get('acknowledge_other_account') === 'yes',
+    at,
   });
-  const name = String(form.get('preset_name') ?? '').trim();
-  if (name) {
-    try {
-      await savePreset(env, {
-        bank_name: String(form.get('preset_bank') ?? ''),
-        name,
-        headers: preview.headers,
-        mapping,
-      });
-    } catch (error) {
-      return page(
-        'import',
-        `${wizard(3)}<div class="banner" role="status">Transactions were imported. Preset was not saved.</div><p class="lede">${escape(error instanceof InputError ? error.message : 'Storage unavailable. Try saving the mapping again.')}</p><a class="btn primary" href="/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}">Match receipts</a>`,
-        200,
-        env,
-        { detail: 'Import complete' },
-      );
-    }
+  // A layout the owner worked out by hand is kept for the next file of this bank.
+  if (['', 'custom'].includes(String(form.get('current_preset') ?? '')))
+    await saveLayout(env, preview.headers, mapping, account.kind === 'new' ? account.bank_name : '', account.id);
+  return importedResponse(env, {
+    importId: importedId,
+    rows: parsed.rows,
+    replayed: prior?.status === 'complete',
+    at,
+    anyway: 0,
+    similar: 0,
+  });
+}
+// Keeps a layout under its header fingerprint, named after the bank and the columns, so the next
+// file with these columns needs no detection. A layout already kept for them is left alone, and a
+// refusal to save never fails the import.
+export async function saveLayout(
+  env: Env,
+  headers: string[],
+  mapping: CsvMapping,
+  bank: string,
+  account: string,
+): Promise<void> {
+  try {
+    if ((await savedPresets(env, headers)).length) return;
+    const name = (
+      bank ||
+      (await env.DB.prepare('SELECT bank_name FROM accounts WHERE id=?').bind(account).first<string>('bank_name')) ||
+      ''
+    ).trim();
+    const fingerprint = (await headerFingerprint(headers)).slice(0, 6);
+    await savePreset(env, { bank_name: name || 'My bank', name: `Layout ${fingerprint}`, headers, mapping });
+  } catch (error) {
+    if (!(error instanceof InputError)) throw error;
   }
-  const inserted =
-    prior?.status === 'complete'
-      ? 0
-      : Number(
-          await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE import_id=?')
-            .bind(importedId)
-            .first('n'),
-        );
-  const skipped = prior?.status === 'complete' ? 0 : parsed.rows.length - inserted;
+}
+// The redirect after an import: what was added and skipped, where this file's payments out stand,
+// and what the banner may offer (Undo, Import anyway). at: the time the import's Undo is logged under.
+export async function importedResponse(
+  env: Env,
+  a: {
+    importId: string;
+    rows: ParsedImport['rows'];
+    replayed: boolean;
+    at: UndoAt;
+    anyway: number;
+    similar: number;
+  },
+): Promise<Response> {
+  const inserted = a.replayed
+    ? 0
+    : Number(
+        await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE import_id=?').bind(a.importId).first('n'),
+      );
+  const skipped = a.replayed ? 0 : a.rows.length - inserted;
   // Rows a rule left open that read like a transfer to a person: one capped Clef question.
-  if (inserted) await exemptByClef(env, importedId);
+  if (inserted) await exemptByClef(env, a.importId);
   // Where this file's payments out stand, for the banner.
   const tally = inserted
     ? ((await env.DB.prepare(
-        `SELECT total(t.receipt_id IS NOT NULL) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing,total(t.receipt_id IS NULL AND t.receipt_required=0 AND t.exempt_by IS NOT NULL AND t.exempt_by<>'owner') auto FROM bank_transactions t WHERE t.import_id=? AND t.amount_minor<0 AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
+        `SELECT total(t.receipt_id IS NOT NULL) matched,total(t.receipt_id IS NULL AND t.receipt_required=0) exempt,total(t.receipt_id IS NULL AND t.receipt_required=1) missing FROM bank_transactions t WHERE t.import_id=? AND t.amount_minor<0 AND NOT EXISTS(SELECT 1 FROM internal_transfers p WHERE p.debit_id=t.id)`,
       )
-        .bind(importedId)
+        .bind(a.importId)
         .first<Record<string, number>>()) ?? {})
     : {};
   return new Response(null, {
     status: 303,
     headers: {
-      Location: withDone('imported', `/payments?month=${parsed.rows[0]!.booking_date.slice(0, 7)}`, {
+      Location: withDone('imported', `/payments?month=${a.rows[0]!.booking_date.slice(0, 7)}`, {
         inserted,
         skipped,
-        replayed: prior?.status === 'complete' ? parsed.rows.length : 0,
+        replayed: a.replayed ? a.rows.length : 0,
         auto: tally.matched ?? 0,
         np: tally.exempt ?? 0,
         missing: tally.missing ?? 0,
-        imp: tally.auto ? importedId : null,
+        anyway: a.replayed ? 0 : a.anyway,
+        similar: a.replayed ? 0 : a.similar,
+        imp: a.importId,
+        ...(inserted && !a.replayed ? { at: a.at, op: 'import' } : {}),
       }),
     },
   });

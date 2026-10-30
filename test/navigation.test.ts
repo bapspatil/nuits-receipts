@@ -121,7 +121,11 @@ test('step markers carry the same three words everywhere', async () => {
     (m) => `${m[1]} ${m[2]}`,
   );
   expect(words.every((w) => /^(done Done|now Next|todo To do): $/.test(w))).toBe(true);
-  expect((await home('/import')).match(/<span class="vh">(Done|Next|To do): <\/span>/g)).toHaveLength(3);
+  const body = new FormData();
+  body.set('file', new File(['Date;Amount;Payee\n2026-09-01;-1.00;Shop\n'], 'b.csv', { type: 'text/csv' }));
+  body.set('account', 'holvi');
+  const editor = await (await request('/imports/csv', { method: 'POST', body })).text();
+  expect(editor.match(/<span class="vh">(Done|Next|To do): <\/span>/g)).toHaveLength(3);
 });
 
 test('Receipts has one Add button that follows the open tab', async () => {
