@@ -139,8 +139,10 @@ test('Discard is one click with no reason; a matched receipt still asks about it
     ),
   );
   const bulk = review.slice(review.indexOf('class="bulkbar"'));
-  expect(bulk).toContain('<button name="op" value="discard" class="btn danger">Discard</button>');
-  expect(bulk).not.toContain('Discard these?');
+  // No reason to pick, but the bar still asks, since Undo can't bring a match back yet.
+  expect(bulk).toContain(
+    '<p class="ask">Discard these? Matched ones lose their match.</p><button name="op" value="discard" class="btn danger">Discard</button>',
+  );
   const page = await (await request(`/receipts/${id(1)}`)).text();
   expect(page).not.toContain('name="reason"');
   expect(page).not.toContain('Remove match?');
