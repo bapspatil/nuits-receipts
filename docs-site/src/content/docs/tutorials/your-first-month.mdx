@@ -49,50 +49,47 @@ Each file shows **Added** with an **Open** link, and the page says **2 of 2 adde
 
 ## Check and approve each receipt
 
-Open **Review** in the top bar (on a phone, the tab bar at the bottom). Its title says how many receipts the app wants you to check, for example **1 to check, 1 undated**. Each row shows the first question, such as **Seller +6**. Select the first one in the list.
+Open **Receipts** in the sidebar (on a phone, the tab bar at the bottom). It opens on **To do**, which lists the receipts the app wants you to check, each with a **Needs you** stamp. Press **Start checking** to open the first one.
 
-The receipt page shows **The original** beside what the app read. Anything it is unsure of comes first, as a short question with its field, under a heading such as **7 to check**. The bar at the bottom says where you are, for example **1 of 1 to check**, and holds **Approve receipt**.
+The receipt page shows **The original** beside what the app read. Anything it is unsure of comes first, as a short question with its field, under a heading such as **5 fields to fill**. The bar at the bottom says where you are, for example **1 of 1 to check**, and holds **Approve receipt**.
 
-![A receipt page for sample.png marked Needs you, with the original on the left and the seller, date, currency, total, amount before VAT, VAT amount and receipt number flagged on the right](../../../assets/screenshots/receipt-review.png)
+![A receipt page marked Needs you, with the text that was read on the left, the currency, total, amount before VAT and VAT amount marked Required on the right, and Approve receipt in the bar](../../../assets/screenshots/receipt-review.png)
 
-In this screenshot the app could not read anything from the photo, so every field is flagged. Your copy may have read more of it.
+This screenshot is a different sample receipt; your copy may ask for other fields.
 
-For each receipt in Review:
+For each receipt in To do:
 
 1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. Set **Which currency?** from the list. The fields that were not flagged are under **Other fields**.
 2. Leave **Part** and **Kind** as they are.
 3. Leave the **Note** as **Checked against the original**.
 4. Press **Approve receipt**.
 
-**Approve receipt** opens the next receipt in Review, with the banner **Approved.** After the last one, **Review** says **All checked** and points you to the next step: **Import statement**. For the USD receipt, **Other fields** shows a euro amount converted at the ECB reference rate.
+**Approve receipt** opens the next receipt in To do, with a banner that names the one you approved and offers **Undo**. After the last one you are back on To do, which says **All checked** and points you to the next step: **Import statement**. For the USD receipt, **Other fields** shows a euro amount converted at the ECB reference rate.
 
 :::note
-If the app read a receipt correctly, it is already **Ready** and does not appear in Review. Open it from **Receipts** later if you want to compare it with the table anyway.
+If the app read a receipt correctly, it is already **Ready** and does not appear in To do. Open it from **Receipts** > **All** later if you want to compare it with the table anyway.
 :::
 
 ## Import the bank statement
 
-Press **Import statement** on **Review**, or open **Bank** in the top bar (on a phone, the tab bar at the bottom) and press **Import statement** there. The **Import a bank statement** page opens. Its three steps are **Choose file**, **Check** and **Import**.
+Press **Import statement** on **To do**, or open **Bank** in the sidebar (on a phone, the tab bar at the bottom) and press **Import statement** there. The **Import a bank statement** page opens.
 
-1. Under **Bank statement (CSV file)**, choose `bank.csv`.
-2. Leave **Which account is this?** set to **Bank account**.
-3. Press **Check the file**.
+1. Under **Bank statement (XLSX, CSV or PDF)**, choose `bank.csv`.
+2. Press **Import statement**.
 
-The **Check the file** page shows what the app read before anything is saved. It recognises the sample's layout, says **No problems found.**, and lists two payments: Sample Cloud Lantern Oy for -125.50 and Sample Missing Vendor for -9.99.
+The app picks your account and reads the sample's columns itself. If it asks **Which account is this?**, pick **Bank account** and press **Import statement** again.
 
-![The Check the file page, listing two payments read from bank.csv with their dates, amounts and currency, and an Import 2 payments button](../../../assets/screenshots/import-preview.png)
-
-Press **Import 2 payments**.
+![The Import a bank statement page, with one file field and the Import statement button](../../../assets/screenshots/import-preview.png)
 
 ## See the match
 
-The app takes you to **Bank** for September 2026, with **Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.** at the top.
+The app takes you to **Bank** for September 2026, with **Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.** and **Undo** at the top.
 
 ![The Bank page for September 2026, with the Sample Cloud Lantern Oy payment matched and the Sample Missing Vendor payment missing its receipt](../../../assets/screenshots/payments.png)
 
-The page opens on **Missing**, under the line "2 out, 1 matched, 0 not a purchase, 1 missing". Sample Missing Vendor shows the **Missing** stamp and **No receipt fits.**, because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows **Matched automatically** and a **Receipt** link: the app paired it with the PDF receipt by amount, date and name. When a receipt only nearly fits, the app shows it beside the payment as **Likely** and leaves the choice to you.
+The page opens on **To do**, under the line "2 out, 1 matched, 0 not a purchase, 1 missing". Sample Missing Vendor shows the **Missing** stamp and **No receipt found yet.**, because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows **Matched** and a **Receipt** link: the app paired it with the PDF receipt by amount, date and name. When a receipt only nearly fits, the app shows it beside the payment as **Likely** and leaves the choice to you.
 
-This sample payment has no receipt on purpose. Under it, press **Not a purchase**. It now shows **Not a purchase**, and the page says **Every payment has a receipt.**
+This sample payment has no receipt on purpose. Under it, press **Not a purchase**. It leaves To do, the banner offers **Undo**, and the page says **Every payment has a receipt.**
 
 ## Send the month
 

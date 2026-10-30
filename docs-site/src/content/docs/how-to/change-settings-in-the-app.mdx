@@ -17,12 +17,11 @@ Use this guide to change most of the app's settings from **Settings**, without e
 
 | Section | Fields |
 | --- | --- |
-| **Business** | App name, Your business names, Parts of the business, Default part, Payment terms (days), New account currency |
-| **Email** | Receipt address, Invoice address, Forward a copy to |
-| **Senders** | Allowed senders (**Add** or **Remove**, no tick needed) and ignored senders (**Stop ignoring**) |
-| **Export** | Accountant, Export file name, Note under the month download |
-| **Advanced > Review & matching** | The review and matching thresholds |
-| **Advanced > Integrations** | Source code link |
+| **Business** | App name, Your business names, Parts of the business, Default part, Payment terms (days), New account currency, and **Vendor rules** |
+| **Email** | Receipt address, Invoice address, Forward a copy to, and **Email senders**: allowed senders (**Add** or **Remove**, no tick needed), ignored senders (**Stop ignoring**) and **Mail we didn't keep** |
+| **Bank** | Bank accounts |
+| **Sending** | Accountant, Export file name, Note under the month download, and OneDrive when it is set up |
+| **Advanced** | **Review & matching** (the review and matching thresholds), **Integrations** (source code link), **Set at deploy**, **Change history** and **About** |
 
 Sign-in (Access settings, the password user name and the password), the base path, the reader mode, the OneDrive app and its secrets stay deploy-time. They are listed read-only under **Advanced > Set at deploy**, with secrets shown only as "Set" or "Not set". For every variable and where it can be changed, see [Configuration](/reference/configuration/).
 
@@ -31,7 +30,7 @@ Sign-in (Access settings, the password user name and the password), the base pat
 <Steps>
   <Step title="Open the section">
 
-Open **Settings** and open the section. Every section starts closed, with a one-line summary such as "2 allowed" for **Senders**. A link to a section, such as `/settings#senders`, opens it. **Review & matching** and **Integrations** are folded under **Advanced**.
+Open **Settings** and open the section. There are five sections, **Business**, **Email**, **Bank**, **Sending** and **Advanced**. Every section starts closed, with a one-line summary such as "receipts@example.com, 2 allowed" for **Email**. A link to a section, such as `/settings#email`, opens it.
 
   </Step>
   <Step title="Edit the field">
@@ -48,7 +47,7 @@ For **Parts of the business**, rename a part in place, tick **Remove** to drop o
   </Step>
   <Step title="Save">
 
-Press the section's **Save**. You come back with the same section open. Values are checked with the same rules as the Worker variables; an invalid value is refused with the reason.
+Press **Save** at the bottom of the page. One **Save** covers every section. You come back with the same section open. Values are checked with the same rules as the Worker variables; an invalid value is refused with the reason.
 
   </Step>
   <Step title="Finish email changes in Cloudflare">

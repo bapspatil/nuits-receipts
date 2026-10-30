@@ -237,7 +237,7 @@ One row per email the Worker received, and every Unknown sender email that is wa
 | `message_id` | TEXT | At most 300 characters | The Message-ID header. Unique among waiting rows. |
 | `attachments`, `size_bytes` | INTEGER | | |
 | `email_key` | TEXT | | The R2 key of the stored email, when one was kept. |
-| `state` | TEXT | `imported`, `held`, `ignored` or `dropped` | `held` is an email from an unknown sender, waiting in Review. |
+| `state` | TEXT | `imported`, `held`, `ignored` or `dropped` | `held` is an email from an unknown sender, waiting in Receipts To do. |
 | `reason` | TEXT | 1 to 40 characters | A reason code, such as `allowed`, `sender_not_allowed` or `sender_approved`. See [Email intake results](/reference/receipt-fields-and-flags/#email-intake-results). |
 
 ## `ignored_senders`
