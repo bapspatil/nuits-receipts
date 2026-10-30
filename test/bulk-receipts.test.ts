@@ -91,9 +91,10 @@ test('approve takes the complete ones, skips the rest, needs a reason, and survi
   expect(missing.status).toBe(422);
   expect(await missing.json()).toEqual({ error: expect.stringContaining('note') });
 
-  const res = await bulk({ op: 'approve', id: all, approval_reason: 'Checked against the original', back: '/review' });
+  const res = await bulk({ op: 'approve', id: all, approval_reason: 'Checked against the original', view: 'todo' });
   expect(res.status).toBe(303);
-  expect(locationOf(res)).toBe('/review?done=approvedMany&n=2&skipped=2');
+  // Back to To do, at the first row still open after the first one acted on.
+  expect(locationOf(res)).toBe(`/receipts?view=todo&done=approvedMany&n=2&skipped=2#row-${id(3)}`);
   const done = (await row(1))!;
   expect(done).toMatchObject({ status: 'ready', review_reasons_json: '[]' });
   expect(done.reviewed_at).toBeTruthy();
@@ -119,10 +120,13 @@ test('discard sets the rows aside with one Undo back to the same list; restore b
     op: 'discard',
     id: ids(1, 2),
     list: 'receipts',
-    back: '/receipts?month=2026-10&q=vendor',
+    view: 'all',
+    month: '2026-10',
+    q: 'vendor',
+    offset: '50',
   });
   const location = locationOf(res);
-  expect(location).toMatch(/^\/receipts\?month=2026-10&q=vendor&done=discarded&n=2&at=[^&]+&back=/);
+  expect(location).toMatch(/^\/receipts\?view=all&month=2026-10&q=vendor&done=discarded&n=2&at=[^&]+&back=/);
   expect((await row(1))!.discard_reason).toBeNull();
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('2 discarded.');
@@ -130,9 +134,9 @@ test('discard sets the rows aside with one Undo back to the same list; restore b
   const at = new URL(location, 'http://localhost').searchParams.get('at')!;
   const undo = await request('/restore', {
     method: 'POST',
-    body: form({ at, back: '/receipts?month=2026-10&q=vendor' }),
+    body: form({ at, back: '/receipts?view=all&month=2026-10&q=vendor' }),
   });
-  expect(locationOf(undo)).toBe('/receipts?month=2026-10&q=vendor&done=restored&n=2');
+  expect(locationOf(undo)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=restored&n=2');
   expect((await row(1))!.discarded_at).toBeNull();
 
   await bulk({ op: 'discard', id: ids(1, 2) });
@@ -170,7 +174,7 @@ test('paid marks sales invoices only, and needs the day and how', async () => {
     paid_outside_on: '2026-10-25',
     paid_outside_note: 'Stripe payout',
     list: 'invoices',
-    back: '/invoices?month=2026-10',
+    month: '2026-10',
   });
   expect(locationOf(res)).toBe('/invoices?month=2026-10&done=paidMany&n=1&on=2026-10-25&skipped=1');
   expect(await row(1)).toMatchObject({ paid_outside_on: '2026-10-25', paid_outside_note: 'Stripe payout' });
@@ -194,19 +198,19 @@ test('all=1 takes the list filter, never more than the cap', async () => {
   await receipt(1, { vendor: 'Alpha Fake Oy' });
   await receipt(2, { vendor: 'Beta Fake Oy' });
   await receipt(3, { vendor: 'Alpha Fake Oy', month: '2026-09' });
-  const res = await json({ op: 'discard', all: '1', list: 'receipts', q: 'alpha', month: '2026-10' });
+  const res = await json({ op: 'discard', all: '1', list: 'receipts', view: 'all', q: 'alpha', month: '2026-10' });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { location: string; n: number; skipped: number };
   expect(body).toMatchObject({ n: 1, skipped: 0 });
   // The location is the signed banner link for the list the post came from.
-  expect(body.location).toMatch(/^\/receipts\?done=discarded&n=1&at=.*&iat=\d+&sig=/);
+  expect(body.location).toMatch(/^\/receipts\?view=all&month=2026-10&q=alpha&done=discarded&n=1&at=.*&iat=\d+&sig=/);
   expect((await row(1))!.discarded_at).toBeTruthy();
   expect((await row(2))!.discarded_at).toBeNull();
   expect((await row(3))!.discarded_at).toBeNull();
 
   // Over the AI cap for the filter: refused, nothing read.
   for (let n = 10; n < 21; n++) await receipt(n);
-  const capped = await json({ op: 'retry', all: '1', list: 'receipts' });
+  const capped = await json({ op: 'retry', all: '1', list: 'receipts', view: 'all' });
   expect(capped.status).toBe(400);
   expect(await capped.json()).toEqual({ error: 'Up to 10 at a time. Narrow the filter.' });
 
@@ -216,33 +220,34 @@ test('all=1 takes the list filter, never more than the cap', async () => {
     ).bind(id(1000 + i), `receipts/${id(1000 + i)}`),
   );
   await env.DB.batch(many);
-  const over = await bulk({ op: 'discard', all: '1', list: 'receipts' });
+  const over = await bulk({ op: 'discard', all: '1', list: 'receipts', view: 'all' });
   expect(over.status).toBe(400);
   expect(await over.text()).toContain('Up to 500 at a time. Narrow the filter.');
 });
 
-test('all=1 on Review acts on the To do rows only', async () => {
+test('all=1 on To do acts on the To do rows only', async () => {
   await receipt(1, { status: 'needs_review' });
   await receipt(2, { status: 'needs_review' });
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_total"]' WHERE id=?`).bind(id(1)).run();
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["missing_invoice_number"]' WHERE id=?`)
     .bind(id(2))
     .run();
-  const res = await json({ op: 'discard', all: '1', list: 'review', back: '/review' });
-  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/review\?done=/) });
+  const res = await json({ op: 'discard', all: '1', list: 'receipts', view: 'todo' });
+  expect(await res.json()).toMatchObject({ n: 1, location: expect.stringMatching(/^\/receipts\?view=todo&done=/) });
   expect((await row(1))!.discarded_at).toBeTruthy();
   expect((await row(2))!.discarded_at).toBeNull();
 });
 
-test('back goes only to a list in this app', async () => {
+test('the return is rebuilt from the list state, never followed as sent', async () => {
   await receipt(1);
   for (const back of ['https://evil.example/receipts', '//evil.example/review', '/\\evil.example', '/settings', 'x'])
     expect(locationOf(await bulk({ op: 'restore', id: id(1), list: 'invoices', back })), back).toBe(
       '/invoices?done=restored&n=0&skipped=1',
     );
-  // Only the list's own filter is kept.
-  expect(locationOf(await bulk({ op: 'restore', id: id(1), back: '/receipts?show=discarded&select=1&evil=1#x' }))).toBe(
-    '/receipts?show=discarded&done=restored&n=0&skipped=1',
+  // Only the list's own state is kept, each value checked.
+  const odd = { list: 'receipts', view: 'all', show: 'discarded', month: '2026-13', select: '1', evil: '1' };
+  expect(locationOf(await bulk({ op: 'restore', id: id(1), ...odd }))).toBe(
+    '/receipts?view=all&show=discarded&done=restored&n=0&skipped=1',
   );
 });
 
@@ -258,10 +263,12 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   await receipt(3, { kind: 'sales', client: 'Example Client Oy' });
   const review = await (await request('/review')).text();
   expect(review).toContain(`<input type="checkbox" name="id" value="${id(1)}" form="bulk-review">`);
-  expect(review).toContain('<div data-bulk-list="bulk-review">');
+  expect(review).toContain('<div data-list="receipts-todo" data-total="1" data-bulk-list="bulk-review">');
   expect(review).toMatch(/<\/div><form id="bulk-review" class="bulkbar" data-bulk data-total="1"/);
   expect(review).toContain('name="approval_reason" value="Checked against the original"');
-  expect(review).toContain('<input type="hidden" name="list" value="review">');
+  expect(review).toContain(
+    '<input type="hidden" name="list" value="receipts"><input type="hidden" name="view" value="todo">',
+  );
   expect(review).toContain('<script src="/assets/bulk.js" defer></script>');
   // The old Select mode is gone; the per-row Discard stays.
   expect(review).not.toContain('class="bulk"');
@@ -322,8 +329,10 @@ test('approving a foreign receipt values it in euros, as approving one does', as
 test('a run that changed nothing says so, with no Undo', async () => {
   await receipt(1);
   await bulk({ op: 'discard', id: id(1) });
-  const res = await bulk({ op: 'discard', id: id(1), back: '/receipts' });
-  expect(locationOf(res)).toMatch(/^\/receipts\?done=discarded&n=0&at=[^&]+&back=%2Freceipts&skipped=1$/);
+  const res = await bulk({ op: 'discard', id: id(1), list: 'receipts', view: 'all' });
+  expect(locationOf(res)).toMatch(
+    /^\/receipts\?view=all&done=discarded&n=0&at=[^&]+&back=%2Freceipts%3Fview%3Dall&skipped=1$/,
+  );
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('Nothing changed. 1 skipped.');
   expect(page).not.toContain('action="/restore"');

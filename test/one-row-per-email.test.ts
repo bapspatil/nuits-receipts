@@ -93,7 +93,7 @@ test('a receipt PDF and an invoice PDF for one charge become one receipt, both f
   expect(html).toContain('Receipt-2983-5731.pdf');
   // Only one row waits in Review.
   const review = await (await request('/review')).text();
-  expect(review.match(/href="\/receipts\/[a-f0-9]{64}"/g) ?? []).toHaveLength(1);
+  expect(review.match(/href="\/receipts\/[a-f0-9]{64}\?from=todo"/g) ?? []).toHaveLength(1);
 });
 
 test('an attachment that read nothing does not beat one that read a vendor and total', async () => {

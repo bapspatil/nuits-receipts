@@ -110,8 +110,8 @@ test('a genuine link shows the banner with its Undo form', async () => {
 test('a redirect from the app is signed, and the page it lands on shows the banner', async () => {
   const response = await request('/review/merge', { method: 'POST' });
   const location = response.headers.get('Location')!;
-  expect(location).toMatch(/^\/review\?done=merged&n=0&iat=\d+&sig=[A-Za-z0-9_-]{43}$/);
-  expect(locationOf(response)).toBe('/review?done=merged&n=0');
+  expect(location).toMatch(/^\/receipts\?view=todo&done=merged&n=0&iat=\d+&sig=[A-Za-z0-9_-]{43}$/);
+  expect(locationOf(response)).toBe('/receipts?view=todo&done=merged&n=0');
   expect(await (await request(location)).text()).toContain('Merged 0 duplicates.');
   // The same address without its signature says nothing.
   expect(await (await request(locationOf(response))).text()).not.toContain('Merged 0');

@@ -15,11 +15,9 @@ import {
 } from './domain';
 import {
   BANK_VIEWS,
-  bankPath,
   bankUpto,
   cacheFx,
   clearBankReview,
-  nextOpenPayment,
   reconcile,
   SET_REQUIRED_SQL,
   viewRows,
@@ -38,10 +36,19 @@ import {
   unignoreSenders,
 } from './inbound';
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
-import { backPath, withDone, type EventKey } from './events';
+import { withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { reviewQueue } from './views';
 import { filterIds, parseQuery } from './all';
+import {
+  landing,
+  LIST_DEFS,
+  listState,
+  listUrl,
+  openRows,
+  parseReturn,
+  RECEIPTS_TODO,
+  type ListState,
+} from './worklist';
 import { invoiceRows, invoiceShow } from './invoices';
 import { month } from './ui';
 
@@ -56,14 +63,12 @@ type Op = {
   run: (env: Env, ids: string[], form: FormData, back: string, caller: Caller) => Promise<Done>;
 };
 // One bulk route: its ops, the shape of its ids, every row of the list's
-// filter for all=1 (refused without), and the list it lands on.
+// filter for all=1 (refused without), and the list it lands on, or a fixed place that isn't a list.
 type Endpoint = {
   ops: Record<string, Op>;
   id: (value: string) => string;
   all?: (env: Env, form: FormData) => Promise<string[]>;
-  back: (form: FormData) => string;
-  // The open row to land on after the save, as #row-<id>.
-  next?: (env: Env, form: FormData, ids: string[]) => Promise<string | null>;
+  to: (form: FormData) => ListState | string;
 };
 export type BulkResult = { location: string; n: number; skipped: number };
 const ROW_ID = /^[a-f0-9]{64}$/;
@@ -189,32 +194,33 @@ const OPS: Record<ReceiptOp, Op> = {
   },
 };
 
+// The list a receipt bar posts from: Invoices when it says so, else Receipts (To do by default).
+const receiptList = (form: FormData) =>
+  listState(form, { ...RECEIPTS_TODO, key: text(form, 'list') === 'invoices' ? 'invoices' : 'receipts' });
 // Every row of a list's filter, the way its page picks them. Refused over the cap.
-const LISTS: Record<string, (env: Env, form: FormData) => Promise<string[]>> = {
-  review: async (env) => (await reviewQueue(env)).map((r) => r.id),
-  receipts: (env, form) => {
-    const params = new URLSearchParams();
-    for (const key of ['show', 'month', 'q']) if (text(form, key)) params.set(key, text(form, key));
-    return filterIds(env, parseQuery(params), BULK_CAP + 1);
-  },
-  invoices: async (env, form) =>
-    (await invoiceRows(env, month(text(form, 'month') || null), invoiceShow(form.get('show')))).shown.map((r) => r.id),
-};
-const HOME: Record<string, string> = { review: '/review', receipts: '/receipts', invoices: '/invoices' };
+async function allOf(env: Env, s: ListState): Promise<string[]> {
+  if (s.key === 'invoices') return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.map((r) => r.id);
+  if (s.view === 'todo')
+    return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP + 1)).map((r) => r.id);
+  return filterIds(
+    env,
+    parseQuery(new URLSearchParams({ show: s.show ?? '', month: s.month ?? '', q: s.q })),
+    BULK_CAP + 1,
+  );
+}
 const RECEIPTS: Endpoint = {
   ops: OPS,
   id: rowId,
   all: (env, form) => {
-    const list = text(form, 'list');
-    requireInput(Object.hasOwn(LISTS, list), 'Invalid list', 400);
-    return LISTS[list]!(env, form);
+    requireInput(['', 'receipts', 'invoices'].includes(text(form, 'list')), 'Invalid list', 400);
+    return allOf(env, receiptList(form));
   },
-  back: (form) => backPath(form.get('back'), HOME[text(form, 'list')] ?? '/receipts'),
+  to: receiptList,
 };
 
 // ---------- Bank ----------
 // The month, view and rows shown that the bar was drawn for.
-function bankScope(form: FormData): { month: string; view: BankView; upto: number } {
+function bankScope(form: FormData): ListState {
   const month = text(form, 'month'),
     view = text(form, 'view');
   requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
@@ -223,7 +229,7 @@ function bankScope(form: FormData): { month: string; view: BankView; upto: numbe
     'Invalid filter',
     400,
   );
-  return { month, view: view as BankView, upto: bankUpto(text(form, 'upto'), BULK_CAP) };
+  return { ...RECEIPTS_TODO, key: 'bank', month, view: view as BankView, upto: bankUpto(text(form, 'upto'), BULK_CAP) };
 }
 // Not a purchase (0) and Needs receipt (1): only money out that is not that already. A matched
 // row is left alone, since SET_REQUIRED_SQL would drop its match without a word.
@@ -244,7 +250,7 @@ const PAYMENT_OPS: Record<PaymentOp, Op> = {
   // one time on all of them, so the banner's Undo finds them.
   match: {
     run: async (env, ids, form) => {
-      const { month } = bankScope(form);
+      const month = bankScope(form).month!;
       const tuning = config(env).tuning;
       const [open, receipts, rules] = await Promise.all([
         viewRows(env, month, 'todo', BULK_CAP),
@@ -280,17 +286,12 @@ const PAYMENTS: Endpoint = {
   id: rowId,
   all: async (env, form) => {
     const { month, view } = bankScope(form);
-    return (await viewRows(env, month, view, BULK_CAP + 1)).map((t) => t.id);
+    return (await viewRows(env, month!, view, BULK_CAP + 1)).map((t) => t.id);
   },
-  back: (form) => {
-    const { month, view, upto } = bankScope(form);
-    return bankPath(month, view, upto);
-  },
-  next: (env, form, ids) => nextOpenPayment(env, bankScope(form).month, ids),
+  to: bankScope,
 };
 
 // ---------- Unknown senders and Settings > Senders ----------
-const BACK_TO: Record<string, string> = { settings: '/settings#senders', receipts: '/receipts' };
 // Settings opens its Senders section for the mail events too.
 const from = (back: string) => ({ from: back.startsWith('/settings') ? 'settings' : null });
 const SENDER_OPS: Record<SenderOp, Op> = {
@@ -344,7 +345,11 @@ const SENDERS: Endpoint = {
     requireInput(/^[0-9a-f-]{36}$/.test(value), 'Invalid email', 400);
     return value;
   },
-  back: (form) => BACK_TO[text(form, 'back')] ?? '/review',
+  // Settings, or the list the held mail is on. No row anchor: the mail sits above the list's rows.
+  to: (form) =>
+    text(form, 'back') === 'settings'
+      ? '/settings#senders'
+      : (parseReturn(text(form, 'back')) ?? listUrl(RECEIPTS_TODO)),
 };
 
 // The checked ids: at least one, at most max, each of the list's shape.
@@ -378,17 +383,17 @@ async function runBulk(endpoint: Endpoint, env: Env, form: FormData, caller: Cal
   } else ids = bulkIds(form.getAll('id'), max, op.id ?? endpoint.id);
   const before = progress(form, 'done_before'),
     skippedBefore = progress(form, 'skipped_before');
-  const back = endpoint.back(form);
+  const to = endpoint.to(form);
+  const back = typeof to === 'string' ? to : listUrl(to);
   const done = await op.run(env, ids, form, back, caller);
   const n = before + done.n,
     skipped = skippedBefore + (done.skipped ?? ids.length - done.n);
-  const next = await endpoint.next?.(env, form, ids);
+  const params = { n, ...done.params, skipped: skipped || null };
   return {
-    location: withDone(done.event, next ? `${back}#row-${next}` : back, {
-      n,
-      ...done.params,
-      skipped: skipped || null,
-    }),
+    location:
+      typeof to === 'string'
+        ? withDone(done.event, to, params)
+        : await landing(env, to, ids, { event: done.event, params }),
     n,
     skipped,
   };

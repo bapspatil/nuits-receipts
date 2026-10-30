@@ -21,7 +21,6 @@ import {
   importPage,
   payments,
   previewable,
-  queueAround,
   helpPage,
   NEW_ACCOUNT,
   receiptPage,
@@ -45,7 +44,20 @@ import { discardReceipts, receiptIds, restoreBatch, restoreReceipts } from './di
 import { resetSetting, saveSetup, SETTINGS_JS } from './setup';
 import { arrivalMonth } from './arrival';
 import { markSent, options, packageZip, query, unmarkSent } from './package';
-import { backPath, withDone, type EventKey } from './events';
+import { withDone, type EventKey } from './events';
+import {
+  landing,
+  LIST_DEFS,
+  listFrom,
+  listState,
+  listUrl,
+  nextOpen,
+  parseReturn,
+  RECEIPTS_TODO,
+  receiptState,
+  receiptUrl,
+  type ListState,
+} from './worklist';
 import { requestState, type FormFailure, type RequestState } from './request';
 import { chooseFolder, connectCallback, connectStart, disconnect, oneDrive, uploadBatch } from './onedrive';
 
@@ -91,12 +103,10 @@ async function formData(request: Request, limit: number): Promise<FormData> {
   }
 }
 // Approve, ignore, delete and the Settings > Senders list. Each form says
-// where to go back to: Review (default), Settings or All receipts.
+// where to go back to: Settings, or the list the held mail is on (Receipts To do by default).
 async function senderAction(request: Request, env: Env, path: string, who: string, ctx: Waiter): Promise<Response> {
   const form = await formData(request, 4096);
-  const back = ({ settings: '/settings', mail: '/settings', receipts: '/receipts' } as Record<string, string>)[
-    String(form.get('back'))
-  ];
+  const settings = ['settings', 'mail'].includes(String(form.get('back')));
   const address = form.get('address');
   let event: EventKey, n: number | undefined;
   if (path === '/senders/approve') [event, n] = ['mailAllowed', await approveSender(env, address, who, ctx)];
@@ -116,10 +126,8 @@ async function senderAction(request: Request, env: Env, path: string, who: strin
   // Allow this sender, from the mail log: the banner names them and offers Undo.
   if (path === '/senders/approve' && form.get('back') === 'mail')
     return redirect(withDone('senderAllowed', '/settings#mail', { sender: senderAddress(address), n }));
-  const settings = back === '/settings';
-  return redirect(
-    withDone(event, settings ? '/settings#senders' : (back ?? '/review'), { n, from: settings ? 'settings' : null }),
-  );
+  if (settings) return redirect(withDone(event, '/settings#senders', { n, from: 'settings' }));
+  return redirect(withDone(event, parseReturn(form.get('back')) ?? listUrl(RECEIPTS_TODO), { n }));
 }
 // The fields of a vendor rule, checked the same way for a new rule and an edit.
 function ruleFrom(env: Env, form: FormData): [string, string | null, string | null, string, string, number] {
@@ -165,15 +173,18 @@ function redirect(location: string): Response {
 export function moved(location: string, search = ''): Response {
   return new Response(null, { status: 302, headers: { Location: location + search } });
 }
+// The Bank list a form came from, in the month of the row it acted on unless it names one.
+function bankList(form: FormData, row: { booking_date: string }): ListState {
+  return listState(form, { ...RECEIPTS_TODO, key: 'bank', month: row.booking_date.slice(0, 7) });
+}
 // The first transfer row on Bank, in the month the money left, and who was paid.
 async function transferRow(env: Env, debitId: string): Promise<{ to: string; name: string }> {
   const row = await env.DB.prepare('SELECT booking_date,merchant FROM bank_transactions WHERE id=?')
     .bind(debitId)
     .first<{ booking_date: string; merchant: string }>();
-  return {
-    to: `/payments?${row ? `month=${row.booking_date.slice(0, 7)}&` : ''}view=all#row-${debitId}`,
-    name: row?.merchant ?? '',
-  };
+  // All, since a transfer leg is never in To do.
+  const all: ListState = { ...RECEIPTS_TODO, key: 'bank', view: 'all', month: row?.booking_date.slice(0, 7) ?? null };
+  return { to: listUrl(all, { next: debitId }), name: row?.merchant ?? '' };
 }
 type Waiter = Pick<ExecutionContext, 'waitUntil'>;
 // Where this browser's last request left the database (see fetch).
@@ -227,34 +238,43 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
   if (read && path === '/more') return moved('/settings');
-  if (request.method === 'GET' && path === '/review') return reviewPage(env);
+  // Until Receipts has its own To do, /receipts?view=todo is the Review queue under the list's filter.
+  if (request.method === 'GET' && path === '/review') return reviewPage(env, RECEIPTS_TODO);
+  if (request.method === 'GET' && path === '/receipts' && url.searchParams.get('view') === 'todo')
+    return reviewPage(env, listState(url.searchParams, RECEIPTS_TODO));
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
     const ids = receiptIds(form.getAll('id'));
     const revision = form.get('revision');
-    // From the receipt page in the queue: land on the next one, like Skip.
-    const queue = form.get('back') === 'queue' && ids.length === 1 ? (await queueAround(env, ids[0]!)).next : null;
+    // From a receipt page opened from To do (it posts from): move on like Approve. Otherwise back
+    // to the list it came from.
+    const page = form.has('from') && ids.length === 1;
+    const state = page ? receiptState(form, true) : listState(form, RECEIPTS_TODO);
     const { at } = await discardReceipts(env, ids, {
       unmatch: form.get('unmatch') === '1',
       revision: revision === null ? null : Number(revision),
     });
-    const to =
-      queue && queue !== ids[0]
-        ? `/receipts/${queue}`
-        : form.get('back') === 'queue'
-          ? '/review'
-          : backPath(form.get('back'));
-    return redirect(withDone('discarded', to, { n: ids.length, at, back: to }));
+    const done = { event: 'discarded', params: { n: ids.length, at, back: listUrl(state) } } as const;
+    const next =
+      page && state.view === 'todo' ? await nextOpen(env, LIST_DEFS.receipts!, state, ids, { wrap: true }) : null;
+    return redirect(
+      next ? withDone(done.event, receiptUrl(next, state), done.params) : await landing(env, state, ids, done),
+    );
   }
   if (request.method === 'POST' && path === '/restore') {
     const form = await formData(request, 16 * 1024);
     const at = form.get('at');
-    const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, receiptIds(form.getAll('id')));
+    const ids = at ? [] : receiptIds(form.getAll('id'));
+    const n = at ? await restoreBatch(env, String(at)) : await restoreReceipts(env, ids);
     if (n) await reconcile(env);
-    return redirect(withDone('restored', backPath(form.get('back')), { n }));
+    // Back to the receipt page it was restored on, or to the list it was discarded from.
+    const back = parseReturn(form.get('back'));
+    if (back?.startsWith('/receipts/')) return redirect(withDone('restored', back, { n }));
+    const state = (back ? listFrom(back) : null) ?? RECEIPTS_TODO;
+    return redirect(await landing(env, state, ids, { event: 'restored', params: { n } }));
   }
   if (request.method === 'POST' && path === '/review/merge')
-    return redirect(withDone('merged', '/review', { n: await mergeDuplicates(env) }));
+    return redirect(listUrl(RECEIPTS_TODO, { done: { event: 'merged', params: { n: await mergeDuplicates(env) } } }));
   if (request.method === 'GET' && path === '/month/package.zip')
     return packageZip(env, month(url.searchParams.get('month')), options(url.searchParams), url.origin + base);
   if (request.method === 'POST' && path === '/month/sent') {
@@ -416,24 +436,34 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
   }
   const receipt = path.match(/^\/receipts\/([a-f0-9]{64})$/);
-  if (request.method === 'GET' && receipt?.[1]) return receiptPage(env, await getReceipt(env, receipt[1]));
+  if (request.method === 'GET' && receipt?.[1])
+    return receiptPage(env, await getReceipt(env, receipt[1]), url.searchParams);
   if (request.method === 'POST' && receipt?.[1]) {
     const id = receipt[1];
     const form = await formData(request, 64 * 1024);
     const action = String(form.get('action') ?? '');
     const before = await getReceipt(env, id);
-    const { next } = await queueAround(env, id);
+    const state = receiptState(form, needsReview(before));
     await correctReceipt(env, id, form);
-    const after = await getReceipt(env, id);
-    // Approve and Skip move on through the queue; the last one lands on Review.
-    if (needsReview(before) && (action === 'approve' || action === 'skip')) {
-      if (action === 'approve' && !next)
-        return redirect(withDone('approvedLast', '/review', await afterLastReview(env, after.issue_date)));
-      return redirect(withDone(action === 'approve' ? 'approved' : 'skipped', next ? `/receipts/${next}` : '/review'));
+    // Approve and Skip move on through To do under the page's filter, from after the save: Approve
+    // wraps to the first open one, Skip doesn't. With none left they land on the list.
+    const moving = needsReview(before) && (action === 'approve' || action === 'skip');
+    const [after, next] = await Promise.all([
+      getReceipt(env, id),
+      moving
+        ? nextOpen(env, LIST_DEFS.receipts!, { ...state, view: 'todo' }, [id], { wrap: action === 'approve' })
+        : null,
+    ]);
+    if (moving) {
+      const event = action === 'approve' ? 'approved' : 'skipped';
+      if (next) return redirect(withDone(event, receiptUrl(next, state)));
+      if (action === 'skip') return redirect(await landing(env, state, [id], { event }));
+      const last = await afterLastReview(env, state.month ?? after.issue_date);
+      return redirect(listUrl(state, { done: { event: 'approvedLast', params: last } }));
     }
-    // Saving a ready receipt checks it again; new flags send it back to Review.
-    if (isReady(before) && needsReview(after)) return redirect(withDone('movedBack', `/receipts/${id}`));
-    return redirect(withDone('saved', `/receipts/${id}`));
+    // Saving a ready receipt checks it again; new flags send it back to To do.
+    if (isReady(before) && needsReview(after)) return redirect(withDone('movedBack', receiptUrl(id, state)));
+    return redirect(withDone('saved', receiptUrl(id, state)));
   }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);
   if (request.method === 'GET' && original?.[1]) {
@@ -481,14 +511,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     await reconcile(env);
     return redirect(
-      withDone(
-        required === '0' ? 'notPurchase' : 'needsReceipt',
-        `/payments?month=${transaction.booking_date.slice(0, 7)}`,
-        {
-          tx: transaction.id,
-          name: transaction.merchant,
-        },
-      ),
+      await landing(env, bankList(form, transaction), [transaction.id], {
+        event: required === '0' ? 'notPurchase' : 'needsReceipt',
+        params: { tx: transaction.id, name: transaction.merchant },
+      }),
     );
   }
   if (request.method === 'POST' && path === '/matches') {
@@ -569,19 +595,21 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     // The invoice page sends its own address back; nothing else is followed.
     const back = String(form.get('return_to') ?? '');
     const onReceipt = /^\/receipts\/[a-f0-9]{64}$/.test(back);
+    const done = {
+      event: unlink ? 'unmatched' : 'matched',
+      params: {
+        tx: transaction.id,
+        rid: matchedTo,
+        name: transaction.merchant,
+        kind: transaction.amount_minor > 0 ? 'invoice' : 'receipt',
+        back: onReceipt ? back : null,
+        exc: unlink && exception ? 1 : null,
+      },
+    } as const;
     return redirect(
-      withDone(
-        unlink ? 'unmatched' : 'matched',
-        onReceipt ? back : `/payments?month=${transaction.booking_date.slice(0, 7)}`,
-        {
-          tx: transaction.id,
-          rid: matchedTo,
-          name: transaction.merchant,
-          kind: transaction.amount_minor > 0 ? 'invoice' : 'receipt',
-          back: onReceipt ? back : null,
-          exc: unlink && exception ? 1 : null,
-        },
-      ),
+      onReceipt
+        ? withDone(done.event, back, done.params)
+        : await landing(env, bankList(form, transaction), [transaction.id], done),
     );
   }
   // Match all likely: each pair is checked again here and skipped if it changed or is no longer an exact fit.
@@ -602,10 +630,9 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     await clearBankReview(env);
     return redirect(
-      withDone('matchedMany', `/payments?month=${selected}`, {
-        n: matched,
-        skipped,
-        at: matched ? at : null,
+      await landing(env, bankList(form, { booking_date: selected }), payments, {
+        event: 'matchedMany',
+        params: { n: matched, skipped, at: matched ? at : null },
       }),
     );
   }
@@ -614,14 +641,19 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const form = await formData(request, 4096);
     const selected = month(String(form.get('month') ?? '') || null);
     const n = await undoExemptions(env, exemptUndo[1]);
-    return redirect(withDone('exemptUndone', `/payments?month=${selected}`, { n }));
+    return redirect(
+      await landing(env, bankList(form, { booking_date: selected }), [], { event: 'exemptUndone', params: { n } }),
+    );
   }
   if (request.method === 'POST' && path === '/matches/undo') {
     const form = await formData(request, 4096),
       at = String(form.get('at') ?? '');
     requireInput(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(at), 'Nothing to match');
     const selected = month(String(form.get('month') ?? '') || null);
-    return redirect(withDone('unmatchedMany', `/payments?month=${selected}`, { n: await unmatchLikely(env, at) }));
+    const n = await unmatchLikely(env, at);
+    return redirect(
+      await landing(env, bankList(form, { booking_date: selected }), [], { event: 'unmatchedMany', params: { n } }),
+    );
   }
   if (request.method === 'POST' && path === '/rules') {
     const form = await formData(request, 4096);
@@ -766,7 +798,9 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
     let shown: Promise<Response> | null = null;
     const receipt = url.pathname.match(/^\/receipts\/([a-f0-9]{64})$/);
     if (receipt?.[1] && error.status === 422)
-      shown = requestState.run(refused('receipt'), async () => receiptPage(env, await getReceipt(env, receipt[1]!)));
+      shown = requestState.run(refused('receipt'), async () =>
+        receiptPage(env, await getReceipt(env, receipt[1]!), form),
+      );
     else if (url.pathname === '/matches') {
       const tx = String(form.get('transaction_id') ?? '');
       const row = await env.DB.prepare('SELECT booking_date FROM bank_transactions WHERE id=?')
@@ -780,7 +814,7 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
           refused(scope, error.field === 'confirm_exception' ? `f-confirm-${tx}` : errorId(scope)),
           async () =>
             onReceipt
-              ? receiptPage(env, await getReceipt(env, onReceipt[1]!))
+              ? receiptPage(env, await getReceipt(env, onReceipt[1]!), new URLSearchParams())
               : payments(
                   env,
                   month(row.booking_date.slice(0, 7)),

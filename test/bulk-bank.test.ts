@@ -212,7 +212,7 @@ test('Bank renders a box per payment, the bar for its filter, and the script onc
   );
   expect(html).toMatch(/<\/ol><\/div><form id="bulk-payments" class="bulkbar" data-bulk data-total="2"/);
   expect(html).toContain(
-    '<input type="hidden" name="month" value="2026-09"><input type="hidden" name="view" value="all"><input type="hidden" name="upto" value="50">',
+    '<input type="hidden" name="list" value="bank"><input type="hidden" name="view" value="all"><input type="hidden" name="month" value="2026-09">',
   );
   expect(html).toContain('<button name="op" value="match" class="btn primary">Match</button>');
   expect(html).toContain('<button name="op" value="exempt" class="btn">Not a purchase</button>');

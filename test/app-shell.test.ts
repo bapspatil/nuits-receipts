@@ -323,8 +323,12 @@ test('Receipts leaves Needs you and Unknown sender to Review, and offers Add', a
 
 test('a receipt links back to where it lives', async () => {
   const { ready, flagged } = await seed();
-  expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain('<a href="/review">‹ Review</a>');
-  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain('<a href="/receipts">‹ Receipts</a>');
+  expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
+    '<a href="/receipts?view=todo">‹ Review</a>',
+  );
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain(
+    '<a href="/receipts?view=all">‹ Receipts</a>',
+  );
 });
 
 test('old Month and More addresses redirect, keeping the query exactly', async () => {
@@ -496,6 +500,7 @@ test('Approve receipt posts the prefilled note and keeps every field name', asyn
       'eur_override',
       'eur_override_reason',
       'expense_type',
+      'from',
       'invoice_number',
       'issue_date',
       'net',
@@ -764,7 +769,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   skip.set('vendor', 'Typed Then Skipped');
   skip.set('action', 'skip');
   const skipped = await request(`/receipts/${flagged.id}`, { method: 'POST', body: skip });
-  expect(locationOf(skipped)).toBe(`/receipts/${second.id}?done=skipped`);
+  expect(locationOf(skipped)).toBe(`/receipts/${second.id}?from=todo&done=skipped`);
   expect((await getReceipt(env, flagged.id)).vendor).toBe('Typed Then Skipped');
   expect((await getReceipt(env, flagged.id)).status).toBe('needs_review');
   // Approve opens the next one with a one-word confirmation.
@@ -773,7 +778,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
     approve.set(k, v);
   approve.set('action', 'approve');
   const approved = await request(`/receipts/${second.id}`, { method: 'POST', body: approve });
-  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?done=approved`);
+  expect(locationOf(approved)).toBe(`/receipts/${flagged.id}?from=todo&done=approved`);
   expect(await (await request(await signed(`/receipts/${flagged.id}?done=approved`))).text()).toContain(
     '<p class="banner" role="status">Approved.</p>',
   );
@@ -781,7 +786,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   for (const [k, v] of Object.entries({ issue_date: '2026-09-03', net: '66.40', vat: '15.67' })) last.set(k, v);
   last.set('action', 'approve');
   const landing = locationOf(await request(`/receipts/${flagged.id}`, { method: 'POST', body: last }));
-  expect(landing).toBe('/review?done=approvedLast&month=2026-09&step=match');
+  expect(landing).toBe('/receipts?view=todo&done=approvedLast&month=2026-09&step=match');
   // The empty Review says it is done and points at the next step, for the month the receipt belongs to.
   const empty = await (await request(await signed(landing))).text();
   expect(empty).toContain(
@@ -800,12 +805,12 @@ test('a ready receipt has one Save; a new problem sends it back to Review', asyn
   const form = htmlForm(html, `/receipts/${ready.id}`);
   form.set('action', 'save');
   expect(locationOf(await request(`/receipts/${ready.id}`, { method: 'POST', body: form }))).toBe(
-    `/receipts/${ready.id}?done=saved`,
+    `/receipts/${ready.id}?from=all&done=saved`,
   );
   form.set('revision', String((await getReceipt(env, ready.id)).revision));
   form.set('vat', '');
   const moved = await request(`/receipts/${ready.id}`, { method: 'POST', body: form });
-  expect(locationOf(moved)).toBe(`/receipts/${ready.id}?done=movedBack`);
+  expect(locationOf(moved)).toBe(`/receipts/${ready.id}?from=all&done=movedBack`);
   expect((await getReceipt(env, ready.id)).status).toBe('needs_review');
   expect(await (await request(await signed(`/receipts/${ready.id}?done=movedBack`))).text()).toContain(
     'it moved back to Review.',
@@ -841,7 +846,7 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   // Review rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/review')).text();
   expect(review).toContain(
-    `<li><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-review"><span class="vh">Select photo.png</span></label><a class="btn primary" href="/receipts/${flagged.id}">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span><form method="post" action="/discard" class="discard">`,
+    `<li data-row="${flagged.id}" id="row-${flagged.id}"><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-review"><span class="vh">Select photo.png</span></label><a class="btn primary" href="/receipts/${flagged.id}?from=todo">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span><form method="post" action="/discard" class="discard">`,
   );
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('Start reviewing');

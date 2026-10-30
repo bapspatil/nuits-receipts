@@ -103,7 +103,7 @@ test('Allow adds every sender in one write and reads all their waiting mail', as
   const shop = rows.find((r) => r.sender === 'new@shop.example')!;
   const res = await bulk({ op: 'allow', id: [link.id, shop.id], back: 'review' });
   expect(res.status).toBe(303);
-  expect(locationOf(res)).toBe('/review?done=mailAllowed&n=3&senders=2');
+  expect(locationOf(res)).toBe('/receipts?view=todo&done=mailAllowed&n=3&senders=2');
   expect(await allowedWrites()).toBe(1);
   expect(await allowedList()).toBe(
     'owner@example.com, bookkeeping@example.org, sender@example.net, notifications@link.com, new@shop.example',
@@ -114,7 +114,11 @@ test('Allow adds every sender in one write and reads all their waiting mail', as
 
   const again = await json({ op: 'allow', id: [link.id, shop.id] });
   const body = (await again.json()) as { location: string; n: number; skipped: number };
-  expect(body).toMatchObject({ n: 0, skipped: 2, location: expect.stringMatching(/^\/review\?done=mailAllowed&n=0/) });
+  expect(body).toMatchObject({
+    n: 0,
+    skipped: 2,
+    location: expect.stringMatching(/^\/receipts\?view=todo&done=mailAllowed&n=0/),
+  });
   expect(await allowedWrites()).toBe(1);
   expect(await (await request(body.location)).text()).toContain('Nothing was allowed. 2 skipped.');
 });
@@ -129,8 +133,8 @@ test('Ignore lists the senders once and deletes their mail; an approved sender i
     .bind(crypto.randomUUID())
     .run();
   const rows = await held();
-  const res = await bulk({ op: 'ignore', id: rows.map((r) => r.id), back: 'receipts' });
-  expect(locationOf(res)).toBe('/receipts?done=mailIgnored&n=3&senders=2&skipped=1');
+  const res = await bulk({ op: 'ignore', id: rows.map((r) => r.id), back: '/receipts?view=all&show=unknown' });
+  expect(locationOf(res)).toBe('/receipts?view=all&show=unknown&done=mailIgnored&n=3&senders=2&skipped=1');
   expect(await (await request(res.headers.get('Location')!)).text()).toContain(
     'Ignored 2 senders. 3 emails deleted. 1 skipped.',
   );
@@ -151,7 +155,7 @@ test('Delete removes the checked emails and their copies; a second run changes n
   const rows = await held();
   const picked = rows.filter((r) => r.sender === 'notifications@link.com');
   const res = await bulk({ op: 'delete', id: picked.map((r) => r.id) });
-  expect(locationOf(res)).toBe('/review?done=mailDeleted&n=2');
+  expect(locationOf(res)).toBe('/receipts?view=todo&done=mailDeleted&n=2');
   expect(await (await request(res.headers.get('Location')!)).text()).toContain('2 emails deleted.');
   expect((await held()).map((r) => r.sender)).toEqual(['new@shop.example']);
   for (const r of picked) expect(await env.ORIGINALS.get(r.email_key)).toBeNull();
@@ -203,7 +207,7 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   expect(review).toContain(`<input type="checkbox" name="id" value="${mailRow!.id}" form="bulk-held">`);
   expect(review).toContain('<div data-bulk-list="bulk-held">');
   expect(review).toMatch(/<\/ul><\/div><form id="bulk-held" class="bulkbar" data-bulk data-total="1"/);
-  expect(review).toContain('<input type="hidden" name="back" value="review">');
+  expect(review).toContain('<input type="hidden" name="back" value="/receipts?view=todo">');
   expect(review).toContain('<button name="op" value="allow" class="btn primary">Allow</button>');
   expect(review).toContain('<button name="op" value="ignore" class="btn">Ignore</button>');
   expect(review).toContain('<summary class="btn danger">Delete</summary>');

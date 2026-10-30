@@ -944,11 +944,3 @@ export async function viewRows(env: Env, month: string, view: BankView, limit?: 
       .all<BankRow>()
   ).results;
 }
-// After a save: the first open payment after the first of ids in Bank's order, else the first open one.
-export async function nextOpenPayment(env: Env, month: string, ids: readonly string[]): Promise<string | null> {
-  return env.DB.prepare(
-    `SELECT t.id ${IN_MONTH} AND ${VIEW_SQL.todo} ORDER BY (${BANK_ORDER})>(SELECT booking_date,account_key,id FROM bank_transactions WHERE id IN (SELECT value FROM json_each(?)) ORDER BY booking_date,account_key,id LIMIT 1) DESC,${BANK_ORDER} LIMIT 1`,
-  )
-    .bind(month, JSON.stringify(ids))
-    .first<string>('id');
-}

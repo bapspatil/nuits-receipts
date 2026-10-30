@@ -7,6 +7,7 @@ import { config } from './config';
 import { STATUS } from './status';
 import { flagFor, isReady, needsReview, needsReviewSql, reasonCodes } from './flags';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
+import { listParams, RECEIPTS_TODO } from './worklist';
 import {
   amount,
   day,
@@ -160,13 +161,18 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
         return due ? `Due ${escape(shortDay(due))}` : 'No date';
     }
   };
-  const here = `/invoices?month=${selected}${show === 'all' ? '' : `&show=${show}`}`;
   const bulk: BulkList = {
     form: 'bulk-invoices',
     action: '/receipts/bulk',
     noun: ['invoice', 'invoices'],
     total: shown.length,
-    scope: { list: 'invoices', month: selected, ...(show === 'all' ? {} : { show }), back: here },
+    scope: listParams({
+      ...RECEIPTS_TODO,
+      key: 'invoices',
+      view: 'all',
+      month: selected,
+      show: show === 'all' ? null : show,
+    }),
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length

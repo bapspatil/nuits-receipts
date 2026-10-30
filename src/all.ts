@@ -9,6 +9,7 @@ import { restoreForm } from './discard';
 import { bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, SENDER_ACTIONS, type BulkList } from './bulk';
 import { invoiceName } from './invoices';
 import type { MailRow } from './inbound';
+import { listParams, listUrl, RECEIPTS_TODO, receiptUrl } from './worklist';
 import {
   amount,
   chipRow,
@@ -154,9 +155,9 @@ function rowName(row: AllRow): string {
   return row.kind === 'sales' ? invoiceName(row) : (row.vendor ?? row.filename ?? 'Receipt');
 }
 
-// The Unknown senders block. back: where the forms return to. primary: the
+// The Unknown senders block. back: the list the forms return to. primary: the
 // first Allow is the screen's one primary (when nothing else is).
-export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts' = 'review', primary = false): string {
+export function heldSection(rows: readonly MailRow[], back: string, primary = false): string {
   if (!rows.length) return '';
   const bulk: BulkList = {
     form: 'bulk-held',
@@ -169,7 +170,7 @@ export function heldSection(rows: readonly MailRow[], back: 'review' | 'receipts
   const form = (action: string, fields: Record<string, string>, button: string) =>
     `<form method="post" action="${action}">${Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
-      .join('')}<input type="hidden" name="back" value="${back}">${button}</form>`;
+      .join('')}<input type="hidden" name="back" value="${escape(back)}">${button}</form>`;
   const items = rows
     .map((r, i) => {
       const who = escape(r.sender);
@@ -236,19 +237,14 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
     ? `<details class="filters"${query.show && (CHIPS as readonly string[]).includes(query.show) ? ' open' : ''}><summary>More filters</summary><div class="body">${chipList}</div></details>`
     : '';
   const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
-  const here = path(query, { offset: query.offset });
+  // The list as actions return to it: the filter and search, never the page.
+  const state = { ...RECEIPTS_TODO, view: 'all', show: query.show, month: query.month, q: query.q } as const;
   const bulk: BulkList = {
     form: 'bulk-receipts',
     action: '/receipts/bulk',
     noun: ['receipt', 'receipts'],
     total,
-    scope: {
-      list: 'receipts',
-      ...(query.show ? { show: query.show } : {}),
-      ...(query.month ? { month: query.month } : {}),
-      ...(query.q ? { q: query.q } : {}),
-      back: here,
-    },
+    scope: listParams(state),
     actions:
       query.show === 'discarded'
         ? [RECEIPT_ACTIONS.restore]
@@ -262,7 +258,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const ul = `<ul class="list all">${shown
     .map((r) => {
       const chip = chipOf(r);
-      const href = r.type === 'mail' ? `/review#mail-${escape(r.id)}` : `/receipts/${escape(r.id)}`;
+      const href = escape(r.type === 'mail' ? `/review#mail-${r.id}` : receiptUrl(r.id, state));
       const status =
         chip.css === 'needs'
           ? `<span class="stamp needs">${chip.label}</span> `
@@ -270,7 +266,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
             ? `${tag(chip.label)} `
             : '';
       const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
-      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, '/receipts') : ''}</li>`;
+      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}</li>`;
     })
     .join('')}</ul>`;
   const list = shown.length

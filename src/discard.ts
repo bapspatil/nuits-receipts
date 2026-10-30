@@ -90,12 +90,13 @@ export async function restoreBatch(env: Env, at: string): Promise<number> {
 
 // ---------- UI ----------
 // One click discards. A receipt a bank line points at asks first, because its match goes too.
+// list: the hidden fields of the list or receipt page it is on, which the return keeps.
 export function discardControl(
   id: string | null,
-  o: { back: string; matched?: boolean; revision?: number; name?: string },
+  o: { list: string; matched?: boolean; revision?: number; name?: string },
 ): string {
   const hidden = (k: string, v: string | number) => `<input type="hidden" name="${k}" value="${escape(String(v))}">`;
-  const fields = `${id ? hidden('id', id) : ''}${hidden('back', o.back)}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
+  const fields = `${id ? hidden('id', id) : ''}${o.list}${o.revision === undefined ? '' : hidden('revision', o.revision)}${o.matched ? hidden('unmatch', '1') : ''}`;
   const aria = o.name ? ` aria-label="Discard ${escape(o.name)}"` : '';
   if (!o.matched)
     return `<form method="post" action="/discard" class="discard">${fields}<button class="linkbtn"${aria}>Discard</button></form>`;

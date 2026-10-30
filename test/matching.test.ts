@@ -67,7 +67,7 @@ test('Match all matches the pairs that still fit, says so once, and its Undo tak
   const done = await post('/matches/bulk', form);
   expect(done.status).toBe(303);
   const location = done.headers.get('Location')!;
-  expect(locationOf(done)).toMatch(/^\/payments\?month=2026-09&done=matchedMany&n=1&skipped=1&at=/);
+  expect(locationOf(done)).toMatch(/^\/payments\?month=2026-09&view=todo&done=matchedMany&n=1&skipped=1&at=/);
   const page = await (await request(location)).text();
   expect(page).toContain('Matched 1 payment. 1 payment changed since you opened the page and was left alone.');
   expect(page).toContain('<form method="post" action="/matches/undo">');
@@ -94,7 +94,7 @@ test('Match all re-checks each pair on the server and never accepts an exception
   form.append('receipt_id', id);
   form.append('confirm_exception', 'yes');
   const done = await post('/matches/bulk', form);
-  expect(locationOf(done)).toMatch(/done=matchedMany&n=0&skipped=1$/);
+  expect(locationOf(done)).toMatch(/done=matchedMany&n=0&skipped=1(#row-[0-9a-f]{64})?$/);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n')).toBe(
     0,
   );
