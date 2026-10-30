@@ -219,7 +219,9 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
             }`,
         addButton('invoices', true),
       );
-  const overdue = overdueAll.filter((r) => !month.includes(r));
+  // Older: overdue invoices dated in other months. By id, since the two queries return their own objects.
+  const inMonth = new Set(month.map((r) => r.id));
+  const overdue = overdueAll.filter((r) => !inMonth.has(r.id));
   const body = `${switcher}${receiptsTabs(tabs, 'invoices', selected)}${
     month.length
       ? `<p class="summary">Invoiced EUR ${money(invoiced)}, received EUR ${money(received)}${noEur ? `<span class="red">${noEur} without EUR</span>` : ''}</p>`

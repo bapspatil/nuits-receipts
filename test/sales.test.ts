@@ -319,6 +319,11 @@ test('overdue and paid outside the bank', async () => {
   expect(await (await request('/receipts?view=all&kind=sales&month=2026-10&show=overdue')).text()).toContain(
     'Esimerkki Asiakas Oy',
   );
+  // The "older invoices" note counts invoices dated in other months only.
+  expect(await (await request('/receipts?view=all&kind=sales&month=2026-09')).text()).not.toContain('older invoice');
+  expect(await (await request('/receipts?view=all&kind=sales&month=2026-10')).text()).toContain(
+    '1 older invoice overdue ›',
+  );
   // Overdue is To do: an Invoice row that Mark paid resolves, back on the list.
   const todo = await (await request('/receipts?view=todo')).text();
   expect(todo).toMatch(
