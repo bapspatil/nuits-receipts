@@ -118,7 +118,7 @@ test('every list return keeps its list and its next open row under the base path
   );
 
   const month = b.earlierMonth;
-  const todo = { view: 'todo', month, upto: '50' };
+  const todo = { list: 'receipts', view: 'todo', month, upto: '50' };
   const onTodo = `^/app/receipts\\?view=todo&month=${month}&done=`;
   const [e0, e1, e2] = b.earlier as [string, string, string];
   const list = await (await at(`/app/receipts?view=todo&month=${month}`)).text();

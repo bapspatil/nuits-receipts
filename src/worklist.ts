@@ -3,6 +3,7 @@
 import type { Env } from './env';
 import { BANK_ORDER, BANK_UPTO, bankPath, VIEW_SQL } from './banking';
 import { BULK_CAP } from './bulk';
+import { requireInput } from './domain';
 import { withDone, type EventKey } from './events';
 import { needsReviewSql } from './flags';
 import { escape } from './ui';
@@ -49,6 +50,25 @@ export function listState(p: Params, fallback: Partial<ListState> & Pick<ListSta
     ...(read(p, 'q') ? { q: read(p, 'q').slice(0, 100) } : {}),
     ...(Number.isSafeInteger(upto) && upto > 0 ? { upto: Math.min(upto, BULK_CAP) } : {}),
   };
+}
+// The list a bulk bar posts, in full, as its form carries it. One that is missing a value or sends
+// one the list doesn't take comes from a page older than the server, and is refused, never guessed:
+// a guessed To do once discarded rows the All search on screen did not match. shows says which
+// filter chips the list has.
+export function postedState(p: Params, key: ListKey, shows: (show: string) => boolean): ListState {
+  const s = listState(p, { key });
+  const upto = read(p, 'upto');
+  requireInput(
+    read(p, 'view') === s.view &&
+      read(p, 'month') === (s.month ?? '') &&
+      read(p, 'show') === (s.show ?? '') &&
+      (!s.show || shows(s.show)) &&
+      read(p, 'q') === s.q &&
+      (!upto || upto === String(s.upto)),
+    'This page is out of date. Reload it and try again.',
+    400,
+  );
+  return s;
 }
 // The list a receipt page was opened from: ?from=todo|all&month=M. Without one, an open receipt
 // belongs to To do and any other to All.

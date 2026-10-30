@@ -38,8 +38,9 @@ function form(fields: Record<string, string | string[]>) {
   for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one);
   return body;
 }
+// Every bar posts its list's state; these default to Receipts All unless a test says otherwise.
 const bulk = (fields: Record<string, string | string[]>, headers: Record<string, string> = {}) =>
-  request('/receipts/bulk', { method: 'POST', body: form(fields), headers });
+  request('/receipts/bulk', { method: 'POST', body: form({ list: 'receipts', view: 'all', ...fields }), headers });
 const json = (fields: Record<string, string | string[]>) => bulk(fields, { Accept: 'application/json' });
 const ids = (...ns: number[]) => ns.map(id);
 
@@ -244,11 +245,15 @@ test('the return is rebuilt from the list state, never followed as sent', async 
     expect(locationOf(await bulk({ op: 'restore', id: id(1), list: 'invoices', back })), back).toBe(
       '/invoices?done=restored&n=0&skipped=1',
     );
-  // Only the list's own state is kept, each value checked.
-  const odd = { list: 'receipts', view: 'all', show: 'discarded', month: '2026-13', select: '1', evil: '1' };
+  // Only the list's own state is kept. Other fields are ignored; a value the list doesn't take is
+  // refused, never guessed.
+  const odd = { list: 'receipts', view: 'all', show: 'discarded', select: '1', evil: '1' };
   expect(locationOf(await bulk({ op: 'restore', id: id(1), ...odd }))).toBe(
     '/receipts?view=all&show=discarded&done=restored&n=0&skipped=1',
   );
+  const stale = await json({ op: 'restore', id: id(1), ...odd, month: '2026-13' });
+  expect(stale.status).toBe(400);
+  expect(await stale.json()).toEqual({ error: 'This page is out of date. Reload it and try again.' });
 });
 
 test('the lists render checkboxes, the bar and its script; an empty list renders none', async () => {

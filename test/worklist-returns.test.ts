@@ -85,3 +85,57 @@ test('F: Undo of a Discard lands on the receipt it brought back', async () => {
   const undone = await request('/restore', { method: 'POST', body: htmlForm(landed, '/restore') });
   expect(locationOf(undone)).toBe(`/receipts?view=todo&month=${month}&done=restored&n=1#row-${e1}`);
 });
+
+const openCount = async () =>
+  (await env.DB.prepare(
+    "SELECT count(*) n FROM receipts WHERE discarded_at IS NULL AND status='needs_review'",
+  ).first<number>('n'))!;
+test('A: a bulk post without its full list state is refused, and select-all on All uses its search', async () => {
+  const b = await seedBusyMonth();
+  const before = await openCount();
+  // What the All page posted before PR 5: no view. It used to fall back to To do.
+  const stale = await post('/receipts/bulk', { op: 'discard', all: '1', list: 'receipts', q: 'zzzznomatch' });
+  expect(stale.status).toBe(400);
+  expect(await stale.text()).toContain('This page is out of date. Reload it and try again.');
+  const one = { op: 'discard', id: b.earlier[0]! };
+  expect((await post('/receipts/bulk', { ...one, list: 'receipts', month: b.earlierMonth, q: 'foo' })).status).toBe(
+    400,
+  );
+  expect((await post('/receipts/bulk', { ...one, view: 'all' })).status).toBe(400);
+  expect((await post('/receipts/bulk', { ...one, list: 'receipts', view: 'all', show: 'nope' })).status).toBe(400);
+  expect(await openCount()).toBe(before);
+
+  const none = await post('/receipts/bulk', {
+    op: 'discard',
+    all: '1',
+    list: 'receipts',
+    view: 'all',
+    q: 'zzzznomatch',
+  });
+  expect(none.status).toBe(400);
+  expect(await openCount()).toBe(before);
+
+  const vendor = 'Fake Unique Searchable Seller';
+  await env.DB.prepare('UPDATE receipts SET vendor=? WHERE id IN (?,?)').bind(vendor, b.ready[0]!, b.ready[1]!).run();
+  const hit = await post('/receipts/bulk', {
+    op: 'discard',
+    all: '1',
+    list: 'receipts',
+    view: 'all',
+    q: 'unique searchable',
+  });
+  expect(locationOf(hit)).toMatch(/^\/receipts\?view=all&q=unique\+searchable&done=discarded&n=2&/);
+  const gone = await env.DB.prepare('SELECT id FROM receipts WHERE discarded_at IS NOT NULL ORDER BY id').all<{
+    id: string;
+  }>();
+  expect(gone.results.map((r) => r.id)).toEqual([b.ready[0]!, b.ready[1]!].sort());
+  // show narrows it too: Discarded holds just those two, and Restore on all of it takes exactly them.
+  const back = await post('/receipts/bulk', {
+    op: 'restore',
+    all: '1',
+    list: 'receipts',
+    view: 'all',
+    show: 'discarded',
+  });
+  expect(locationOf(back)).toMatch(/done=restored&n=2/);
+});

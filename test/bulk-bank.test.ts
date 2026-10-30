@@ -39,7 +39,7 @@ test('ids, ops, scope and caps are checked at the door', async () => {
   expect((await bulk({ ...sept, op: 'exempt', id: 'not-an-id' })).status).toBe(400);
   expect((await bulk({ ...sept, op: 'exempt' })).status).toBe(400);
   expect((await bulk({ month: '2026-09', view: 'nope', op: 'exempt', id: paper.id })).status).toBe(400);
-  expect((await bulk({ month: '2026-9', view: 'all', op: 'exempt', id: paper.id })).status).toBe(422);
+  expect((await bulk({ month: '2026-9', view: 'all', op: 'exempt', id: paper.id })).status).toBe(400);
   expect((await tx('Fake Paper Shop')).receipt_required).toBe(1);
 
   const anonymous = await worker.fetch(

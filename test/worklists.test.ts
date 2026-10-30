@@ -39,7 +39,15 @@ function post(path: string, fields: Record<string, string | string[]>) {
 const bankState = { view: 'todo', month: MONTH, upto: '50' };
 const bulkBank = (op: string, ids: string[]) => post('/payments/bulk', { ...bankState, op, id: ids });
 const bulkApprove = (ids: string[], more: Record<string, string> = {}) =>
-  post('/receipts/bulk', { op: 'approve', approval_reason: 'Checked', view: 'todo', upto: '50', id: ids, ...more });
+  post('/receipts/bulk', {
+    op: 'approve',
+    approval_reason: 'Checked',
+    list: 'receipts',
+    view: 'todo',
+    upto: '50',
+    id: ids,
+    ...more,
+  });
 
 // Receipts To do ids in order, optionally cut to one month, as the app lists them.
 async function todoIds(b: Busy, month?: string): Promise<string[]> {

@@ -13,16 +13,7 @@ import {
   type Receipt,
   type Rule,
 } from './domain';
-import {
-  BANK_VIEWS,
-  bankUpto,
-  cacheFx,
-  clearBankReview,
-  reconcile,
-  SET_REQUIRED_SQL,
-  viewRows,
-  type BankView,
-} from './banking';
+import { cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, viewRows } from './banking';
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
 import { discardReceipts, restoreReceipts } from './discard';
@@ -38,15 +29,15 @@ import {
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
 import { withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { filterIds, parseQuery } from './all';
+import { filterIds, parseQuery, SHOW } from './all';
 import {
   cursorFor,
   landing,
   LIST_DEFS,
-  listState,
   listUrl,
   openRows,
   parseReturn,
+  postedState,
   RECEIPTS_TODO,
   type ListState,
 } from './worklist';
@@ -195,9 +186,14 @@ const OPS: Record<ReceiptOp, Op> = {
   },
 };
 
-// The list a receipt bar posts from: Invoices when it says so, else Receipts (To do by default).
-const receiptList = (form: FormData) =>
-  listState(form, { ...RECEIPTS_TODO, key: text(form, 'list') === 'invoices' ? 'invoices' : 'receipts' });
+// The list a receipt bar posts from, Receipts or Invoices, with its whole state.
+function receiptList(form: FormData): ListState {
+  const list = text(form, 'list');
+  requireInput(list === 'receipts' || list === 'invoices', 'This page is out of date. Reload it and try again.', 400);
+  return list === 'invoices'
+    ? postedState(form, 'invoices', (show) => invoiceShow(show) === show)
+    : postedState(form, 'receipts', (show) => Object.hasOwn(SHOW, show));
+}
 // Every row of a list's filter, the way its page picks them. Refused over the cap.
 async function allOf(env: Env, s: ListState): Promise<string[]> {
   if (s.key === 'invoices') return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.map((r) => r.id);
@@ -212,25 +208,16 @@ async function allOf(env: Env, s: ListState): Promise<string[]> {
 const RECEIPTS: Endpoint = {
   ops: OPS,
   id: rowId,
-  all: (env, form) => {
-    requireInput(['', 'receipts', 'invoices'].includes(text(form, 'list')), 'Invalid list', 400);
-    return allOf(env, receiptList(form));
-  },
+  all: (env, form) => allOf(env, receiptList(form)),
   to: receiptList,
 };
 
 // ---------- Bank ----------
 // The month, view and rows shown that the bar was drawn for.
 function bankScope(form: FormData): ListState {
-  const month = text(form, 'month'),
-    view = text(form, 'view');
-  requireInput(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
-  requireInput(
-    BANK_VIEWS.some((v) => v === view),
-    'Invalid filter',
-    400,
-  );
-  return { ...RECEIPTS_TODO, key: 'bank', month, view: view as BankView, upto: bankUpto(text(form, 'upto'), BULK_CAP) };
+  const state = postedState(form, 'bank', () => false);
+  requireInput(state.month, 'This page is out of date. Reload it and try again.', 400);
+  return state;
 }
 // Not a purchase (0) and Needs receipt (1): only money out that is not that already. A matched
 // row is left alone, since SET_REQUIRED_SQL would drop its match without a word.
