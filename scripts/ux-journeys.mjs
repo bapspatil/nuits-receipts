@@ -445,7 +445,7 @@ try {
   page = await busy.newPage();
   const f = new Recorder(page, busyJourney.name);
   try {
-    await busyJourney.run(page, f, { ...helpers, BUSY_MONTH });
+    await busyJourney.run(page, f, { ...helpers, BUSY_MONTH, credentials: { username: 'owner', password } });
   } catch (error) {
     f.check(false, `journey f stopped: ${String(error.message).split('\n')[0]}`);
   }

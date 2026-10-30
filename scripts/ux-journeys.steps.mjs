@@ -427,6 +427,56 @@ async function receiptsTodo(page, rec, month, { busyReceipts, isComplete, isTodo
   );
 }
 
+// The keyboard pass: j, j, x and ? on Receipts To do, and the same keys doing nothing on a phone.
+async function keyboardPass(page, rec, { BASE, credentials }) {
+  await rec.goto('/receipts?view=todo');
+  const rows = await rowIds(page);
+  rec.check(rows.length >= 2, 'Receipts To do has two rows to move between');
+  if (rows.length < 2) return;
+  const focused = () => page.evaluate(() => document.activeElement?.dataset?.row ?? null);
+  const sheetOpen = () => page.evaluate(() => document.getElementById('keys-sheet')?.open ?? null);
+  rec.check((await sheetOpen()) === false, 'The shortcut sheet is closed on load');
+  await page.keyboard.press('j');
+  await page.keyboard.press('j');
+  rec.check((await focused()) === rows[1], 'j, j moves focus to the second row');
+  await page.keyboard.press('x');
+  rec.check(await page.locator(`[data-row="${rows[1]}"] input[name=id]`).isChecked(), 'x checks the focused row');
+  rec.check(
+    !(await page.locator(`[data-row="${rows[0]}"] input[name=id]`).isChecked()),
+    'x leaves the first row alone',
+  );
+  await page.keyboard.press('?');
+  rec.check((await sheetOpen()) === true, '? opens the shortcut sheet');
+  await page.keyboard.press('Escape');
+  rec.check((await sheetOpen()) === false, 'Escape closes the shortcut sheet');
+
+  const phone = await page
+    .context()
+    .browser()
+    .newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      httpCredentials: credentials,
+    });
+  try {
+    const small = await phone.newPage();
+    await small.goto(BASE + '/receipts?view=todo');
+    for (const key of ['j', 'j', 'x', '?']) await small.keyboard.press(key);
+    const state = await small.evaluate(() => ({
+      row: document.activeElement?.dataset?.row ?? null,
+      open: document.getElementById('keys-sheet')?.open ?? null,
+      checked: document.querySelectorAll('input[name=id]:checked').length,
+    }));
+    rec.check(
+      state.row === null && state.open === false && state.checked === 0,
+      'On a 390 px touch device j, x and ? do nothing',
+    );
+  } finally {
+    await phone.close();
+  }
+}
+
 export const busyJourney = {
   name: 'f. Busy month',
   async run(page, rec, helpers) {
@@ -435,5 +485,6 @@ export const busyJourney = {
     const seed = await import('./busy-month.mjs');
     await section(rec, 'Bank To do', () => bankTodo(page, rec, month));
     await section(rec, 'Receipts To do', () => receiptsTodo(page, rec, month, seed));
+    await section(rec, 'Keyboard', () => keyboardPass(page, rec, helpers));
   },
 };
