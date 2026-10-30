@@ -27,7 +27,7 @@ const STATUS_HELP: Record<StatusKey, string> = {
   newSender: "Mail from an address you haven't allowed yet. Allow the sender to read it, or ignore it.",
   overdue: 'A sales invoice that is past its due date and not marked paid.',
   ready: 'Checked and complete. Nothing is left to do for it.',
-  matched: 'This payment is linked to its receipt. You can remove the match.',
+  matched: 'This payment is linked to its receipt. Unmatch takes the link off.',
   missing: 'A payment out of your account that has no receipt yet.',
   notPurchase: "A payment that isn't a purchase, such as a transfer between your own accounts. It needs no receipt.",
   sent: 'You marked the month as sent to your accountant.',
@@ -66,7 +66,7 @@ const GLOSSARY: readonly HelpEntry[] = [
   {
     ids: ['mail-not-kept'],
     term: "Mail we didn't keep",
-    text: 'Email that reached the app but was not read: from a sender that is not allowed, one that failed the sender check, a duplicate, or one too large. Settings, Email shows the latest 50 with the date, sender, subject and why. The message itself is never shown. If the sender is one you trust, press Allow this sender.',
+    text: 'Email that reached the app but was not read: from a sender that is not allowed, one that failed the sender check, a duplicate, or one too large. Settings, Email, Email senders shows the latest 50 with the date, sender, subject and why. The message itself is never shown. If the sender is one you trust, press Allow.',
   },
 ];
 
