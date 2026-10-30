@@ -199,7 +199,7 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   ).run();
   // To do shows held mail as rows with Allow and Ignore, and no bar of its own: one bar per page.
   const review = await (await request('/receipts?view=todo')).text();
-  expect(review).toContain(`<li id="mail-${mailRow!.id}">`);
+  expect(review).toContain(`<li class="row" id="mail-${mailRow!.id}">`);
   expect(review).not.toContain('bulk-held');
   expect(review).toContain('<input type="hidden" name="back" value="/receipts?view=todo">');
   expect(review).toContain(button('allow', { attrs: ' aria-label="Allow notifications@link.com"' }));

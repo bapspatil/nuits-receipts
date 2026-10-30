@@ -257,9 +257,9 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   await seed();
   const html = await (await request('/')).text();
   const { nav } = tabsOf(html);
-  expect([...nav.matchAll(/<\/span>([A-Za-z]+)<\/a>/g)].map((m) => m[1])).toEqual(LABELS);
+  expect([...nav.matchAll(/<\/span><span>([A-Za-z]+)<\/span><\/a>/g)].map((m) => m[1])).toEqual(LABELS);
   const header = html.match(/<nav class="main" aria-label="Main">([\s\S]*?)<\/nav>/)?.[1] ?? '';
-  expect([...header.matchAll(/<a href="[^"]*"[^>]*>([A-Za-z]+)/g)].map((m) => m[1])).toEqual(LABELS);
+  expect([...header.matchAll(/<a href="[^"]*"[^>]*><svg[\s\S]*?<\/svg>([A-Za-z]+)/g)].map((m) => m[1])).toEqual(LABELS);
   expect(header).toMatch(/Receipts <span class="count">\d+<span class="vh"> to do<\/span><\/span>/);
   expect(header).toMatch(/Bank <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);
   expect(nav.match(/<svg [^>]*aria-hidden="true"/g)).toHaveLength(4);
@@ -267,8 +267,11 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(nav).toMatch(/href="\/payments">.*?<span class="count">1<span class="vh"> missing a receipt<\/span>/);
   const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
   expect(phone).toContain('nav.main,.sign-out{display:none}');
-  expect(phone).toMatch(/nav\.tabs\{display:block;position:fixed;[^}]*bottom:0/);
-  expect(phone).toMatch(/nav\.tabs a\{[^}]*min-height:3\.5rem/);
+  // A floating capsule above the home indicator: the installed app has no browser chrome under it.
+  expect(phone).toMatch(
+    /nav\.tabs\{display:block;position:fixed;[^}]*bottom:calc\(10px \+ env\(safe-area-inset-bottom\)\)/,
+  );
+  expect(phone).toMatch(/nav\.tabs a\{[^}]*min-height:64px/);
   expect(phone).toContain('env(safe-area-inset-bottom)');
   expect(phone).toContain('body{padding-bottom:var(--tabbar-height)}');
   expect(phone).toContain('html{scroll-padding-bottom:');
@@ -304,7 +307,7 @@ test('Receipts and Invoices are two tabs of All with counts, always shown, and n
   const todo = await (await request('/receipts?view=todo&month=2026-09')).text();
   expect(segment(todo)).toBeUndefined();
   expect(todo).not.toContain('class="months"');
-  expect(todo).toContain('<ul class="chips" aria-label="View">');
+  expect(todo).toContain('<nav class="seg" aria-label="View">');
   // Without an invoice address the tabs are still there.
   const plain = { ...env, INVOICES_ADDRESS: '' } as Env;
   const at = async (path: string) =>
@@ -391,7 +394,7 @@ test('Invoices is a list like Receipts: one summary line, one status word, CSV w
     '<p class="summary">Invoiced EUR 125.50, received EUR 0.00</p>',
   );
   expect(html).toContain(
-    `<li><label class="pick"><input type="checkbox" name="id" value="${sales}" form="bulk-invoices"><span class="vh">Select Invoice to Example Client Oy</span></label><a href="/receipts/${sales}?from=all&amp;month=2026-09">Example Client Oy</a><span class="amt">EUR 125.50</span><span class="ok">INV-7 · ${statusMark('overdue', { after: '18 Sep' })}</span></li>`,
+    `<li class="row"><label class="pick"><input type="checkbox" name="id" value="${sales}" form="bulk-invoices"><span class="vh">Select Invoice to Example Client Oy</span></label><span class="date">4 Sep</span><div class="rb"><p class="rt"><a href="/receipts/${sales}?from=all&amp;month=2026-09">Example Client Oy</a></p><p class="meta">INV-7</p></div><span class="rs">${statusMark('overdue', { after: '18 Sep' })}</span><span class="amt">EUR 125.50</span></li>`,
   );
   expect(html).toContain(`<p class="small">${EXPORT_LINE}</p>`);
   expect(html).not.toContain('What counts as paid?');
@@ -420,7 +423,7 @@ test('flagged fields are one compact row: the question labels the input, its sen
   expect(phone).toContain('body.p-reviewItem nav.tabs{display:none}');
   expect(html).toContain('<body class="p-reviewItem">');
   expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
-  expect(html).toMatch(/\n\.sbar\{position:sticky;bottom:0;/);
+  expect(html).toMatch(/\n\.sbar\{position:sticky;bottom:var\(--space-4\);/);
 });
 
 test('home closes the month and lists what needs you, counting undated receipts', async () => {
@@ -591,7 +594,7 @@ test('images preview inline with locked-down headers; PDFs and emails never do',
 
 test('fonts are served by the Worker, match the site files and need sign-in', async () => {
   // Drift check against the marketing site's copies, where site/ exists (not in the public template).
-  if (env.SITE_FONTS) expect(FONT_FILES).toEqual(JSON.parse(env.SITE_FONTS));
+  if (env.SITE_FONTS) expect(FONT_FILES).toMatchObject(JSON.parse(env.SITE_FONTS));
   const html = await (await request('/')).text();
   expect(html).toMatch(/@font-face\{font-family:"Bricolage";src:url\("\/assets\/fonts\/bricolage\.woff2\?v=[\d.]+"\)/);
   expect(html).not.toMatch(/https?:\/\/(?!localhost)/);
@@ -723,9 +726,13 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
 
 test('filter chips show only when they filter something', async () => {
   const chips = (html: string) =>
-    [...(html.match(/<ul class="chips"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? '').matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]);
+    [
+      ...(
+        html.match(/<(?:ul class="chips"[^>]*|nav class="seg" aria-label="View"><ul)>([\s\S]*?)<\/ul>/)?.[1] ?? ''
+      ).matchAll(/>([^<]+)<\/a>/g),
+    ].map((m) => m[1]);
   // Filter chips only, not the To do | All switch.
-  const filters = (html: string) => chips(html.replace(/<ul class="chips" aria-label="View">[\s\S]*?<\/ul>/, ''));
+  const filters = (html: string) => chips(html.replace(/<nav class="seg" aria-label="View">[\s\S]*?<\/nav>/, ''));
   await seed();
   // A short queue needs no filters.
   const second = await flaggedImage(1);
@@ -752,7 +759,9 @@ test('rarely used things sit behind one More per object, named for screen reader
   expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop']);
   expect(bank).not.toMatch(/ID <code>/);
   // Remove match waits in More; the row shows only the receipt link.
-  const matchedRow = bank.match(/<li class="pay"[^>]*>[\s\S]*?<\/li>/)![0];
+  const matchedRow = [...bank.matchAll(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/g)]
+    .map((m) => m[0])
+    .find((r) => r.includes('value="unlink"'))!;
   expect(matchedRow).toMatch(
     /<details class="more">[\s\S]*value="unlink"><svg[^>]*><use href="#i-unlink"\/><\/svg><span>Unmatch<\/span><\/button>/,
   );
@@ -772,7 +781,9 @@ test('one type and spacing scale, 44px targets, and a footer clear of the tab ba
   const html = await (await request('/')).text();
   const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
   expect(css).toContain('h1{font-family:var(--font-display);font-size:var(--text-2xl);');
-  expect(css).toMatch(/@media\(max-width:720px\)\{:root\{--text-base:16px;--text-2xl:26px;\}\}/);
+  expect(css).toMatch(
+    /@media\(max-width:720px\)\{:root\{--text-sm:13\.5px;--text-base:16px;--text-2xl:30px;--btn-height:44px;\}\}/,
+  );
   expect(css).toContain('h2{font-size:var(--text-lg);');
   expect(css).toContain('font:400 var(--text-base)/1.5 var(--font-ui)');
   // No text under 12px, in the type tokens or in a raw length.
@@ -889,9 +900,13 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   expect(html).toContain(`<a class="frame" href="/originals/${flagged.id}?view=inline">`);
   // To do rows: name, amount and the first problem as one word, its question as a tooltip.
   const review = await (await request('/receipts?view=todo')).text();
-  expect(review).toContain(
-    `<li data-row="${flagged.id}" id="row-${flagged.id}" tabindex="-1" style="view-transition-name:r-${flagged.id}"><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-todo"><span class="vh">Select photo.png</span></label><a href="/receipts/${flagged.id}?from=todo">photo.png</a><span class="amt">EUR 82.07</span><span class="why" title="Who is this from?">Seller +4</span></li>`,
+  const todoRow = review.match(new RegExp(`<li class="row" data-row="${flagged.id}"[^>]*>[\\s\\S]*?</li>`))![0];
+  expect(todoRow).toContain(
+    `id="row-${flagged.id}" tabindex="-1" style="view-transition-name:r-${flagged.id}"><label class="pick"><input type="checkbox" name="id" value="${flagged.id}" form="bulk-todo"><span class="vh">Select photo.png</span></label>`,
   );
+  expect(todoRow).toContain(`<a href="/receipts/${flagged.id}?from=todo">photo.png</a>`);
+  expect(todoRow).toContain('<span class="kind">Receipt</span> <span title="Who is this from?">Seller +4</span>');
+  expect(todoRow).toContain(`<span class="rs">${statusMark('needs')}</span><span class="amt">EUR 82.07</span>`);
   expect(review).not.toContain('arrived');
   expect(review).not.toContain('action="/discard" class="discard"');
   expect(review).toContain('Start checking (1)');

@@ -28,6 +28,7 @@ import {
   matchError,
 } from './ui';
 import { button, buttonLink, statusMark } from './actions';
+import { row, rowList } from './row';
 
 export type SalesRow = Receipt & { paid_bank_on: string | null };
 export type SalesStatus = 'reading' | 'review' | 'paid' | 'overdue' | 'unpaid';
@@ -178,12 +179,18 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
     actions: [RECEIPT_ACTIONS.paid(iso()), RECEIPT_ACTIONS.discard, RECEIPT_ACTIONS.retry],
   };
   const rows = shown.length
-    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, shown.length)}<ul class="list all">${shown
-        .map(
-          (r) =>
-            `<li>${bulkCheck(bulk, r.id, invoiceName(r))}<a href="${escape(receiptUrl(r.id, here))}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a><span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${r.client && r.invoice_number ? `${escape(r.invoice_number)} · ` : ''}${status(r)}</span></li>`,
-        )
-        .join('')}</ul></div>${bulkBar(bulk)}`
+    ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, shown.length)}${rowList(
+        shown.map((r) =>
+          row({
+            pick: bulkCheck(bulk, r.id, invoiceName(r)),
+            date: r.issue_date ? escape(shortDay(r.issue_date)) : '',
+            title: `<a href="${escape(receiptUrl(r.id, here))}">${escape(r.client ?? r.invoice_number ?? 'Invoice')}</a>`,
+            meta: r.client && r.invoice_number ? escape(r.invoice_number) : '',
+            status: status(r),
+            amount: r.total_minor === null ? '' : amount(r.total_minor, r.currency),
+          }),
+        ),
+      )}</div>${bulkBar(bulk)}`
     : emptyState(
         month.length || across
           ? 'Nothing here.'

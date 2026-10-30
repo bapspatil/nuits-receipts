@@ -27,7 +27,7 @@ test('a pair that is not exact is explained on its row, and Match goes through',
   expect(html).toContain('<title>Bank · September 2026');
   expect(alertOf(html)).toContain(`<a href="#f-confirm-${tx}">Go to it</a>`);
   // The row now holds the pair, the reason, and one button that says what it does.
-  const row = html.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
+  const row = html.match(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/)![0];
   expect(row).toContain(`id="f-confirm-${tx}" aria-describedby="e-why-${tx} e-match-${tx}"`);
   expect(row).toContain('<span>Match</span></button>');
   expect(row).not.toContain('Match anyway');
@@ -46,7 +46,7 @@ test('a row with an exact pair has no exception field, and typing a label in the
   const { id, tx } = await seedMismatch();
   const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Nothing looks like this payment: the line says so and the search box stands alone.
-  const row = page.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
+  const row = page.match(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/)![0];
   expect(row).toContain('No receipt fits.');
   expect(row).toContain('<input name="receipt_id" list="pick-receipts"');
   expect(row).not.toContain('name="confirm_exception"');

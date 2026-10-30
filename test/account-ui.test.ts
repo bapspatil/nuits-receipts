@@ -109,7 +109,7 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Both legs say where the money went; Undo is in each row's More.
   expect(page).toContain(
-    `<li class="pay" data-row="${debit}" id="row-${debit}" tabindex="-1" style="view-transition-name:r-${debit}">`,
+    `<li class="row" data-row="${debit}" id="row-${debit}" tabindex="-1" style="view-transition-name:r-${debit}">`,
   );
   expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
   expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');

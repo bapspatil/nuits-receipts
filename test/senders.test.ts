@@ -185,8 +185,8 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   );
   // Settings lists it next to the defaults, with no source badges.
   const settings = await (await request('/settings')).text();
-  expect(settings).toMatch(/notifications@link\.com<\/span><\/div>/);
-  expect(settings).toMatch(/owner@example\.com<\/span><\/div>/);
+  expect(settings).toMatch(/notifications@link\.com<\/p>/);
+  expect(settings).toMatch(/owner@example\.com<\/p>/);
   expect(settings).toContain('<span class="sum">4 allowed</span>');
 });
 
@@ -286,7 +286,8 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h1>Receipts</h1>');
   expect(html).toContain(`href="/receipts/${needs}?from=all"`);
-  expect(html).toContain(`${statusMark('needs')} 30 Aug`);
+  expect(html).toContain('<span class="date">30 Aug</span>');
+  expect(html).toContain(`<span class="rs">${statusMark('needs')}</span>`);
   // Rows show the document date only; held mail is Review's, with no mail log here.
   expect(html).not.toContain('Received ');
   expect(html).not.toContain('Recent mail');
@@ -309,7 +310,9 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(second).toContain('Newest');
   expect(second).not.toContain('>Older<');
   expect([
-    ...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g),
+    ...second.matchAll(
+      /<li class="row"><label class="pick">.*?<\/label>(?:<span class="date">[^<]*<\/span>)?<div class="rb"><p class="rt"><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g,
+    ),
   ]).toHaveLength(4);
 });
 

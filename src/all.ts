@@ -39,11 +39,10 @@ import {
   plural,
   shortDay,
   receiptsTabs,
-  tag,
   viewSwitch,
   VIEW_TRANSITION_CSS,
-  rowAttrs,
 } from './ui';
+import { row, rowList } from './row';
 
 export const PAGE_SIZE = 50;
 export const SHOW = {
@@ -239,7 +238,13 @@ function firstFlag(r: Receipt): string {
 function heldRow(m: MailRow, back: string): string {
   const who = escape(m.sender);
   const fields = `<input type="hidden" name="address" value="${who}"><input type="hidden" name="back" value="${escape(back)}">`;
-  return `<li id="mail-${escape(m.id)}"><p class="who"><b>${who}</b></p><p class="subj">${m.subject ? escape(m.subject) : '<span class="muted">(no subject)</span>'}</p><div class="btns"><form method="post" action="/senders/approve">${fields}${button('allow', { attrs: ` aria-label="Allow ${who}"` })}</form><details class="more">${buttonSummary('ignore', { attrs: ` aria-label="Ignore ${who}"` })}<div class="body"><form method="post" action="/senders/ignore">${fields}<p class="ask">Delete the waiting mail from ${who}, and only log what they send later?</p>${button('ignore', { label: 'Ignore and delete' })}</form></div></details></div></li>`;
+  return row({
+    id: `mail-${m.id}`,
+    title: who,
+    meta: m.subject ? escape(m.subject) : '(no subject)',
+    status: statusMark('newSender'),
+    actions: `<form method="post" action="/senders/approve">${fields}${button('allow', { attrs: ` aria-label="Allow ${who}"` })}</form><details class="more">${buttonSummary('ignore', { attrs: ` aria-label="Ignore ${who}"` })}<div class="body"><form method="post" action="/senders/ignore">${fields}<p class="ask">Delete the waiting mail from ${who}, and only log what they send later?</p>${button('ignore', { label: 'Ignore and delete' })}</form></div></details>`,
+  });
 }
 
 // Receipts To do: the held mail, then the open rows of the list in its order, the first upto of
@@ -267,19 +272,26 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
     actions: [RECEIPT_ACTIONS.approve, RECEIPT_ACTIONS.discard],
   };
   const fields = listFields(state);
-  const items = rows
-    .map((r) => {
-      const name = receiptName(r);
-      const sales = r.kind === 'sales';
-      const overdue = sales && !needsReview(r);
-      const amt = `<span class="amt">${r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span>`;
-      const invoice = sales ? `${tag('Invoice')} ` : '';
-      const note = overdue
-        ? `<span class="ok">${invoice}${statusMark('overdue', { after: escape(shortDay(dueOn(r, terms) ?? r.issue_date!)) })}</span><details class="more">${buttonSummary('paid', { attrs: ` aria-label="Mark ${escape(name)} paid"` })}<div class="body"><form method="post" action="/receipts/${r.id}/paid">${fields}<label>Paid on<input type="date" name="paid_outside_on" value="${iso()}" required></label><label>How<input name="paid_outside_note" maxlength="300" required placeholder="Stripe payout 14 Oct"></label>${button('paid')}</form></div></details>`
-        : `<span class="why" title="${escape(firstFlag(r))}">${invoice}${escape(reasonWord(r))}</span>`;
-      return `<li data-row="${r.id}" id="row-${r.id}"${rowAttrs(r.id)}>${bulkCheck(bulk, r.id, name)}<a href="${escape(receiptUrl(r.id, state))}">${escape(name)}</a>${amt}${note}</li>`;
-    })
-    .join('');
+  const items = rows.map((r) => {
+    const name = receiptName(r);
+    const sales = r.kind === 'sales';
+    const overdue = sales && !needsReview(r);
+    const kind = `<span class="kind">${sales ? 'Invoice' : 'Receipt'}</span> `;
+    return row({
+      key: r.id,
+      pick: bulkCheck(bulk, r.id, name),
+      date: r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated',
+      title: `<a href="${escape(receiptUrl(r.id, state))}">${escape(name)}</a>`,
+      meta: overdue
+        ? `${kind}Due ${escape(shortDay(dueOn(r, terms) ?? r.issue_date!))}`
+        : `${kind}<span title="${escape(firstFlag(r))}">${escape(reasonWord(r))}</span>`,
+      status: statusMark(overdue ? 'overdue' : 'needs'),
+      amount: r.total_minor === null ? '' : amount(r.total_minor, r.currency),
+      actions: overdue
+        ? `<details class="more">${buttonSummary('paid', { attrs: ` aria-label="Mark paid: ${escape(name)}"` })}<div class="body"><form method="post" action="/receipts/${r.id}/paid">${fields}<label>Paid on<input type="date" name="paid_outside_on" value="${iso()}" required></label><label>How<input name="paid_outside_note" maxlength="300" required placeholder="Stripe payout 14 Oct"></label>${button('paid')}</form></div></details>`
+        : '',
+    });
+  });
   const everything = total + heldTotal;
   const left = total - rows.length;
   const more =
@@ -287,11 +299,11 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
       ? `<p>${buttonLink('showMore', listUrl({ ...state, upto: Math.min(state.upto + BANK_UPTO, BULK_CAP) }), { label: `Show ${Math.min(left, BANK_UPTO)} more` })}</p>`
       : '';
   const mail = held.length
-    ? `<section class="held" id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${heldTotal})</h2><ul class="list">${held.map((m) => heldRow(m, listUrl(state))).join('')}</ul></section>`
+    ? `<section id="unknown" aria-labelledby="unknown-h"><h2 id="unknown-h">Unknown senders (${heldTotal})</h2>${rowList(held.map((m) => heldRow(m, listUrl(state))))}</section>`
     : '';
   const list = `<div data-list="receipts-todo" data-total="${total}"${rows.length ? ` data-bulk-list="${bulk.form}"` : ''}>${
     rows.length
-      ? `${bulkTools(bulk, rows.length)}<ul class="list checks">${items}</ul>`
+      ? `${bulkTools(bulk, rows.length)}${rowList(items)}`
       : everything
         ? ''
         : emptyState(
@@ -368,16 +380,22 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams): Promis
           ],
   };
   const picks = shown.filter((r) => r.type === 'receipt').length;
-  const ul = `<ul class="list all">${shown
-    .map((r) => {
+  const ul = rowList(
+    shown.map((r) => {
       const chip = chipOf(r);
       const href = escape(r.type === 'mail' ? `${listUrl(RECEIPTS_TODO)}#mail-${r.id}` : receiptUrl(r.id, state));
-      const status =
-        chip.key === 'ready' ? '' : `${statusMark(chip.key, { after: chip.after ? escape(chip.after) : undefined })} `;
-      const date = r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated';
-      return `<li>${r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : ''}<a href="${href}">${escape(rowName(r))}</a><span class="amt">${r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency)}</span><span class="ok">${status}${date}</span>${r.status === 'pending' || r.status === 'processing' ? `<a class="refresh" href="${escape(listUrl(state))}">Refresh</a>` : ''}${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}</li>`;
-    })
-    .join('')}</ul>`;
+      const reading = r.status === 'pending' || r.status === 'processing';
+      return row({
+        pick: r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : '',
+        date: r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated',
+        title: `<a href="${href}">${escape(rowName(r))}</a>`,
+        status:
+          chip.key === 'ready' ? '' : statusMark(chip.key, { after: chip.after ? escape(chip.after) : undefined }),
+        amount: r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency),
+        actions: `${reading ? `<a class="refresh" href="${escape(listUrl(state))}">Refresh</a>` : ''}${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}`,
+      });
+    }),
+  );
   const last = shown[shown.length - 1];
   const pages =
     query.before || more
