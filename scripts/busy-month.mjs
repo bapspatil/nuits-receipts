@@ -2,6 +2,7 @@
 // into the vitest database (the bank rows through importBankCsv) and
 // busySql() renders the same shape as SQL for the journeys, so the invariant
 // tests and journey f look at the same kind of month. Every name is invented.
+import { hasTodoReason } from '../src/flags.ts';
 
 const pad = (n, width = 2) => String(n).padStart(width, '0');
 export const hex64 = (prefix, n) => (prefix + n.toString(16)).padStart(64, '0');
@@ -85,6 +86,9 @@ export function busyReceipts(month) {
   }
   return rows;
 }
+
+// Flagged for a reason that keeps it in To do, by the app's own rule.
+export const isTodo = (r) => r.status === 'needs_review' && hasTodoReason(JSON.parse(r.review_reasons_json));
 
 // Facts all there, so Approve accepts it.
 export const isComplete = (r) =>

@@ -377,14 +377,14 @@ async function bankTodo(page, rec, month) {
   rec.check(focused !== null && !acted.includes(focused), 'Focus is inside the next open row');
 }
 
-async function receiptsTodo(page, rec, month, { busyReceipts, isComplete }) {
+async function receiptsTodo(page, rec, month, { busyReceipts, isComplete, isTodo }) {
   await rec.goto('/receipts?view=todo');
   const contract = await page.locator('[data-list="receipts-todo"]').count();
   rec.check(contract === 1, 'Receipts has a To do list (data-list="receipts-todo")');
   if (!contract) await rec.goto('/review');
   const seeded = new Set(
     busyReceipts(month)
-      .filter((r) => r.status === 'needs_review' && isComplete(r))
+      .filter((r) => isTodo(r) && isComplete(r))
       .map((r) => r.id),
   );
   await selectPage(page, rec, 'approve');
