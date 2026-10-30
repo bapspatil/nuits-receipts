@@ -125,7 +125,7 @@ test('schema/ accepts configured products and rejects invalid product lengths', 
 });
 
 test.skipIf(!existsSync('migrations'))(
-  'populated migrations/0001..0010 preserve every legacy value, link and constraint',
+  'populated migrations/0001..0011 preserve every legacy value, link and constraint',
   () => {
     using db = apply('migrations', '0003_duplicate_integrity.sql');
     seedLegacy(db);
@@ -199,6 +199,14 @@ test.skipIf(!existsSync('migrations'))(
     expect(() => db.exec("UPDATE bank_transactions SET exempt_by='guess' WHERE id='tx-exempt'")).toThrow();
     db.exec("UPDATE bank_transactions SET exempt_by=NULL WHERE id='tx-exempt'");
     expect(db.query('SELECT count(*) n FROM match_rejections').get()).toEqual({ n: 0 });
+    // 0011: the undo log starts empty; one row per action, table and row.
+    db.transaction(() => db.exec(readFileSync('migrations/0011_undo_log.sql', 'utf8')))();
+    expect(db.query('SELECT count(*) n FROM undo_log').get()).toEqual({ n: 0 });
+    db.exec("INSERT INTO undo_log VALUES ('2026-10-30T10:00:00.000Z','approve','receipts','r1','{}',NULL)");
+    expect(() =>
+      db.exec("INSERT INTO undo_log VALUES ('2026-10-30T10:00:00.000Z','discard','receipts','r1','{}',NULL)"),
+    ).toThrow();
+    db.exec('DELETE FROM undo_log');
     healthy(db);
     using fresh = apply('schema');
     expect(shape(fresh)).toEqual(shape(db));
@@ -207,7 +215,7 @@ test.skipIf(!existsSync('migrations'))(
 );
 
 test.skipIf(!existsSync('migrations'))(
-  'schema/ and empty migrations/0001..0010 have identical tables, columns, indexes, triggers and foreign keys',
+  'schema/ and empty migrations/0001..0011 have identical tables, columns, indexes, triggers and foreign keys',
   () => {
     using fresh = apply('schema');
     using upgraded = apply('migrations');
