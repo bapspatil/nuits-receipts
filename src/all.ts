@@ -92,10 +92,11 @@ export function allWhere(query: Omit<AllQuery, 'offset'>): { where: string; bind
     binds.push(query.month);
   }
   if (query.q) {
+    // instr, not LIKE: D1 refuses a LIKE pattern over 50 bytes, and a search may be 100 characters.
     where.push(
-      "lower(coalesce(vendor,'')||' '||coalesce(filename,'')||' '||coalesce(invoice_number,'')||' '||coalesce(client,'')||' '||coalesce(sender,'')||' '||coalesce(subject,'')) LIKE ? ESCAPE '\\'",
+      "instr(lower(coalesce(vendor,'')||' '||coalesce(filename,'')||' '||coalesce(invoice_number,'')||' '||coalesce(client,'')||' '||coalesce(sender,'')||' '||coalesce(subject,'')),?)>0",
     );
-    binds.push(`%${query.q.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    binds.push(query.q.toLowerCase());
   }
   return { where: where.join(' AND '), binds };
 }
