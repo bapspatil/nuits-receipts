@@ -31,6 +31,7 @@ import {
   bulkBar,
   bulkCheck,
   bulkTools,
+  KIND_LOSS,
   PAYMENT_ACTIONS,
   SENDER_ACTIONS,
   type BulkAction,
@@ -511,7 +512,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
           : flag.action === 'upload'
             ? `<div class="fx"><a href="/add${sales ? '?kind=sales' : ''}">Upload a copy</a></div>`
             : flag.action === 'move'
-              ? `<div class="fx"><button class="btn secondary" formaction="/receipts/${r.id}/kind" name="kind" value="expense">Move to receipts</button></div>`
+              ? `<details class="fx"><summary>Move to receipts</summary><div class="body"><p class="ask">${KIND_LOSS}</p><button class="btn secondary" formaction="/receipts/${r.id}/kind" name="kind" value="expense">Move to receipts</button></div></details>`
               : '';
       if (names.length === 1) {
         const [first, ...more] = controls(names[0]!, tier);
@@ -612,7 +613,7 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
       : '';
   const move =
     sales || config(env).invoicesAddress
-      ? `<form action="/receipts/${r.id}/kind" method="post">${own}${hidden('revision', r.revision)}<button class="linkbtn" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form>`
+      ? `<details><summary>${sales ? 'Move to receipts' : 'Move to invoices'}</summary><div class="body"><form action="/receipts/${r.id}/kind" method="post">${own}${hidden('revision', r.revision)}<p class="ask">${KIND_LOSS}</p><button class="btn secondary" name="kind" value="${sales ? 'expense' : 'sales'}">${sales ? 'Move to receipts' : 'Move to invoices'}</button></form></div></details>`
       : '';
   const always = sales
     ? ''
@@ -1254,7 +1255,7 @@ async function oneDrivePart(env: Env, open: boolean, origin: string): Promise<st
     escape(conn.account_email ?? conn.account_name),
     `<dl class="kv"><div><dt>Account</dt><dd>${escape(conn.account_name)}${conn.account_email ? ` (${escape(conn.account_email)})` : ''}</dd></div><div><dt>Folder</dt><dd>${folder}</dd></div></dl>${
       conn.folder_item_id ? `<details class="why"><summary>Change folder</summary>${folderForm}</details>` : folderForm
-    }<form action="/settings/onedrive/disconnect" method="post" class="cta"><button class="linkbtn">Disconnect</button></form>${tech}`,
+    }<details class="cta"><summary>Disconnect</summary><div class="body"><form action="/settings/onedrive/disconnect" method="post"><p class="ask">Delete this app's sign-in to your Microsoft account? Uploads stop until you connect again.</p><button class="btn secondary">Disconnect</button></form></div></details>${tech}`,
     open,
   );
 }

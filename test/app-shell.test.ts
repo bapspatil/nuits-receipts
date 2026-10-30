@@ -856,6 +856,10 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
     html.match(/<details class="more"><summary>More<\/summary>([\s\S]*?)<\/div><\/section><\/div>/)?.[1] ?? '';
   for (const action of ['Read again', 'Move to invoices', 'Download original', 'Upload a copy', 'Always file as'])
     expect(more, action).toContain(action);
+  // Move has no Undo, so it says what it clears before it runs.
+  expect(more).toMatch(
+    /<details><summary>Move to invoices<\/summary><div class="body"><form action="\/receipts\/[0-9a-f]{64}\/kind" method="post">[^]*?<p class="ask">Moving clears the client, VAT details, paid date, your corrections and any match.<\/p><button class="btn secondary" name="kind" value="sales">Move to invoices<\/button>/,
+  );
   expect(more).not.toContain('Technical details');
   for (const gone of [
     'Save, decide later',
