@@ -62,12 +62,12 @@ test('the SQL predicates agree with the TypeScript ones', async () => {
   expect(await ids(needsReviewSql('receipts'))).toEqual(await ids(needsReviewSql()));
 });
 
-test('an optional-only receipt is ready, a required one goes to Review, and the counts agree', async () => {
+test('an optional-only receipt is ready, a required one goes to To do, and the counts agree', async () => {
   await receipt(1, 'needs_review', ['missing_total']);
   await receipt(2, 'needs_review', ['missing_invoice_number']);
   await receipt(3, 'ready', ['uncertain_product']);
-  const review = await (await request('/review')).text();
-  expect(review).toContain('<h1>1 to check</h1>');
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review).toContain('<p class="listhead">1 to do</p>');
   expect(review).toContain('Vendor 1');
   expect(review).not.toContain('Vendor 2');
   expect(review).not.toContain('Vendor 3');
@@ -75,8 +75,8 @@ test('an optional-only receipt is ready, a required one goes to Review, and the 
   expect(home).toContain('1 to check');
   expect(home).not.toContain('2 to check');
   expect(home).not.toContain('3 to check');
-  expect(review).toContain('Review <span class="count">1<span class="vh"> waiting</span>');
-  const receipts = await (await request('/receipts?month=2026-10')).text();
+  expect(review).toContain('Receipts <span class="count">1<span class="vh"> to do</span>');
+  const receipts = await (await request('/receipts?view=all&month=2026-10')).text();
   expect(receipts).toContain('Vendor 2');
 });
 
@@ -85,7 +85,7 @@ test('an old optional-only row counts as ready everywhere, with no migration', a
   const row = (await get(1))!;
   expect(placement(row, { anyway: false, undated: false })).toBe('main');
   expect(await (await request('/?month=2026-10')).text()).toContain('All checked');
-  expect(await (await request('/review')).text()).toContain('Nothing to check');
+  expect(await (await request('/receipts?view=todo')).text()).toContain('Nothing to do.');
   const page = await (await request(`/receipts/${id(1)}`)).text();
   expect(page).toContain('Not needed to approve: What is the receipt number?');
   expect(page).not.toContain('class="stamp needs"');

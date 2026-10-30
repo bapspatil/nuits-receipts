@@ -105,16 +105,16 @@ test('an unknown sender is held with its facts, never read, and only the domain 
   expect(logged).toContain('"reason":"sender_not_allowed"');
   expect(logged).toContain('"domain":"link.com"');
   expect(logged).not.toContain('notifications@');
-  // Review shows it with Allow, Ignore and (under More) Delete, named for screen readers; the nav badge counts it.
-  const html = await (await request('/review')).text();
+  // To do shows it with Allow, and Ignore behind a confirm, named for screen readers; the badge counts it.
+  const html = await (await request('/receipts?view=todo')).text();
   expect(html).toContain('notifications@link.com');
   expect(html).toContain('Your receipt from Example');
-  expect(html).toContain('<button class="btn primary" aria-label="Allow notifications@link.com">Allow</button>');
-  expect(html).toContain('<button class="linkbtn" aria-label="Ignore notifications@link.com">Ignore</button>');
+  expect(html).toContain('<button class="btn secondary" aria-label="Allow notifications@link.com">Allow</button>');
   expect(html).toMatch(
-    /<details class="more"><summary aria-label="More for notifications@link.com">More<\/summary><div class="body">[\s\S]*?Delete email<\/button>/,
+    /<details class="more"><summary aria-label="Ignore notifications@link.com">Ignore<\/summary><div class="body"><form method="post" action="\/senders\/ignore">[\s\S]*?Ignore and delete<\/button>/,
   );
-  expect(html).toMatch(/Review <span class="count">1/);
+  expect(html).not.toContain('Delete email');
+  expect(html).toMatch(/Receipts <span class="count">1/);
 });
 
 test('the same Message-ID is held once; the pending limits log the rest', async () => {
@@ -179,7 +179,7 @@ test('Approve sender saves it next to the defaults and reads every waiting email
   await deliver(mail({ id: '<a3@amazonses.com>' }, 'vendor: Third Shop'));
   expect(await receipts()).toBe(3);
   expect(await held()).toHaveLength(0);
-  expect(await (await request(await signed('/review?done=mailAllowed&n=2'))).text()).toContain(
+  expect(await (await request(await signed('/receipts?view=todo&done=mailAllowed&n=2'))).text()).toContain(
     'Allowed. Reading 2 emails.',
   );
   // Settings lists it next to the defaults, with no source badges.
@@ -225,15 +225,11 @@ test('Ignore sender deletes their waiting mail and keeps none of it later', asyn
   expect(await held()).toHaveLength(1);
 });
 
-test('Delete removes one email; Remove takes a sender off the list', async () => {
+test('Delete email is gone, Ignore covers it; Remove takes a sender off the list', async () => {
   await deliver(mail());
-  await deliver(mail({ id: '<a2@amazonses.com>' }, 'different body'));
   const [first] = await held();
-  const response = await post('/senders/delete', { id: String(first!.id) });
-  expect(locationOf(response)).toBe('/receipts?view=todo&done=mailDeleted');
-  expect(await held()).toHaveLength(1);
-  expect(await env.ORIGINALS.get(String(first!.email_key))).toBeNull();
   expect((await post('/senders/delete', { id: String(first!.id) })).status).toBe(404);
+  expect(await held()).toHaveLength(1);
 
   const removed = await post('/senders/remove', { address: 'sender@example.net', back: 'settings' });
   expect(locationOf(removed)).toBe('/settings?done=senderRemoved&from=settings#senders');
@@ -286,37 +282,42 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(await ids({ q: 'link.com' })).toHaveLength(1);
   expect(await ids({ q: '%' })).toEqual([]);
 
-  const html = await (await request('/receipts')).text();
+  const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h1>Receipts</h1>');
   expect(html).toContain(`href="/receipts/${needs}?from=all"`);
   expect(html).toContain('<span class="stamp needs">Needs you</span> 30 Aug');
   // Rows show the document date only; held mail is Review's, with no mail log here.
   expect(html).not.toContain('Received ');
   expect(html).not.toContain('Recent mail');
-  const september = await (await request('/receipts?month=2026-09')).text();
+  const september = await (await request('/receipts?view=all&month=2026-09')).text();
   expect(september).toContain('<h1>September 2026</h1>');
   expect(september).toContain(`href="/receipts/${ready}?from=all&amp;month=2026-09"`);
   expect(september).not.toContain(`href="/receipts/${needs}?`);
   expect(html.indexOf(`/receipts/${dup}`)).toBeLessThan(html.indexOf(`/receipts/${ready}`));
-  expect((await request('/receipts?month=2026-13')).status).toBe(422);
+  expect((await request('/receipts?view=all&month=2026-13')).status).toBe(422);
 
-  // Paging.
+  // Paging: Older is a cursor at the last row shown, never an offset.
   for (let i = 10; i < 10 + PAGE_SIZE; i++) await receipt(i, `2026-08-01T00:00:${String(i % 60).padStart(2, '0')}Z`);
-  const first = await (await request('/receipts')).text();
-  expect(first).toContain(`href="/receipts?offset=${PAGE_SIZE}"`);
-  const second = await (await request(`/receipts?offset=${PAGE_SIZE}`)).text();
-  expect(second).toContain('Newer');
+  const first = await (await request('/receipts?view=all')).text();
+  expect(first).not.toContain('offset=');
+  const older = first.match(/<a class="btn secondary" href="(\/receipts\?view=all&amp;before=[^"]+)">Older<\/a>/)?.[1];
+  expect(older).toBeDefined();
+  const second = await (await request(older!.replaceAll('&amp;', '&'))).text();
+  expect(second).toContain('Newest');
+  expect(second).not.toContain('>Older<');
   expect([
     ...second.matchAll(/<li><label class="pick">.*?<\/label><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g),
   ]).toHaveLength(4);
 });
 
 test('Receipts empty states: one line and one action', async () => {
-  const html = await (await request('/receipts')).text();
+  const html = await (await request('/receipts?view=all')).text();
   expect(html).toContain('<h2>No receipts yet. Forward to <code>receipts@example.com</code>.</h2>');
-  expect(await (await request('/receipts?month=2026-09')).text()).toContain('<h2>Nothing dated September.</h2>');
+  expect(await (await request('/receipts?view=all&month=2026-09')).text()).toContain(
+    '<h2>Nothing dated September.</h2>',
+  );
   const search = await (await request('/receipts?q=xyz')).text();
   expect(search).toContain(
-    '<h2>Nothing matches &#8220;xyz&#8221;.</h2><a class="btn primary" href="/receipts">Clear search</a>',
+    '<h2>Nothing matches &#8220;xyz&#8221;.</h2><a class="btn primary" href="/receipts?view=all">Clear search</a>',
   );
 });

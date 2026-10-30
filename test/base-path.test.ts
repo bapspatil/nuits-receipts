@@ -64,6 +64,30 @@ test('links, form actions and redirects carry the base path', async () => {
   expect((await at(location.replace('/receipts/', '/originals/'))).status).toBe(200);
 });
 
+test('Review and Invoices answer 302 to Receipts under the base path, keeping their list', async () => {
+  for (const [from, to] of [
+    ['/app/review', '/app/receipts?view=todo'],
+    ['/app/review?month=2026-09', '/app/receipts?view=todo&month=2026-09'],
+    ['/app/review/merge', '/app/receipts?view=todo'],
+    ['/app/invoices', '/app/receipts?view=all&kind=sales'],
+    ['/app/invoices?month=2026-09&show=overdue', '/app/receipts?view=all&kind=sales&month=2026-09&show=overdue'],
+  ]) {
+    const response = await at(from!);
+    expect(response.status, from).toBe(302);
+    expect(response.headers.get('Location'), from).toBe(to);
+  }
+  const merge = await at('/app/review/merge', { method: 'POST' });
+  expect(merge.status).toBe(302);
+  expect(merge.headers.get('Location')).toBe('/app/receipts?view=todo');
+  // The pages they point at render, with the To do | All switch under the base path.
+  const todo = await (await at('/app/receipts?view=todo&month=2026-09')).text();
+  expect(todo).toContain('data-list="receipts-todo"');
+  expect(todo).toContain('href="/app/receipts?view=all&amp;month=2026-09" data-view="all"');
+  expect(await (await at('/app/receipts?view=all&kind=sales&month=2026-09')).text()).toContain(
+    'href="/app/receipts?view=todo&amp;month=2026-09" data-view="todo"',
+  );
+});
+
 test('cross-origin posts are refused under the base path', async () => {
   const form = new FormData();
   form.set('label', 'x');
@@ -82,7 +106,9 @@ test('export links point at the base path', async () => {
 
 test('the feedback banner and its Undo form carry the base path', async () => {
   const tx = 'a'.repeat(64);
-  const html = await (await at(await signed(`/app/review?done=notPurchase&tx=${tx}&name=Acme`, '/app'))).text();
+  const html = await (
+    await at(await signed(`/app/receipts?view=todo&done=notPurchase&tx=${tx}&name=Acme`, '/app'))
+  ).text();
   expect(html).toContain(`<form method="post" action="/app/payments/${tx}">`);
   expect(html).toContain('Acme is not a purchase');
 });
@@ -141,7 +167,7 @@ test('every list return keeps its list and its next open row under the base path
   expect(await to('/discard', { id: e1, from: 'todo', month })).toMatch(
     new RegExp(`^/app/receipts/[0-9a-f]{64}\\?from=todo&month=${month}&done=discarded&`),
   );
-  expect(await to('/review/merge', todo)).toBe(`/app/receipts?view=todo&month=${month}&done=merged&n=0`);
+  expect(await to('/receipts/merge', todo)).toBe(`/app/receipts?view=todo&month=${month}&done=merged&n=0`);
   const back = `/receipts?view=todo&month=${month}`;
   expect(await to('/senders/ignore', { address: 'nobody@example.com', back })).toMatch(
     new RegExp(`${onTodo}mailIgnored`),

@@ -21,7 +21,7 @@ test('Settings loads its own script under a policy that allows only same-origin 
   const script = await request('/assets/settings.js');
   expect(script.headers.get('Content-Type')).toContain('text/javascript');
   expect(await script.text()).toContain('beforeunload');
-  for (const path of ['/', '/help', '/review', '/import'])
+  for (const path of ['/', '/help', '/receipts?view=todo', '/import'])
     expect((await request(path)).headers.get('Content-Security-Policy'), path).toContain("script-src 'self';");
 });
 

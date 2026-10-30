@@ -922,7 +922,14 @@ export async function payments(
       );
   return page('bank', `${others}${body}${importButton}`, 200, env, {
     detail: monthName(selected),
-    head: monthHead('/payments', selected),
+    // The one primary, as on Receipts To do: the first open payment, not a button on its row.
+    head: monthHead(
+      '/payments',
+      selected,
+      open[0]
+        ? `<a class="btn primary" href="${escape(bankPath(selected, 'todo'))}#row-${open[0].id}">Start matching (${views.todo})</a>`
+        : '',
+    ),
   });
 }
 

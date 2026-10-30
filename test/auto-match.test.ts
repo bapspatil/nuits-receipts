@@ -368,10 +368,13 @@ test('matching runs again for every month when a receipt arrives, and a removed 
 
 test('a restored receipt is matched again, and a receipt for a row a rule marked wins', async () => {
   const id = idFrom(await uploadPdf());
-  await request('/discard', { method: 'POST', body: new URLSearchParams({ id, back: '/review', reason: 'other' }) });
+  await request('/discard', {
+    method: 'POST',
+    body: new URLSearchParams({ id, back: '/receipts?view=todo', reason: 'other' }),
+  });
   await importText(statement('a;2026-09-05;-125,50;EUR;Sample Cloud Lantern Oy service fee;fee\n'));
   expect(await row('Sample Cloud Lantern Oy service fee')).toMatchObject({ receipt_required: 0, exempt_by: 'fee' });
-  await request('/restore', { method: 'POST', body: new URLSearchParams({ id, back: '/review' }) });
+  await request('/restore', { method: 'POST', body: new URLSearchParams({ id, back: '/receipts?view=todo' }) });
   expect(await row('Sample Cloud Lantern Oy service fee')).toMatchObject({
     receipt_id: id,
     receipt_required: 1,

@@ -163,7 +163,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'A rule with the same seller text already exists':
     'You already have a rule for that seller text. Edit that one instead.',
   'Origin does not match': 'That request came from another site, so we ignored it. Open the app and try again.',
-  'Invalid page': "That page number isn't valid.",
   'No preview for this file type': "There's no preview for this kind of file. Download it instead.",
   'Source email not found': "We don't have the original email for this one.",
   'Original not found': "We can't find the original file. Upload it again if you have it.",
@@ -244,7 +243,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Enter one email address, like billing@example.com': 'Enter one email address, like billing@example.com.',
   'That sender is approved. Remove it from approved senders in Settings first.':
     'That sender is approved. Remove it from approved senders in Settings first.',
-  'That email is gone already.': 'That email is gone already.',
   'That sender is not on the list.': 'That sender is not on the list.',
   'Your Microsoft sign-in has expired or was revoked. Reconnect it in Settings, then try again.':
     'Your Microsoft sign-in has expired or was revoked. Reconnect it in Settings, then try again.',

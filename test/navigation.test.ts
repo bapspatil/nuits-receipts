@@ -68,7 +68,7 @@ test('a later step that is done shows done, even before an earlier one is', asyn
   // Money in only: the statement is there and nothing is missing a receipt.
   await missingPayment('2020-03', 'Client Oy', 4200);
   const html = await home('/?month=2020-03');
-  expect(html).toContain('<li class="step now" aria-current="step"><a href="/review">');
+  expect(html).toContain('<li class="step now" aria-current="step"><a href="/receipts?view=todo&amp;month=2020-03">');
   expect(html).toContain('<li class="step done"><a href="/payments?month=2020-03">');
 });
 
@@ -127,12 +127,12 @@ test('step markers carry the same three words everywhere', async () => {
 test('Receipts has one Add button that follows the open tab', async () => {
   await seed({ bytes: 'r', issue_date: open('2020-03') });
   await seed({ bytes: 'i', issue_date: open('2020-03'), kind: 'sales', client: 'Client Oy', invoice_number: 'I-1' });
-  const receipts = await home('/receipts?month=2020-03');
+  const receipts = await home('/receipts?view=all&month=2020-03');
   expect(receipts).toContain('Receipts <span class="num">1</span>');
   expect(receipts).toContain('Invoices <span class="num">1</span>');
   expect(receipts).toContain('<a class="btn primary" href="/add">Add receipt</a>');
   expect(receipts).not.toContain('Add invoice');
-  const invoices = await home('/invoices?month=2020-03');
+  const invoices = await home('/receipts?view=all&kind=sales&month=2020-03');
   expect(invoices).toContain('<a class="btn primary" href="/add?kind=sales">Add invoice</a>');
   expect(invoices).not.toContain('>Add receipt<');
 });

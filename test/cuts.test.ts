@@ -114,7 +114,7 @@ test('Receipts keeps Reading, Duplicate and Discarded behind one More filters, a
   )
     .bind('a'.repeat(64), 'receipts/a', 'b'.repeat(64), 'receipts/b')
     .run();
-  const page = await (await request('/receipts')).text();
+  const page = await (await request('/receipts?view=all')).text();
   expect(page).toMatch(/<details class="filters"><summary>More filters<\/summary>[\s\S]*?Reading \(1\)/);
   const reading = await request('/receipts?show=reading');
   expect(reading.status).toBe(200);

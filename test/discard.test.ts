@@ -49,7 +49,7 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   await receipt(1);
   await receipt(2, { status: 'needs_review' });
   await env.DB.prepare(`UPDATE receipts SET review_reasons_json='["vendor_missing"]' WHERE id=?`).bind(id(2)).run();
-  expect(await (await request('/review')).text()).toContain('Discard');
+  expect(await (await request('/receipts?view=todo')).text()).toContain('Discard');
 
   const res = await post('/discard', { id: [id(1), id(2)], view: 'todo' });
   expect(res.status).toBe(303);
@@ -116,7 +116,7 @@ test('a bank-matched row needs unmatch, which removes the match in the same step
 
 test('stale revisions and oversized batches are refused', async () => {
   await receipt(1);
-  expect((await post('/discard', { id: id(1), revision: '99', back: '/review' })).status).toBe(409);
+  expect((await post('/discard', { id: id(1), revision: '99', back: '/receipts?view=todo' })).status).toBe(409);
   expect((await post('/discard', { id: Array.from({ length: MAX_BULK + 1 }, (_, i) => id(i + 10)) })).status).toBe(400);
   expect((await post('/discard', { id: 'not-an-id' })).status).toBe(400);
   expect((await row(1))!.discarded_at).toBeNull();
@@ -126,17 +126,17 @@ test('Discard is one click with no reason; a matched receipt still asks about it
   await receipt(1, { status: 'needs_review' });
   await receipt(2, { status: 'needs_review' });
   await matchTo(2);
-  const review = await (await request('/review')).text();
+  const review = await (await request('/receipts?view=todo')).text();
   expect(review).not.toContain('name="reason"');
-  expect(review).toMatch(
+  // To do rows have no Discard of their own: it is in the bulk bar and on the receipt page.
+  expect(review).not.toContain('action="/discard"');
+  expect(await (await request(`/receipts/${id(1)}`)).text()).toMatch(
     new RegExp(
-      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(1)}">[^]*?<button class="linkbtn" aria-label="Discard Vendor 1">Discard</button></form>`,
+      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(1)}">[^]*?<button class="linkbtn">Discard</button></form>`,
     ),
   );
-  expect(review).toMatch(
-    new RegExp(
-      `<details class="discard"><summary aria-label="Discard Vendor 2">Discard</summary>[^]*?<p class="ask">Remove match\\?</p><button class="btn secondary">Remove and discard</button>`,
-    ),
+  expect(await (await request(`/receipts/${id(2)}`)).text()).toMatch(
+    /<details class="discard"><summary>Discard<\/summary>[^]*?<p class="ask">Remove match\?<\/p><button class="btn secondary">Remove and discard<\/button>/,
   );
   const bulk = review.slice(review.indexOf('class="bulkbar"'));
   // No reason to pick, but the bar still asks, since Undo can't bring a match back yet.

@@ -16,7 +16,7 @@ const SAMPLE: Partial<Record<EventKey, Record<string, string>>> = {
   notPurchase: { tx: TX, name: 'Acme' },
   needsReceipt: { tx: TX, name: 'Acme' },
   transferMade: { tx: TX, name: 'Acme' },
-  discarded: { n: '2', at: '2026-09-03T10:00:00.000Z', back: '/review' },
+  discarded: { n: '2', at: '2026-09-03T10:00:00.000Z', back: '/receipts?view=todo' },
   restored: { n: '2' },
   merged: { n: '2' },
   imported: { inserted: '3', skipped: '1' },
@@ -28,7 +28,8 @@ const SAMPLE: Partial<Record<EventKey, Record<string, string>>> = {
   accountRenamed: { name: 'Everyday' },
 };
 
-const pageFor = (event: EventKey) => signed(`/review?${new URLSearchParams({ done: event, ...SAMPLE[event] })}`);
+const pageFor = (event: EventKey) =>
+  signed(`/receipts?view=todo&${new URLSearchParams({ done: event, ...SAMPLE[event] })}`);
 
 test('every event renders one non-empty status banner on a real page', async () => {
   for (const key of Object.keys(EVENTS) as EventKey[]) {
@@ -58,7 +59,7 @@ test('an event with an Undo posts the inverse route, and only when its params ar
   expect(undone('transferUndone')).toBeNull();
   expect(undone('discarded')).toEqual({
     action: '/restore',
-    fields: { at: '2026-09-03T10:00:00.000Z', back: '/review' },
+    fields: { at: '2026-09-03T10:00:00.000Z', back: '/receipts?view=todo' },
   });
   // A forged id or back path gets no Undo form.
   expect(undone('matched', { tx: 'nope' })).toBeNull();
@@ -74,7 +75,7 @@ test('the Undo form on a page posts to the inverse route', async () => {
 });
 
 test('a link that is not genuine and fresh says nothing and offers no Undo', async () => {
-  const forged = `/review?done=unmatched&tx=${TX}&rid=${RID}&name=Acme&exc=1`;
+  const forged = `/receipts?view=todo&done=unmatched&tx=${TX}&rid=${RID}&name=Acme&exc=1`;
   const good = await signed(forged);
   const shows = async (path: string) => (await (await request(path)).text()).includes('role="status"');
   expect(await shows(good)).toBe(true);
@@ -82,7 +83,7 @@ test('a link that is not genuine and fresh says nothing and offers no Undo', asy
   // Any changed param, a swapped page, or a copied signature on other params fails.
   expect(await shows(good.replace('name=Acme', 'name=Mallory'))).toBe(false);
   expect(await shows(good.replace('exc=1', 'exc=0'))).toBe(false);
-  expect(await shows(good.replace('/review', '/receipts'))).toBe(false);
+  expect(await shows(good.replace('/receipts?view=todo', '/receipts'))).toBe(false);
   // Change the signature's first character for certain: a fixed 'A' is a no-op when it already starts with one.
   expect(await shows(good.replace(/sig=(.)/, (_, c: string) => `sig=${c === 'A' ? 'B' : 'A'}`))).toBe(false);
   expect(await shows(good.replace('done=unmatched', 'done=matched'))).toBe(false);
@@ -92,7 +93,7 @@ test('a link that is not genuine and fresh says nothing and offers no Undo', asy
 });
 
 test('an expired link says nothing, a fresh one still does', async () => {
-  const path = `/review?done=saved`;
+  const path = `/receipts?view=todo&done=saved`;
   const now = Date.now();
   const shows = async (p: string) => (await (await request(p)).text()).includes('role="status"');
   expect(await shows(await signed(path, '', now - (FEEDBACK_TTL - 30) * 1000))).toBe(true);
@@ -102,13 +103,13 @@ test('an expired link says nothing, a fresh one still does', async () => {
 });
 
 test('a genuine link shows the banner with its Undo form', async () => {
-  const html = await (await request(await signed(`/review?done=notPurchase&tx=${TX}&name=Acme`))).text();
+  const html = await (await request(await signed(`/receipts?view=todo&done=notPurchase&tx=${TX}&name=Acme`))).text();
   expect(html).toContain('Acme is not a purchase');
   expect(html).toContain(`<form method="post" action="/payments/${TX}">`);
 });
 
 test('a redirect from the app is signed, and the page it lands on shows the banner', async () => {
-  const response = await request('/review/merge', { method: 'POST', body: new FormData() });
+  const response = await request('/receipts/merge', { method: 'POST', body: new FormData() });
   const location = response.headers.get('Location')!;
   expect(location).toMatch(/^\/receipts\?view=todo&done=merged&n=0&iat=\d+&sig=[A-Za-z0-9_-]{43}$/);
   expect(locationOf(response)).toBe('/receipts?view=todo&done=merged&n=0');
@@ -120,7 +121,9 @@ test('a redirect from the app is signed, and the page it lands on shows the bann
 test('address-bar text in a message is escaped', async () => {
   const html = await (
     await request(
-      await signed(`/review?${new URLSearchParams({ done: 'matched', name: '<script>alert(1)</script>', tx: TX })}`),
+      await signed(
+        `/receipts?view=todo&${new URLSearchParams({ done: 'matched', name: '<script>alert(1)</script>', tx: TX })}`,
+      ),
     )
   ).text();
   expect(html).not.toContain('<script>alert(1)</script>');
@@ -130,7 +133,7 @@ test('address-bar text in a message is escaped', async () => {
 test('withDone keeps the query and the fragment in order', () => {
   expect(withDone('saved', '/settings#rules')).toBe('/settings?done=saved#rules');
   expect(withDone('sent', '/?month=2026-10#send')).toBe('/?month=2026-10&done=sent#send');
-  expect(withDone('merged', '/review', { n: 2, skip: null })).toBe('/review?done=merged&n=2');
+  expect(withDone('merged', '/receipts?view=todo', { n: 2, skip: null })).toBe('/receipts?view=todo&done=merged&n=2');
 });
 
 test('every event key src/ redirects with exists in EVENTS', () => {
@@ -166,7 +169,7 @@ test('every Undo action is a POST route the app serves', () => {
 
 test('an unknown event says nothing', async () => {
   // Unknown or forged events say nothing rather than guess.
-  const html = await (await request('/review?done=nope')).text();
+  const html = await (await request('/receipts?view=todo&done=nope')).text();
   expect(html).not.toContain('role="status"');
 });
 

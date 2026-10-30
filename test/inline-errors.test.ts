@@ -171,8 +171,10 @@ test("one request's refusal never shows in another running at the same time", as
   const { id, tx } = await seedMismatch();
   const bad = () => post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link' }));
   const bankUrl = '/payments?month=2026-09&view=all';
-  const quiet = await Promise.all([bankUrl, '/review', '/'].map(async (path) => (await request(path)).text()));
-  const results = await Promise.all([bad(), request(bankUrl), bad(), request('/review'), request('/')]);
+  const quiet = await Promise.all(
+    [bankUrl, '/receipts?view=todo', '/'].map(async (path) => (await request(path)).text()),
+  );
+  const results = await Promise.all([bad(), request(bankUrl), bad(), request('/receipts?view=todo'), request('/')]);
   const [first, ...rest] = await Promise.all(results.map((r) => r.text()));
   expect(first).toContain('Nothing was saved.');
   expect(rest[1]).toContain('Nothing was saved.');
