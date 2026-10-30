@@ -67,7 +67,7 @@ test('matches and payments show accounts and export appends two formula-safe acc
   await bank('account-a');
   const r = await receipt();
   expect((await eurValue(env, r)).source).toBe('bank');
-  const payments = await (await request('/payments?month=2026-09&show=all')).text();
+  const payments = await (await request('/payments?month=2026-09&view=all')).text();
   expect(payments).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`);
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,
@@ -97,11 +97,11 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   expect(paired.status).toBe(303);
   // Transfers live on Bank now, in the month the money left.
   expect(locationOf(paired)).toMatch(
-    /^\/payments\?month=2026-09&show=all&done=transferMade&tx=[a-f0-9]{64}&name=[^&#]+#transfers$/,
+    new RegExp(`^/payments\\?month=2026-09&view=all&done=transferMade&tx=${debit}&name=[^&#]+#row-${debit}$`),
   );
-  const page = await (await request('/payments?month=2026-09&show=all')).text();
+  const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Both legs say where the money went; Undo is in each row's More.
-  expect(page).toContain(`<li class="pay" id="transfers">`);
+  expect(page).toContain(`<li class="pay" data-row="${debit}" id="row-${debit}">`);
   expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
   expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');
   expect(page.match(/<button class="linkbtn">Undo transfer<\/button>/g)).toHaveLength(2);
@@ -116,7 +116,7 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   ).toBe(409);
   const undone = await request('/transfers/' + debit + '/undo', { method: 'POST' });
   expect(undone.status).toBe(303);
-  expect(locationOf(undone)).toMatch(/^\/payments\?month=2026-09&show=all&done=transferUndone#transfers$/);
+  expect(locationOf(undone)).toBe(`/payments?month=2026-09&view=all&done=transferUndone#row-${debit}`);
   // Unpaired again: the debit is missing, and its More offers the pair once more.
   const again = await (await request('/payments?month=2026-09')).text();
   expect(again).toContain(

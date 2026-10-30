@@ -27,7 +27,7 @@ async function seedTwoPayments() {
     .results;
   return { id, a: txs[0]!.id, b: txs[1]!.id };
 }
-const bank = async () => (await request('/payments?month=2026-09&show=all')).text();
+const bank = async () => (await request('/payments?month=2026-09&view=all')).text();
 
 test('the copy of Match all pluralises', () => {
   expect(matchAllLabel(1)).toBe('Match the likely one');
@@ -141,7 +141,7 @@ test('a receipt still in Review is matched, and the payment says the receipt nee
   const both = await bank();
   expect(rowOf(both, 'Nothing Like It Oy')).toContain('<span class="stamp missing">Missing</span>');
   expect(both).toContain('2 out, 1 matched, 0 not a purchase, <span class="red">1 missing</span>, 1 needs you');
-  expect(both).toContain('>Missing (1)<');
+  expect(both).toContain('>To do (1)<');
   // Approving it keeps the match and the stamp goes.
   await env.DB.prepare(`UPDATE receipts SET status='ready',review_reasons_json='[]' WHERE id=?`).bind(id).run();
   expect(rowOf(await bank(), 'Sample Cloud Lantern Oy')).not.toContain('Needs you');
@@ -193,14 +193,14 @@ test('an import banner counts the payments matched for you and links to them', a
   const said = feedback(new URL(location, 'https://x.example').searchParams)!;
   expect(said.text).toBe('Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.');
   expect(said.undo).toBeNull();
-  expect(said.link).toEqual({ href: '/payments?month=2026-09&show=matched', label: 'See them' });
-  // The filter lists exactly the matched rows, and the old ?show=auto address still opens it.
-  for (const show of ['matched', 'auto']) {
-    const filtered = await (await request(`/payments?month=2026-09&show=${show}`)).text();
-    expect(filtered).toContain('Sample Cloud Lantern Oy');
-    expect(filtered).not.toContain('Unrelated Shop');
-    expect(filtered).not.toContain('Matched automatically');
-  }
+  expect(said.link).toEqual({ href: '/payments?month=2026-09&view=all', label: 'See them' });
+  // All lists the matched row as Matched; To do keeps only the missing one.
+  const all = await (await request('/payments?month=2026-09&view=all')).text();
+  expect(rowOf(all, 'Sample Cloud Lantern Oy')).toContain('Matched');
+  expect(all).not.toContain('Matched automatically');
+  const todo = await (await request('/payments?month=2026-09')).text();
+  expect(todo).not.toContain('Sample Cloud Lantern Oy');
+  expect(todo).toContain('Unrelated Shop');
 });
 
 test('one registry holds the words for a state', () => {

@@ -46,7 +46,7 @@ test('a Bank row asks for Match, Not a purchase and More, and keeps the rest und
     collision: '',
   });
   await env.DB.prepare('UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL').run();
-  const html = await (await request('/payments?month=2026-09&show=all')).text();
+  const html = await (await request('/payments?month=2026-09&view=all')).text();
   const row = rowOf(html);
   const shown = visibleControls(row).filter((c) => !c.startsWith('input:id'));
   expect(shown.sort()).toEqual(['button:Match', 'button:Not a purchase', 'summary:More']);
@@ -65,7 +65,7 @@ test('a Bank row with no likely receipt shows the search and Not a purchase, wit
     parsed: parsePreset(csv, 'race', 'EUR'),
     collision: '',
   });
-  const row = rowOf(await (await request('/payments?month=2026-09&show=all')).text());
+  const row = rowOf(await (await request('/payments?month=2026-09&view=all')).text());
   expect(id).toBeTruthy();
   expect(
     visibleControls(row)
@@ -81,10 +81,10 @@ test('automatic and manual matches both say Matched, with no Auto chip', async (
     '/matches',
     new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link', confirm_exception: 'yes' }),
   );
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${id}">Receipt</a>`);
   await env.DB.prepare("UPDATE bank_transactions SET match_method='automatic'").run();
-  const auto = await (await request('/payments?month=2026-09&show=all')).text();
+  const auto = await (await request('/payments?month=2026-09&view=all')).text();
   expect(auto).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${id}">Receipt</a>`);
   for (const html of [bank, auto, await (await request(`/receipts/${id}`)).text()]) {
     expect(html).not.toMatch(/Matched (automatically|by you)/);
@@ -94,7 +94,7 @@ test('automatic and manual matches both say Matched, with no Auto chip', async (
 
 test('Bank has no Statements history, only the Import statement button', async () => {
   await seedMismatch();
-  const html = await (await request('/payments?month=2026-09&show=all')).text();
+  const html = await (await request('/payments?month=2026-09&view=all')).text();
   expect(html).not.toContain('Statements (');
   expect(html).toContain('<a class="btn secondary" href="/import">Import statement</a>');
 });

@@ -306,7 +306,7 @@ test('money in is matched to a sales invoice by amount and reference, never to a
   expect(list).toContain('Sample Client GmbH');
   expect(list.match(/tag ok">Paid/g)).toHaveLength(2);
   // Money in on Payments links to the invoice.
-  expect(await (await request('/payments?month=2026-09&show=all')).text()).toContain(
+  expect(await (await request('/payments?month=2026-09&view=all')).text()).toContain(
     `<a class="tag" href="/receipts/${other.id}">Invoice</a>`,
   );
 });

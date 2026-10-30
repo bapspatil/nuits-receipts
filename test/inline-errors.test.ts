@@ -27,7 +27,7 @@ test('a pair that is not exact is explained on its row, and Match goes through',
   expect(html).toContain('<title>Bank · September 2026');
   expect(alertOf(html)).toContain(`<a href="#f-confirm-${tx}">Go to it</a>`);
   // The row now holds the pair, the reason, and one button that says what it does.
-  const row = html.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
+  const row = html.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
   expect(row).toContain(`id="f-confirm-${tx}" aria-describedby="e-why-${tx} e-match-${tx}"`);
   expect(row).toContain('>Match</button>');
   expect(row).not.toContain('Match anyway');
@@ -44,9 +44,9 @@ test('a pair that is not exact is explained on its row, and Match goes through',
 
 test('a row with an exact pair has no exception field, and typing a label in the search box finds the receipt', async () => {
   const { id, tx } = await seedMismatch();
-  const page = await (await request('/payments?month=2026-09&show=all')).text();
+  const page = await (await request('/payments?month=2026-09&view=all')).text();
   // Nothing looks like this payment: the line says so and the search box stands alone.
-  const row = page.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
+  const row = page.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
   expect(row).toContain('No receipt fits.');
   expect(row).toContain('<input name="receipt_id" list="pick-receipts"');
   expect(row).not.toContain('name="confirm_exception"');
@@ -170,7 +170,7 @@ test('a form that is not wired keeps the plain error page', async () => {
 test("one request's refusal never shows in another running at the same time", async () => {
   const { id, tx } = await seedMismatch();
   const bad = () => post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link' }));
-  const bankUrl = '/payments?month=2026-09&show=all';
+  const bankUrl = '/payments?month=2026-09&view=all';
   const quiet = await Promise.all([bankUrl, '/review', '/'].map(async (path) => (await request(path)).text()));
   const results = await Promise.all([bad(), request(bankUrl), bad(), request('/review'), request('/')]);
   const [first, ...rest] = await Promise.all(results.map((r) => r.text()));

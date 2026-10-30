@@ -171,7 +171,7 @@ async function transferRow(env: Env, debitId: string): Promise<{ to: string; nam
     .bind(debitId)
     .first<{ booking_date: string; merchant: string }>();
   return {
-    to: `/payments?${row ? `month=${row.booking_date.slice(0, 7)}&` : ''}show=all#transfers`,
+    to: `/payments?${row ? `month=${row.booking_date.slice(0, 7)}&` : ''}view=all#row-${debitId}`,
     name: row?.merchant ?? '',
   };
 }
@@ -340,7 +340,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return payments(
       env,
       url.searchParams.has('month') ? month(url.searchParams.get('month')) : arrivalMonth(env).then((a) => a.month),
-      offset,
       url.searchParams,
     );
   if (request.method === 'POST' && path === '/imports/csv')
@@ -785,8 +784,7 @@ async function redisplay(inner: Request, env: Env, state: RequestState, error: u
               : payments(
                   env,
                   month(row.booking_date.slice(0, 7)),
-                  0,
-                  new URLSearchParams({ month: row.booking_date.slice(0, 7), show: 'all' }),
+                  new URLSearchParams({ month: row.booking_date.slice(0, 7), view: 'all' }),
                 ),
         );
     } else if (url.pathname === '/imports/csv' && form.get('file') instanceof File)

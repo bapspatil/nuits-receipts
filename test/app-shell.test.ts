@@ -103,7 +103,7 @@ test('every page, including error pages, has the same five-item nav', async () =
     ['/receipts', '/receipts'],
     ['/receipts?show=needs&month=2026-09&q=a', '/receipts'],
     ['/payments?month=2026-09', '/payments'],
-    ['/payments?month=2026-09&show=missing', '/payments'],
+    ['/payments?month=2026-09&view=todo', '/payments'],
     ['/settings', '/settings'],
     ['/import', '/payments'],
     ['/invoices?month=2026-09', '/receipts'],
@@ -414,7 +414,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   expect(steps).toBe(
     // Undated receipts wait in Review, so Check is not done while any is left.
     '<li class="step now" aria-current="step"><a href="/review"><span class="vh">Next: </span><b>Check</b><span class="red">2 undated</span></a></li>' +
-      '<li class="step todo"><a href="/payments?month=2026-09&show=missing"><span class="vh">To do: </span><b>Match</b><span class="red">1 missing</span></a></li>' +
+      '<li class="step todo"><a href="/payments?month=2026-09&view=todo"><span class="vh">To do: </span><b>Match</b><span class="red">1 missing</span></a></li>' +
       '<li class="step todo"><a href="#send"><span class="vh">To do: </span><b>Send</b><span>Not ready</span></a></li>',
   );
   expect(html).not.toContain('Done: </span><b>Check</b>');
@@ -476,7 +476,7 @@ test('raw reason codes and payment IDs appear nowhere on the receipt page', asyn
     expect(visible(html), path).not.toMatch(/\b(uncertain|missing)_[a-z_]+\b/);
     expect(visible(html), path).not.toMatch(/\bneeds_review\b/);
   }
-  const payments = await (await request('/payments?month=2026-09&show=all')).text();
+  const payments = await (await request('/payments?month=2026-09&view=all')).text();
   expect(payments).toMatch(/value="[a-f0-9]{64}"/);
   expect(visible(payments)).not.toMatch(/[a-f0-9]{64}/);
   expect(payments).toContain('Sample Cloud Lantern Oy');
@@ -622,7 +622,7 @@ test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
     '/app/import',
     '/app/nope',
     `/app/receipts/${flagged.id}`,
-    '/app/payments?month=2026-09&show=missing',
+    '/app/payments?month=2026-09&view=todo',
   ]) {
     const response = await at(path);
     const html = await response.text();
@@ -672,7 +672,7 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
     for (const [, kind] of html.matchAll(/<span class="stamp (\w+)">/g))
       expect(['needs', 'missing'], path).toContain(kind);
   }
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toMatch(
     /<span class="tag ok">Matched<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
   );
@@ -700,29 +700,28 @@ test('filter chips show only when they filter something', async () => {
   for (let i = 2; i < 6; i++) await flaggedImage(i);
   expect(chips(await (await request('/review')).text())).toEqual([]);
   expect(chips(await (await request('/review?reason=sender')).text())).toEqual([]);
-  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
-    'All (3)',
-    'Missing (1)',
-    'Matched (1)',
-  ]);
+  // Bank's To do | All switch always shows both views, counted month-wide.
+  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual(['To do (1)', 'All (3)']);
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
-  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual(['All (3)', 'Matched (1)']);
+  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual(['To do (0)', 'All (3)']);
 });
 
 test('rarely used things sit behind one More per object, named for screen readers', async () => {
   await seed();
-  const bank = await (await request('/payments?month=2026-09&show=all')).text();
+  const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).not.toContain('Technical details');
   const more = [...bank.matchAll(/<details class="more"><summary aria-label="More for ([^"]+)">More<\/summary>/g)];
   // A row has a More only when it has an action to hide; the payment ID is not shown at all.
   expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop']);
   expect(bank).not.toMatch(/ID <code>/);
   // Remove match waits in More; the row shows only the receipt link.
-  const matchedRow = bank.match(/<li class="pay">[\s\S]*?<\/li>/)![0];
+  const matchedRow = bank.match(/<li class="pay"[^>]*>[\s\S]*?<\/li>/)![0];
   expect(matchedRow).toMatch(/<details class="more">[\s\S]*value="unlink">Remove match<\/button>/);
-  // Bank opens on Missing; the footer trio and the Transfers section are gone.
+  // Bank opens on To do; the footer trio and the Transfers section are gone.
   const missing = await (await request('/payments?month=2026-09')).text();
-  expect(missing).toContain('<a href="/payments?month=2026-09&show=missing" aria-current="page">Missing (1)</a>');
+  expect(missing).toContain(
+    '<a href="/payments?month=2026-09&view=todo" data-view="todo" data-count="1" aria-current="page">To do (1)</a>',
+  );
   expect(missing).not.toContain('Sample Cloud Lantern Oy');
   expect(missing).toContain('<button class="linkbtn" name="receipt_required" value="0">Not a purchase</button>');
   for (const gone of ['What is a missing receipt?', 'Own-account transfers', 'Pair a transfer', 'Statements imported'])
@@ -786,7 +785,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   // The empty Review says it is done and points at the next step, for the month the receipt belongs to.
   const empty = await (await request(await signed(landing))).text();
   expect(empty).toContain(
-    '<p class="banner" role="status">Every receipt is checked. Next, match September&#39;s payments. <a href="/payments?month=2026-09&amp;show=missing">Open Bank</a></p>',
+    '<p class="banner" role="status">Every receipt is checked. Next, match September&#39;s payments. <a href="/payments?month=2026-09&amp;view=todo">Open Bank</a></p>',
   );
 });
 

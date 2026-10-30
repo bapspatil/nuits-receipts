@@ -174,7 +174,7 @@ test('the last approval points at the next step for its month, or just says it i
   const said = (extra: string) => feedback(new URLSearchParams(`done=approvedLast${extra}`));
   expect(said('&month=2026-09&step=match')).toMatchObject({
     text: "Every receipt is checked. Next, match September's payments.",
-    link: { href: '/payments?month=2026-09&show=missing', label: 'Open Bank' },
+    link: { href: '/payments?month=2026-09&view=todo', label: 'Open Bank' },
   });
   expect(said('&month=2026-09&step=send')).toMatchObject({
     text: 'Every receipt is checked. Next, send September to your accountant.',
