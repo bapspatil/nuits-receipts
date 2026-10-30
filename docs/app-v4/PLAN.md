@@ -212,9 +212,9 @@ Playbook: figure-it-out (cross-cutting, multi-PR), running Feature steps inside 
   2. *After bulk-exempting every visible missing row, the next ones appear, and the page doesn't claim "Every payment has a receipt".
   3. *Chip counts equal `showCounts`, and the bulk total equals the rendered "N to do".
   4. *A single Not a purchase keeps the view and ends at `#row-<nextOpenId>`.
-  5. *Approve under `reason=amount` lands on the next item in that filter.
+  5. *Approve on a receipt opened from To do (`from=todo`, optionally `month=M`) lands on the next open item in the same order and filter, computed after the save. (The reason chips are cut, so `month` is the only To do filter.)
   6. *Skip on the last item ends on the list.
-  7. *Discard from a filtered To do keeps the filter.
+  7. *Discard from a month-filtered To do keeps the month.
   8. *Bulk-approve Undo brings all the rows back into To do.
   9. A resolved id never renders in To do, and the order is stable.
   10. *Bulk Not a purchase never drops a match silently.
