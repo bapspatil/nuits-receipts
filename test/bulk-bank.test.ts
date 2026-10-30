@@ -211,7 +211,7 @@ test('Bank renders a box per payment, the bar for its filter, and the script onc
   const paper = await tx('Fake Paper Shop');
   const html = await (await request('/payments?month=2026-09&view=all')).text();
   expect(html).toContain(
-    `<li class="pay missing" data-row="${paper.id}" id="row-${paper.id}"><label class="pick"><input type="checkbox" name="id" value="${paper.id}" form="bulk-payments">`,
+    `<li class="pay missing" data-row="${paper.id}" id="row-${paper.id}" tabindex="-1" style="view-transition-name:r-${paper.id}"><label class="pick"><input type="checkbox" name="id" value="${paper.id}" form="bulk-payments">`,
   );
   expect(html).toContain(
     '<div data-list="bank-all" data-total="2" data-bulk-list="bulk-payments"><div class="bulktools">',

@@ -56,7 +56,7 @@ export const PAGES = {
 } as const satisfies Record<string, { nav?: NavKey; title: string }>;
 export type PageKey = keyof typeof PAGES;
 // detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
-export type PageOptions = { detail?: string; head?: string; style?: string };
+export type PageOptions = { detail?: string; head?: string; style?: string; refresh?: number };
 export type Counts = { todo: number; missing: number };
 
 // Its own query, so a database without the inbound_mail table still counts.
@@ -122,7 +122,7 @@ h3{font-size:var(--text-base);line-height:1.25;font-weight:600;margin:0 0 var(--
 p{margin:0 0 var(--space-3)}
 code{font:500 .875em/1.4 var(--font-mono);background:var(--surface-sunken);padding:1px var(--space-2);border-radius:var(--radius-sm);overflow-wrap:anywhere}
 pre{font:400 var(--text-xs)/1.5 var(--font-mono);background:var(--surface-sunken);padding:var(--space-3);overflow:auto;border-radius:var(--radius-sm);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px}
-header.top{border-bottom:1px solid var(--border);background:var(--surface-raised)}
+main:focus{outline:none}header.top{border-bottom:1px solid var(--border);background:var(--surface-raised)}
 .bar{max-width:var(--page-max);margin:auto;padding:0 var(--pad);display:flex;align-items:stretch;gap:var(--space-6);min-height:var(--nav-height)}
 .brand{font:700 var(--text-lg)/1 var(--font-display);letter-spacing:-.01em;color:var(--text);text-decoration:none;display:flex;align-items:center;white-space:nowrap;min-height:44px}
 nav.main ul{display:flex;gap:var(--space-1);list-style:none;margin:0;padding:0;height:100%}
@@ -504,7 +504,7 @@ html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 .is-pending{opacity:.5}
 @media (max-width:879px){.bulkbar{bottom:var(--tabbar-height)}html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:calc(var(--tabbar-height) + 9rem)}}
 .gone{margin:0 0 var(--space-4)}
-@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;
+@media (prefers-reduced-motion:no-preference){.btn,nav.main a,nav.tabs a,.seg a,.chips a{transition:background-color .15s,border-color .15s,color .15s}.is-pending{transition:opacity .15s}}`;
 }
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
 export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${PALETTE.paper}"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="${PALETTE.petrol900}"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="${PALETTE.paper}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -618,18 +618,38 @@ function failureSummary(): string {
   return `<div class="alert" role="alert"><p><strong>Nothing was saved.</strong> ${escape(failure.message)}${link}</p></div>`;
 }
 
+const BANNER_ID = 'banner';
+const saidNow = () => {
+  const params = requestState.getStore()?.params;
+  return (params && feedback(params)) || null;
+};
 // The one status banner: what the last action did, with a next step or an Undo.
 function feedbackBanner(): string {
-  const params = requestState.getStore()?.params;
-  const said = params && feedback(params);
+  const said = saidNow();
   if (!said) return '';
   const link = said.link ? ` <a href="${escape(said.link.href)}">${escape(said.link.label)}</a>` : '';
-  if (!said.undo) return `<p class="banner" role="status">${escape(said.text)}${link}</p>`;
+  if (!said.undo) return `<p class="banner" id="${BANNER_ID}" role="status">${escape(said.text)}${link}</p>`;
   const fields = Object.entries(said.undo.fields)
     .map(([k, v]) => `<input type="hidden" name="${escape(k)}" value="${escape(v)}">`)
     .join('');
-  return `<div class="banner undo" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
+  return `<div class="banner undo" id="${BANNER_ID}" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
 }
+
+// Cross-document view transitions, opted into by the work lists and the receipt page only, since
+// both documents of a navigation must carry the rule. Each row is named inline by rowAttrs:
+// view-transition-name:auto, which would take the row's id, left the rows unanimated in Chrome 151.
+// scroll-margin-top keeps the row a fragment lands on clear of the header. Off under reduced motion.
+export const VIEW_TRANSITION_CSS = `@view-transition{navigation:auto}
+@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}
+::view-transition-group(*){animation-duration:.25s}
+#${BANNER_ID}{view-transition-name:banner}.listhead{view-transition-name:listhead}.fixes{view-transition-name:fixes}
+[data-row]{scroll-margin-top:calc(var(--nav-height) + var(--space-4))}
+[data-row]:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}`;
+// A list row the next action can land on: focusable by its #row- fragment, and described by the
+// banner when the page has one, so a screen reader reads what happened with the row it lands on.
+export const rowAttrs = (id: string) =>
+  ` tabindex="-1"${saidNow() ? ` aria-describedby="${BANNER_ID}"` : ''}` +
+  ` style="view-transition-name:r-${escape(id)}"`;
 
 // Once per page however many bulk lists it has: the script binds every bar it finds.
 const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
@@ -648,10 +668,12 @@ export async function page(
   const entry: { nav?: NavKey; title: string } = PAGES[view];
   const { title } = entry;
   const heading = options.detail ? `${title} · ${options.detail}` : title;
+  const said = saidNow();
+  const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
     {
       status: requestState.getStore()?.failure?.status ?? status,
       headers: {
