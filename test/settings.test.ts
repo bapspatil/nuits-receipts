@@ -8,7 +8,7 @@ import { kindFor } from '../src/receipts';
 import { applied, layer, SETTING_VALUE_LIMIT, sourceOf, withSettings, type Row } from '../src/settings';
 import { DATA_LINE } from '../src/ui';
 import type { Env } from '../src/env';
-import { locationOf, request, signed } from './helpers';
+import { htmlForm, locationOf, request, signed } from './helpers';
 
 const page = async () => (await request('/settings')).text();
 const decode = (s: string) =>
@@ -378,6 +378,22 @@ test('parts of the business: rename and add freely, remove only when unused', as
   expect(settings.defaultProduct).toBe('Consulting');
   const html = await page();
   expect(html).toContain('<option value="Consulting" selected>Consulting</option>');
+  // Removing a part offers Undo, which puts the whole save back, audited like any save.
+  const landed = await (await request(ok.headers.get('Location')!)).text();
+  expect(landed).toContain('Saved your business. Removed 1 part.');
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undone)).toMatch(
+    /^\/settings\?done=undone&op=settings&n=\d+&section=setup-business#setup-business$/,
+  );
+  const back = config(await withSettings(env));
+  expect(back.products.map((p) => p.id)).toEqual(['general', 'app', 'website', 'hosting']);
+  expect(back.defaultProduct).not.toBe('Consulting');
+  // The Undo is in the history under the person who made it, which also makes older tabs stale.
+  expect(
+    await env.DB.prepare("SELECT changed_by FROM settings_audit WHERE key='PRODUCTS_JSON' ORDER BY id DESC").first(
+      'changed_by',
+    ),
+  ).toBe('password');
 });
 
 test('advanced thresholds are bounded and change matching', async () => {

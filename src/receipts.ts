@@ -41,6 +41,7 @@ import {
 import { SALES_DERIVED, salesReview } from './sales';
 import { hasTodoReason, REQUIRED_FIELDS, REQUIRED_SALES_FIELDS } from './flags';
 import { parseDocument } from './parse';
+import { undoAt, withUndo, type UndoAt } from './undo';
 
 export async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
   requireInput(stream, 'Empty request', 400);
@@ -623,7 +624,8 @@ async function emailReview(env: Env, bytes: Uint8Array, emailKey: string, kind: 
     .run();
 }
 
-export async function correctReceipt(env: Env, id: string, form: FormData): Promise<void> {
+// Returns the action's time when it approved, which the banner's Undo names.
+export async function correctReceipt(env: Env, id: string, form: FormData): Promise<UndoAt | null> {
   const current = await getReceipt(env, id),
     revision = Number(form.get('revision'));
   requireInput(!current.discarded_at, 'Restore it first.', 409);
@@ -736,7 +738,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     ...(approved ? { approval_reason: approval, acknowledged_reasons: reasons } : {}),
   };
   const entries = [...Object.entries(facts), ...Object.entries(sales)],
-    now = new Date().toISOString();
+    now = undoAt();
   const invalidatesFx =
     facts.currency !== current.currency ||
     facts.issue_date !== current.issue_date ||
@@ -749,7 +751,7 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
     invalidatesFx ||
     duplicate !== null ||
     (isSales && status !== 'ready' && JSON.stringify(reasons) !== '["missing_eur"]');
-  const result = await env.DB.batch([
+  const writes = [
     env.DB.prepare(
       "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE receipt_id=? AND (?=1 OR match_method IS NOT 'manual') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND revision=?)",
     ).bind(id, unlinks ? 1 : 0, id, revision),
@@ -771,10 +773,14 @@ export async function correctReceipt(env: Env, id: string, form: FormData): Prom
       id,
       revision,
     ),
-  ]);
+  ];
+  const result = approved
+    ? await withUndo(env, { at: now, op: 'approve', ids: [id] }, writes)
+    : await env.DB.batch(writes);
   requireInput(result[1]?.meta.changes === 1, 'Stale receipt. Reload before saving.', 409);
   await cacheFx(env, await getReceipt(env, id));
   await reconcile(env);
+  return approved ? now : null;
 }
 
 // The sales fields of the invoice form. Empty values are unknown.
@@ -852,14 +858,20 @@ export function kindWrites(env: Env, id: string, kind: Kind, revision: number): 
 }
 
 // A sales invoice paid where no imported statement shows it (a Stripe payout,
-// cash, another bank). Empty date clears it.
-export async function markPaidOutside(env: Env, id: string, form: FormData): Promise<void> {
+// cash, another bank). Empty date clears it. Returns the action's time, for Undo.
+export async function markPaidOutside(env: Env, id: string, form: FormData): Promise<UndoAt> {
   const current = await getReceipt(env, id);
   requireInput(current.kind === 'sales', 'Only sales invoices can be marked paid');
   const { on, note } = paidFields(form);
-  await env.DB.prepare('UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE id=?')
-    .bind(on || null, on ? note : null, id)
-    .run();
+  const at = undoAt();
+  await withUndo(env, { at, op: 'paid', ids: [id] }, [
+    env.DB.prepare('UPDATE receipts SET paid_outside_on=?,paid_outside_note=? WHERE id=?').bind(
+      on || null,
+      on ? note : null,
+      id,
+    ),
+  ]);
+  return at;
 }
 // The paid date and how it was paid. No date means not paid.
 export function paidFields(form: FormData): { on: string; note: string } {

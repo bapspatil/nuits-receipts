@@ -122,8 +122,6 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Invalid receipt': "We couldn't find that receipt. Reload the page and try again.",
   'Receipt not found': "We couldn't find that receipt. It may have been removed.",
   'This receipt changed. Reload and try again.': 'This receipt changed since you opened it. Reload and try again.',
-  'Remove the match first.':
-    'This receipt is matched to a payment. Remove the match first, or choose Remove and discard.',
   'Invalid undo': "That undo link isn't valid any more.",
 
   // domain

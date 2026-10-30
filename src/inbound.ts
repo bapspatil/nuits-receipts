@@ -11,6 +11,7 @@ import { hash, requireInput } from './domain';
 import { headerFields, headerFromAddress, senderVerdict } from './sender';
 import { importEmail, kindFor } from './receipts';
 import { applied, saveChanges } from './settings';
+import type { UndoAt } from './undo';
 
 // At most this many unknown-sender emails wait at once, and this many from one
 // sender. Mail beyond either limit is logged only.
@@ -282,12 +283,14 @@ export async function ignoredSenders(env: Env): Promise<{ address: string; added
   }
 }
 
-async function saveAllowed(env: Env, list: string[], who: string): Promise<void> {
+// at: the time of an action the banner can undo.
+async function saveAllowed(env: Env, list: string[], who: string, at?: UndoAt): Promise<void> {
   await saveChanges(
     env,
     [{ key: 'ALLOWED_SENDER_EMAILS', value: list.join(', '), old: null }],
     who,
     applied(env).revision,
+    at,
   );
 }
 
@@ -434,14 +437,14 @@ export async function unignoreSenders(env: Env, senders: readonly string[]): Pro
   return result.meta.changes ?? 0;
 }
 
-export async function removeApproved(env: Env, value: unknown, who: string): Promise<void> {
-  requireInput(await removeSenders(env, [senderAddress(value)], who), 'That sender is not on the list.', 404);
+export async function removeApproved(env: Env, value: unknown, who: string, at: UndoAt): Promise<void> {
+  requireInput(await removeSenders(env, [senderAddress(value)], who, at), 'That sender is not on the list.', 404);
 }
-// Takes these off the allowed list in one write. Returns how many were on it.
-export async function removeSenders(env: Env, senders: readonly string[], who: string): Promise<number> {
+// Takes these off the allowed list in one write, with its Undo. Returns how many were on it.
+export async function removeSenders(env: Env, senders: readonly string[], who: string, at: UndoAt): Promise<number> {
   const current = [...config(env).allowedSenders];
   const gone = new Set(senders);
   const kept = current.filter((s) => !gone.has(s));
-  if (kept.length < current.length) await saveAllowed(env, kept, who);
+  if (kept.length < current.length) await saveAllowed(env, kept, who, at);
   return current.length - kept.length;
 }

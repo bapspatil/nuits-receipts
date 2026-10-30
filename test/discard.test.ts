@@ -7,7 +7,7 @@ import { mergePlan } from '../src/dedupe';
 import { placement } from '../src/package';
 import { documentRows, monthRows } from '../src/ui';
 import { MAX_BULK } from '../src/discard';
-import { locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, locationOf, request, uploadPdf } from './helpers';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 async function receipt(n: number, o: { status?: string; vendor?: string; total?: number; invoice?: string } = {}) {
@@ -78,9 +78,8 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(page).toContain('Discarded · Personal');
   expect(page).not.toContain('action="/discard"');
 
-  const at = new URL(location, 'http://localhost').searchParams.get('at')!;
-  const undo = await post('/restore', { at, back: '/receipts?view=todo' });
-  expect(locationOf(undo)).toMatch(/^\/receipts\?view=todo&done=restored&n=2#row-/);
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(review, '/undo') });
+  expect(locationOf(undo)).toMatch(/^\/receipts\?view=todo&done=undone&op=discard&n=2#row-/);
   expect((await row(1))!.discarded_at).toBeNull();
   expect((await monthRows(env, '2026-10')).map((r) => r.id)).toEqual([id(1), id(2)]);
   expect(await (await request('/receipts?show=discarded')).text()).toContain('Nothing discarded.');
@@ -97,14 +96,13 @@ test('a discarded row is never a merge primary and cannot be matched or edited',
   expect(edit.status).toBe(409);
 });
 
-test('a bank-matched row needs unmatch, which removes the match in the same step', async () => {
+test('a bank-matched row is discarded in one click with its match, and Undo brings back both', async () => {
   await receipt(1);
   await matchTo(1);
+  const matched = await env.DB.prepare("SELECT * FROM bank_transactions WHERE id='tx1'").first();
   const page = await (await request(`/receipts/${id(1)}`)).text();
-  expect(page).toContain('Remove match?');
-  expect((await post('/discard', { id: id(1), back: '/receipts' })).status).toBe(409);
-  expect((await row(1))!.discarded_at).toBeNull();
-  const ok = await post('/discard', { id: id(1), unmatch: '1', back: '/receipts' });
+  expect(page).not.toContain('Remove match?');
+  const ok = await post('/discard', { id: id(1), back: '/receipts' });
   expect(ok.status).toBe(303);
   expect((await row(1))!.discarded_at).toBeTruthy();
   expect(
@@ -112,6 +110,27 @@ test('a bank-matched row needs unmatch, which removes the match in the same step
   ).toBeNull();
   // The freed payment is not matched back to the discarded receipt.
   expect((await post('/matches', { transaction_id: 'tx1', receipt_id: id(1), action: 'link' })).status).toBe(422);
+  const landed = await (await request(ok.headers.get('Location')!)).text();
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect(locationOf(undo)).toMatch(/done=undone&op=discard&n=1/);
+  expect((await row(1))!.discarded_at).toBeNull();
+  expect(await env.DB.prepare("SELECT * FROM bank_transactions WHERE id='tx1'").first()).toEqual(matched);
+});
+
+test('Undo of a discard leaves the payment alone when it was matched to another receipt since', async () => {
+  await receipt(1);
+  await receipt(2, { status: 'ready' });
+  await matchTo(1);
+  const ok = await post('/discard', { id: id(1), back: '/receipts' });
+  const landed = await (await request(ok.headers.get('Location')!)).text();
+  await env.DB.prepare("UPDATE bank_transactions SET receipt_id=?,match_method='manual' WHERE id='tx1'")
+    .bind(id(2))
+    .run();
+  await request('/undo', { method: 'POST', body: htmlForm(landed, '/undo') });
+  expect((await row(1))!.discarded_at).toBeNull();
+  expect(await env.DB.prepare("SELECT receipt_id FROM bank_transactions WHERE id='tx1'").first('receipt_id')).toBe(
+    id(2),
+  );
 });
 
 test('stale revisions and oversized batches are refused', async () => {
@@ -122,7 +141,7 @@ test('stale revisions and oversized batches are refused', async () => {
   expect((await row(1))!.discarded_at).toBeNull();
 });
 
-test('Discard is one click with no reason; a matched receipt still asks about its match', async () => {
+test('Discard is one click with no reason, matched or not, on the page and in the bar', async () => {
   await receipt(1, { status: 'needs_review' });
   await receipt(2, { status: 'needs_review' });
   await matchTo(2);
@@ -136,13 +155,14 @@ test('Discard is one click with no reason; a matched receipt still asks about it
     ),
   );
   expect(await (await request(`/receipts/${id(2)}`)).text()).toMatch(
-    /<details class="discard"><summary>Discard<\/summary>[^]*?<p class="ask">Remove match\?<\/p><button class="btn secondary">Remove and discard<\/button>/,
+    new RegExp(
+      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(2)}">[^]*?<button class="linkbtn">Discard</button></form>`,
+    ),
   );
   const bulk = review.slice(review.indexOf('class="bulkbar"'));
-  // No reason to pick, but the bar still asks, since Undo can't bring a match back yet.
-  expect(bulk).toContain(
-    '<p class="ask">Discard these? Matched ones lose their match.</p><button name="op" value="discard" class="btn danger">Discard</button>',
-  );
+  // Nothing to ask: Undo brings back the receipts and their matches.
+  expect(bulk).not.toContain('Discard these?');
+  expect(bulk).toMatch(/<button name="op" value="discard" class="btn[^"]*">Discard<\/button>/);
   const page = await (await request(`/receipts/${id(1)}`)).text();
   expect(page).not.toContain('name="reason"');
   expect(page).not.toContain('Remove match?');
@@ -155,9 +175,9 @@ test('from a receipt opened from To do, discard moves on to the next receipt lik
   }
   const r = (await row(1))!;
   const res = await post('/discard', { id: id(1), revision: String(r.revision), from: 'todo' });
-  expect(locationOf(res)).toMatch(new RegExp(`^/receipts/${id(2)}\\?from=todo&done=discarded&n=1&`));
+  expect(locationOf(res)).toBe(`/receipts/${id(2)}?from=todo&done=discarded&n=1`);
   const last = await post('/discard', { id: id(2), from: 'todo' });
-  expect(locationOf(last)).toMatch(/^\/receipts\?view=todo&done=discarded&n=1&/);
+  expect(locationOf(last)).toBe('/receipts?view=todo&done=discarded&n=1');
 });
 
 test('the same file sent again stays discarded', async () => {

@@ -69,4 +69,7 @@ export async function signed(path: string, base = '', now = Date.now()): Promise
 export function unsigned(location: string | null): string {
   return (location ?? '').replace(/&(iat|sig)=[^&#]*/g, '');
 }
-export const locationOf = (response: Response) => unsigned(response.headers.get('Location'));
+// Also without the at and op an Undo names the action by, since at changes on every run; a test
+// that undoes reads them from the page the redirect lands on.
+export const locationOf = (response: Response) =>
+  unsigned(response.headers.get('Location')).replace(/&at=[^&#]*&op=[^&#]*/, '');

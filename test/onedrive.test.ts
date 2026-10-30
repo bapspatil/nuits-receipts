@@ -507,6 +507,10 @@ test('upload and disconnect need the same origin, a folder, and the config', asy
     (await post('/app/month/onedrive-upload', { month: '2026-10' }, { Origin: 'https://evil.example' })).status,
   ).toBe(403);
   expect((await post('/app/settings/onedrive/disconnect', {}, { Origin: 'https://evil.example' })).status).toBe(403);
+  // Disconnect deletes the sign-in and has no Undo, so it asks first.
+  expect(await (await at('/app/settings')).text()).toMatch(
+    /<details class="cta"><summary>Disconnect<\/summary><div class="body"><form action="\/app\/settings\/onedrive\/disconnect" method="post"><p class="ask">/,
+  );
   const gone = await post('/app/settings/onedrive/disconnect', {});
   expect(locationOf(gone)).toBe('/app/settings?done=oneDriveDisconnected#onedrive');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_connection').first('n')).toBe(0);

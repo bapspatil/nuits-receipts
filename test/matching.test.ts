@@ -67,10 +67,10 @@ test('Match all matches the pairs that still fit, says so once, and its Undo tak
   const done = await post('/matches/bulk', form);
   expect(done.status).toBe(303);
   const location = done.headers.get('Location')!;
-  expect(locationOf(done)).toMatch(/^\/payments\?month=2026-09&view=todo&done=matchedMany&n=1&skipped=1&at=/);
+  expect(locationOf(done)).toMatch(/^\/payments\?month=2026-09&view=todo&done=matchedMany&n=1&skipped=1#row-/);
   const page = await (await request(location)).text();
   expect(page).toContain('Matched 1 payment. 1 payment changed since you opened the page and was left alone.');
-  expect(page).toContain('<form method="post" action="/matches/undo">');
+  expect(page).toContain('<form method="post" action="/undo">');
   const rows = await env.DB.prepare(
     'SELECT id,receipt_id,match_method FROM bank_transactions ORDER BY booking_date',
   ).all();
@@ -78,9 +78,9 @@ test('Match all matches the pairs that still fit, says so once, and its Undo tak
   expect(rows.results[1]).toMatchObject({ receipt_id: null });
   // A by-you match says so in words.
   expect(await bank()).toContain('<span class="tag ok">Matched</span>');
-  const undo = await post('/matches/undo', htmlForm(page, '/matches/undo'));
+  const undo = await post('/undo', htmlForm(page, '/undo'));
   expect(undo.status).toBe(303);
-  expect(await (await request(undo.headers.get('Location')!)).text()).toContain('Removed 1 match.');
+  expect(await (await request(undo.headers.get('Location')!)).text()).toContain('Match undone for 1 payment.');
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n')).toBe(
     0,
   );
@@ -99,19 +99,19 @@ test('Match all re-checks each pair on the server and never accepts an exception
     0,
   );
   expect((await post('/matches/bulk', new URLSearchParams({ month: '2026-09' }))).status).toBe(422);
-  expect((await post('/matches/undo', new URLSearchParams({ at: 'x', month: '2026-09' }))).status).toBe(422);
+  expect((await post('/undo', new URLSearchParams({ at: 'x', op: 'match' }))).status).toBe(400);
 });
 
 test('a forged Undo for Match all gets no form', () => {
   const p = (extra: Record<string, string>) => new URLSearchParams({ done: 'matchedMany', n: '2', ...extra });
   const at = '2026-09-03T10:00:00.000Z';
-  expect(feedback(p({ at, month: '2026-09' }))?.undo).toEqual({
-    action: '/matches/undo',
-    fields: { at, month: '2026-09' },
+  expect(feedback(p({ at, op: 'match', month: '2026-09' }))?.undo).toEqual({
+    action: '/undo',
+    fields: { at, op: 'match', month: '2026-09' },
   });
-  expect(feedback(p({ at: 'now', month: '2026-09' }))?.undo).toBeNull();
+  expect(feedback(p({ at: 'now', op: 'match' }))?.undo).toBeNull();
   expect(feedback(p({ at }))?.undo).toBeNull();
-  expect(feedback(new URLSearchParams({ done: 'matchedMany', n: '0', at, month: '2026-09' }))?.undo).toBeNull();
+  expect(feedback(new URLSearchParams({ done: 'matchedMany', n: '0', at, op: 'match' }))?.undo).toBeNull();
 });
 
 test('a receipt still in Review is matched, and the payment says the receipt needs you', async () => {

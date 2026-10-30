@@ -6,7 +6,7 @@ import worker from '../src/index';
 import { importBankCsv, parsePreset } from '../src/banking';
 import { BULK_CAP } from '../src/bulk';
 import type { Receipt } from '../src/domain';
-import { idFrom, locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 type Seed = { status?: string; kind?: string; vendor?: string; net?: number | null; month?: string; client?: string };
@@ -126,18 +126,12 @@ test('discard sets the rows aside with one Undo back to the same list; restore b
     q: 'vendor',
     offset: '50',
   });
-  const location = locationOf(res);
-  expect(location).toMatch(/^\/receipts\?view=all&month=2026-10&q=vendor&done=discarded&n=2&at=[^&]+&back=/);
+  expect(locationOf(res)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=discarded&n=2');
   expect((await row(1))!.discard_reason).toBeNull();
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('2 discarded.');
-  expect(page).toContain('action="/restore"');
-  const at = new URL(location, 'http://localhost').searchParams.get('at')!;
-  const undo = await request('/restore', {
-    method: 'POST',
-    body: form({ at, back: '/receipts?view=all&month=2026-10&q=vendor' }),
-  });
-  expect(locationOf(undo)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=restored&n=2');
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(page, '/undo') });
+  expect(locationOf(undo)).toBe('/receipts?view=all&month=2026-10&q=vendor&done=undone&op=discard&n=2');
   expect((await row(1))!.discarded_at).toBeNull();
 
   await bulk({ op: 'discard', id: ids(1, 2) });
@@ -342,10 +336,8 @@ test('a run that changed nothing says so, with no Undo', async () => {
   await receipt(1);
   await bulk({ op: 'discard', id: id(1) });
   const res = await bulk({ op: 'discard', id: id(1), list: 'receipts', view: 'all' });
-  expect(locationOf(res)).toMatch(
-    /^\/receipts\?view=all&done=discarded&n=0&at=[^&]+&back=%2Freceipts%3Fview%3Dall&skipped=1$/,
-  );
+  expect(locationOf(res)).toBe('/receipts?view=all&done=discarded&n=0&skipped=1');
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('Nothing changed. 1 skipped.');
-  expect(page).not.toContain('action="/restore"');
+  expect(page).not.toContain('action="/undo"');
 });

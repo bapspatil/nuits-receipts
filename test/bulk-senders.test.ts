@@ -5,7 +5,7 @@ import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import worker from '../src/index';
 import { BULK_CAP } from '../src/bulk';
-import { locationOf, request } from './helpers';
+import { htmlForm, locationOf, request } from './helpers';
 
 const LINK_AUTH =
   'Authentication-Results: mx.cloudflare.net; dkim=pass header.d=link.com header.s=x header.b=y; dmarc=pass header.from=link.com policy.dmarc=reject; spf=pass (mx.cloudflare.net: domain of bounce@amazonses.com designates 1.2.3.4 as permitted sender) smtp.mailfrom=0100-abc@amazonses.com\r\n';
@@ -167,6 +167,14 @@ test('Settings removes allowed senders in one write and stops ignoring others', 
     skipped: 1,
   });
   expect(await allowedWrites()).toBe(1);
+  // Undo puts the list back as the deploy set it: the app's own value goes again, with an audit row.
+  const undone = await request('/undo', { method: 'POST', body: htmlForm(page, '/undo') });
+  expect(locationOf(undone)).toBe('/settings?done=undone&op=settings&n=1&section=senders#senders');
+  expect(await allowedList()).toBe('');
+  expect(await allowedWrites()).toBe(2);
+  expect(await (await request(undone.headers.get('Location')!)).text()).toContain(
+    'Your settings are back as they were.',
+  );
 
   await env.DB.batch(
     ['a@fake.example', 'b@fake.example'].map((a) =>

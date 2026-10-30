@@ -167,7 +167,7 @@ test('Match takes only the exact likely pairs, and the banner Undo takes them ba
   const res = await bulk({ month: '2026-09', view: 'todo', op: 'match', id: ids });
   const location = locationOf(res);
   expect(location).toMatch(
-    /^\/payments\?month=2026-09&view=todo&done=matchedMany&n=1&at=[^&]+&picked=1&skipped=2#row-[a-f0-9]{64}$/,
+    /^\/payments\?month=2026-09&view=todo&done=matchedMany&n=1&picked=1&skipped=2#row-[a-f0-9]{64}$/,
   );
   expect(
     await env.DB.prepare('SELECT id,receipt_id,match_method FROM bank_transactions WHERE receipt_id IS NOT NULL').all(),
@@ -176,8 +176,8 @@ test('Match takes only the exact likely pairs, and the banner Undo takes them ba
   expect(done).toContain(
     'Matched 1 payment. 2 skipped: no exact likely receipt, or changed since you opened the page.',
   );
-  const undo = await request('/matches/undo', { method: 'POST', body: htmlForm(done, '/matches/undo') });
-  expect(undo.status).toBe(303);
+  const undo = await request('/undo', { method: 'POST', body: htmlForm(done, '/undo') });
+  expect(locationOf(undo)).toBe(`/payments?month=2026-09&view=todo&done=undone&op=match&n=1#row-${offered[0]}`);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions WHERE receipt_id IS NOT NULL').first('n')).toBe(
     0,
   );
@@ -191,7 +191,9 @@ test('all=1 takes the month and the view', async () => {
   const missing = await json({ month: '2026-09', view: 'todo', op: 'exempt', all: '1' });
   const body = (await missing.json()) as { location: string; n: number; skipped: number };
   expect(body).toMatchObject({ n: 1, skipped: 0 });
-  expect(body.location).toMatch(/^\/payments\?month=2026-09&view=todo&done=notPurchaseMany&n=1&iat=\d+&sig=/);
+  expect(body.location).toMatch(
+    /^\/payments\?month=2026-09&view=todo&done=notPurchaseMany&n=1&at=[^&]+&op=exempt&iat=\d+&sig=/,
+  );
   expect((await tx('Fake Paper Shop')).receipt_required).toBe(0);
   // The matched row is not missing, and October is another month.
   expect((await tx('Sample Cloud Lantern Oy')).receipt_required).toBe(1);

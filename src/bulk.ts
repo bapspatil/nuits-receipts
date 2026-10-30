@@ -150,6 +150,7 @@ export function bulkBar(list: BulkList): string {
   }</div><progress hidden max="1" value="0"></progress></form>`;
 }
 
+export const KIND_LOSS = 'Moving clears the client, VAT details, paid date, your corrections and any match.';
 // The receipt lists' actions; src/batch.ts runs each op.
 export type ReceiptOp = 'approve' | 'discard' | 'restore' | 'retry' | 'kind' | 'paid';
 const chip = (name: string, value: string, label: string, on = false) =>
@@ -163,19 +164,16 @@ export const RECEIPT_ACTIONS = {
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
-  // Undo can't bring a match back yet, so the bar still asks before it removes one.
-  discard: {
-    op: 'discard',
-    label: 'Discard',
-    tone: 'danger',
-    confirm: 'Discard these? Matched ones lose their match.',
-  },
+  // Undo brings back the receipts and their matches, so it asks nothing.
+  discard: { op: 'discard', label: 'Discard' },
   restore: { op: 'restore', label: 'Restore' },
   retry: { op: 'retry', label: 'Read again', max: AI_CAP },
+  // No Undo: the move clears what belongs to the other kind, so it asks first.
   kind: (from: Kind) => ({
     op: 'kind',
     label: 'Move',
     max: AI_CAP,
+    confirm: KIND_LOSS,
     fields: `<div class="reasons" role="group" aria-label="Move to">${chip('to', 'sales', 'Sales invoices', from === 'expense')}${chip('to', 'expense', 'Receipts', from === 'sales')}</div>`,
   }),
   paid: (today: string) => ({

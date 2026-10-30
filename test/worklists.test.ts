@@ -218,8 +218,7 @@ test('inv7: Discard from a month-filtered To do keeps the month', async () => {
   expect(to.hash).toBe(`#row-${last}`);
 });
 
-// Today: the banner has no Undo form.
-test.fails('inv8: Undo after a bulk approve brings every row back into To do', async () => {
+test('inv8: Undo after a bulk approve brings every row back into To do', async () => {
   const b = await seedBusyMonth();
   const ids = b.todoApprovable.slice(0, 4);
   expect(ids).toHaveLength(4);
@@ -235,11 +234,13 @@ test.fails('inv8: Undo after a bulk approve brings every row back into To do', a
   const approved = await bulkApprove(ids);
   expect(approved.status).toBe(303);
   expect((await snapshot()).every((r) => r.status === 'ready')).toBe(true);
-  const banner = await get(locationOf(approved));
+  const banner = await get(approved.headers.get('Location')!);
+  expect(banner).toContain('Approved 4 receipts.');
   const undo = htmlForm(banner, '/undo');
   expect(list(banner).rows).not.toEqual(expect.arrayContaining(ids));
   const undone = await request('/undo', { method: 'POST', body: undo });
   expect(undone.status).toBe(303);
+  expect(await get(undone.headers.get('Location')!)).toContain('Approval undone for 4 receipts.');
   expect(await snapshot()).toEqual(before);
   expect(list(await get('/receipts?view=todo')).rows).toEqual(expect.arrayContaining(ids));
 });

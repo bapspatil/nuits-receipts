@@ -7,6 +7,7 @@ import { InputError, money, normalize, withinWindow, type Receipt, type Rule, ty
 import { aliased, nameScore } from './matcher';
 import type { Env } from './env';
 import { invoiceName } from './invoices';
+import { withUndo, type UndoAt } from './undo';
 import { plural } from './ui';
 
 export function receiptName(r: Receipt): string {
@@ -156,28 +157,33 @@ export function whyLikely(f: PairFacts): string {
 export const matchAllLabel = (n: number): string => (n === 1 ? 'Match the likely one' : `Match all ${n} likely`);
 
 // ---------- Writing a match ----------
-// One guarded write for POST /matches and the bulk route; true when the pair was still open.
-export async function linkMatch(env: Env, t: Transaction, r: Receipt, at: string): Promise<boolean> {
+// The guarded write for POST /matches and Match all: it applies only while the pair is still open.
+// free: also only while no other payment holds the receipt, so a batch of them never trips the
+// UNIQUE receipt_id and stops the rest.
+function linkWrite(env: Env, t: Transaction, r: Receipt, at: string, free = false): D1PreparedStatement {
   const credit = t.amount_minor > 0;
-  const result = await env.DB.prepare(
-    `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND ${MATCHABLE_SQL})`,
-  )
-    .bind(r.id, at, t.id, r.id, r.kind, r.revision)
-    .run();
-  return result.meta.changes === 1;
+  return env.DB.prepare(
+    `UPDATE bank_transactions SET receipt_id=?,match_method='manual',matched_at=? WHERE id=? AND receipt_id IS NULL AND receipt_required=1 AND ${credit ? 'amount_minor>0' : 'amount_minor<0'} AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete') AND EXISTS(SELECT 1 FROM receipts WHERE id=? AND kind=? AND revision=? AND duplicate_of IS NULL AND discarded_at IS NULL AND ${MATCHABLE_SQL})${free ? ' AND NOT EXISTS(SELECT 1 FROM bank_transactions o WHERE o.receipt_id=?4)' : ''}`,
+  ).bind(r.id, at, t.id, r.id, r.kind, r.revision);
+}
+// One match, with its Undo; true when the pair was still open.
+export async function linkMatch(env: Env, t: Transaction, r: Receipt, at: UndoAt): Promise<boolean> {
+  const [result] = await withUndo(env, { at, op: 'match', ids: [t.id] }, [linkWrite(env, t, r, at)]);
+  return result?.meta.changes === 1;
 }
 
 export const BULK_MAX = 100;
-// Match every listed pair that still fits exactly, all stamped with one time so
-// Undo can find them. A pair that changed since the page was drawn is skipped.
+// Match every listed pair that still fits exactly, in one batch with its Undo.
+// A pair that changed since the page was drawn is skipped.
 export async function matchLikely(
   env: Env,
   pairs: readonly (readonly [string, string])[],
   rules: Rule[],
   tuning: Tuning,
-  at: string,
+  at: UndoAt,
 ): Promise<{ matched: number; skipped: number }> {
-  let matched = 0;
+  const writes: D1PreparedStatement[] = [];
+  const ids: string[] = [];
   for (const [txId, receiptId] of pairs.slice(0, BULK_MAX)) {
     const t = await env.DB.prepare(
       "SELECT t.* FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.id=? AND i.status='complete'",
@@ -190,34 +196,23 @@ export async function matchLikely(
     if (!t || !r || t.amount_minor >= 0 || r.kind !== 'expense' || r.duplicate_of || r.discarded_at || !matchable(r))
       continue;
     if (!fits(r, t, rules, tuning) || t.receipt_id || !t.receipt_required) continue;
-    try {
-      if (await linkMatch(env, t, r, at)) matched++;
-    } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('UNIQUE constraint')) throw error;
-    }
+    writes.push(linkWrite(env, t, r, at, true));
+    ids.push(t.id);
   }
+  const results = await withUndo(env, { at, op: 'match', ids }, writes);
+  const matched = results.filter((r) => r.meta.changes === 1).length;
   return { matched, skipped: Math.min(pairs.length, BULK_MAX) - matched };
 }
-// Undo for the bulk match: only rows still carrying that batch's time, and only by-you matches.
-// Returns the payments it unmatched.
-export async function unmatchLikely(env: Env, at: string): Promise<string[]> {
-  const result = await env.DB.prepare(
-    "UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE matched_at=? AND match_method='manual' RETURNING id",
-  )
-    .bind(at)
-    .all<{ id: string }>();
-  return result.results.map((r) => r.id);
-}
-// Takes the matches off these payments. Taken apart by the owner, so the
+// Takes the matches off these payments, with their Undo. Taken apart by the owner, so the
 // matcher never links the same pair again on its own. Returns how many it unmatched.
-export async function unlinkMatches(env: Env, ids: readonly string[]): Promise<number> {
+export async function unlinkMatches(env: Env, ids: readonly string[], at: UndoAt): Promise<number> {
   const picked =
     "id IN (SELECT value FROM json_each(?)) AND receipt_id IS NOT NULL AND EXISTS(SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')";
   const list = JSON.stringify(ids);
-  const [, unlinked] = await env.DB.batch([
+  const [, unlinked] = await withUndo(env, { at, op: 'unmatch', ids }, [
     env.DB.prepare(
       `INSERT INTO match_rejections(transaction_id,receipt_id,rejected_at) SELECT id,receipt_id,? FROM bank_transactions WHERE ${picked} ON CONFLICT DO NOTHING`,
-    ).bind(new Date().toISOString(), list),
+    ).bind(at, list),
     env.DB.prepare(
       `UPDATE bank_transactions SET receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE ${picked}`,
     ).bind(list),
