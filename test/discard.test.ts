@@ -8,6 +8,7 @@ import { placement } from '../src/package';
 import { documentRows, monthRows } from '../src/ui';
 import { MAX_BULK } from '../src/discard';
 import { htmlForm, locationOf, request, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 const id = (n: number) => n.toString(16).padStart(64, '0');
 async function receipt(n: number, o: { status?: string; vendor?: string; total?: number; invoice?: string } = {}) {
@@ -151,18 +152,18 @@ test('Discard is one click with no reason, matched or not, on the page and in th
   expect(review).not.toContain('action="/discard"');
   expect(await (await request(`/receipts/${id(1)}`)).text()).toMatch(
     new RegExp(
-      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(1)}">[^]*?<button class="linkbtn">Discard</button></form>`,
+      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(1)}">[^]*?<button class="btn ghost"><svg[^>]*><use href="#i-x"/></svg><span>Discard</span></button></form>`,
     ),
   );
   expect(await (await request(`/receipts/${id(2)}`)).text()).toMatch(
     new RegExp(
-      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(2)}">[^]*?<button class="linkbtn">Discard</button></form>`,
+      `<form method="post" action="/discard" class="discard"><input type="hidden" name="id" value="${id(2)}">[^]*?<button class="btn ghost"><svg[^>]*><use href="#i-x"/></svg><span>Discard</span></button></form>`,
     ),
   );
   const bulk = review.slice(review.indexOf('class="bulkbar"'));
   // Nothing to ask: Undo brings back the receipts and their matches.
   expect(bulk).not.toContain('Discard these?');
-  expect(bulk).toMatch(/<button name="op" value="discard" class="btn[^"]*">Discard<\/button>/);
+  expect(bulk).toContain(button('discard', { attrs: ' name="op" value="discard"' }));
   const page = await (await request(`/receipts/${id(1)}`)).text();
   expect(page).not.toContain('name="reason"');
   expect(page).not.toContain('Remove match?');

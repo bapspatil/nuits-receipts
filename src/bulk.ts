@@ -1,6 +1,6 @@
 import type { Kind } from './domain';
 import { escape } from './ui';
-import { STATUS } from './status';
+import { button, buttonSummary, type ActionKey } from './actions';
 
 // Ids per request, and per all=1 resolution on the server.
 export const BULK_CAP = 500;
@@ -8,10 +8,11 @@ export const BULK_CAP = 500;
 // Per request for the ops that read documents again with the model.
 export const AI_CAP = 10;
 
+// The bar is not a place for a primary: the page's one main action stays the header's. Each action
+// renders from its key in ACTIONS, so its label and icon are the ones every other control shows.
 export type BulkAction = {
   op: string;
-  label: string;
-  tone?: 'primary' | 'danger';
+  key: ActionKey;
   // Shown in a <details> step before the submit button.
   confirm?: string;
   // Trusted HTML for extra inputs inside the step. Avoid `required`: a hidden
@@ -120,16 +121,14 @@ export function bulkTools(list: BulkList, pageCount: number): string {
   return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label></div>`;
 }
 
-const toneClass = (tone: BulkAction['tone']) =>
-  tone === 'primary' ? 'btn primary' : tone === 'danger' ? 'btn danger' : 'btn';
-
 function actionHtml(action: BulkAction): string {
-  const submit = (cls: string) =>
-    `<button name="op" value="${escape(action.op)}" class="${cls}"${action.max ? ` data-max="${action.max}"` : ''}>${escape(action.label)}</button>`;
-  if (!action.confirm && !action.fields) return submit(toneClass(action.tone));
-  return `<details class="bulkstep"><summary class="${toneClass(action.tone)}">${escape(action.label)}</summary><div class="body">${action.fields ?? ''}${
+  const submit = button(action.key, {
+    attrs: ` name="op" value="${escape(action.op)}"${action.max ? ` data-max="${action.max}"` : ''}`,
+  });
+  if (!action.confirm && !action.fields) return submit;
+  return `<details class="bulkstep">${buttonSummary(action.key)}<div class="body">${action.fields ?? ''}${
     action.confirm ? `<p class="ask">${escape(action.confirm)}</p>` : ''
-  }${submit(action.tone === 'danger' ? 'btn danger' : 'btn primary')}</div></details>`;
+  }${submit}</div></details>`;
 }
 
 export function bulkBar(list: BulkList): string {
@@ -141,11 +140,15 @@ export function bulkBar(list: BulkList): string {
   // Select all acts on the list's first BULK_CAP rows in its order, as the server resolves all=1.
   const all = Math.min(list.total, BULK_CAP);
   const noun = escape(list.noun[all === 1 ? 0 : 1]);
-  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-all="${all}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p><button type="button" class="linkbtn" data-bulk-all hidden>${
-    all < list.total ? `Select the first ${all} ${noun}` : `Select all ${all} ${noun}`
-  }</button><button type="reset" class="linkbtn">Clear</button><div class="bulkacts">${shown}${
+  return `<form id="${escape(list.form)}" class="bulkbar" data-bulk data-total="${list.total}" data-all="${all}" data-noun="${escape(list.noun.join('|'))}" method="post" action="${escape(list.action)}">${scope}<input type="hidden" name="all" value=""><p class="bulkcount"><output data-bulk-count aria-live="polite"></output><span class="bulkstatus" data-bulk-status aria-live="polite"></span></p>${button(
+    'selectAll',
+    {
+      label: all < list.total ? `Select the first ${all} ${noun}` : `Select all ${all} ${noun}`,
+      attrs: ' type="button" data-bulk-all hidden',
+    },
+  )}${button('clear', { attrs: ' type="reset"' })}<div class="bulkacts">${shown}${
     more.length
-      ? `<details class="bulkmore"><summary class="btn">More</summary><div class="body">${more.map(actionHtml).join('')}</div></details>`
+      ? `<details class="bulkmore">${buttonSummary('more')}<div class="body">${more.map(actionHtml).join('')}</div></details>`
       : ''
   }</div><progress hidden max="1" value="0"></progress></form>`;
 }
@@ -158,28 +161,26 @@ const chip = (name: string, value: string, label: string, on = false) =>
 export const RECEIPT_ACTIONS = {
   approve: {
     op: 'approve',
-    label: 'Approve',
-    tone: 'primary',
+    key: 'approve',
     confirm: 'Approve the selected receipts as they are?',
     fields:
       '<label class="bulkfield">Reason<input type="text" name="approval_reason" value="Checked against the original" maxlength="1000"></label>',
   },
   // Undo brings back the receipts and their matches, so it asks nothing.
-  discard: { op: 'discard', label: 'Discard' },
-  restore: { op: 'restore', label: 'Restore' },
-  retry: { op: 'retry', label: 'Read again', max: AI_CAP },
+  discard: { op: 'discard', key: 'discard' },
+  restore: { op: 'restore', key: 'restore' },
+  retry: { op: 'retry', key: 'reread', max: AI_CAP },
   // No Undo: the move clears what belongs to the other kind, so it asks first.
   kind: (from: Kind) => ({
     op: 'kind',
-    label: 'Move',
+    key: from === 'expense' ? 'move' : 'moveBack',
     max: AI_CAP,
     confirm: KIND_LOSS,
     fields: `<div class="reasons" role="group" aria-label="Move to">${chip('to', 'sales', 'Sales invoices', from === 'expense')}${chip('to', 'expense', 'Receipts', from === 'sales')}</div>`,
   }),
   paid: (today: string) => ({
     op: 'paid',
-    label: 'Paid',
-    tone: 'primary',
+    key: 'paid',
     fields: `<label class="bulkfield">Paid on<input type="date" name="paid_outside_on" value="${escape(today)}"></label><label class="bulkfield">How<input type="text" name="paid_outside_note" maxlength="300" placeholder="Stripe payout 14 Oct"></label>`,
   }),
 } as const satisfies Record<
@@ -190,29 +191,24 @@ export const RECEIPT_ACTIONS = {
 // Bank's actions; src/batch.ts runs each op.
 export type PaymentOp = 'match' | 'exempt' | 'require' | 'unmatch';
 export const PAYMENT_ACTIONS = [
-  { op: 'match', label: 'Match', tone: 'primary' },
-  { op: 'exempt', label: STATUS.notPurchase },
-  { op: 'require', label: 'Needs receipt' },
-  {
-    op: 'unmatch',
-    label: 'Remove match',
-    tone: 'danger',
-    confirm: 'Remove the matches of the selected payments? They will not be matched again on their own.',
-  },
+  { op: 'match', key: 'match' },
+  { op: 'exempt', key: 'exempt' },
+  { op: 'require', key: 'needs' },
+  // Undo brings the matches back, so it asks nothing.
+  { op: 'unmatch', key: 'unmatch' },
 ] as const satisfies readonly (BulkAction & { op: PaymentOp })[];
 
 // Unknown senders' held mail by email, and Settings > Senders by address.
 export type SenderOp = 'allow' | 'ignore' | 'remove' | 'unignore';
 export const SENDER_ACTIONS = {
-  allow: { op: 'allow', label: 'Allow', tone: 'primary' },
-  ignore: { op: 'ignore', label: 'Ignore' },
+  allow: { op: 'allow', key: 'allow' },
+  ignore: { op: 'ignore', key: 'ignore' },
   remove: {
     op: 'remove',
-    label: 'Remove',
-    tone: 'danger',
+    key: 'remove',
     confirm: 'Remove the selected senders? Their next emails wait in To do.',
   },
-  unignore: { op: 'unignore', label: 'Stop ignoring' },
+  unignore: { op: 'unignore', key: 'unignore' },
 } as const satisfies { [K in SenderOp]: BulkAction & { op: K } };
 
 // Runs once per bar: reducer state, rendering, keys, long-press and posting.

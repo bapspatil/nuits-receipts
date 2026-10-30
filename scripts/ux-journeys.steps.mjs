@@ -96,7 +96,7 @@ export const journeys = [
       await rec.click(nav(page, '/payments'));
       await rec.click(link(page, 'Import statement'));
       await rec.upload(page.locator('input[name=file]'), file);
-      await rec.click(button(page, 'Import'));
+      await rec.click(button(page, 'Import statement'));
       rec.note(`After import: ${(await page.locator('main p.summary').first().innerText()).trim()}`);
       rec.note(
         `Import banner: ${(await page.locator('main [role=status]').first().innerText()).replace(/\s+/g, ' ').trim()}`,
@@ -138,7 +138,7 @@ export const journeys = [
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
       await rec.upload(page.locator('input[name=file]'), file);
-      await rec.click(button(page, 'Add files'));
+      await rec.click(button(page, 'Upload'));
       await page.waitForTimeout(2000);
       rec.note(
         `After upload: ${new URL(page.url()).pathname} says "${(await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 160)}"`,
@@ -221,7 +221,7 @@ async function unsettleBank(page, base) {
   // First, so its reconcile cannot match the others again.
   await open('Sample Missing Vendor', 'Needs a receipt');
   for (const merchant of ['Sample Cloud Lantern Oy', 'DOMAINDESK', 'Sample Train Line'])
-    await open(merchant, 'Remove match');
+    await open(merchant, 'Unmatch');
 }
 
 // Settings runs one same-origin script under its own policy. The audit contexts bypass CSP, so

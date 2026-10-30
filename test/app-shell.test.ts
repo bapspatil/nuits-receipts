@@ -7,6 +7,8 @@ import { FONT_FILES } from '../src/fonts';
 import { EXPORT_LINE, FOOTER_NOTICE } from '../src/ui';
 import type { Env } from '../src/env';
 import { authorization, htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
+import { icon } from '../src/icons';
+import { button, buttonLink, statusMark } from '../src/actions';
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
 // The same four destinations in the header and the phone tab bar, on every page.
@@ -128,7 +130,7 @@ test('every page, including error pages, has the same four-item nav', async () =
   expect(missingHtml).toContain(
     '<div class="alert" role="alert"><p><strong>We couldn&#39;t find that page.</strong></p></div>',
   );
-  expect(missingHtml).toContain('<a class="btn primary" href="/receipts?view=todo">Go back</a>');
+  expect(missingHtml).toContain(buttonLink('back', '/receipts?view=todo', { tone: 'primary' }));
   const body = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   body.set('action', 'approve');
   const refused = await request(`/receipts/${flagged.id}`, {
@@ -222,10 +224,12 @@ test('empty screens say what is missing and offer one next step', async () => {
     '/receipts?view=all&kind=sales&month=2026-09',
   ]) {
     const empty = (await (await request(path)).text()).match(/<div class="card empty">([\s\S]*?)<\/div>/)?.[1] ?? '';
-    expect(empty, path).toMatch(/^<h2>[^]*<\/h2><a class="btn primary" href="[^"]+">[^<]+<\/a>$/);
+    expect(empty, path).toMatch(
+      /^<h2>[^]*<\/h2><a class="btn primary" href="[^"]+"><svg[^>]*><use href="#i-[a-z-]+"\/><\/svg><span>[^<]+<\/span><\/a>$/,
+    );
   }
   expect(await (await request('/receipts?view=todo')).text()).toContain(
-    '<div class="card empty"><h2>Nothing to do.</h2><a class="btn primary" href="/receipts?view=all">See receipts</a></div>',
+    `<div class="card empty"><h2>Nothing to do.</h2>${buttonLink('seeReceipts', '/receipts?view=all', { tone: 'primary' })}</div>`,
   );
   // No statement yet: Bank has no transfer or import sections to show.
   expect(await (await request('/payments?month=2026-09')).text()).not.toContain('id="transfers"');
@@ -241,7 +245,7 @@ test('empty screens say what is missing and offer one next step', async () => {
   await uploadPdf();
   const quiet = await (await request('/?month=2030-01')).text();
   expect(quiet).toContain('<b>Check</b><span>Nothing yet</span>');
-  expect(quiet).toContain('<a class="btn primary" href="/add">Add receipts</a>');
+  expect(quiet).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
   expect(primaries(quiet)).toBe(1);
   await seed();
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
@@ -313,11 +317,11 @@ test('Receipts and Invoices are two tabs of All with counts, always shown, and n
 test('Receipts All leaves Needs you and Unknown sender to To do, and offers Add', async () => {
   const empty = await (await request('/receipts?view=all')).text();
   // Empty: Add receipt is the one primary, not also a head button.
-  expect(empty).toContain('<a class="btn primary" href="/add">Add receipt</a>');
+  expect(empty).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
   expect(empty.match(/>Add receipt</g)).toHaveLength(1);
   const { ready } = await seed();
   const html = await (await request('/receipts?view=all')).text();
-  expect(html).toContain('<a class="btn primary" href="/add">Add receipt</a>');
+  expect(html).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
   expect(html.match(/>Add receipt</g)).toHaveLength(1);
   // No exceptions, no chips; one search field, no month input.
   expect(html).not.toContain('aria-label="Show"');
@@ -386,10 +390,8 @@ test('Invoices is a list like Receipts: one summary line, one status word, CSV w
   expect(html.match(/<p class="summary">.*?<\/p>/)?.[0]).toBe(
     '<p class="summary">Invoiced EUR 125.50, received EUR 0.00</p>',
   );
-  expect(html).toMatch(
-    new RegExp(
-      `<li><label class="pick"><input type="checkbox" name="id" value="${sales}" form="bulk-invoices"><span class="vh">Select Invoice to Example Client Oy</span></label><a href="/receipts/${sales}\\?from=all&amp;month=2026-09">Example Client Oy</a><span class="amt">EUR 125.50</span><span class="ok">INV-7 · <span class="stamp missing">Overdue</span> 18 Sep</span></li>`,
-    ),
+  expect(html).toContain(
+    `<li><label class="pick"><input type="checkbox" name="id" value="${sales}" form="bulk-invoices"><span class="vh">Select Invoice to Example Client Oy</span></label><a href="/receipts/${sales}?from=all&amp;month=2026-09">Example Client Oy</a><span class="amt">EUR 125.50</span><span class="ok">INV-7 · ${statusMark('overdue', { after: '18 Sep' })}</span></li>`,
   );
   expect(html).toContain(`<p class="small">${EXPORT_LINE}</p>`);
   expect(html).not.toContain('What counts as paid?');
@@ -427,7 +429,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   await flaggedImage(1);
   const html = await (await request('/?month=2026-09')).text();
   expect(html).toContain(
-    '<div class="head"><div class="months" role="group" aria-label="Month"><a href="/?month=2026-08"><span aria-hidden="true">‹</span>Aug<span class="vh"> 2026</span></a><h1>September 2026</h1><a href="/?month=2026-10">Oct<span class="vh"> 2026</span><span aria-hidden="true">›</span></a></div></div>',
+    `<div class="head"><div class="months" role="group" aria-label="Month"><a href="/?month=2026-08">${icon('chevron-left')}Aug<span class="vh"> 2026</span></a><h1>September 2026</h1><a href="/?month=2026-10">Oct<span class="vh"> 2026</span>${icon('chevron-right')}</a></div></div>`,
   );
   // Three status rows, one word each; the current step's action is the one primary.
   const steps = html.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)?.[1];
@@ -439,7 +441,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   );
   expect(html).not.toContain('Done: </span><b>Check</b>');
   expect(html).toContain(
-    '<div class="next"><a class="btn primary" href="/receipts?view=todo&amp;month=2026-09">Check receipts</a></div>',
+    `<div class="next">${buttonLink('start', '/receipts?view=todo&month=2026-09', { tone: 'primary' })}</div>`,
   );
   expect(primaries(html)).toBe(1);
   expect(html).toMatch(/Receipts <span class="count">2<span class="vh"> to do<\/span><\/span>/);
@@ -457,7 +459,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   expect(dated).toContain(
     '<a href="/receipts?view=todo&amp;month=2026-09"><span class="vh">Next: </span><b>Check</b><span class="red">2 to check</span></a>',
   );
-  expect(dated).toContain('<a class="btn primary" href="/receipts?view=todo&amp;month=2026-09">Check receipts</a>');
+  expect(dated).toContain(buttonLink('start', '/receipts?view=todo&month=2026-09', { tone: 'primary' }));
   expect(dated).not.toContain('undated');
   // First run says what to do next instead of showing zeros.
   await env.DB.batch([
@@ -508,7 +510,7 @@ test('raw reason codes and payment IDs appear nowhere on the receipt page', asyn
   expect(payments).toMatch(/value="[a-f0-9]{64}"/);
   expect(visible(payments)).not.toMatch(/[a-f0-9]{64}/);
   expect(payments).toContain('Sample Cloud Lantern Oy');
-  expect(payments).toContain('<span class="stamp missing">Missing</span>');
+  expect(payments).toContain(statusMark('missing'));
 });
 
 test('Approve receipt posts the prefilled note and keeps every field name', async () => {
@@ -539,10 +541,14 @@ test('Approve receipt posts the prefilled note and keeps every field name', asyn
   expect(form.get('approval_reason')).toBe('Checked against the original');
   // Approve sits in the sticky bar, tied to the form; a hidden first button makes Enter approve.
   expect(html).toContain(
-    '<button class="btn primary" form="fix" name="action" value="approve">Approve receipt</button>',
+    button('approve', {
+      tone: 'primary',
+      label: 'Approve receipt',
+      attrs: ' form="fix" name="action" value="approve"',
+    }),
   );
   expect(html).toMatch(
-    /<form [^>]*id="fix">\s*<button class="vh" name="action" value="approve" tabindex="-1" aria-hidden="true">/,
+    /<form [^>]*id="fix">\s*<button class="btn secondary vh" name="action" value="approve" tabindex="-1" aria-hidden="true">/,
   );
   // Skip is the only "later"; there is no second save button.
   expect(html).not.toContain('Save, decide later');
@@ -574,7 +580,7 @@ test('images preview inline with locked-down headers; PDFs and emails never do',
   expect((await request(`/originals/${flagged.id}`)).headers.get('Content-Disposition')).toContain('attachment');
   // PDF: a link card, never a frame or an inline response.
   const pdfPage = await (await request(`/receipts/${ready.id}`)).text();
-  expect(pdfPage).toContain(`<a class="btn secondary" href="/originals/${ready.id}">Open PDF</a>`);
+  expect(pdfPage).toContain(buttonLink('original', `/originals/${ready.id}`));
   expect(pdfPage).not.toMatch(/<img|<iframe|<object|<embed/);
   expect((await request(`/originals/${ready.id}?view=inline`)).status).toBe(404);
   expect((await request(`/originals/${flagged.id}?variant=email&view=inline`)).status).toBe(404);
@@ -700,20 +706,18 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
   ]) {
     const html = await (await request(path)).text();
     expect(html, path).not.toMatch(/class="stamp (?:ready|matched)"/);
-    for (const [, kind] of html.matchAll(/<span class="stamp (\w+)">/g))
-      expect(['needs', 'missing'], path).toContain(kind);
+    for (const [, kind] of html.matchAll(/<(?:span|a) class="stamp (\w+)"/g))
+      expect(['warn', 'info', 'ok', 'muted'], path).toContain(kind);
   }
   const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).toMatch(
-    /<span class="tag ok">Matched<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
+    /<span class="stamp ok"><svg[^>]*><use href="#i-badge-check"\/><\/svg><span>Matched<\/span><\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
   );
-  expect(bank).toContain('<span class="stamp missing">Missing</span>');
+  expect(bank).toContain(statusMark('missing'));
   expect(bank).toContain('<span class="tag">Money in</span>');
   // A ready receipt has no stamp at all; one that needs you keeps it, tilted on its own page only.
-  expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(/<span class="tag ok">Matched<\/span>/);
-  expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
-    '<span class="stamp needs">Needs you</span>',
-  );
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain(statusMark('matched'));
+  expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(statusMark('needs'));
   expect(bank).not.toMatch(/\.stamp[^{]*\{[^}]*rotate/);
 });
 
@@ -743,20 +747,22 @@ test('rarely used things sit behind one More per object, named for screen reader
   await seed();
   const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).not.toContain('Technical details');
-  const more = [...bank.matchAll(/<details class="more"><summary aria-label="More for ([^"]+)">More<\/summary>/g)];
+  const more = [...bank.matchAll(/<details class="more"><summary class="btn ghost" aria-label="More for ([^"]+)">/g)];
   // A row has a More only when it has an action to hide; the payment ID is not shown at all.
   expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop']);
   expect(bank).not.toMatch(/ID <code>/);
   // Remove match waits in More; the row shows only the receipt link.
   const matchedRow = bank.match(/<li class="pay"[^>]*>[\s\S]*?<\/li>/)![0];
-  expect(matchedRow).toMatch(/<details class="more">[\s\S]*value="unlink">Remove match<\/button>/);
+  expect(matchedRow).toMatch(
+    /<details class="more">[\s\S]*value="unlink"><svg[^>]*><use href="#i-unlink"\/><\/svg><span>Unmatch<\/span><\/button>/,
+  );
   // Bank opens on To do; the footer trio and the Transfers section are gone.
   const missing = await (await request('/payments?month=2026-09')).text();
   expect(missing).toContain(
     '<a href="/payments?month=2026-09&amp;view=todo" data-view="todo" data-count="1" aria-current="page">To do (1)</a>',
   );
   expect(missing).not.toContain('Sample Cloud Lantern Oy');
-  expect(missing).toContain('<button class="linkbtn" name="receipt_required" value="0">Not a purchase</button>');
+  expect(missing).toContain(button('exempt', { attrs: ' name="receipt_required" value="0"' }));
   for (const gone of ['What is a missing receipt?', 'Own-account transfers', 'Pair a transfer', 'Statements imported'])
     expect(missing).not.toContain(gone);
   expect(bank).toContain('summary:focus-visible{');
@@ -791,7 +797,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
   const second = await flaggedImage(1);
   const first = await (await request(`/receipts/${flagged.id}`)).text();
   expect(first).toContain('<span class="prog">1 of 2 to check</span>');
-  expect(first).toContain('<button class="linkbtn" form="fix" name="action" value="skip">Skip ›</button>');
+  expect(first).toContain(button('skip', { attrs: ' form="fix" name="action" value="skip"' }));
   // Skip saves what was typed and opens the next one.
   const skip = htmlForm(first, `/receipts/${flagged.id}`);
   skip.set('vendor', 'Typed Then Skipped');
@@ -829,7 +835,7 @@ test('Approve and Skip move through Review; the last approval lands on Review', 
 test('a ready receipt has one Save; a new problem sends it back to Review', async () => {
   const { ready } = await seed();
   const html = await (await request(`/receipts/${ready.id}`)).text();
-  expect(html).toContain('<button class="btn primary" form="fix" name="action" value="save">Save</button>');
+  expect(html).toContain(button('save', { tone: 'primary', attrs: ' form="fix" name="action" value="save"' }));
   expect(html).not.toContain('value="approve"');
   // A ready receipt opens as its summary; Edit opens every field.
   expect(html).toContain('<details class="all"><summary>Edit</summary>');
@@ -856,12 +862,14 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   expect(html).toContain('<details class="all"><summary>Other fields</summary>');
   expect(html).toContain('<details class="note"><summary>Note</summary>');
   const more =
-    html.match(/<details class="more"><summary>More<\/summary>([\s\S]*?)<\/div><\/section><\/div>/)?.[1] ?? '';
+    html.match(
+      /<details class="more"><summary class="btn ghost">[\s\S]*?<\/summary>([\s\S]*?)<\/div><\/section><\/div>/,
+    )?.[1] ?? '';
   for (const action of ['Read again', 'Move to invoices', 'Download original', 'Upload a copy', 'Always file as'])
     expect(more, action).toContain(action);
   // Move has no Undo, so it says what it clears before it runs.
   expect(more).toMatch(
-    /<details><summary>Move to invoices<\/summary><div class="body"><form action="\/receipts\/[0-9a-f]{64}\/kind" method="post">[^]*?<p class="ask">Moving clears the client, VAT details, paid date, your corrections and any match.<\/p><button class="btn secondary" name="kind" value="sales">Move to invoices<\/button>/,
+    /<details><summary class="btn ghost"><svg[^>]*><use href="#i-folder-input"\/><\/svg><span>Move to invoices<\/span><\/summary><div class="body"><form action="\/receipts\/[0-9a-f]{64}\/kind" method="post">[^]*?<p class="ask">Moving clears the client, VAT details, paid date, your corrections and any match.<\/p><button class="btn ghost" name="kind" value="sales"><svg[^>]*><use href="#i-folder-input"\/><\/svg><span>Move to invoices<\/span><\/button>/,
   );
   expect(more).not.toContain('Technical details');
   for (const gone of [

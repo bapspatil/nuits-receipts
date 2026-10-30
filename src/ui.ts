@@ -8,7 +8,9 @@ import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
 import { isReady, needsReview } from './flags';
 import { LIST_DEFS, RECEIPTS_TODO, type View } from './worklist';
-import { STATUS, STEP, type StepState } from './status';
+import { STEP, type StepState } from './status';
+import { button, buttonLink, buttonSummary, statusMark } from './actions';
+import { icon, sprite, type IconName } from './icons';
 import { failureFor, kept, requestState } from './request';
 
 export function escape(value: unknown): string {
@@ -151,17 +153,24 @@ footer.foot a{color:var(--text-muted)}
 .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
 .btn:disabled{cursor:not-allowed;color:var(--text-muted);background:var(--surface-sunken)}
 .btn:active{transform:translateY(1px)}
-.linkbtn{text-align:left;background:none;border:0;padding:0 var(--space-2);font:inherit;font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;color:var(--accent);cursor:pointer;min-height:44px}
-a.linkbtn,.inline>a{display:inline-flex;align-items:center;min-height:44px}
+.btn.ghost{background:none;border-color:transparent;color:var(--accent)}
+.btn.ghost:hover{border-color:transparent;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
+.btn.danger{color:var(--danger);border-color:var(--danger)}.btn.danger:hover{background:var(--danger-surface);border-color:var(--danger)}
+.btn:disabled.ghost{background:none}
+svg.i{width:1.15em;height:1.15em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+summary.btn{list-style:none}summary.btn::-webkit-details-marker{display:none}
+.inline>a{display:inline-flex;align-items:center;min-height:44px}
 .stamp,.tag{display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);font-weight:600;white-space:nowrap;vertical-align:middle}
-.stamp::before,.tag.ok::before{content:"";width:8px;height:8px;flex:none;background:currentColor}
-.stamp.needs,.stamp.missing{color:var(--danger)}
+.tag.ok::before{content:"";width:8px;height:8px;flex:none;background:currentColor}
+.stamp{gap:var(--space-1)}.stamp svg.i{width:1em;height:1em}
+.stamp.warn{color:var(--stamp-needs)}.stamp.info{color:var(--info)}.stamp.ok{color:var(--stamp-ok)}
 .stamp.muted,.tag{color:var(--text-muted)}
-.stamp.muted::before{background:transparent;box-shadow:inset 0 0 0 1px currentColor}
+.stamp .when{font-weight:400;color:var(--text-muted)}
+a.stamp{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
 .tag.ok{color:var(--success)}
 a.tag{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
-.head .stamp{height:28px;padding:0 var(--space-3);border:1px solid currentColor;border-radius:var(--radius-sm);background:var(--danger-surface);font-size:var(--text-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.head .stamp::before{display:none}
+.head .stamp{height:28px;padding:0 var(--space-3);border:1px solid currentColor;border-radius:var(--radius-sm);font-size:var(--text-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.head .stamp.warn{background:var(--warn-surface)}.head .stamp.info{background:var(--info-surface)}.head .stamp.ok{background:var(--success-surface)}
 .head .stamp.muted{background:var(--surface-sunken)}
 .card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-5);margin-bottom:var(--space-4)}
 .card.active{border-top:3px solid var(--accent)}
@@ -224,7 +233,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .steps li.now>a>.vh,.steps li.now>div>.vh{color:var(--accent)}
 .steps li.done>a>.vh,.steps li.done>div>.vh{color:var(--success)}
 .steps b{font:600 var(--text-lg)/1.2 var(--font-ui)}
-.steps span:not(.vh){color:var(--text-muted);font-size:var(--text-sm);font-weight:600}.steps span.red{color:var(--danger)}
+.steps span:not(.vh){color:var(--text-muted);font-size:var(--text-sm);font-weight:600}.steps span.red{color:var(--warn)}
 .steps a::after{content:"\\203A";position:absolute;top:var(--space-4);right:var(--space-4);color:var(--text-muted);font-weight:600}
 .setup{margin:0 0 var(--space-5)}.setup h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-3);margin:0 0 var(--space-2)}.setup h2 span{font-size:var(--text-sm);font-weight:600;color:var(--text-muted)}
 .setup .steps{display:block;margin-bottom:var(--space-2)}
@@ -246,8 +255,8 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .send .btns{margin:var(--space-3) 0}
 .fixes>details.more{margin-top:var(--space-4)}
 details.more>.body>p>a{display:inline-flex;align-items:center;min-height:44px}
-details.more>.body .linkbtn{padding-inline:0;font-weight:400}
-.crumbs{display:flex;align-items:center;gap:var(--space-2) var(--space-4);margin:0 0 var(--space-2);font-size:var(--text-sm)}.crumbs a,.crumbs .linkbtn{min-height:44px;display:inline-flex;align-items:center}.crumbs a+a,.crumbs .linkbtn{margin-left:auto;padding:0}
+details.more>.body .btn.ghost{padding-inline:0;font-weight:400}
+.crumbs{display:flex;align-items:center;gap:var(--space-2) var(--space-4);margin:0 0 var(--space-2);font-size:var(--text-sm)}.crumbs a,.crumbs .btn{min-height:44px;display:inline-flex;align-items:center}.crumbs a+a,.crumbs .btn{margin-left:auto;padding:0}
 .head .amt{font:600 var(--text-lg)/1.2 var(--font-ui);margin-left:auto}
 .fix h2{margin:0 0 var(--space-2)}.fix details.all,.fix details.note{margin:var(--space-3) 0 0}
 .matchs{margin-top:var(--space-4)}.match .btn{margin-top:var(--space-2)}
@@ -276,7 +285,6 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .sbar{position:sticky;bottom:0;z-index:4;background:var(--surface-raised);border-top:1px solid var(--border-strong);padding:var(--space-2);margin-top:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);align-items:center}
 .sbar .prog{font-size:var(--text-sm);font-weight:600;white-space:nowrap}
 .sbar>.btn:last-child{margin-left:auto}
-.sbar>.linkbtn{padding:0 var(--space-2)}
 .sbar>details{border:0;background:none;margin:0;border-radius:0}
 .sbar>details>summary{font-size:var(--text-sm);font-weight:600;display:flex;align-items:center;min-height:44px;padding:0 var(--space-2);list-style:none;color:var(--text-muted)}
 .sbar>details>summary::-webkit-details-marker{display:none}
@@ -309,7 +317,7 @@ html:has(.sbar){scroll-padding-bottom:7rem}
 .inline{display:flex;gap:var(--space-2) var(--space-4);align-items:center;flex-wrap:wrap;margin-top:var(--space-2)}
 .inline form{display:inline}
 .summary{display:flex;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-4);font-weight:600}
-.summary .red{color:var(--danger)}
+.summary .red{color:var(--warn)}
 .csv{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4);margin:var(--space-4) 0 0}.csv p{margin:0}
 .wizard{list-style:none;display:flex;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-5);padding:0;counter-reset:w;font-weight:600;font-size:var(--text-sm);color:var(--text-muted)}
 .wizard li{display:flex;align-items:center;gap:var(--space-2)}
@@ -346,7 +354,7 @@ details.sect>.body>.banner,details.sect>.body>.warning,details.sect>.body>.alert
 .srow.bad input,.srow.bad textarea,.srow.bad select{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
 .meta{font-size:var(--text-sm);color:var(--text-muted);line-height:1.5}
 .meta code{font-size:var(--text-xs);padding:1px var(--space-1)}
-.meta .linkbtn,.sc .warning .linkbtn{min-height:44px;padding:0 var(--space-1)}
+.meta .btn.ghost,.sc .warning .btn.ghost{min-height:44px;padding:0 var(--space-1)}
 .confirm{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-3)}
 .confirm label.check{font-size:var(--text-sm);align-items:center}
 details.why{display:inline-block;background:none;border:0;margin:0}
@@ -464,7 +472,7 @@ body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=
 .tools{display:flex;align-items:center;gap:var(--space-2) var(--space-4);flex-wrap:wrap;margin:0 0 var(--space-3)}.tools form{margin:0}
 .list li:has(>.discard)>.why{align-self:center}
 form.discard{grid-column:2;grid-row:2;justify-self:end;margin:0}
-form.discard>.linkbtn{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);text-decoration:none}
+form.discard>.btn{font-size:var(--text-sm);color:var(--text-muted)}
 details.discard{grid-column:2;grid-row:2;justify-self:end;border:0;background:none;margin:0}
 details.discard>summary{padding:0 0 0 var(--space-2);font-size:var(--text-sm);color:var(--text-muted);display:flex;align-items:center;justify-content:flex-end;list-style:none}
 details.discard>summary::-webkit-details-marker{display:none}
@@ -497,7 +505,6 @@ html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 .bulkbar details{margin:0;border:0;background:none}.bulkbar details[open]{flex:1 1 100%}
 .bulkbar details>.body{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;padding:var(--space-2) 0}
 .bulkbar .body>.ask{flex:1 1 100%;margin:0}
-.bulkbar .btn.danger{color:var(--danger);border-color:var(--danger)}.bulkbar .btn.danger:hover{background:var(--danger-surface)}
 .bulkbar progress{flex:1 1 100%;height:4px;accent-color:var(--accent)}
 .bulkbar .chip{display:inline-flex;align-items:center;gap:var(--space-2)}.bulkbar .chip input{width:auto;min-height:0;margin:0;accent-color:var(--accent)}.bulkbar .chip:has(:checked){border-color:var(--text)}
 .bulkfield{display:flex;flex-direction:column;gap:var(--space-1);flex:1 1 14rem;font-size:var(--text-sm);font-weight:600}
@@ -509,14 +516,12 @@ html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 // The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
 export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${PALETTE.paper}"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="${PALETTE.petrol900}"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="${PALETTE.paper}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
-const svg = (paths: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
-const ICONS = {
-  home: svg('<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>'),
-  receipts: svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/>'),
-  bank: svg('<path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/>'),
-  settings: svg('<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
-};
+const NAV_ICONS = {
+  home: 'house',
+  receipts: 'receipt',
+  bank: 'landmark',
+  settings: 'sliders-horizontal',
+} as const satisfies Record<NavKey, IconName>;
 const count = (n: number, what: string) =>
   n > 0 ? ` <span class="count">${n}<span class="vh"> ${what}</span></span>` : '';
 const badges = (counts: Counts): Partial<Record<NavKey, string>> => ({
@@ -543,7 +548,7 @@ function tabs(active: NavKey | undefined, counts: Counts): string {
   const badge = badges(counts);
   return `<nav class="tabs" aria-label="Main"><ul>${NAV.map(
     (t) =>
-      `<li><a href="${t.href}"${current(t.key === active)}><span class="ti">${ICONS[t.key]}${badge[t.key] ?? ''}</span>${t.label}</a></li>`,
+      `<li><a href="${t.href}"${current(t.key === active)}><span class="ti">${icon(NAV_ICONS[t.key])}${badge[t.key] ?? ''}</span>${t.label}</a></li>`,
   ).join('')}</ul></nav>`;
 }
 
@@ -578,8 +583,9 @@ export function viewSwitch(href: (view: View) => string, counts: Record<View, nu
 }
 // The one Add button of the Receipts page; its label and target follow the open tab.
 export function addButton(active: 'all' | 'invoices', primary: boolean): string {
-  const [href, label] = active === 'invoices' ? ['/add?kind=sales', 'Add invoice'] : ['/add', 'Add receipt'];
-  return `<a class="btn ${primary ? 'primary' : 'secondary'}" href="${href}">${label}</a>`;
+  const [key, href] =
+    active === 'invoices' ? (['addInvoice', '/add?kind=sales'] as const) : (['addReceipt', '/add'] as const);
+  return buttonLink(key, href, { tone: primary ? 'primary' : 'secondary' });
 }
 // The words of a step marker, for screen readers: the same three everywhere.
 export function stepWord(state: StepState): string {
@@ -587,7 +593,7 @@ export function stepWord(state: StepState): string {
 }
 // The Access sign-out link, for the Settings page head on every screen size.
 export function signOutLink(env: Env): string {
-  return config(env).access ? '<a class="btn secondary" href="/cdn-cgi/access/logout">Sign out</a>' : '';
+  return config(env).access ? buttonLink('signOut', '/cdn-cgi/access/logout') : '';
 }
 
 // ---------- A refused form, shown in place ----------
@@ -632,7 +638,7 @@ function feedbackBanner(): string {
   const fields = Object.entries(said.undo.fields)
     .map(([k, v]) => `<input type="hidden" name="${escape(k)}" value="${escape(v)}">`)
     .join('');
-  return `<div class="banner undo" id="${BANNER_ID}" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}<button class="linkbtn">${escape(said.undo.label ?? 'Undo')}</button></form></div>`;
+  return `<div class="banner undo" id="${BANNER_ID}" role="status"><span>${escape(said.text)}${link}</span><form method="post" action="${escape(said.undo.action)}">${fields}${button('undo', { label: said.undo.label })}</form></div>`;
 }
 
 // Cross-document view transitions, opted into by the work lists and the receipt page only, since
@@ -672,8 +678,9 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>SPRITE</body></html>`;
   return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer></body></html>`,
+    markup.replace('SPRITE', () => sprite(markup)),
     {
       status: requestState.getStore()?.failure?.status ?? status,
       headers: {
@@ -717,7 +724,7 @@ export function tag(label: string, ok = false): string {
 }
 // Rarely used actions, behind one More per object. name says whose (for screen readers).
 export function more(body: string, name = '', open = false): string {
-  return `<details class="more"${open ? ' open' : ''}><summary${name ? ` aria-label="More for ${name}"` : ''}>More</summary><div class="body">${body}</div></details>`;
+  return `<details class="more"${open ? ' open' : ''}>${buttonSummary('more', { attrs: name ? ` aria-label="More for ${name}"` : '' })}<div class="body">${body}</div></details>`;
 }
 export type Chip = { href: string; label: string; count?: number; current: boolean };
 // Filter chips that filter something: a chip whose count is 0 or the whole
@@ -742,7 +749,7 @@ export function errorPage(env: Env, status: number, message: string, back: strin
   const view = status >= 500 ? 'failed' : 'rejected';
   return page(
     view,
-    `<div class="alert" role="alert"><p><strong>${escape(message)}</strong></p></div><div class="btns"><a class="btn primary" href="${escape(back)}">Go back</a><a class="linkbtn" href="/">Home</a></div>`,
+    `<div class="alert" role="alert"><p><strong>${escape(message)}</strong></p></div><div class="btns">${buttonLink('back', back, { tone: 'primary' })}${buttonLink('home', '/')}</div>`,
     status,
     env,
   );
@@ -856,13 +863,13 @@ export function monthSwitcher(path: string, selected: string): string {
     `<a href="${escape(`${path}${path.includes('?') ? '&' : '?'}month=${m}`)}">${text}</a>`;
   const prev = shiftMonth(selected, -1),
     next = shiftMonth(selected, 1);
-  return `<div class="months" role="group" aria-label="Month">${link(prev, `<span aria-hidden="true">‹</span>${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}<span aria-hidden="true">›</span>`)}</div>`;
+  return `<div class="months" role="group" aria-label="Month">${link(prev, `${icon('chevron-left')}${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}${icon('chevron-right')}`)}</div>`;
 }
-// A stamp only when the receipt needs you; quiet text otherwise, nothing when ready.
+// A stamp when the receipt needs you or is being read, Matched once it is paired, nothing when ready.
 export function stamp(receipt: Pick<Receipt, 'status' | 'review_reasons_json'>, matched = false): string {
-  if (needsReview(receipt)) return `<span class="stamp needs">${STATUS.needs}</span>`;
-  if (receipt.status === 'pending' || receipt.status === 'processing') return tag(STATUS.reading);
-  return matched ? tag(STATUS.matched, true) : '';
+  if (needsReview(receipt)) return statusMark('needs');
+  if (receipt.status === 'pending' || receipt.status === 'processing') return statusMark('reading');
+  return matched ? statusMark('matched') : '';
 }
 
 // Expense receipts dated in the month. Sales invoices have salesMonthRows().
@@ -892,7 +899,7 @@ export async function documentRows(env: Env, selected: string): Promise<Receipt[
 }
 export function uploadForm(receiptAddress = '', primary = false, kind: 'expense' | 'sales' = 'expense'): string {
   const mail = receiptAddress ? `Or forward to <code>${escape(receiptAddress)}</code>` : '';
-  return `<form action="/upload" method="post" enctype="multipart/form-data" class="upload">${kind === 'sales' ? '<input type="hidden" name="kind" value="sales">' : ''}<label>${kind === 'sales' ? 'Invoice' : 'Receipt'} (PDF or photo)<input required name="file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp"></label><div class="btns"><button class="btn ${primary ? 'primary' : 'secondary'}">Upload</button><a class="linkbtn" href="/add">Add several</a></div>${mail ? `<p class="small">${mail}</p>` : ''}</form>`;
+  return `<form action="/upload" method="post" enctype="multipart/form-data" class="upload">${kind === 'sales' ? '<input type="hidden" name="kind" value="sales">' : ''}<label>${kind === 'sales' ? 'Invoice' : 'Receipt'} (PDF or photo)<input required name="file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp"></label><div class="btns">${button('upload', { tone: primary ? 'primary' : 'secondary' })}${buttonLink('addMany', '/add')}</div>${mail ? `<p class="small">${mail}</p>` : ''}</form>`;
 }
 export function csvCell(value: unknown): string {
   const text = String(value ?? '');

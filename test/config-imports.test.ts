@@ -5,6 +5,7 @@ import worker from '../src/index';
 import type { Env } from '../src/env';
 import { FOOTER_NOTICE, EXPORT_LINE } from '../src/ui';
 import { confirmationForm, pdfBytes } from './helpers';
+import { button } from '../src/actions';
 
 const configured: Env = {
   ...env,
@@ -76,7 +77,7 @@ test('configured owner imports into a new account and retains products, notices 
     if (path.startsWith('/?')) {
       expect(rendered).not.toContain('By part');
       expect(rendered).toContain('<b>Send</b>');
-      expect(rendered).toMatch(/Mark September as sent<\/button>/);
+      expect(rendered).toContain(button('sent', { label: 'Mark September as sent' }));
       expect(rendered).toContain(EXPORT_LINE);
     }
   }

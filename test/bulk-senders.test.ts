@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import worker from '../src/index';
 import { BULK_CAP } from '../src/bulk';
 import { htmlForm, locationOf, request } from './helpers';
+import { button, buttonSummary } from '../src/actions';
 
 const LINK_AUTH =
   'Authentication-Results: mx.cloudflare.net; dkim=pass header.d=link.com header.s=x header.b=y; dmarc=pass header.from=link.com policy.dmarc=reject; spf=pass (mx.cloudflare.net: domain of bounce@amazonses.com designates 1.2.3.4 as permitted sender) smtp.mailfrom=0100-abc@amazonses.com\r\n';
@@ -201,16 +202,16 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   expect(review).toContain(`<li id="mail-${mailRow!.id}">`);
   expect(review).not.toContain('bulk-held');
   expect(review).toContain('<input type="hidden" name="back" value="/receipts?view=todo">');
-  expect(review).toContain('aria-label="Allow notifications@link.com">Allow</button>');
-  expect(review).toContain('<summary aria-label="Ignore notifications@link.com">Ignore</summary>');
+  expect(review).toContain(button('allow', { attrs: ' aria-label="Allow notifications@link.com"' }));
+  expect(review).toContain(buttonSummary('ignore', { attrs: ' aria-label="Ignore notifications@link.com"' }));
   expect(review).not.toContain('/assets/bulk.js');
 
   const settings = await (await request('/settings?open=senders')).text();
   expect(settings).toMatch(/<details class="sect" open><summary><h2>Email senders<\/h2>/);
   expect(settings).toContain('<input type="checkbox" name="id" value="owner@example.com" form="bulk-allowed">');
   expect(settings).toContain('<input type="checkbox" name="id" value="a@fake.example" form="bulk-ignored">');
-  expect(settings).toContain('<summary class="btn danger">Remove</summary>');
-  expect(settings).toContain('<button name="op" value="unignore" class="btn">Stop ignoring</button>');
+  expect(settings).toContain(buttonSummary('remove'));
+  expect(settings).toContain(button('unignore', { attrs: ' name="op" value="unignore"' }));
   expect(settings).toContain('<script src="/assets/settings.js" defer></script>');
   expect([...settings.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
 });

@@ -7,6 +7,7 @@ import type { Env } from '../src/env';
 import { hash } from '../src/domain';
 import { authorization, locationOf, signed } from './helpers';
 import { seed, unzip } from './package-helpers';
+import { buttonLink } from '../src/actions';
 
 // Synthetic app registration and key; nothing here talks to Microsoft.
 const CLIENT_ID = '11111111-2222-3333-4444-555555555555';
@@ -203,7 +204,7 @@ test('without the config there is no OneDrive UI, and a half config only gets a 
 
 test('connect sends PKCE S256 and a sealed state cookie; the callback stores the token encrypted', async () => {
   const settings = await (await at('/app/settings')).text();
-  expect(settings).toContain('<a class="btn secondary" href="/app/settings/onedrive/connect">Connect</a>');
+  expect(settings).toContain(buttonLink('connect', '/app/settings/onedrive/connect'));
   expect(settings).toContain(`${ORIGIN}/app/settings/onedrive/callback`);
   expect(settings).toContain(
     '<h2>OneDrive</h2><span class="sum">Not connected</span></summary><div class="body" id="onedrive">',
@@ -375,7 +376,7 @@ test('upload puts small files, chunked large files and the index in the month fo
   const [small, large] = await readyMonth(1, true);
   const page = await (await at('/app/?month=2026-10')).text();
   expect(page).toContain('action="/app/month/onedrive-upload"');
-  expect(page).toContain('>Upload anyway</button>');
+  expect(page).toContain('<span>Upload anyway</span></button>');
   expect(page).toContain('href="/app/settings#onedrive">Change</a>');
 
   const first = await post('/app/month/onedrive-upload', { month: '2026-10' });
@@ -509,7 +510,7 @@ test('upload and disconnect need the same origin, a folder, and the config', asy
   expect((await post('/app/settings/onedrive/disconnect', {}, { Origin: 'https://evil.example' })).status).toBe(403);
   // Disconnect deletes the sign-in and has no Undo, so it asks first.
   expect(await (await at('/app/settings')).text()).toMatch(
-    /<details class="cta"><summary>Disconnect<\/summary><div class="body"><form action="\/app\/settings\/onedrive\/disconnect" method="post"><p class="ask">/,
+    /<details class="cta"><summary class="btn ghost"><svg[^>]*><use href="#i-unplug"\/><\/svg><span>Disconnect<\/span><\/summary><div class="body"><form action="\/app\/settings\/onedrive\/disconnect" method="post"><p class="ask">/,
   );
   const gone = await post('/app/settings/onedrive/disconnect', {});
   expect(locationOf(gone)).toBe('/app/settings?done=oneDriveDisconnected#onedrive');

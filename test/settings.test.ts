@@ -95,7 +95,9 @@ test('a saved value wins over the deploy value, is audited, and Reset goes back'
   expect(await rows()).toEqual([{ key: 'APP_NAME', value_json: '"Example Books"', updated_by: 'password' }]);
   const html = await page();
   expect(html).toContain('Example Books</a>'); // the header brand
-  expect(html).toContain('<button class="linkbtn" form="reset-APP_NAME" name="reset" value="APP_NAME">Reset');
+  expect(html).toContain(
+    '<button class="btn ghost" form="reset-APP_NAME" name="reset" value="APP_NAME" aria-label="Reset ',
+  );
   expect(await audit()).toEqual([
     { key: 'APP_NAME', old_json: null, new_json: '"Example Books"', changed_by: 'password' },
   ]);
@@ -128,7 +130,9 @@ test('Reset posts its own small form, so Enter in a field still means Save', asy
   // belong to another form.
   const own = [...form.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]).filter((b) => !/\bform="/.test(b));
   expect(own[0]).toBe('<button class="btn secondary">');
-  expect(form).toContain('<button class="linkbtn" form="reset-APP_NAME" name="reset" value="APP_NAME">Reset');
+  expect(form).toContain(
+    '<button class="btn ghost" form="reset-APP_NAME" name="reset" value="APP_NAME" aria-label="Reset ',
+  );
   const reset = html.match(
     /<form id="reset-APP_NAME" action="\/settings\/setup\/reset" method="post" hidden>(.*?)<\/form>/,
   )!;
@@ -179,7 +183,9 @@ test('the page is one fold per section, one Save per group and history tucked aw
   const forms = [...html.matchAll(/<form action="\/settings\/setup" method="post"[^>]*>([\s\S]*?)<\/form>/g)];
   expect(forms).toHaveLength(5);
   for (const [, body] of forms) {
-    const own = [...body!.matchAll(/<button\b([^>]*)>([^<]*)/g)].filter(([, attrs]) => !/\bform="/.test(attrs!));
+    const own = [...body!.matchAll(/<button\b([^>]*)>(?:<svg.*?<\/svg>)?<span>([^<]*)/g)].filter(
+      ([, attrs]) => !/\bform="/.test(attrs!),
+    );
     expect(own.map(([, , text]) => text)).toEqual(['Save']);
   }
   // Deploy-only values and history start collapsed.

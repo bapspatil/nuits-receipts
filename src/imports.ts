@@ -29,6 +29,7 @@ import {
 import { ariaFor, day, errorLine, escape, input, page, pageHead, select, stepWord } from './ui';
 import { failureFor, kept } from './request';
 import { withDone } from './events';
+import { button } from './actions';
 
 export function hidden(name: string, value: unknown): string {
   return `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`;
@@ -80,7 +81,7 @@ export function presetLabel(p: { id: string; bank_name: string; name: string }):
 export const IMPORT = 'import';
 export async function importForm(): Promise<string> {
   const refused = failureFor(IMPORT);
-  return `<form action="/import" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX, CSV or PDF)<input type="file" name="file" accept=".xlsx,.csv,.pdf,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label></div><p class="small">Booked payments only. We find the account and the columns, and skip what you imported before.</p><button class="btn primary">Import</button></form>`;
+  return `<form action="/import" method="post" enctype="multipart/form-data"><h2>Choose the file</h2>${refused && !refused.field ? errorLine(IMPORT, '') : ''}<div class="fields"><label class="wide">Bank statement (XLSX, CSV or PDF)<input type="file" name="file" accept=".xlsx,.csv,.pdf,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/pdf" required id="f-file"${ariaFor(IMPORT, 'file')}>${errorLine(IMPORT, 'file')}</label></div><p class="small">Booked payments only. We find the account and the columns, and skip what you imported before.</p>${button('importStmt', { tone: 'primary' })}</form>`;
 }
 export function wizard(step: 1 | 2 | 3): string {
   return `<ol class="wizard" aria-label="Import steps">${['Choose file', 'Check', 'Import']
@@ -475,7 +476,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
       { value: 'additional', label: 'Import them as extra payments' },
     ],
     collision,
-  )}</div>${state.overlaps.length ? `<p class="warning">${state.overlaps.length} payments without a bank ID look the same as ones from another file. Skip them, or import them as extra payments.</p>` : ''}<label class="check"><input type="checkbox" name="acknowledge_other_account" value="yes"${ack === 'yes' ? ' checked' : ''}>I checked the account. Similar payments in my other accounts are separate payments.</label></fieldset><button class="btn ${errors ? 'primary' : 'secondary'}" formaction="/imports/csv/preview">Check again</button></div></details>`;
+  )}</div>${state.overlaps.length ? `<p class="warning">${state.overlaps.length} payments without a bank ID look the same as ones from another file. Skip them, or import them as extra payments.</p>` : ''}<label class="check"><input type="checkbox" name="acknowledge_other_account" value="yes"${ack === 'yes' ? ' checked' : ''}>I checked the account. Similar payments in my other accounts are separate payments.</label></fieldset>${button('checkAgain', { tone: errors ? 'primary' : 'secondary', attrs: ' formaction="/imports/csv/preview"' })}</div></details>`;
   let confirm = '',
     proof = '';
   if (!errors) {
@@ -499,7 +500,7 @@ export async function importPreview(env: Env, form: FormData): Promise<Response>
       account.kind === 'new'
         ? account.label
         : await env.DB.prepare('SELECT label FROM accounts WHERE id=?').bind(account.id).first('label');
-    confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p><button class="btn primary" formaction="/imports/csv/confirm">Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}</button></div>`;
+    confirm = `<div class="card active"><h2>Import into ${escape(accountName)}</h2><p class="hint">Only what you see here is imported.</p>${button('importStmt', { tone: 'primary', label: `Import ${preview.rows.length === 1 ? '1 payment' : `${preview.rows.length} payments`}`, attrs: ' formaction="/imports/csv/confirm"' })}</div>`;
   }
   const markup = `<form action="${errors ? '/imports/csv/preview' : '/imports/csv/confirm'}" method="post" enctype="multipart/form-data">${common}${proof}${unmapped ? editor : `${table}${exclusions}${confirm}${editor}`}</form>`;
   return page('import', wizard(2) + status + warnings + markup, errors ? 422 : 200, env, {

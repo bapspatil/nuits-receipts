@@ -5,6 +5,7 @@ import worker from '../src/index';
 import { importBankCsv, parsePreset, type Transaction } from '../src/banking';
 import { BULK_CAP } from '../src/bulk';
 import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { button } from '../src/actions';
 
 // The mock receipt is Sample Cloud Lantern Oy, EUR 125.50, 4 Sep.
 async function statement(rows: string, account = 'holvi') {
@@ -220,10 +221,14 @@ test('Bank renders a box per payment, the bar for its filter, and the script onc
   expect(html).toContain(
     '<input type="hidden" name="list" value="bank"><input type="hidden" name="view" value="all"><input type="hidden" name="month" value="2026-09">',
   );
-  expect(html).toContain('<button name="op" value="match" class="btn primary">Match</button>');
-  expect(html).toContain('<button name="op" value="exempt" class="btn">Not a purchase</button>');
-  expect(html).toContain('<button name="op" value="require" class="btn">Needs receipt</button>');
-  expect(html).toContain('<summary class="btn danger">Remove match</summary>');
+  expect(html).toContain(button('match', { attrs: ' name="op" value="match"' }));
+  expect(html).toContain(button('exempt', { attrs: ' name="op" value="exempt"' }));
+  expect(html).toContain(button('needs', { attrs: ' name="op" value="require"' }));
+  // Undo brings the matches back, so Unmatch asks nothing and is not red.
+  expect(html).toContain(button('unmatch', { attrs: ' name="op" value="unmatch"' }));
+  expect(html).not.toContain(
+    '<summary class="btn ghost"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-unlink"/>',
+  );
   // Every nested row form stays.
   expect(html).toContain(`<form action="/payments/${paper.id}" method="post">`);
   expect([...html.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);

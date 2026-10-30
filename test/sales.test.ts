@@ -11,6 +11,7 @@ import { hash, type Receipt } from '../src/domain';
 import type { Env } from '../src/env';
 import { htmlForm, idFrom, locationOf, pdfBytes, request } from './helpers';
 import { seed, zipOf } from './package-helpers';
+import { statusMark } from '../src/actions';
 // Headers Cloudflare Email Routing prepends after authenticating the envelope.
 const cloudflarePass = 'Authentication-Results: mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass;\r\n';
 
@@ -304,7 +305,7 @@ test('money in is matched to a sales invoice by amount and reference, never to a
   expect((await t(loose))!.receipt_id).toBe(other.id);
   const list = await (await request('/receipts?view=all&kind=sales&month=2026-09')).text();
   expect(list).toContain('Sample Client GmbH');
-  expect(list.match(/tag ok">Paid/g)).toHaveLength(2);
+  expect(list.split(statusMark('paid').slice(0, -'</span></span>'.length))).toHaveLength(3);
   // Money in on Payments links to the invoice.
   expect(await (await request('/payments?month=2026-09&view=all')).text()).toContain(
     `<a class="tag" href="/receipts/${other.id}">Invoice</a>`,
@@ -322,7 +323,7 @@ test('overdue and paid outside the bank', async () => {
   const todo = await (await request('/receipts?view=todo')).text();
   expect(todo).toMatch(
     new RegExp(
-      `<li data-row="${r.id}" id="row-${r.id}" tabindex="-1" style="view-transition-name:r-${r.id}">[^]*?<span class="tag">Invoice</span> <span class="stamp missing">Overdue</span>[^]*?<summary aria-label="Mark [^"]+ paid">Mark paid</summary>`,
+      `<li data-row="${r.id}" id="row-${r.id}" tabindex="-1" style="view-transition-name:r-${r.id}">[^]*?<span class="tag">Invoice</span> <span class="stamp warn">[^]*?<span>Overdue</span>[^]*?<summary class="btn secondary" aria-label="Mark [^"]+ paid">[^]*?<span>Mark paid</span></summary>`,
     ),
   );
   const form = new FormData();

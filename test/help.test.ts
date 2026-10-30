@@ -11,7 +11,7 @@ const entries = () => helpSections().flatMap((s) => s.groups.flatMap((g) => g.en
 
 test('every status word and every flag has a help entry', () => {
   const terms = entries().map((e) => e.term);
-  for (const [key, word] of Object.entries(STATUS)) {
+  for (const [key, { word }] of Object.entries(STATUS)) {
     expect(terms, key).toContain(word);
     expect(
       entries().some((e) => e.ids.includes(`status-${key}`)),

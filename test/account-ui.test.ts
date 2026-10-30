@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import { importBankCsv, parsePreset, reconcile, eurValue } from '../src/banking';
 import { getReceipt } from '../src/receipts';
 import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { button, buttonLink, statusMark } from '../src/actions';
 async function account(id: string, label: string) {
   await env.DB.prepare('INSERT INTO accounts(id,label,bank_name,default_currency,created_at) VALUES (?,?,?, ?,?)')
     .bind(id, label, 'Fake Bank', 'EUR', '2026-10-20')
@@ -68,7 +69,7 @@ test('matches and payments show accounts and export appends two formula-safe acc
   const r = await receipt();
   expect((await eurValue(env, r)).source).toBe('bank');
   const payments = await (await request('/payments?month=2026-09&view=all')).text();
-  expect(payments).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${r.id}">Receipt</a>`);
+  expect(payments).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${r.id}">Receipt</a>`);
   const csv = Papa.parse<Record<string, string>>(await (await request('/export.csv?month=2026-09')).text(), {
     header: true,
   });
@@ -112,10 +113,8 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   );
   expect(page).toContain('<span class="tag">Transfer to Fake Savings</span>');
   expect(page).toContain('<span class="tag">Transfer from Fake Main</span>');
-  expect(page.match(/<button class="linkbtn">Undo transfer<\/button>/g)).toHaveLength(2);
-  expect(page).toContain(
-    '<div class="stmts" id="imports"><a class="btn secondary" href="/import">Import statement</a></div>',
-  );
+  expect(page.split(button('undo', { label: 'Undo transfer' }))).toHaveLength(3);
+  expect(page).toContain(`<div class="stmts" id="imports">${buttonLink('importStmt', '/import')}</div>`);
   expect(page).not.toContain('Statements (2)');
   expect(page).not.toContain('stamp missing');
   expect(
@@ -136,9 +135,7 @@ test('manual transfer confirm and undo retain both legs and block normal exempti
   );
   expect(await env.DB.prepare('SELECT sum(receipt_required) n FROM bank_transactions').first('n')).toBe(2);
   expect(await env.DB.prepare('SELECT count(*) n FROM bank_transactions').first('n')).toBe(2);
-  expect(await (await request('/payments?month=2026-09')).text()).toContain(
-    '<span class="stamp missing">Missing</span>',
-  );
+  expect(await (await request('/payments?month=2026-09')).text()).toContain(statusMark('missing'));
 });
 
 test('legacy account IDs with spaces keep their identity when renamed through the rendered form', async () => {

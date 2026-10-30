@@ -17,6 +17,7 @@ import { hash, type Receipt } from '../src/domain';
 import { getReceipt } from '../src/receipts';
 import { request, uploadPdf, confirmationForm, idFrom } from './helpers';
 import { seed } from './package-helpers';
+import { statusMark } from '../src/actions';
 
 const csv =
   'Transaction ID;Booking date;Amount;Currency;Payee;Reference\na;2026-09-07;-125,50;EUR;Sample Cloud Lantern Oy;SAMPLE-1001\nb;2026-09-08;-9,99;EUR;Sample Missing;missing\n';
@@ -45,8 +46,8 @@ test('confirmed import and reimport match one receipt and show one missing payme
   expect(await env.DB.prepare('SELECT count(*) AS n FROM bank_transactions').first('n')).toBe(2);
   expect((await eurValue(env, row)).source).toBe('bank');
   const view = await (await request('/payments?month=2026-09&view=all')).text();
-  expect(view).toContain(`<span class="tag ok">Matched</span> <a class="tag" href="/receipts/${row.id}">Receipt</a>`);
-  expect(view).toContain('<span class="stamp missing">Missing</span>');
+  expect(view).toContain(`${statusMark('matched')} <a class="tag" href="/receipts/${row.id}">Receipt</a>`);
+  expect(view).toContain(statusMark('missing'));
   // Bank opens on what is missing.
   expect(await (await request('/payments?month=2026-09')).text()).not.toContain(`href="/receipts/${row.id}"`);
   const monthly = await (await request('/?month=2026-09')).text();

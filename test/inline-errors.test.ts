@@ -29,7 +29,7 @@ test('a pair that is not exact is explained on its row, and Match goes through',
   // The row now holds the pair, the reason, and one button that says what it does.
   const row = html.match(/<li class="pay[^"]*"[^>]*>[\s\S]*?<\/li>/)![0];
   expect(row).toContain(`id="f-confirm-${tx}" aria-describedby="e-why-${tx} e-match-${tx}"`);
-  expect(row).toContain('>Match</button>');
+  expect(row).toContain('<span>Match</span></button>');
   expect(row).not.toContain('Match anyway');
   expect(row).not.toContain('/help#match-anyway');
   expect(row).toContain('This pair isn&#39;t exact: the amounts differ');

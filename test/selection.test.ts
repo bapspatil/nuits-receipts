@@ -17,6 +17,7 @@ import {
   type Selection,
 } from '../src/bulk';
 import { request } from './helpers';
+import { button } from '../src/actions';
 
 const fresh = (order: string[]): Selection => ({ order, picked: [], anchor: null, all: false });
 const run = (state: Selection, ...events: Parameters<typeof select>[1][]) => events.reduce(select, state);
@@ -27,10 +28,10 @@ const list: BulkList = {
   total: 120,
   scope: { month: '2026-09', back: '/receipts?month=2026-09' },
   actions: [
-    { op: 'discard', label: 'Discard', tone: 'danger', confirm: 'Discard the selected receipts?' },
-    { op: 'reread', label: 'Read again', max: 10 },
-    { op: 'move', label: 'Move', fields: '<select name="kind"><option>sales</option></select>' },
-    { op: 'restore', label: 'Restore', tone: 'primary' },
+    { op: 'discard', key: 'discard', confirm: 'Discard the selected receipts?' },
+    { op: 'reread', key: 'reread', max: 10 },
+    { op: 'move', key: 'move', fields: '<select name="kind"><option>sales</option></select>' },
+    { op: 'restore', key: 'restore' },
   ],
 };
 
@@ -182,16 +183,20 @@ test('the bar and row checks are real form controls that work without the script
   expect(bar).toContain('<input type="hidden" name="month" value="2026-09">');
   expect(bar).toContain('<input type="hidden" name="all" value="">');
   expect(bar).toContain('aria-live="polite"');
-  expect(bar).toContain('<button type="reset" class="linkbtn">Clear</button>');
-  expect(bar).toContain('data-bulk-all hidden>Select all 120 receipts</button>');
-  expect(bar).toMatch(
-    /<details class="bulkstep"><summary class="btn danger">Discard<\/summary>.*Discard the selected receipts\?.*name="op" value="discard"/,
+  expect(bar).toContain(button('clear', { attrs: ' type="reset"' }));
+  expect(bar).toContain(
+    button('selectAll', { label: 'Select all 120 receipts', attrs: ' type="button" data-bulk-all hidden' }),
   );
-  expect(bar).toContain('<button name="op" value="reread" class="btn" data-max="10">Read again</button>');
-  expect(bar).toMatch(/<details class="bulkmore"><summary class="btn">More<\/summary>.*value="restore"/);
+  expect(bar).toMatch(
+    /<details class="bulkstep"><summary class="btn ghost">.*<span>Discard<\/span><\/summary>.*Discard the selected receipts\?.*name="op" value="discard"/,
+  );
+  expect(bar).toContain(button('reread', { attrs: ' name="op" value="reread" data-max="10"' }));
+  expect(bar).toMatch(
+    /<details class="bulkmore"><summary class="btn ghost">.*<span>More<\/span><\/summary>.*value="restore"/,
+  );
   expect(bulkBar({ ...list, total: BULK_CAP + 1 })).toContain(`data-all="${BULK_CAP}"`);
   expect(bulkBar({ ...list, total: BULK_CAP + 1 })).toContain(
-    `data-bulk-all hidden>Select the first ${BULK_CAP} receipts</button>`,
+    `<span>Select the first ${BULK_CAP} receipts</span></button>`,
   );
   const tools = bulkTools(list, 25);
   expect(tools).toContain('<label class="pick" hidden><input type="checkbox" data-bulk-page>');
