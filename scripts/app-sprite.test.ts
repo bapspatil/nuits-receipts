@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { ICON_PATHS, LUCIDE_VERSION as GENERATED } from '../src/icons';
-import { ICONS, LUCIDE_VERSION } from './app-icons.mjs';
+import { ICONS, LUCIDE_VERSION } from './app-sprite.mjs';
 
-test('src/icons.ts holds exactly the icons scripts/app-icons.mjs lists', () => {
-  expect(Object.keys(ICON_PATHS), 'run `bun run icons`').toEqual(ICONS);
+test('src/icons.ts holds exactly the icons scripts/app-sprite.mjs lists', () => {
+  expect(Object.keys(ICON_PATHS), 'run `bun run sprite`').toEqual(ICONS);
   expect(GENERATED).toBe(LUCIDE_VERSION);
 });
 

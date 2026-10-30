@@ -1,6 +1,6 @@
-// Generated from lucide-static 1.65.0 by scripts/app-icons.mjs. Do not edit by hand.
+// Generated from lucide-static 1.65.0 by scripts/app-sprite.mjs. Do not edit by hand.
 // Lucide is ISC licensed (some icons derive from Feather, MIT); see NOTICE.
-// Add an icon to scripts/app-icons.mjs and run `bun run icons`.
+// Add an icon to scripts/app-sprite.mjs and run `bun run sprite`.
 
 export const LUCIDE_VERSION = '1.65.0';
 

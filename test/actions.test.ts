@@ -125,7 +125,7 @@ test('every registry icon exists in the sprite, and every sprite icon is used by
   ]);
   for (const icon of wanted) expect(Object.keys(ICON_PATHS), icon).toContain(icon);
   const unused = Object.keys(ICON_PATHS).filter((icon) => !wanted.has(icon));
-  expect(unused, 'remove it from scripts/app-icons.mjs and run `bun run icons`').toEqual([]);
+  expect(unused, 'remove it from scripts/app-sprite.mjs and run `bun run sprite`').toEqual([]);
 });
 
 test('each page ships a sprite with every icon it references and no other', async () => {

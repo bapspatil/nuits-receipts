@@ -3,8 +3,8 @@
 // from the published lucide-static package, never by hand. src/ui.ts emits one
 // hidden <svg> per page holding only the <symbol>s the page references.
 //
-//   bun run icons            fetches lucide-static@1.65.0 with npm pack
-//   node scripts/app-icons.mjs <dir>   reads <dir>/<name>.svg instead
+//   bun run sprite            fetches lucide-static@1.65.0 with npm pack
+//   node scripts/app-sprite.mjs <dir>   reads <dir>/<name>.svg instead
 //
 // To add an icon, add its Lucide name to ICONS below and run the script.
 import { execFileSync } from 'node:child_process';
@@ -105,9 +105,9 @@ export function inner(svg) {
 
 export function render(paths) {
   const body = ICONS.map((name) => `  ${JSON.stringify(name)}: ${JSON.stringify(paths[name])},`).join('\n');
-  return `// Generated from lucide-static ${LUCIDE_VERSION} by scripts/app-icons.mjs. Do not edit by hand.
+  return `// Generated from lucide-static ${LUCIDE_VERSION} by scripts/app-sprite.mjs. Do not edit by hand.
 // Lucide is ISC licensed (some icons derive from Feather, MIT); see NOTICE.
-// Add an icon to scripts/app-icons.mjs and run \`bun run icons\`.
+// Add an icon to scripts/app-sprite.mjs and run \`bun run sprite\`.
 
 export const LUCIDE_VERSION = ${JSON.stringify(LUCIDE_VERSION)};
 
