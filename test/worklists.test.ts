@@ -47,7 +47,7 @@ const bulkApprove = (ids: string[], more: Record<string, string> = {}) =>
 async function todoIds(b: Busy, month?: string): Promise<string[]> {
   const rows = (
     await env.DB.prepare(
-      `SELECT id FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${month ? 'AND substr(issue_date,1,7)=?' : ''} ORDER BY issue_date IS NOT NULL,issue_date,received_at,id`,
+      `SELECT id FROM receipts WHERE status='needs_review' AND duplicate_of IS NULL AND discarded_at IS NULL ${month ? 'AND (substr(issue_date,1,7)=? OR issue_date IS NULL)' : ''} ORDER BY issue_date IS NOT NULL,issue_date,received_at,id`,
     )
       .bind(...(month ? [month] : []))
       .all<{ id: string }>()

@@ -30,7 +30,7 @@ Selection: a row's checkbox is `input[name=id]` inside it, the select-all-on-pag
 | Bank | `/payments?month=M&view=todo\|all&upto=` |
 | Receipt page | `/receipts/<id>?from=todo&month=` (`from=all` from the All list) |
 
-`month` filters on `substr(issue_date,1,7)` for receipts (undated receipts match no month) and on the booking month for Bank. Empty parameters are omitted.
+`month` filters on the booking month for Bank. In Receipts To do it keeps receipts dated in that month plus every undated one (`substr(issue_date,1,7)=M OR issue_date IS NULL`), because an undated receipt belongs to no month yet and Home counts it with every month ("3 to check, plus 2 undated"). In Receipts All it keeps today's browse rule, `substr(coalesce(issue_date,received_at),1,7)=M`. Empty parameters are omitted.
 
 ## Order
 
