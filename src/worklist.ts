@@ -5,7 +5,8 @@ import { BANK_ORDER, BANK_UPTO, bankPath, VIEW_SQL } from './banking';
 import { BULK_CAP } from './bulk';
 import { requireInput } from './domain';
 import { withDone, type EventKey } from './events';
-import { needsReviewSql } from './flags';
+import { config } from './config';
+import { needsReviewSql, readySql } from './flags';
 import { escape } from './ui';
 
 export type ListKey = 'receipts' | 'invoices' | 'bank';
@@ -95,7 +96,7 @@ const PATHS: Record<ListKey, (s: ListState) => string> = {
         ? { view: 'todo', month: s.month, upto: upto(s) }
         : { view: 'all', show: s.show, month: s.month, q: s.q },
     ),
-  invoices: (s) => query('/invoices', { month: s.month, show: s.show }),
+  invoices: (s) => query('/receipts', { view: 'all', kind: 'sales', month: s.month, show: s.show }),
   bank: (s) => (s.month ? bankPath(s.month, s.view, s.upto) : query('/payments', { view: s.view, upto: upto(s) })),
 };
 const upto = (s: ListState) => (s.view === 'todo' && s.upto !== BANK_UPTO ? String(s.upto) : null);
@@ -145,13 +146,16 @@ export function receiptFields(state: ListState): string {
 export function listFrom(path: string): ListState | null {
   if (!/^\/(?!\/)/.test(path) || path.length > 300) return null;
   const url = new URL(path, 'http://app.invalid');
-  const key = (
-    { '/receipts': 'receipts', '/review': 'receipts', '/invoices': 'invoices', '/payments': 'bank' } as const
-  )[url.pathname];
+  const p = url.searchParams;
+  const sales = url.pathname === '/invoices' || (url.pathname === '/receipts' && p.get('kind') === 'sales');
+  const key = sales
+    ? 'invoices'
+    : ({ '/receipts': 'receipts', '/review': 'receipts', '/payments': 'bank' } as const)[url.pathname];
   if (url.origin !== 'http://app.invalid' || !key) return null;
-  // Receipts is All unless it says To do (Review was To do); Bank defaults to To do.
-  const todo = url.pathname === '/review' || key === 'bank' || url.searchParams.get('view') === 'todo';
-  return listState(url.searchParams, { key, view: todo ? 'todo' : 'all' });
+  // Every list defaults to To do (Review was To do), except Invoices, which lives in All, and an
+  // old Receipts link with a filter or a search, from before To do.
+  const all = sales || (key === 'receipts' && !p.has('view') && (p.has('show') || p.has('q')));
+  return listState(p, { key, view: all ? 'all' : 'todo' });
 }
 // A posted return address made safe: a receipt page as it is, a list rebuilt from its state.
 export function parseReturn(value: unknown): string | null {
@@ -167,34 +171,39 @@ export type ListDef = {
   from: string;
   table: string;
   alias: string;
-  open: string;
   order: readonly string[];
   // The views whose rows render in this order, each with its #row-<id> anchor.
   views: readonly View[];
-  where: (s: ListState) => { sql: string; binds: unknown[] };
+  // The rows that need the owner, under the list's filter, in SQL.
+  open: (env: Env, s: ListState) => { sql: string; binds: unknown[] };
 };
+// A sales invoice that nobody marked paid and no bank line pays, past its due date: the date on it,
+// else the payment terms after it was issued. The terms are bound, since Settings can change them.
+const OVERDUE = `(r.kind='sales' AND ${readySql('r')} AND r.paid_outside_on IS NULL AND r.issue_date IS NOT NULL AND coalesce(r.due_date,date(r.issue_date,'+'||?||' days'))<date('now') AND NOT EXISTS (SELECT 1 FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE t.receipt_id=r.id AND i.status='complete'))`;
 const RECEIPTS: ListDef = {
   from: 'receipts r',
   table: 'receipts r',
   alias: 'r',
-  open: `${needsReviewSql('r')} AND r.duplicate_of IS NULL AND r.discarded_at IS NULL`,
   // Undated first, as they wait on a date before anything else.
   order: ['r.issue_date IS NOT NULL', "coalesce(r.issue_date,'')", 'r.received_at', 'r.id'],
   views: ['todo'],
-  // An undated receipt belongs to no month yet, so it stays in every month's To do.
-  where: (s) =>
-    s.month
-      ? { sql: '(substr(r.issue_date,1,7)=? OR r.issue_date IS NULL)', binds: [s.month] }
-      : { sql: '1', binds: [] },
+  // A receipt to check or an overdue invoice. An undated receipt belongs to no month yet, so it
+  // stays in every month's To do.
+  open: (env, s) => ({
+    sql: `r.duplicate_of IS NULL AND r.discarded_at IS NULL AND (${needsReviewSql('r')} OR ${OVERDUE})${s.month ? ' AND (substr(r.issue_date,1,7)=? OR r.issue_date IS NULL)' : ''}`,
+    binds: [config(env).tuning.paymentTermsDays, ...(s.month ? [s.month] : [])],
+  }),
 };
 const BANK: ListDef = {
   from: 'bank_transactions t JOIN imports i ON i.id=t.import_id',
   table: 'bank_transactions t',
   alias: 't',
-  open: `i.status='complete' AND ${VIEW_SQL.todo}`,
   order: BANK_ORDER.split(','),
   views: ['todo', 'all'],
-  where: (s) => (s.month ? { sql: 'substr(t.booking_date,1,7)=?', binds: [s.month] } : { sql: '1', binds: [] }),
+  open: (_env, s) => ({
+    sql: `i.status='complete' AND ${VIEW_SQL.todo}${s.month ? ' AND substr(t.booking_date,1,7)=?' : ''}`,
+    binds: s.month ? [s.month] : [],
+  }),
 };
 export const LIST_DEFS: Partial<Record<ListKey, ListDef>> = { receipts: RECEIPTS, bank: BANK };
 // The list's model when its view shows open rows with anchors to land on.
@@ -252,18 +261,18 @@ export async function nextOpen(
   cursor: Cursor | null,
   { wrap }: { wrap: boolean },
 ): Promise<string | null> {
-  const where = def.where(state);
+  const open = def.open(env, state);
   const order = orderOf(def);
-  const select = `SELECT ${def.alias}.id AS id FROM ${def.from} WHERE ${def.open} AND ${where.sql}`;
+  const select = `SELECT ${def.alias}.id AS id FROM ${def.from} WHERE ${open.sql}`;
   if (!cursor)
     return env.DB.prepare(`${select} ORDER BY ${order} LIMIT 1`)
-      .bind(...where.binds)
+      .bind(...open.binds)
       .first<string>('id');
   const after = `(${order})${cursor.at ? '>=' : '>'}${cursor.sql}`;
   return env.DB.prepare(
     wrap ? `${select} ORDER BY ${after} DESC,${order} LIMIT 1` : `${select} AND ${after} ORDER BY ${order} LIMIT 1`,
   )
-    .bind(...where.binds, ...cursor.binds)
+    .bind(...open.binds, ...cursor.binds)
     .first<string>('id');
 }
 // Where one row stands in the open list: its place from 0 (-1 when it isn't open) and the count.
@@ -273,22 +282,20 @@ export async function openPlace(
   state: ListState,
   id: string,
 ): Promise<{ position: number; total: number }> {
-  const where = def.where(state);
+  const open = def.open(env, state);
   const row = await env.DB.prepare(
-    `SELECT count(*) total,total((${orderOf(def)})<${current(def)}) before,total(${def.alias}.id=?) here FROM ${def.from} WHERE ${def.open} AND ${where.sql}`,
+    `SELECT count(*) total,total((${orderOf(def)})<${current(def)}) before,total(${def.alias}.id=?) here FROM ${def.from} WHERE ${open.sql}`,
   )
-    .bind(JSON.stringify([id]), id, ...where.binds)
+    .bind(JSON.stringify([id]), id, ...open.binds)
     .first<{ total: number; before: number; here: number }>();
   return { position: row?.here ? row.before : -1, total: row?.total ?? 0 };
 }
 // The open rows themselves, in order.
 export async function openRows<T>(env: Env, def: ListDef, state: ListState, limit: number): Promise<T[]> {
-  const where = def.where(state);
+  const open = def.open(env, state);
   return (
-    await env.DB.prepare(
-      `SELECT ${def.alias}.* FROM ${def.from} WHERE ${def.open} AND ${where.sql} ORDER BY ${orderOf(def)} LIMIT ?`,
-    )
-      .bind(...where.binds, limit)
+    await env.DB.prepare(`SELECT ${def.alias}.* FROM ${def.from} WHERE ${open.sql} ORDER BY ${orderOf(def)} LIMIT ?`)
+      .bind(...open.binds, limit)
       .all<T>()
   ).results;
 }
@@ -299,11 +306,9 @@ export async function openCount(
   state: ListState,
   also = '0',
 ): Promise<{ total: number; also: number }> {
-  const where = def.where(state);
-  const row = await env.DB.prepare(
-    `SELECT count(*) total,total(${also}) also FROM ${def.from} WHERE ${def.open} AND ${where.sql}`,
-  )
-    .bind(...where.binds)
+  const open = def.open(env, state);
+  const row = await env.DB.prepare(`SELECT count(*) total,total(${also}) also FROM ${def.from} WHERE ${open.sql}`)
+    .bind(...open.binds)
     .first<{ total: number; also: number }>();
   return { total: row?.total ?? 0, also: row?.also ?? 0 };
 }

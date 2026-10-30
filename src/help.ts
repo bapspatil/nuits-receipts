@@ -21,7 +21,7 @@ export type HelpSection = {
 };
 
 const STATUS_HELP: Record<keyof typeof STATUS, string> = {
-  needs: "A receipt we couldn't finish reading, or one that needs a fact from you. Open Review to fix it.",
+  needs: "A receipt we couldn't finish reading, or one that needs a fact from you. Open Receipts To do to fix it.",
   reading: 'We are reading the file. It usually takes under a minute.',
   ready: 'Checked and complete. Nothing is left to do for it.',
   matched: 'This payment is linked to its receipt. You can remove the match.',
@@ -44,7 +44,7 @@ const GLOSSARY: readonly HelpEntry[] = [
   {
     ids: ['undated'],
     term: 'Undated',
-    text: 'A receipt with no date we could read. It belongs to no month yet, so it waits in Review until you type the date in.',
+    text: 'A receipt with no date we could read. It belongs to no month yet, so it waits in To do until you type the date in.',
   },
   {
     ids: ['changed-since-sent'],

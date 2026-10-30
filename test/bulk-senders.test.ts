@@ -67,19 +67,21 @@ test('ops, ids and caps are checked at the door', async () => {
   await fromLink(1);
   const [one] = await held();
   expect(
-    (await bulk({ op: 'delete', id: Array.from({ length: BULK_CAP + 1 }, () => crypto.randomUUID()) })).status,
+    (await bulk({ op: 'ignore', id: Array.from({ length: BULK_CAP + 1 }, () => crypto.randomUUID()) })).status,
   ).toBe(400);
   expect((await bulk({ op: 'explode', id: one!.id })).status).toBe(400);
-  expect((await bulk({ op: 'delete', id: 'not-an-id' })).status).toBe(400);
-  expect((await bulk({ op: 'delete' })).status).toBe(400);
+  // Delete email is gone: Ignore covers it.
+  expect((await bulk({ op: 'delete', id: one!.id })).status).toBe(400);
+  expect((await bulk({ op: 'ignore', id: 'not-an-id' })).status).toBe(400);
+  expect((await bulk({ op: 'ignore' })).status).toBe(400);
   // Held mail has no filter to take all of.
-  expect((await bulk({ op: 'delete', all: '1' })).status).toBe(400);
+  expect((await bulk({ op: 'ignore', all: '1' })).status).toBe(400);
   expect((await bulk({ op: 'remove', id: 'not an address' })).status).toBe(422);
 
   const anonymous = await worker.fetch(
     new Request('http://localhost/senders/bulk', {
       method: 'POST',
-      body: form({ op: 'delete', id: one!.id }),
+      body: form({ op: 'ignore', id: one!.id }),
       headers: { Origin: 'http://localhost' },
     }),
     env,
@@ -87,7 +89,7 @@ test('ops, ids and caps are checked at the door', async () => {
   expect(anonymous.status).toBe(401);
   const foreign = await request('/senders/bulk', {
     method: 'POST',
-    body: form({ op: 'delete', id: one!.id }),
+    body: form({ op: 'ignore', id: one!.id }),
     headers: { Origin: 'http://evil.example' },
   });
   expect(foreign.status).toBe(403);
@@ -148,23 +150,6 @@ test('Ignore lists the senders once and deletes their mail; an approved sender i
   expect(await held()).toHaveLength(1);
 });
 
-test('Delete removes the checked emails and their copies; a second run changes nothing', async () => {
-  await fromLink(1);
-  await fromLink(2);
-  await fromShop(1);
-  const rows = await held();
-  const picked = rows.filter((r) => r.sender === 'notifications@link.com');
-  const res = await bulk({ op: 'delete', id: picked.map((r) => r.id) });
-  expect(locationOf(res)).toBe('/receipts?view=todo&done=mailDeleted&n=2');
-  expect(await (await request(res.headers.get('Location')!)).text()).toContain('2 emails deleted.');
-  expect((await held()).map((r) => r.sender)).toEqual(['new@shop.example']);
-  for (const r of picked) expect(await env.ORIGINALS.get(r.email_key)).toBeNull();
-  expect(await (await json({ op: 'delete', id: picked.map((r) => r.id) })).json()).toMatchObject({
-    n: 0,
-    skipped: 2,
-  });
-});
-
 test('Settings removes allowed senders in one write and stops ignoring others', async () => {
   const res = await bulk({
     op: 'remove',
@@ -176,7 +161,7 @@ test('Settings removes allowed senders in one write and stops ignoring others', 
   expect(await allowedWrites()).toBe(1);
   const page = await (await request(res.headers.get('Location')!)).text();
   expect(page).toContain('Removed 2 senders. 1 skipped.');
-  expect(page).toMatch(/<details class="sect" open><summary><h2>Senders<\/h2>/);
+  expect(page).toMatch(/<details class="sect" open><summary><h2>Email senders<\/h2>/);
   expect(await (await json({ op: 'remove', id: 'sender@example.net', back: 'settings' })).json()).toMatchObject({
     n: 0,
     skipped: 1,
@@ -203,43 +188,21 @@ test('Review and Settings render the boxes and bars, with the script once', asyn
   await env.DB.prepare(
     "INSERT INTO ignored_senders (address,added_at,added_by) VALUES ('a@fake.example','2026-10-01','owner')",
   ).run();
-  const review = await (await request('/review')).text();
-  expect(review).toContain(`<input type="checkbox" name="id" value="${mailRow!.id}" form="bulk-held">`);
-  expect(review).toContain('<div data-bulk-list="bulk-held">');
-  expect(review).toMatch(/<\/ul><\/div><form id="bulk-held" class="bulkbar" data-bulk data-total="1"/);
+  // To do shows held mail as rows with Allow and Ignore, and no bar of its own: one bar per page.
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review).toContain(`<li id="mail-${mailRow!.id}">`);
+  expect(review).not.toContain('bulk-held');
   expect(review).toContain('<input type="hidden" name="back" value="/receipts?view=todo">');
-  expect(review).toContain('<button name="op" value="allow" class="btn primary">Allow</button>');
-  expect(review).toContain('<button name="op" value="ignore" class="btn">Ignore</button>');
-  expect(review).toContain('<summary class="btn danger">Delete</summary>');
-  // The single-row forms stay.
   expect(review).toContain('aria-label="Allow notifications@link.com">Allow</button>');
-  expect([...review.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
+  expect(review).toContain('<summary aria-label="Ignore notifications@link.com">Ignore</summary>');
+  expect(review).not.toContain('/assets/bulk.js');
 
   const settings = await (await request('/settings?open=senders')).text();
-  expect(settings).toMatch(/<details class="sect" open><summary><h2>Senders<\/h2>/);
+  expect(settings).toMatch(/<details class="sect" open><summary><h2>Email senders<\/h2>/);
   expect(settings).toContain('<input type="checkbox" name="id" value="owner@example.com" form="bulk-allowed">');
   expect(settings).toContain('<input type="checkbox" name="id" value="a@fake.example" form="bulk-ignored">');
   expect(settings).toContain('<summary class="btn danger">Remove</summary>');
   expect(settings).toContain('<button name="op" value="unignore" class="btn">Stop ignoring</button>');
   expect(settings).toContain('<script src="/assets/settings.js" defer></script>');
   expect([...settings.matchAll(/<script src="\/assets\/bulk\.js" defer><\/script>/g)]).toHaveLength(1);
-});
-
-test('Delete ends every email in the same few queries, however many', async () => {
-  for (const n of [1, 2, 3, 4]) await fromLink(n);
-  await fromShop(1);
-  const [shop, ...link] = await held();
-  const prepared = vi.spyOn(env.DB, 'prepare');
-  const queries = async (fields: Record<string, string | string[]>) => {
-    prepared.mockClear();
-    expect((await bulk(fields)).status).toBe(303);
-    return prepared.mock.calls.length;
-  };
-  // The first post also loads what every request caches.
-  await queries({ op: 'delete', id: shop!.id });
-  const one = await queries({ op: 'delete', id: link[0]!.id });
-  expect(await queries({ op: 'delete', id: link.slice(1).map((r) => r.id) })).toBe(one);
-  for (const r of link) expect(await env.ORIGINALS.get(r.email_key)).toBeNull();
-  prepared.mockRestore();
-  expect(await held()).toEqual([]);
 });

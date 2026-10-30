@@ -177,7 +177,7 @@ test('paid marks sales invoices only, and needs the day and how', async () => {
     list: 'invoices',
     month: '2026-10',
   });
-  expect(locationOf(res)).toBe('/invoices?month=2026-10&done=paidMany&n=1&on=2026-10-25&skipped=1');
+  expect(locationOf(res)).toBe('/receipts?view=all&kind=sales&month=2026-10&done=paidMany&n=1&on=2026-10-25&skipped=1');
   expect(await row(1)).toMatchObject({ paid_outside_on: '2026-10-25', paid_outside_note: 'Stripe payout' });
   expect((await row(2))!.paid_outside_on).toBeNull();
 });
@@ -245,7 +245,7 @@ test('the return is rebuilt from the list state, never followed as sent', async 
   await receipt(1);
   for (const back of ['https://evil.example/receipts', '//evil.example/review', '/\\evil.example', '/settings', 'x'])
     expect(locationOf(await bulk({ op: 'restore', id: id(1), list: 'invoices', back })), back).toBe(
-      '/invoices?done=restored&n=0&skipped=1',
+      '/receipts?view=all&kind=sales&done=restored&n=0&skipped=1',
     );
   // Only the list's own state is kept. Other fields are ignored; a value the list doesn't take is
   // refused, never guessed.
@@ -259,7 +259,7 @@ test('the return is rebuilt from the list state, never followed as sent', async 
 });
 
 test('the lists render checkboxes, the bar and its script; an empty list renders none', async () => {
-  for (const path of ['/review', '/receipts', '/invoices?month=2026-10']) {
+  for (const path of ['/receipts?view=todo', '/receipts?view=all', '/receipts?view=all&kind=sales&month=2026-10']) {
     const empty = await (await request(path)).text();
     expect(empty, path).not.toContain('<form id="bulk-');
     expect(empty, path).not.toContain('/assets/bulk.js');
@@ -268,21 +268,21 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   await receipt(1, { status: 'needs_review' });
   await receipt(2);
   await receipt(3, { kind: 'sales', client: 'Example Client Oy' });
-  const review = await (await request('/review')).text();
-  expect(review).toContain(`<input type="checkbox" name="id" value="${id(1)}" form="bulk-review">`);
-  expect(review).toContain('<div data-list="receipts-todo" data-total="1" data-bulk-list="bulk-review">');
-  expect(review).toMatch(/<\/div><form id="bulk-review" class="bulkbar" data-bulk data-total="1"/);
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review).toContain(`<input type="checkbox" name="id" value="${id(1)}" form="bulk-todo">`);
+  expect(review).toContain('<div data-list="receipts-todo" data-total="1" data-bulk-list="bulk-todo">');
+  expect(review).toMatch(/<\/div><form id="bulk-todo" class="bulkbar" data-bulk data-total="1"/);
   expect(review).toContain('name="approval_reason" value="Checked against the original"');
   expect(review).toContain(
     '<input type="hidden" name="list" value="receipts"><input type="hidden" name="view" value="todo">',
   );
   expect(review).toContain('<script src="/assets/bulk.js" defer></script>');
-  // The old Select mode is gone; the per-row Discard stays.
+  // The old Select mode is gone, and so is the per-row Discard: it is in the bar.
   expect(review).not.toContain('class="bulk"');
-  expect(review).toContain('action="/discard"');
-  expect(await (await request('/review?select=1')).text()).not.toContain('data-selecting');
+  expect(review).not.toContain('action="/discard"');
+  expect(await (await request('/receipts?view=todo&select=1')).text()).not.toContain('data-selecting');
 
-  const all = await (await request('/receipts?month=2026-10')).text();
+  const all = await (await request('/receipts?view=all&month=2026-10')).text();
   expect(all).toContain(`value="${id(2)}" form="bulk-receipts"`);
   expect(all).toContain('data-total="2"');
   expect(all).toContain('<button name="op" value="retry" class="btn" data-max="10">Read again</button>');
@@ -294,13 +294,18 @@ test('the lists render checkboxes, the bar and its script; an empty list renders
   expect(after).toContain('<button name="op" value="restore" class="btn">Restore</button>');
   expect(after).not.toContain('value="discard"');
 
-  const invoices = await (await request('/invoices?month=2026-10')).text();
+  const invoices = await (await request('/receipts?view=all&kind=sales&month=2026-10')).text();
   expect(invoices).toContain(`value="${id(3)}" form="bulk-invoices"`);
   expect(invoices).toContain('name="paid_outside_on" value="');
   expect(invoices).toContain('<input type="hidden" name="list" value="invoices">');
 
   // Select mode is gone: the boxes are always there and no list links to ?select=1.
-  for (const path of ['/review', '/receipts?month=2026-10', '/invoices?month=2026-10', '/settings?open=senders']) {
+  for (const path of [
+    '/receipts?view=todo',
+    '/receipts?view=all&month=2026-10',
+    '/receipts?view=all&kind=sales&month=2026-10',
+    '/settings?open=senders',
+  ]) {
     const html = await (await request(path)).text();
     expect(html, path).not.toContain('select=1');
     expect(html, path).not.toContain('data-bulk-select');
@@ -321,7 +326,7 @@ test('chunk totals of done and skipped add up, within bounds', async () => {
 test('names from the object prototype are not reasons or shows', async () => {
   await receipt(1, { status: 'needs_review' });
   expect((await row(1))!.discarded_at).toBeNull();
-  for (const path of ['/review?reason=constructor', '/receipts?show=toString'])
+  for (const path of ['/receipts?view=todo&reason=constructor', '/receipts?show=toString'])
     expect((await request(path)).status, path).toBe(200);
 });
 

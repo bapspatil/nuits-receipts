@@ -138,7 +138,7 @@ const receiptHtml = (fields) =>
     .join('')}</body></html>`;
 
 // The receipts the owner gets in a month: three the reader can file on its own,
-// three it can't (no date; no VAT; no amounts), so Review has work in it.
+// three it can't (no date; no VAT; no amounts), so Receipts To do has work in it.
 const MAIL = [
   {
     vendor: 'Sample Cloud Lantern Oy',
@@ -383,7 +383,7 @@ function report(results, screens) {
 }
 
 // Journey f's month, apart from the Septembers that a-e use, applied once they are done so
-// Review and Bank in a-e keep their small data.
+// Receipts To do and Bank in a-e keep their small data.
 const BUSY_MONTH = '2026-08';
 function seedBusyMonth() {
   const file = `${STATE}-busy.sql`;

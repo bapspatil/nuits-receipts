@@ -58,10 +58,10 @@ export const MAIL_REASONS = {
     words: 'Failed the sender check (SPF or DKIM), so it may not be from who it says.',
     allow: false,
   },
-  sender_not_allowed: { words: 'Sender not allowed. Waiting in Review.', allow: true },
+  sender_not_allowed: { words: 'Sender not allowed. Waiting in To do.', allow: true },
   sender_ignored: { words: 'Sender not allowed: you chose to ignore them.', allow: true },
   held_limit: { words: 'Sender not allowed, and too many of their emails were already waiting.', allow: true },
-  deleted: { words: 'Sender not allowed: you deleted this email from Review.', allow: true },
+  deleted: { words: 'Sender not allowed: you deleted this email.', allow: true },
   duplicate: { words: 'Already received: the same message is waiting or was read.', allow: false },
   email_too_large: { words: 'Too large to read.', allow: false },
   original_missing: { words: 'Its saved copy was gone, so it could not be read.', allow: false },
@@ -421,19 +421,6 @@ export async function ignoreSenders(env: Env, senders: readonly string[], who: s
     .bind(new Date().toISOString(), who.slice(0, 254), list)
     .run();
   return discardHeld(env, await heldFrom(env, senders), 'ignored', 'sender_ignored');
-}
-
-export async function deleteHeld(env: Env, id: string): Promise<void> {
-  requireInput(await deleteHeldMail(env, [id]), 'That email is gone already.', 404);
-}
-// Deletes these waiting emails. Returns how many were still waiting.
-export async function deleteHeldMail(env: Env, ids: readonly string[]): Promise<number> {
-  const rows = (
-    await env.DB.prepare("SELECT * FROM inbound_mail WHERE state='held' AND id IN (SELECT value FROM json_each(?))")
-      .bind(JSON.stringify(ids))
-      .all<MailRow>()
-  ).results;
-  return discardHeld(env, rows, 'dropped', 'deleted');
 }
 
 export async function unignoreSender(env: Env, value: unknown): Promise<void> {

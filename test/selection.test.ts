@@ -167,7 +167,7 @@ test('the bulk script is served as JavaScript and app pages allow same-origin sc
   expect(js.status).toBe(200);
   expect(js.headers.get('Content-Type')).toContain('text/javascript');
   expect(await js.text()).toBe(BULK_JS);
-  for (const path of ['/', '/receipts', '/review'])
+  for (const path of ['/', '/receipts', '/receipts?view=todo'])
     expect((await request(path)).headers.get('Content-Security-Policy'), path).toContain("script-src 'self';");
 });
 

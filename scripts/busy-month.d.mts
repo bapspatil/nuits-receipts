@@ -11,6 +11,7 @@ type Cols = Record<string, string | number | null>;
 export function busyReceipts(month: string): Cols[];
 export function isComplete(row: Cols): boolean;
 export function isTodo(row: Cols): boolean;
+export function isOverdue(row: Cols, today: string, terms?: number): boolean;
 export function busyMail(month: string): Cols[];
 export type StatementRow = { ext: string; date: string; amount_minor: number; merchant: string; reference: string };
 export function busyStatement(month: string): StatementRow[];

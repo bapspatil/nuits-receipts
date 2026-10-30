@@ -78,9 +78,9 @@ export const journeys = [
       await rec.goto('/');
       const home = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
       rec.note(`Home on arrival (oldest month not sent): ${home.slice(0, 200)}`);
-      await rec.click(page.locator('main .steps a[href="/review"]'));
+      await rec.click(page.locator('main .steps a[href^="/receipts?view=todo"]'));
       const queue = await page.locator('main a[href^="/receipts/"]').count();
-      rec.note(`Review lists ${queue} receipts.`);
+      rec.note(`Receipts To do lists ${queue} receipts.`);
       await rec.click(page.locator('main a.btn.primary[href^="/receipts/"]'));
       const approved = [];
       for (let i = 0; i < 10 && /\/receipts\/[a-f0-9]{64}/.test(page.url()); i++)
@@ -132,7 +132,9 @@ export const journeys = [
         'total: 125.50',
       ]);
       await rec.click(nav(page, '/receipts'));
-      await rec.click(page.locator('main nav.seg a[href^="/invoices"]'));
+      // Receipts opens on To do; the kind tabs are in All.
+      await rec.click(page.locator('main a[data-view="all"]'));
+      await rec.click(page.locator('main nav.seg a[href*="kind=sales"]'));
       await rec.click(link(page, 'Add invoice'));
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
@@ -178,11 +180,11 @@ export const journeys = [
 ];
 
 // Screens to photograph and axe-check after the journeys, with real ids.
-// A keyboard-only run from Review to the first receipt: Tab to it, open it, Tab into a field, type,
+// A keyboard-only run from Receipts To do to the first receipt: Tab to Start checking, open it, Tab into a field, type,
 // and press Enter. Enter must approve (this receipt is incomplete, so the refusal comes back in
 // place); Skip, Discard or Read again would redirect or post elsewhere.
 async function keyboardCheck(page, base) {
-  await page.goto(base + '/review');
+  await page.goto(base + '/receipts?view=todo');
   for (
     let i = 0;
     i < 40 && !(await page.evaluate(() => document.activeElement?.matches('main a.btn.primary[href^="/receipts/"]')));
@@ -203,7 +205,7 @@ async function keyboardCheck(page, base) {
   ]);
   if (post.status() !== 422 || !(await page.locator('main [role=alert]').innerText()).includes('Nothing was saved'))
     throw new Error(`Enter in a field did not approve (status ${post.status()}, now at ${page.url()})`);
-  console.log('keyboard: Review to first receipt, fill a field, Enter approves');
+  console.log('keyboard: Receipts To do to first receipt, fill a field, Enter approves');
 }
 
 // Put three payments back to "Missing" so Bank shows likely pairs, a Match all and a payment nothing fits.
@@ -264,14 +266,18 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     receiptHtml({ vendor: 'Sample Unknown Shop', issue_date: '2026-09-22' }),
   );
   await page.waitForTimeout(1000);
-  await page.goto(base + '/review');
-  await page.getByRole('button', { name: 'Ignore billing@unknown-shop.example', exact: true }).click();
+  await page.goto(base + '/receipts?view=todo');
+  const ignore = page.locator('details', {
+    has: page.locator('summary[aria-label="Ignore billing@unknown-shop.example"]'),
+  });
+  await ignore.locator('summary').click();
+  await ignore.getByRole('button', { name: 'Ignore and delete' }).click();
   await page.waitForLoadState('load');
-  await page.goto(base + '/review');
+  await page.goto(base + '/receipts?view=todo');
   const flagged = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
-  await page.goto(base + '/invoices?month=2026-09');
+  await page.goto(base + '/receipts?view=all&kind=sales&month=2026-09');
   const invoice = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
-  await page.goto(base + '/receipts?month=2026-09');
+  await page.goto(base + '/receipts?view=all&month=2026-09');
   const ready = await page
     .locator('main a[href^="/receipts/"]')
     .evaluateAll(
@@ -285,16 +291,16 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'home-sep', path: '/?month=2026-09' },
     { name: 'home-arrival', path: '/' },
     { name: 'home-oct', path: `/?month=${new Date().toISOString().slice(0, 7)}` },
-    { name: 'review', path: '/review' },
-    { name: 'receipts', path: '/receipts?month=2026-09' },
+    { name: 'receipts-todo', path: '/receipts?view=todo' },
+    { name: 'receipts', path: '/receipts?view=all&month=2026-09' },
     { name: 'receipt-ready', path: ready },
     { name: 'invoice-paid', path: invoice },
     { name: 'bank', path: '/payments?month=2026-09&view=all' },
     { name: 'import', path: '/import' },
     { name: 'add', path: '/add' },
-    { name: 'invoices', path: '/invoices?month=2026-09' },
+    { name: 'invoices', path: '/receipts?view=all&kind=sales&month=2026-09' },
     { name: 'settings', path: '/settings' },
-    { name: 'settings-mail', path: '/settings?open=mail#mail' },
+    { name: 'settings-mail', path: '/settings?open=senders#mail' },
     // Last: it undoes the matches, so the screens above keep the settled month.
     { name: 'bank-likely', path: '/payments?month=2026-09&view=todo', prepare: () => unsettleBank(page, base) },
     { name: 'help', path: '/help' },
@@ -381,7 +387,6 @@ async function receiptsTodo(page, rec, month, { busyReceipts, isComplete, isTodo
   await rec.goto('/receipts?view=todo');
   const contract = await page.locator('[data-list="receipts-todo"]').count();
   rec.check(contract === 1, 'Receipts has a To do list (data-list="receipts-todo")');
-  if (!contract) await rec.goto('/review');
   const seeded = new Set(
     busyReceipts(month)
       .filter((r) => isTodo(r) && isComplete(r))

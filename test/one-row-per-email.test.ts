@@ -91,9 +91,9 @@ test('a receipt PDF and an invoice PDF for one charge become one receipt, both f
   const html = await (await request(`/receipts/${rows[0]!.id}`)).text();
   expect(html).toContain(`/originals/${other.results[0]!.id}`);
   expect(html).toContain('Receipt-2983-5731.pdf');
-  // Only one row waits in Review.
-  const review = await (await request('/review')).text();
-  expect(review.match(/href="\/receipts\/[a-f0-9]{64}\?from=todo"/g) ?? []).toHaveLength(1);
+  // Only one row waits in To do.
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review.match(/data-row="[a-f0-9]{64}"/g) ?? []).toHaveLength(1);
 });
 
 test('an attachment that read nothing does not beat one that read a vendor and total', async () => {
@@ -229,12 +229,12 @@ test('Merge duplicates folds existing per-attachment rows, keeps files, and is s
   const loose = await legacyRow('photo.pdf', null, { ...openRouter, invoice_number: null });
   const objects = (await env.ORIGINALS.list()).objects.length;
 
-  const review = await (await request('/review')).text();
-  expect(review).toContain('action="/review/merge"');
+  const review = await (await request('/receipts?view=todo')).text();
+  expect(review).toContain('action="/receipts/merge"');
   expect(review).toMatch(/Merge 2\b/);
   expect((await mergePlan(env)).length).toBe(2);
 
-  const response = await request('/review/merge', { method: 'POST', body: htmlForm(review, '/review/merge') });
+  const response = await request('/receipts/merge', { method: 'POST', body: htmlForm(review, '/receipts/merge') });
   expect(response.status).toBe(303);
   expect(locationOf(response)).toContain('done=merged&n=2');
   const dup = async (id: string) => (await getReceipt(env, id)).duplicate_of;
@@ -246,8 +246,10 @@ test('Merge duplicates folds existing per-attachment rows, keeps files, and is s
   expect((await env.ORIGINALS.list()).objects.length).toBe(objects);
 
   expect(await mergeDuplicates(env)).toBe(0);
-  expect(await (await request('/review')).text()).not.toContain('action="/review/merge"');
-  expect(await (await request(await signed('/review?done=merged&n=2'))).text()).toContain('Merged 2 duplicates.');
+  expect(await (await request('/receipts?view=todo')).text()).not.toContain('action="/receipts/merge"');
+  expect(await (await request(await signed('/receipts?view=todo&done=merged&n=2'))).text()).toContain(
+    'Merged 2 duplicates.',
+  );
 });
 
 test('Merge keeps a row you edited or matched as the one that counts', async () => {

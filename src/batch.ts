@@ -17,15 +17,7 @@ import { cacheFx, clearBankReview, reconcile, SET_REQUIRED_SQL, viewRows } from 
 import { AI_CAP, BULK_CAP, type PaymentOp, type ReceiptOp, type SenderOp } from './bulk';
 import { config } from './config';
 import { discardReceipts, restoreReceipts } from './discard';
-import {
-  approveSenders,
-  deleteHeldMail,
-  heldSenders,
-  ignoreSenders,
-  removeSenders,
-  senderAddress,
-  unignoreSenders,
-} from './inbound';
+import { approveSenders, heldSenders, ignoreSenders, removeSenders, senderAddress, unignoreSenders } from './inbound';
 import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } from './match';
 import { withDone, type EventKey } from './events';
 import { kindWrites, paidFields, processReceipt } from './receipts';
@@ -312,13 +304,6 @@ const SENDER_OPS: Record<SenderOp, Op> = {
         params: { senders: todo.length, ...from(back) },
       };
     },
-  },
-  delete: {
-    run: async (env, ids, _form, back) => ({
-      n: await deleteHeldMail(env, ids),
-      event: 'mailDeleted',
-      params: from(back),
-    }),
   },
   remove: {
     id: senderAddress,

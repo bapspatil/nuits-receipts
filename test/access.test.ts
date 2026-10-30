@@ -156,7 +156,7 @@ test('in Access mode the app needs a valid Access token and ignores the password
   expect(html).toContain('href="/cdn-cgi/access/logout"');
   expect(html).not.toContain('href="/app/cdn-cgi');
   // Every page, error pages included, has the un-prefixed Access sign out.
-  for (const path of ['/app/review', '/app/?month=2026-09', '/app/settings', '/app/import', '/app/nope']) {
+  for (const path of ['/app/receipts?view=todo', '/app/?month=2026-09', '/app/settings', '/app/import', '/app/nope']) {
     const page = await (await at(path, { 'Cf-Access-Jwt-Assertion': await token() })).text();
     expect(page, path).toContain('<a href="/cdn-cgi/access/logout" class="sign-out">Sign out</a>');
     expect(page, path).toContain('<nav class="main" aria-label="Main">');

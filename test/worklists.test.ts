@@ -138,8 +138,8 @@ test('inv3: chip counts equal viewCounts and the bulk total equals the rendered 
   expect(all.barTotal).toBe(all.total);
 });
 
-// Today: Receipts has no To do list yet.
-test.fails('inv3 (Receipts): the bulk total equals the rendered to do count', async () => {
+// Held mail sits above the list, outside data-total.
+test('inv3 (Receipts): the bulk total equals the rendered to do count', async () => {
   const b = await seedBusyMonth();
   const receipts = list(await get('/receipts?view=todo'));
   expect(receipts.name).toBe('receipts-todo');
@@ -244,7 +244,7 @@ test.fails('inv8: Undo after a bulk approve brings every row back into To do', a
   expect(list(await get('/receipts?view=todo')).rows).toEqual(expect.arrayContaining(ids));
 });
 
-// Receipts To do is still the Review queue (PR 6 builds its page), under the same order and filter.
+// Receipts To do keeps the order and filter of its list model.
 test('inv9: a resolved id never renders in To do and the order is stable', async () => {
   const b = await seedBusyMonth();
   const approved = b.todoApprovable.slice(0, 4);

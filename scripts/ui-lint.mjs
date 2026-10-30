@@ -27,10 +27,9 @@ const PATHS = given.length
   ? given
   : [
       '/',
-      '/review',
-      '/receipts',
       '/receipts?view=todo',
-      '/invoices',
+      '/receipts?view=all',
+      '/receipts?view=all&kind=sales',
       '/payments',
       '/payments?view=todo',
       '/settings',

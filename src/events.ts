@@ -114,9 +114,9 @@ export const EVENTS = {
       return monthWord(month) && next ? next.link(month) : { href: '/payments', label: 'Open Bank' };
     },
   },
-  skipped: { text: () => 'Skipped. It stays in Review for later.' },
+  skipped: { text: () => 'Skipped. It stays in To do for later.' },
   saved: { text: () => 'Saved.' },
-  movedBack: { text: () => 'Saved. It needs another look, so it moved back to Review.' },
+  movedBack: { text: () => 'Saved. It needs another look, so it moved back to To do.' },
   readAgain: { text: () => 'Reading it again. This can take a minute.' },
   uploaded: { text: () => "Uploaded. We're reading it now." },
   filesAdded: {
@@ -192,16 +192,7 @@ export const EVENTS = {
           (count(p, 'n') ? ` ${plural(count(p, 'n'), 'email')} deleted.` : '')) + skipped(p),
     section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
   },
-  mailDeleted: {
-    text: (p) =>
-      (p.has('n')
-        ? count(p, 'n')
-          ? `${plural(count(p, 'n'), 'email')} deleted.`
-          : 'Nothing was deleted.'
-        : 'Email deleted.') + skipped(p),
-    section: (p) => (p.get('from') === 'settings' ? 'senders' : null),
-  },
-  // Allow this sender, from Settings > Mail we didn't keep. Undo takes them off the list again.
+  // Allow this sender, from Settings > Email senders. Undo takes them off the list again.
   senderAllowed: {
     text: (p) => {
       const sender = words(p, 'sender', 'The sender');
@@ -215,7 +206,7 @@ export const EVENTS = {
         ? { action: '/senders/remove', fields: { address: sender, back: 'settings' } }
         : null;
     },
-    section: () => 'mail',
+    section: () => 'senders',
   },
   senderRemoved: {
     text: (p) =>

@@ -204,16 +204,15 @@ export const PAYMENT_ACTIONS = [
 ] as const satisfies readonly (BulkAction & { op: PaymentOp })[];
 
 // Unknown senders' held mail by email, and Settings > Senders by address.
-export type SenderOp = 'allow' | 'ignore' | 'delete' | 'remove' | 'unignore';
+export type SenderOp = 'allow' | 'ignore' | 'remove' | 'unignore';
 export const SENDER_ACTIONS = {
   allow: { op: 'allow', label: 'Allow', tone: 'primary' },
   ignore: { op: 'ignore', label: 'Ignore' },
-  delete: { op: 'delete', label: 'Delete', tone: 'danger', confirm: 'Delete the selected emails?' },
   remove: {
     op: 'remove',
     label: 'Remove',
     tone: 'danger',
-    confirm: 'Remove the selected senders? Their next emails wait in Review.',
+    confirm: 'Remove the selected senders? Their next emails wait in To do.',
   },
   unignore: { op: 'unignore', label: 'Stop ignoring' },
 } as const satisfies { [K in SenderOp]: BulkAction & { op: K } };

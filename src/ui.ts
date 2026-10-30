@@ -6,7 +6,8 @@ import { config } from './config';
 import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
-import { isReady, needsReview, needsReviewSql } from './flags';
+import { isReady, needsReview } from './flags';
+import { LIST_DEFS, RECEIPTS_TODO, type View } from './worklist';
 import { STATUS, STEP, type StepState } from './status';
 import { failureFor, kept, requestState } from './request';
 
@@ -31,15 +32,15 @@ export const DATA_LINE = "Runs in your own Cloudflare account. Nuits doesn't rec
 export const MISSING_PAYMENTS =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL";
 
-export type NavKey = 'home' | 'review' | 'receipts' | 'bank' | 'settings';
+export type NavKey = 'home' | 'receipts' | 'bank' | 'settings';
 // Every page's place in the nav and its tab title, in one table, so the
 // highlighted tab and the title can't drift apart: a page's title is its nav
 // label. A page names itself with one of these keys and adds a detail (a
 // month, a vendor) after the title.
 export const PAGES = {
   home: { nav: 'home', title: 'Home' },
-  review: { nav: 'review', title: 'Review' },
-  reviewItem: { nav: 'review', title: 'Review' },
+  // A receipt opened to check it, from To do.
+  reviewItem: { nav: 'receipts', title: 'Receipts' },
   receipts: { nav: 'receipts', title: 'Receipts' },
   receipt: { nav: 'receipts', title: 'Receipts' },
   invoices: { nav: 'receipts', title: 'Receipts' },
@@ -56,7 +57,7 @@ export const PAGES = {
 export type PageKey = keyof typeof PAGES;
 // detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
 export type PageOptions = { detail?: string; head?: string; style?: string };
-export type Counts = { review: number; missing: number };
+export type Counts = { todo: number; missing: number };
 
 // Its own query, so a database without the inbound_mail table still counts.
 async function heldTotal(env: Env): Promise<number> {
@@ -76,23 +77,23 @@ export function navCounts(env: Env): Promise<Counts> {
 async function countNav(env: Env): Promise<Counts> {
   try {
     // Held mail is its own query, so it runs alongside the batch instead of after it.
-    const [[review, missing], held] = await Promise.all([
+    const def = LIST_DEFS.receipts!;
+    const open = def.open(env, RECEIPTS_TODO);
+    const [[todo, missing], held] = await Promise.all([
       env.DB.batch<{ n: number }>([
-        env.DB.prepare(
-          `SELECT count(*) n FROM receipts WHERE ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
-        ),
+        env.DB.prepare(`SELECT count(*) n FROM ${def.from} WHERE ${open.sql}`).bind(...open.binds),
         env.DB.prepare(`SELECT count(*) n ${MISSING_PAYMENTS}`),
       ]),
       heldTotal(env),
     ]);
     return {
-      // Unknown-sender emails wait in Review too.
-      review: (review?.results[0]?.n ?? 0) + held,
+      // The whole of Receipts To do: unknown-sender emails, receipts to check and overdue invoices.
+      todo: (todo?.results[0]?.n ?? 0) + held,
       missing: missing?.results[0]?.n ?? 0,
     };
   } catch {
     // An error page must still render when the database is the problem.
-    return { review: 0, missing: 0 };
+    return { todo: 0, missing: 0 };
   }
 }
 
@@ -207,7 +208,6 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .list .why{color:var(--danger);font-size:var(--text-sm);font-weight:600;grid-column:1}
 .list .ok{color:var(--text-muted);font-size:var(--text-sm);grid-column:1}
 .list .amt{text-align:right;font-weight:600;grid-row:1;grid-column:2;white-space:nowrap}
-.list.checks a.btn{justify-self:start;margin:var(--space-1) 0;min-height:var(--btn-height)}
 .chips{display:flex;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-4);padding:0;list-style:none}
 .chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 var(--space-4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);text-decoration:none;font-weight:600;font-size:var(--text-sm);color:var(--text);background:var(--surface-raised)}
 .chips a[aria-current=page]{border-color:var(--accent);background:var(--accent);color:var(--text-on-accent)}
@@ -513,7 +513,6 @@ const svg = (paths: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
 const ICONS = {
   home: svg('<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>'),
-  review: svg('<path d="M9 3h6v4H9z"/><path d="M15 5h3v16H6V5h3"/><path d="m9 14 2 2 4-4"/>'),
   receipts: svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6m-6 4h6m-6 4h3"/>'),
   bank: svg('<path d="M3 10 12 4l9 6"/><path d="M5 10v8m4.67-8v8m4.66-8v8M19 10v8M3 21h18"/>'),
   settings: svg('<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
@@ -521,7 +520,7 @@ const ICONS = {
 const count = (n: number, what: string) =>
   n > 0 ? ` <span class="count">${n}<span class="vh"> ${what}</span></span>` : '';
 const badges = (counts: Counts): Partial<Record<NavKey, string>> => ({
-  review: count(counts.review, 'waiting'),
+  receipts: count(counts.todo, 'to do'),
   bank: count(counts.missing, counts.missing === 1 ? 'missing a receipt' : 'missing receipts'),
 });
 const current = (on: boolean) => (on ? ' aria-current="page"' : '');
@@ -529,7 +528,6 @@ const current = (on: boolean) => (on ? ' aria-current="page"' : '');
 // One list for the wide header and the phone tab bar, so both always match.
 export const NAV: readonly { key: NavKey; href: string; label: string }[] = [
   { key: 'home', href: '/', label: 'Home' },
-  { key: 'review', href: '/review', label: 'Review' },
   { key: 'receipts', href: '/receipts', label: 'Receipts' },
   { key: 'bank', href: '/payments', label: 'Bank' },
   { key: 'settings', href: '/settings', label: 'Settings' },
@@ -566,8 +564,17 @@ export async function tabCounts(env: Env, selected: string | null): Promise<TabC
 }
 export function receiptsTabs(counts: TabCounts, active: 'all' | 'invoices', month: string | null = null): string {
   const link = (key: 'all' | 'invoices', href: string, label: string, n: number) =>
-    `<li><a href="${href}${month ? `?month=${month}` : ''}"${current(key === active)}>${label} <span class="num">${n}</span></a></li>`;
-  return `<nav class="seg" aria-label="Receipts and invoices"><ul>${link('all', '/receipts', 'Receipts', counts.receipts)}${link('invoices', '/invoices', 'Invoices', counts.invoices)}</ul></nav>`;
+    `<li><a href="${href}${month ? `&amp;month=${month}` : ''}"${current(key === active)}>${label} <span class="num">${n}</span></a></li>`;
+  return `<nav class="seg" aria-label="Receipts and invoices"><ul>${link('all', '/receipts?view=all', 'Receipts', counts.receipts)}${link('invoices', '/receipts?view=all&amp;kind=sales', 'Invoices', counts.invoices)}</ul></nav>`;
+}
+// The To do | All switch of a work list: two links, each with its count.
+export function viewSwitch(href: (view: View) => string, counts: Record<View, number>, active: View): string {
+  return `<ul class="chips" aria-label="View">${(['todo', 'all'] as const)
+    .map(
+      (v) =>
+        `<li><a href="${escape(href(v))}" data-view="${v}" data-count="${counts[v]}"${current(v === active)}>${v === 'todo' ? 'To do' : 'All'} (${counts[v]})</a></li>`,
+    )
+    .join('')}</ul>`;
 }
 // The one Add button of the Receipts page; its label and target follow the open tab.
 export function addButton(active: 'all' | 'invoices', primary: boolean): string {
@@ -823,7 +830,8 @@ export function monthSwitcher(path: string, selected: string): string {
   // The name keeps the visible "Aug" and adds the year, so it says what the
   // link shows (WCAG 2.5.3) and the arrows stay out of it.
   const label = (m: string) => `${monthName(m, false).slice(0, 3)}<span class="vh"> ${m.slice(0, 4)}</span>`;
-  const link = (m: string, text: string) => `<a href="${path}?month=${m}">${text}</a>`;
+  const link = (m: string, text: string) =>
+    `<a href="${escape(`${path}${path.includes('?') ? '&' : '?'}month=${m}`)}">${text}</a>`;
   const prev = shiftMonth(selected, -1),
     next = shiftMonth(selected, 1);
   return `<div class="months" role="group" aria-label="Month">${link(prev, `<span aria-hidden="true">‹</span>${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}<span aria-hidden="true">›</span>`)}</div>`;
