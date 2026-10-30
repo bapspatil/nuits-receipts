@@ -909,13 +909,13 @@ export const SET_REQUIRED_SQL =
 // row. Counts, rows, select-all and Match all read the same predicate, month-wide.
 export const BANK_VIEWS = ['todo', 'all'] as const;
 export type BankView = (typeof BANK_VIEWS)[number];
-const VIEW_SQL: Record<BankView, string> = {
+export const VIEW_SQL: Record<BankView, string> = {
   todo: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
   all: '1',
 };
 const IN_MONTH =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id JOIN accounts a ON a.id=t.account_key WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
-const BANK_ORDER = 't.booking_date,t.account_key,t.id';
+export const BANK_ORDER = 't.booking_date,t.account_key,t.id';
 // To do renders its first upto rows, and Show more raises it; there is no offset.
 export const BANK_UPTO = 50;
 export function bankUpto(value: string | null, cap: number): number {
