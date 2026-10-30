@@ -7,7 +7,7 @@ import { version } from '../package.json';
 import { PALETTE, TOKENS_CSS } from './tokens';
 import { feedback } from './events';
 import { isReady, needsReview, needsReviewSql } from './flags';
-import { STATUS, STEP, matchStatus, type StepState } from './status';
+import { STATUS, STEP, type StepState } from './status';
 import { failureFor, kept, requestState } from './request';
 
 export function escape(value: unknown): string {
@@ -158,7 +158,6 @@ a.linkbtn,.inline>a{display:inline-flex;align-items:center;min-height:44px}
 .stamp.muted,.tag{color:var(--text-muted)}
 .stamp.muted::before{background:transparent;box-shadow:inset 0 0 0 1px currentColor}
 .tag.ok{color:var(--success)}
-.tag.ok.auto::before{background:transparent;box-shadow:inset 0 0 0 2px currentColor}
 a.tag{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
 .head .stamp{height:28px;padding:0 var(--space-3);border:1px solid currentColor;border-radius:var(--radius-sm);background:var(--danger-surface);font-size:var(--text-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .head .stamp::before{display:none}
@@ -191,7 +190,7 @@ details{background:var(--surface-raised);border:1px solid var(--border);border-r
 summary{cursor:pointer;font-weight:600;padding:var(--space-2) var(--space-4);min-height:44px;display:list-item}
 summary::marker{color:var(--text-muted)}
 summary:focus-visible{outline-offset:-2px}
-details.more,details.tech,details.add{background:transparent}
+details.more,details.add,details.filters{background:transparent}
 details>.body{padding:var(--space-1) var(--space-4) var(--space-4)}
 .scroll{overflow-x:auto;max-width:100%}
 table{width:100%;border-collapse:collapse;background:var(--surface-raised)}
@@ -244,7 +243,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:600 var(
 .sentq{margin:var(--space-4) 0 0;padding-top:var(--space-3);border-top:1px solid var(--border)}.sentq h3{margin:0 0 var(--space-2)}.why strong{color:var(--text)}.why a{font-weight:600}
 .next{margin:0 0 var(--space-5)}
 .next .btn.primary{min-height:calc(var(--btn-height) + var(--space-1));padding:0 var(--space-5)}
-.send .btns{margin:var(--space-3) 0}.dated{margin:var(--space-4) 0 0}.dated a{display:inline-flex;align-items:center;min-height:44px}
+.send .btns{margin:var(--space-3) 0}
 .fixes>details.more{margin-top:var(--space-4)}
 details.more>.body>p>a{display:inline-flex;align-items:center;min-height:44px}
 details.more>.body .linkbtn{padding-inline:0;font-weight:400}
@@ -684,12 +683,12 @@ export function emptyState(line: string, action = ''): string {
 }
 // Quiet status for things that need nothing: muted text, a green word when it is done. The word
 // says what happened. The square before it is a second cue: hollow when the app did it.
-export function tag(label: string, ok = false, auto = false): string {
-  return `<span class="tag${ok ? ' ok' : ''}${ok && auto ? ' auto' : ''}">${label}</span>`;
+export function tag(label: string, ok = false): string {
+  return `<span class="tag${ok ? ' ok' : ''}">${label}</span>`;
 }
 // Rarely used actions, behind one More per object. name says whose (for screen readers).
-export function more(body: string, name = ''): string {
-  return `<details class="more"><summary${name ? ` aria-label="More for ${name}"` : ''}>More</summary><div class="body">${body}</div></details>`;
+export function more(body: string, name = '', open = false): string {
+  return `<details class="more"${open ? ' open' : ''}><summary${name ? ` aria-label="More for ${name}"` : ''}>More</summary><div class="body">${body}</div></details>`;
 }
 export type Chip = { href: string; label: string; count?: number; current: boolean };
 // Filter chips that filter something: a chip whose count is 0 or the whole
@@ -830,13 +829,10 @@ export function monthSwitcher(path: string, selected: string): string {
   return `<div class="months" role="group" aria-label="Month">${link(prev, `<span aria-hidden="true">‹</span>${label(prev)}`)}<h1>${escape(monthName(selected))}</h1>${link(next, `${label(next)}<span aria-hidden="true">›</span>`)}</div>`;
 }
 // A stamp only when the receipt needs you; quiet text otherwise, nothing when ready.
-export function stamp(
-  receipt: Pick<Receipt, 'status' | 'review_reasons_json'>,
-  match: 'automatic' | 'manual' | null = null,
-): string {
+export function stamp(receipt: Pick<Receipt, 'status' | 'review_reasons_json'>, matched = false): string {
   if (needsReview(receipt)) return `<span class="stamp needs">${STATUS.needs}</span>`;
   if (receipt.status === 'pending' || receipt.status === 'processing') return tag(STATUS.reading);
-  return match ? tag(matchStatus(match), true, match === 'automatic') : '';
+  return matched ? tag(STATUS.matched, true) : '';
 }
 
 // Expense receipts dated in the month. Sales invoices have salesMonthRows().

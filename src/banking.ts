@@ -906,12 +906,12 @@ export const SET_REQUIRED_SQL =
   "UPDATE bank_transactions SET receipt_required=?,exempt_by='owner',receipt_id=NULL,match_method=NULL,matched_at=NULL WHERE NOT EXISTS (SELECT 1 FROM internal_transfers WHERE debit_id=bank_transactions.id OR credit_id=bank_transactions.id) AND EXISTS (SELECT 1 FROM imports WHERE id=bank_transactions.import_id AND status='complete')";
 
 // What Bank's Show chip picks within a month, as the page defines it.
-export const BANK_SHOWS = ['all', 'missing', 'auto'] as const;
+export const BANK_SHOWS = ['all', 'missing', 'matched'] as const;
 export type BankShow = (typeof BANK_SHOWS)[number];
 const SHOW_SQL: Record<BankShow, string> = {
   all: '1',
   missing: `t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL AND ${NO_TRANSFER}`,
-  auto: "t.receipt_id IS NOT NULL AND t.match_method='automatic'",
+  matched: 't.receipt_id IS NOT NULL',
 };
 const IN_MONTH =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND substr(t.booking_date,1,7)=?";
@@ -922,7 +922,7 @@ export async function showCounts(env: Env, month: string): Promise<Record<BankSh
   )
     .bind(month)
     .first<Record<BankShow, number>>();
-  return { all: row?.all ?? 0, missing: row?.missing ?? 0, auto: row?.auto ?? 0 };
+  return { all: row?.all ?? 0, missing: row?.missing ?? 0, matched: row?.matched ?? 0 };
 }
 // The chip's rows in page order, up to limit.
 export async function showRows(env: Env, month: string, show: BankShow, limit: number): Promise<Transaction[]> {

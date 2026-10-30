@@ -223,7 +223,7 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
   const more = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
   const filtered = !!(query.show || query.q);
-  const chips = chipRow('Show', [
+  const chipList = chipRow('Show', [
     { href: link(query, { show: null }), label: 'All', current: !query.show },
     ...CHIPS.map((k) => ({
       href: link(query, { show: k }),
@@ -232,6 +232,9 @@ export async function allReceiptsPage(env: Env, params: URLSearchParams, offset:
       current: k === query.show,
     })),
   ]);
+  const chips = chipList
+    ? `<details class="filters"${query.show && (CHIPS as readonly string[]).includes(query.show) ? ' open' : ''}><summary>More filters</summary><div class="body">${chipList}</div></details>`
+    : '';
   const find = `<form class="find" method="get" action="/receipts" role="search"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100"><button class="btn secondary">Search</button>${query.q ? `<a class="linkbtn" href="${link(query, { q: '' })}">Clear</a>` : ''}</form>`;
   const here = path(query, { offset: query.offset });
   const bulk: BulkList = {

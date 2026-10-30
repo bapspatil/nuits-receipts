@@ -19,7 +19,7 @@ async function seedMismatch() {
 }
 const alertOf = (html: string) => html.match(/<div class="alert" role="alert">[\s\S]*?<\/div>/)?.[0] ?? '';
 
-test('a pair that is not exact is explained on its row, and Match anyway goes through', async () => {
+test('a pair that is not exact is explained on its row, and Match goes through', async () => {
   const { id, tx } = await seedMismatch();
   const refused = await post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: id, action: 'link' }));
   expect(refused.status).toBe(422);
@@ -29,12 +29,14 @@ test('a pair that is not exact is explained on its row, and Match anyway goes th
   // The row now holds the pair, the reason, and one button that says what it does.
   const row = html.match(/<li class="pay[^"]*">[\s\S]*?<\/li>/)![0];
   expect(row).toContain(`id="f-confirm-${tx}" aria-describedby="e-why-${tx} e-match-${tx}"`);
-  expect(row).toContain('>Match anyway</button>');
+  expect(row).toContain('>Match</button>');
+  expect(row).not.toContain('Match anyway');
+  expect(row).not.toContain('/help#match-anyway');
   expect(row).toContain('This pair isn&#39;t exact: the amounts differ');
   expect(row).toMatch(new RegExp(`<p class="ferr" id="e-match-${tx}">[^<]*line up[^<]*</p>`));
   expect(row).not.toContain('Not exact, still this');
   // The exception rides along as a hidden field of that one form, not a box to tick.
-  const form = htmlForm(html, '/matches');
+  const form = htmlForm(row.match(/<form action="\/matches"[^>]*class="likely"[\s\S]*?<\/form>/)![0], '/matches');
   expect(form.get('confirm_exception')).toBe('yes');
   form.set('action', 'link');
   expect((await post('/matches', form)).status).toBe(303);
@@ -54,7 +56,7 @@ test('a row with an exact pair has no exception field, and typing a label in the
   // The label stands for the receipt: it gets as far as the exception check.
   const typed = await post('/matches', new URLSearchParams({ transaction_id: tx, receipt_id: label, action: 'link' }));
   expect(typed.status).toBe(422);
-  expect(await typed.text()).toContain('Match anyway');
+  expect(await typed.text()).toContain('This pair isn&#39;t exact');
   const withBox = new URLSearchParams({
     transaction_id: tx,
     receipt_id: label,

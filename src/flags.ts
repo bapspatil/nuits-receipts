@@ -3,8 +3,7 @@
 // what is wrong; the body says that. test/flags.test.ts holds every title to one of the two.
 // Plain-language copy for every review reason code the app emits (see
 // docs/APP-REDESIGN-PLAN.md §6). Codes that describe the same problem share one
-// entry, so the receipt page shows one card per problem. Raw codes stay in the
-// receipt page's "Technical details" fold only. test/flags.test.ts fails when
+// entry, so the receipt page shows one card per problem. test/flags.test.ts fails when
 // src/ emits a code with no entry here.
 import type { Receipt } from './domain';
 

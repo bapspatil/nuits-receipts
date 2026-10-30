@@ -194,11 +194,11 @@ test('all=1 takes the month and the Show chip', async () => {
   expect((await tx('Sample Cloud Lantern Oy')).receipt_required).toBe(1);
   expect((await tx('Fake October Shop')).receipt_required).toBe(1);
 
-  const auto = await json({ month: '2026-09', show: 'auto', op: 'unmatch', all: '1' });
+  const auto = await json({ month: '2026-09', show: 'matched', op: 'unmatch', all: '1' });
   expect(await auto.json()).toMatchObject({ n: 1, skipped: 0 });
   expect((await tx('Sample Cloud Lantern Oy')).receipt_id).toBeNull();
   // Nothing left in the chip.
-  expect((await json({ month: '2026-09', show: 'auto', op: 'unmatch', all: '1' })).status).toBe(400);
+  expect((await json({ month: '2026-09', show: 'matched', op: 'unmatch', all: '1' })).status).toBe(400);
 });
 
 test('Bank renders a box per payment, the bar for its filter, and the script once', async () => {

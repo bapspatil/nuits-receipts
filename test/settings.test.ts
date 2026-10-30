@@ -171,7 +171,7 @@ test('the page is one fold per section, one Save per group and history tucked aw
   expect(html).not.toContain('Where values come from');
   // Imports and transfers are bookkeeping, so they moved to Bank; the old anchors say so.
   expect(html).toContain(
-    '<p class="small moved" id="imports">Imported statements moved to <a href="/payments#imports">Bank</a>.</p>',
+    '<p class="small moved" id="imports">Importing a statement moved to <a href="/payments#imports">Bank</a>.</p>',
   );
   expect(html).toContain(
     '<p class="small moved" id="transfers">Own-account transfers moved to <a href="/payments#transfers">Bank</a>.</p>',

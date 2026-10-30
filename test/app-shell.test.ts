@@ -69,7 +69,7 @@ function primaries(html: string) {
 }
 function visible(html: string) {
   return html
-    .replace(/<details class="(?:tech|more)">[\s\S]*?<\/details>/g, '')
+    .replace(/<details class="more">[\s\S]*?<\/details>/g, '')
     .replace(/<style>[\s\S]*?<\/style>/g, '')
     .replace(/<[^>]*>/g, ' ');
 }
@@ -425,7 +425,8 @@ test('home closes the month and lists what needs you, counting undated receipts'
   // No lists or tables of the month: one link to them instead.
   expect(html).not.toContain('Fake Unmatched Shop');
   expect(html).not.toContain('<table class="stack">');
-  expect(html).toContain('<p class="dated"><a href="/receipts?month=2026-09">1 receipt dated September ›</a></p>');
+  expect(html).not.toContain('class="dated"');
+  expect(html).not.toContain('dated September');
   // One switcher: no second month field and Go button.
   expect(html).not.toContain('type="month"');
   // Once dated in the month, they count in the month's own step.
@@ -462,11 +463,11 @@ test('home closes the month and lists what needs you, counting undated receipts'
   expect(primaries(first)).toBe(1);
 });
 
-test('raw reason codes and payment IDs appear only in technical details', async () => {
+test('raw reason codes and payment IDs appear nowhere on the receipt page', async () => {
   const { flagged } = await seed();
   const receipt = await (await request(`/receipts/${flagged.id}`)).text();
-  expect(receipt).toContain('<details class="tech">');
-  expect(receipt).toContain('uncertain_vendor');
+  expect(receipt).not.toContain('<details class="tech">');
+  expect(receipt).not.toContain('uncertain_vendor');
   expect(receipt).toContain('Who is this from?');
   expect(receipt).toContain('What is the date?');
   expect(receipt.match(/Who is this from\?/g)).toHaveLength(1);
@@ -673,14 +674,12 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
   }
   const bank = await (await request('/payments?month=2026-09&show=all')).text();
   expect(bank).toMatch(
-    /<span class="tag ok(?: auto)?">Matched (?:automatically|by you)<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
+    /<span class="tag ok">Matched<\/span> <a class="tag" href="\/receipts\/[0-9a-f]{64}">Receipt<\/a>/,
   );
   expect(bank).toContain('<span class="stamp missing">Missing</span>');
   expect(bank).toContain('<span class="tag">Money in</span>');
   // A ready receipt has no stamp at all; one that needs you keeps it, tilted on its own page only.
-  expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
-    /<span class="tag ok(?: auto)?">Matched (?:automatically|by you)<\/span>/,
-  );
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(/<span class="tag ok">Matched<\/span>/);
   expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
     '<span class="stamp needs">Needs you</span>',
   );
@@ -704,13 +703,10 @@ test('filter chips show only when they filter something', async () => {
   expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
     'All (3)',
     'Missing (1)',
-    'Matched automatically (1)',
+    'Matched (1)',
   ]);
   await env.DB.prepare('UPDATE bank_transactions SET receipt_required=0 WHERE receipt_id IS NULL').run();
-  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual([
-    'All (3)',
-    'Matched automatically (1)',
-  ]);
+  expect(chips(await (await request('/payments?month=2026-09')).text())).toEqual(['All (3)', 'Matched (1)']);
 });
 
 test('rarely used things sit behind one More per object, named for screen readers', async () => {
@@ -719,7 +715,7 @@ test('rarely used things sit behind one More per object, named for screen reader
   expect(bank).not.toContain('Technical details');
   const more = [...bank.matchAll(/<details class="more"><summary aria-label="More for ([^"]+)">More<\/summary>/g)];
   // A row has a More only when it has an action to hide; the payment ID is not shown at all.
-  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy']);
+  expect(more.map((m) => m[1])).toEqual(['Sample Cloud Lantern Oy', 'Fake Unmatched Shop']);
   expect(bank).not.toMatch(/ID <code>/);
   // Remove match waits in More; the row shows only the receipt link.
   const matchedRow = bank.match(/<li class="pay">[\s\S]*?<\/li>/)![0];
@@ -825,15 +821,9 @@ test('the receipt page: flags first, Other fields closed, rare actions under one
   expect(html).toContain('<details class="note"><summary>Note</summary>');
   const more =
     html.match(/<details class="more"><summary>More<\/summary>([\s\S]*?)<\/div><\/section><\/div>/)?.[1] ?? '';
-  for (const action of [
-    'Read again',
-    'Move to invoices',
-    'Download original',
-    'Upload a copy',
-    'Always file as',
-    'Technical details',
-  ])
+  for (const action of ['Read again', 'Move to invoices', 'Download original', 'Upload a copy', 'Always file as'])
     expect(more, action).toContain(action);
+  expect(more).not.toContain('Technical details');
   for (const gone of [
     'Save, decide later',
     'Approve again',

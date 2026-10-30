@@ -24,9 +24,7 @@ const STATUS_HELP: Record<keyof typeof STATUS, string> = {
   needs: "A receipt we couldn't finish reading, or one that needs a fact from you. Open Review to fix it.",
   reading: 'We are reading the file. It usually takes under a minute.',
   ready: 'Checked and complete. Nothing is left to do for it.',
-  matchedByYou: 'You linked this payment to its receipt yourself.',
-  matchedAuto:
-    'The app paired this payment with a receipt because the seller, the date and the amount agree. You can remove the match.',
+  matched: 'This payment is linked to its receipt. You can remove the match.',
   missing: 'A payment out of your account that has no receipt yet.',
   notPurchase: "A payment that isn't a purchase, such as a transfer between your own accounts. It needs no receipt.",
   sent: 'You marked the month as sent to your accountant.',
@@ -62,14 +60,6 @@ const GLOSSARY: readonly HelpEntry[] = [
     ids: ['mail-not-kept'],
     term: "Mail we didn't keep",
     text: 'Email that reached the app but was not read: from a sender that is not allowed, one that failed the sender check, a duplicate, or one too large. Settings, Email shows the latest 50 with the date, sender, subject and why. The message itself is never shown. If the sender is one you trust, press Allow this sender.',
-  },
-];
-
-const MATCHING: readonly HelpEntry[] = [
-  {
-    ids: ['match-anyway'],
-    term: 'Match anyway',
-    text: "The payment and the receipt don't agree exactly, for example the amount differs by a few cents or the dates are far apart. The button says why. Press it only when you know they belong together; you can remove the match later.",
   },
 ];
 
@@ -119,7 +109,6 @@ export function helpSections(): HelpSection[] {
         },
       ],
     },
-    { id: 'matching', title: 'Matching payments', groups: [{ entries: [...MATCHING] }] },
     { id: 'books', title: 'Your books', groups: [{ entries: [...GLOSSARY] }] },
     ...FLAG_GROUPS.filter((g) => flags.has(g)).map((g, i) => ({
       id: `flags-${g.toLowerCase().replace(/\W+/g, '-')}`,

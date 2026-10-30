@@ -367,7 +367,7 @@ export const EVENTS = {
     },
     link: (p) =>
       count(p, 'auto') && MONTH.test(p.get('month') ?? '')
-        ? { href: `/payments?month=${p.get('month')}&show=auto`, label: 'See them' }
+        ? { href: `/payments?month=${p.get('month')}&show=matched`, label: 'See them' }
         : null,
   },
   exemptUndone: {

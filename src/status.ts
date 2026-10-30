@@ -5,16 +5,11 @@ export const STATUS = {
   needs: 'Needs you',
   reading: 'Reading',
   ready: 'Ready',
-  matchedByYou: 'Matched by you',
-  matchedAuto: 'Matched automatically',
+  matched: 'Matched',
   missing: 'Missing',
   notPurchase: 'Not a purchase',
   sent: 'Sent',
 } as const;
-
-// A bank row's match, from how bank_transactions.match_method recorded it.
-export const matchStatus = (method: 'automatic' | 'manual' | null | undefined): string =>
-  method === 'automatic' ? STATUS.matchedAuto : STATUS.matchedByYou;
 
 // The state of a step in a list (Home's Check, Match, Send, the import wizard).
 // Every step marker means the same thing everywhere: a tick is done, a filled

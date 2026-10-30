@@ -26,7 +26,7 @@ test('every status word and every flag has a help entry', () => {
       code,
     ).toBe(true);
   }
-  for (const term of ['Match anyway', 'Undated', 'Changed since you sent it', 'Kind', 'Email Routing'])
+  for (const term of ['Matched', 'Undated', 'Changed since you sent it', 'Kind', 'Email Routing'])
     expect(terms, term).toContain(term);
 });
 
@@ -35,7 +35,7 @@ test('every /help#anchor the app links to exists', async () => {
   const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   const linked = new Set<string>();
   for (const text of Object.values(sources)) for (const m of text.matchAll(/\/help#([a-z-]+)/g)) linked.add(m[1]!);
-  expect([...linked].sort()).toEqual(expect.arrayContaining(['kind', 'match-anyway', 'part']));
+  expect([...linked].sort()).toEqual(expect.arrayContaining(['kind', 'part']));
   for (const id of linked) expect(ids.has(id), id).toBe(true);
 });
 
