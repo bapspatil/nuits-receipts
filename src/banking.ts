@@ -943,11 +943,11 @@ export async function viewCounts(env: Env, month: string): Promise<Record<BankVi
   return { todo: row?.todo ?? 0, all: row?.all ?? 0 };
 }
 // The view's rows in Bank's order, up to limit, or the whole month without one.
-export type BankRow = Transaction & { account_name: string; bank_name: string };
+export type BankRow = Transaction & { account_name: string; bank_name: string; receipt_vendor?: string | null };
 export async function viewRows(env: Env, month: string, view: BankView, limit?: number): Promise<BankRow[]> {
   return (
     await env.DB.prepare(
-      `SELECT t.*,a.label AS account_name,a.bank_name ${IN_MONTH} AND ${VIEW_SQL[view]} ORDER BY ${BANK_ORDER} LIMIT ?`,
+      `SELECT t.*,a.label AS account_name,a.bank_name,(SELECT vendor FROM receipts WHERE id=t.receipt_id) AS receipt_vendor ${IN_MONTH} AND ${VIEW_SQL[view]} ORDER BY ${BANK_ORDER} LIMIT ?`,
     )
       .bind(month, limit ?? -1)
       .all<BankRow>()

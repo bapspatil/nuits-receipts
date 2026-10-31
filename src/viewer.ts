@@ -27,7 +27,7 @@ export function viewer(
   const raw = o.raw ?? `/originals/${r.id}?view=raw`;
   const find =
     pdf && !o.compact
-      ? `<details class="vfind-menu"><summary class="btn ghost" aria-label="Find in the document" title="Find in the document">${icon('search')}<span>Find</span></summary><form class="vfind" data-find role="search"><label class="vh" for="vfind-${escape(r.id.slice(0, 8))}">Find in the document</label><input id="vfind-${escape(r.id.slice(0, 8))}" type="search" placeholder="Find in the document" maxlength="100" autocomplete="off"><output data-found aria-live="polite"></output></form></details>`
+      ? `<details class="vfind-menu"><summary class="btn ghost" aria-label="Find in the document" title="Find in the document">${icon('search')}<span>Find</span></summary><form class="vfind" data-find role="search"><label class="vh" for="vfind-${escape(r.id.slice(0, 8))}">Find in the document</label><input id="vfind-${escape(r.id.slice(0, 8))}" type="search" placeholder="Find" maxlength="100" autocomplete="off"><output data-found aria-live="polite"></output></form></details>`
       : '';
   const tools = [
     button('zoomOut', { attrs: ' type="button" data-do="out" aria-label="Zoom out" title="Zoom out"' }),

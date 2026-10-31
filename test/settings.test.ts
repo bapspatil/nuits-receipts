@@ -1,3 +1,4 @@
+import { stylesheet } from './helpers';
 import { env } from 'cloudflare:workers';
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { expect, test } from 'vitest';
@@ -187,7 +188,7 @@ test('the page is five sections and one Save, with history tucked away', async (
     /id="f-RECEIPT_ADDRESS" form="settings-form" title="[^"]+" pattern="receipts@example\\\.com" required/,
   );
   expect(html).toMatch(/id="f-FORWARD_COPY_TO"[^>]*>.*?name="confirm_FORWARD_COPY_TO" value="yes"/);
-  expect(html).toContain('.settings .frow:has(:invalid) .confirm{display:flex}');
+  expect(await stylesheet(html)).toContain('.settings .frow:has(:invalid) .confirm{display:flex}');
   expect(html).not.toContain('<details class="why"><summary>Why');
   // There is no script for it to warn about leaving: one Save has nothing to lose to another.
   expect(html).not.toContain('/assets/settings.js');

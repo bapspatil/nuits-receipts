@@ -948,8 +948,10 @@ export async function payments(
         key: t.id,
         pick: pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`),
         date: day(t.booking_date, false),
-        title: escape(t.merchant),
-        meta: [account, meta].filter(Boolean).join(' · '),
+        title: escape(t.receipt_vendor || t.merchant),
+        meta: [t.receipt_vendor && !sameName(t.receipt_vendor, t.merchant) ? escape(t.merchant) : '', account, meta]
+          .filter(Boolean)
+          .join(' · '),
         status,
         amount: amount(t.amount_minor, t.currency),
         actions: extra.length
@@ -1296,12 +1298,12 @@ async function sendStep(
   const bytes = plan.files.reduce((n, f) => n + (f.size ?? 0), 0);
   const shown = plan.files.slice(0, 5);
   const manifest = plan.files.length
-    ? `<details><summary>In the ZIP</summary><div class="body"><ul class="manifest" aria-label="Files in the package"><li>${escape(plan.folder)}/</li><li>00-index-${selected}.csv</li>${plan.files.some((f) => f.receipt.kind === 'sales') ? `<li>00-sales-index-${selected}.csv</li>` : ''}${s.missing.length ? `<li>00-missing-receipts-${selected}.csv</li>` : ''}${shown.map((f) => `<li>${escape(f.path)}</li>`).join('')}${plan.files.length > shown.length ? `<li class="more">… ${plan.files.length - shown.length} more</li>` : ''}</ul><p class="small">${plural(plan.files.length, 'file')}${sized ? `, ${size(bytes)}` : ''}</p></div></details>`
+    ? `<details class="package-fold"><summary>In the ZIP</summary><div class="body"><ul class="manifest" aria-label="Files in the package"><li>${escape(plan.folder)}/</li><li>00-index-${selected}.csv</li>${plan.files.some((f) => f.receipt.kind === 'sales') ? `<li>00-sales-index-${selected}.csv</li>` : ''}${s.missing.length ? `<li>00-missing-receipts-${selected}.csv</li>` : ''}${shown.map((f) => `<li>${escape(f.path)}</li>`).join('')}${plan.files.length > shown.length ? `<li class="more">… ${plan.files.length - shown.length} more</li>` : ''}</ul><p class="small">${plural(plan.files.length, 'file')}${sized ? `, ${size(bytes)}` : ''}</p></div></details>`
     : '';
   const rowsByKey = [...s.matrix].filter(([, v]) => v !== 0n);
   const byPart =
     rowsByKey.length && hasParts(env)
-      ? `<details><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
+      ? `<details class="package-fold"><summary>By part</summary><div class="body scroll"><table><caption class="vh">Costs by part of the business</caption><thead><tr><th scope="col"><a href="/help#part">Part</a></th><th scope="col"><a href="/help#kind">Kind</a></th><th scope="col" class="n">EUR</th></tr></thead><tbody>${rowsByKey
           .map(([key, v]) => {
             const [product = '', type = ''] = key.split('\u0000');
             return `<tr><th scope="row">${escape(productLabel(env, product))}</th><td>${escape(type)}</td><td class="n">${money(v)}</td></tr>`;
@@ -1640,4 +1642,10 @@ export async function importPage(env: Env): Promise<Response> {
     detail: 'Import a bank statement',
     head: pageHead('Import a bank statement', '', BACK_BANK),
   });
+}
+
+/** A matched receipt's seller and the statement text name the same payee, ignoring case and spacing. */
+function sameName(a: string, b: string | null | undefined): boolean {
+  const norm = (v: string) => v.toLocaleLowerCase('fi').replace(/\s+/g, ' ').trim();
+  return norm(a) === norm(b ?? '');
 }

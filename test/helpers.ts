@@ -15,6 +15,13 @@ export function request(path: string, init: RequestInit = {}) {
     env,
   );
 }
+export async function stylesheet(html: string, fetcher = request): Promise<string> {
+  const path = html.match(/<link rel="stylesheet" href="([^"]+)">/)?.[1];
+  if (!path) throw new Error('Stylesheet link not found');
+  const response = await fetcher(path);
+  if (response.status !== 200) throw new Error(`Stylesheet returned ${response.status}`);
+  return response.text();
+}
 export function pdfBytes() {
   return Uint8Array.from(atob(env.SAMPLE_PDF), (c) => c.charCodeAt(0));
 }
