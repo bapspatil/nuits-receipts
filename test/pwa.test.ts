@@ -40,8 +40,39 @@ test('the icons and favicon answer without sign-in; everything else does not', a
   }
   const png = new Uint8Array(await (await anonymous('/apple-touch-icon.png')).arrayBuffer());
   expect([...png.slice(1, 4)]).toEqual([80, 78, 71]);
-  for (const path of ['/manifest.webmanifest', '/sw.js', '/assets/app.js', '/', '/add', '/icons/icon-1024.png'])
+  for (const path of ['/sw.js', '/assets/app.js', '/', '/add', '/icons/icon-1024.png', '/manifest.json'])
     expect((await anonymous(path)).status, path).toBe(401);
+});
+
+test('the manifest answers without sign-in, holds no data, and keeps the base path', async () => {
+  const plain = await anonymous('/manifest.webmanifest');
+  expect(plain.status).toBe(200);
+  expect(plain.headers.get('Content-Type')).toBe('application/manifest+json');
+  const m = (await (await anonymous('/app/manifest.webmanifest', {}, based)).json()) as Record<string, any>;
+  expect(Object.keys(m).sort()).toEqual(
+    [
+      'background_color',
+      'display',
+      'icons',
+      'id',
+      'name',
+      'scope',
+      'share_target',
+      'short_name',
+      'shortcuts',
+      'start_url',
+      'theme_color',
+    ].sort(),
+  );
+  expect([m.start_url, m.scope, m.display]).toEqual(['/app/', '/app/', 'standalone']);
+  for (const icon of m.icons as { src: string }[]) {
+    const response = await anonymous(icon.src, {}, based);
+    expect(response.status, icon.src).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('image/png');
+  }
+  expect(m.icons.map((i: { purpose: string }) => i.purpose)).toEqual(['any', 'any', 'maskable']);
+  for (const method of ['POST', 'PUT'])
+    expect((await anonymous('/manifest.webmanifest', { method }, based)).status, method).not.toBe(200);
 });
 
 test('the manifest names the app and keeps every URL under the base path', async () => {
@@ -75,6 +106,9 @@ test('pages link the manifest, touch icon and worker script, under the base path
   expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
   expect(html).toContain('<meta name="theme-color" content="#F3EDE2">');
   expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Nuits">');
+  expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes">');
+  expect(html).toContain('<meta name="mobile-web-app-capable" content="yes">');
+  expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default">');
   expect(html).toContain('<script src="/assets/app.js" defer></script>');
 
   const prefixed = await (await at('/app/')).text();

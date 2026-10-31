@@ -9,7 +9,7 @@ import { PALETTE } from './tokens';
 export const SHARE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] as const;
 
 // Stable paths for the icons. They hold no data, and iOS and the browser fetch them
-// without the page's credentials, so these (and /favicon.svg) answer without sign-in.
+// without the page's credentials, so these (and /favicon.svg and the manifest) answer without sign-in.
 export const ICON_PATHS = {
   '/apple-touch-icon.png': 'apple180',
   '/icons/icon-192.png': 'icon192',
@@ -17,7 +17,11 @@ export const ICON_PATHS = {
   '/icons/icon-maskable-512.png': 'maskable512',
 } as const;
 export type IconPath = keyof typeof ICON_PATHS;
-export const PUBLIC_PATHS: ReadonlySet<string> = new Set([...Object.keys(ICON_PATHS), '/favicon.svg']);
+export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
+  ...Object.keys(ICON_PATHS),
+  '/favicon.svg',
+  '/manifest.webmanifest',
+]);
 
 const iconBytes = new Map<string, Uint8Array>();
 export function iconResponse(path: IconPath): Response {
