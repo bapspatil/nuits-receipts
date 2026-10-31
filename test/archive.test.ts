@@ -108,7 +108,7 @@ test('quick find answers with the first matches and where each one opens', async
   const id = idFrom(await uploadPdf());
   const found = await (await request('/search.json?q=lantern')).json<{ name: string; line: string; href: string }[]>();
   expect(found).toHaveLength(1);
-  expect(found[0]!.href).toBe(`/?q=lantern&open=r%3A${id}#preview`);
+  expect(found[0]!.href).toBe(`/?q=lantern&open=r%3A${id}#row-${id}`);
   expect(found[0]!.line).toContain('Receipt');
   expect(await (await request('/search.json?q=')).json()).toEqual([]);
   expect((await request('/search.json?q=lantern')).headers.get('Cache-Control')).toBe('private, no-store');
@@ -143,4 +143,15 @@ test('a sent month is a file: its package as sent, and its ZIP rebuilt from that
   const zip = await request(`/files/${key}/package.zip`);
   expect(zip.status).toBe(200);
   expect(new TextDecoder().decode(await zip.arrayBuffer())).toContain('.pdf');
+});
+
+test('a row opened from an older page keeps that page and lands back on its row', async () => {
+  const id = idFrom(await uploadPdf());
+  const cursor = `2099-01-01_2099-01-01T00:00:00Z_r:${'f'.repeat(64)}`;
+  const list = await page(`/?before=${encodeURIComponent(cursor)}`);
+  expect(list).toContain(`open=r%3A${id}#row-${id}`);
+  expect(list).toContain(`before=${encodeURIComponent(cursor)}&amp;open=r%3A${id}`);
+  const opened = await page(`/?before=${encodeURIComponent(cursor)}&open=r%3A${id}`);
+  expect(opened).toContain(`href="/?before=${encodeURIComponent(cursor)}#row-${id}">‹ Back to the list</a>`);
+  expect(opened).not.toContain('@view-transition');
 });

@@ -12,9 +12,10 @@ import {
   ARCHIVE_SOURCE,
   archiveQuery,
   archiveWhere,
-  KINDS,
   itemKey,
+  KINDS,
   parseItem,
+  rowKey,
   rowName,
   type ArchiveRow,
   type Item,
@@ -224,7 +225,7 @@ export async function quickFind(env: Env, text: string): Promise<Response> {
       ]
         .filter(Boolean)
         .join(' · '),
-      href: `/?q=${encodeURIComponent(q.q)}&open=${encodeURIComponent(r.item)}#preview`,
+      href: `/?q=${encodeURIComponent(q.q)}&open=${encodeURIComponent(r.item)}#row-${rowKey(r)}`,
     })),
     { headers: { 'Cache-Control': 'private, no-store' } },
   );

@@ -10,7 +10,7 @@ import { button, buttonLink } from './actions';
 import { escape } from './ui';
 
 export { PDF_JS, PDF_WORKER_JS };
-export const VIEWER_VERSION = `${PDFJS_VERSION}-1`;
+export const VIEWER_VERSION = `${PDFJS_VERSION}-2`;
 
 type Source = { id: string; media_type: string; filename?: string | null };
 
@@ -180,6 +180,7 @@ async function pdfViewer(src, ui, state) {
     const el = document.createElement('div');
     el.className = 'vpg';
     el.dataset.n = n;
+    el.setAttribute('role', 'group');
     el.setAttribute('aria-label', 'Page ' + n + ' of ' + doc.numPages);
     ui.pages.append(el);
     const thumb = document.createElement('button');
