@@ -269,12 +269,18 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   // The icons hold no data and are fetched without the page's credentials (iOS touch icon).
   // An exact-path list, so nothing else is ever public.
   const publicPath = new URL(request.url).pathname;
+  // The manifest is public too: Add to Home Screen may fetch it without the session, and it
+  // carries only the app's name, colours and its own paths.
   if (request.method === 'GET' && PUBLIC_PATHS.has(publicPath))
-    return publicPath === '/favicon.svg'
-      ? new Response(FAVICON_SVG, {
-          headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
+    return publicPath === '/manifest.webmanifest'
+      ? new Response(manifest(config(env).appName, base), {
+          headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' },
         })
-      : iconResponse(publicPath as IconPath);
+      : publicPath === '/favicon.svg'
+        ? new Response(FAVICON_SVG, {
+            headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
+          })
+        : iconResponse(publicPath as IconPath);
   const who = await authorized(request, env);
   if (!who)
     // No Basic challenge in Access mode, so browsers never show a password prompt.
@@ -475,10 +481,6 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'GET' && path === '/assets/grain.svg')
     return new Response(GRAIN_SVG, {
       headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },
-    });
-  if (request.method === 'GET' && path === '/manifest.webmanifest')
-    return new Response(manifest(config(env).appName, base), {
-      headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' },
     });
   if (request.method === 'GET' && path === '/sw.js')
     return new Response(swJs(MAX_UPLOAD_FILES), {

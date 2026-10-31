@@ -38,6 +38,17 @@ The icon's label is the app name, `APP_NAME`, when that name is 12 characters or
 
 If you serve the app under a path, such as `/app`, the installed app covers that path only. See [Serve the app under a path](/how-to/serve-the-app-under-a-path/).
 
+### With Cloudflare Access
+
+iOS fetches the home screen icon, and the browser may fetch the manifest, without your Access session. Behind Access those requests land on the sign-in page, so the icon shows as a blank tile or a screenshot. In Zero Trust, add a second self-hosted Access application with a single Bypass policy for Everyone that covers only the icon and manifest paths, for example with the app under `/app`:
+
+- `<host>/app/apple-touch-icon.png`
+- `<host>/app/icons/*`
+- `<host>/app/favicon.svg`
+- `<host>/app/manifest.webmanifest`
+
+Access applies the more specific paths first, so everything else stays behind your existing Access application. The Worker answers these paths without sign-in, and they hold no data: the manifest carries only the app name, its colours and its own paths.
+
 ## Know what works offline
 
 The installed app needs a connection, as the browser version does. It keeps no receipts, pages or settings on the device.
