@@ -11,6 +11,7 @@ import {
   readConfig,
   resolveDatabase,
   selectConfig,
+  useAccount,
   validateVars,
   wrangler,
   writeResolved,
@@ -29,6 +30,7 @@ let config;
 try {
   config = readConfig(configPath);
   database(config);
+  useAccount(config);
 } catch (error) {
   fail(error.message);
 }
