@@ -6,7 +6,7 @@ import { getReceipt, preserve } from '../src/receipts';
 import { FONT_FILES } from '../src/fonts';
 import { EXPORT_LINE, FOOTER_NOTICE } from '../src/ui';
 import type { Env } from '../src/env';
-import { authorization, htmlForm, idFrom, locationOf, request, signed, uploadPdf } from './helpers';
+import { authorization, htmlForm, idFrom, locationOf, request, signed, stylesheet, uploadPdf } from './helpers';
 import { icon } from '../src/icons';
 import { button, buttonLink, statusMark } from '../src/actions';
 
@@ -136,6 +136,14 @@ test('every page, including error pages, has the same four-item nav', async () =
   expect(missingHtml).toContain('<code>/nope</code>');
   expect(missingHtml).toContain('<a href="/">Home</a><a href="/#q">Find</a>');
   expect(missingHtml).not.toContain('role="alert"');
+  const missingReceipt = await request(`/receipts/${'0'.repeat(64)}`, {
+    headers: { Referer: 'http://localhost/receipts?view=todo' },
+  });
+  expect(missingReceipt.status).toBe(404);
+  const missingReceiptHtml = await missingReceipt.text();
+  expect(missingReceiptHtml).toContain('We couldn&#39;t find that receipt. It may have been removed.');
+  expect(missingReceiptHtml).toContain('href="/receipts?view=todo"');
+  expect(missingReceiptHtml).not.toContain('Nothing here');
   const body = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   body.set('action', 'approve');
   const refused = await request(`/receipts/${flagged.id}`, {
@@ -269,7 +277,7 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(header).toMatch(/^<a class="navadd" href="\/add"><svg[^>]*><use href="#i-plus"\/><\/svg>Add<\/a>/);
   expect(nav).toMatch(/href="\/receipts">.*?<span class="count">\d+<span class="vh"> to do<\/span><\/span>/);
   expect(nav).toMatch(/href="\/payments">.*?<span class="count">1<span class="vh"> missing a receipt<\/span>/);
-  const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
+  const phone = (await stylesheet(html)).match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
   expect(phone).toContain('nav.main,.sign-out{display:none}');
   // A floating capsule above the home indicator: the installed app has no browser chrome under it.
   expect(phone).toMatch(
@@ -281,7 +289,7 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   expect(phone).toContain('html{scroll-padding-bottom:');
   expect(phone).toContain('textarea:focus) :is(nav.tabs,.sbar){display:none}');
   expect(phone).not.toContain(':hover');
-  expect(html).toContain('nav.tabs{display:none}');
+  expect(await stylesheet(html)).toContain('nav.tabs{display:none}');
 });
 
 test('empty Settings sections say what to add', async () => {
@@ -403,12 +411,12 @@ test('flagged fields are one compact row: the question labels the input, its sen
   // One sticky bar on every width. Phones keep it above the tab bar (and on a receipt in Review the
   // tab bar goes, so only one fixed bar remains), never over the focused field: it hides while typing,
   // and scrolling into view leaves room for it.
-  const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
+  const phone = (await stylesheet(html)).match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';
   expect(phone).toContain('.sbar{position:sticky;bottom:var(--tabbar-height);');
   expect(phone).toContain('body.p-reviewItem nav.tabs{display:none}');
   expect(html).toContain('<body class="p-reviewItem">');
   expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
-  expect(html).toMatch(/\n\.sbar\{position:sticky;bottom:var\(--space-4\);/);
+  expect(await stylesheet(html)).toMatch(/\n\.sbar\{position:sticky;bottom:var\(--space-4\);/);
 });
 
 test('home closes the month and lists what needs you, counting undated receipts', async () => {
@@ -580,11 +588,27 @@ test('images preview inline with locked-down headers; PDFs and emails never do',
   expect(anonymous.status).toBe(401);
 });
 
+test('the shared stylesheet is versioned, immutable and requires sign-in', async () => {
+  const html = await (await request('/')).text();
+  const path = html.match(/<link rel="stylesheet" href="([^"]+)">/)?.[1];
+  expect(path).toMatch(/^\/assets\/app\.[a-f0-9]{16}\.css$/);
+  const response = await request(path!);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('Content-Type')).toBe('text/css; charset=utf-8');
+  expect(response.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+  expect(await response.text()).toContain('nav.tabs{display:none}');
+  expect((await request('/assets/app.0000000000000000.css')).status).toBe(404);
+  expect((await worker.fetch(new Request(`http://localhost${path}`), env)).status).toBe(401);
+  expect(html).not.toContain('nav.tabs{display:none}');
+});
+
 test('fonts are served by the Worker, match the site files and need sign-in', async () => {
   // Drift check against the marketing site's copies, where site/ exists (not in the public template).
   if (env.SITE_FONTS) expect(FONT_FILES).toMatchObject(JSON.parse(env.SITE_FONTS));
   const html = await (await request('/')).text();
-  expect(html).toMatch(/@font-face\{font-family:"Bricolage";src:url\("\/assets\/fonts\/bricolage\.woff2\?v=[\d.]+"\)/);
+  expect(await stylesheet(html)).toMatch(
+    /@font-face\{font-family:"Bricolage";src:url\("fonts\/bricolage\.woff2\?v=[\d.]+"\)/,
+  );
   expect(html).not.toMatch(/https?:\/\/(?!localhost)/);
   for (const name of Object.keys(FONT_FILES)) {
     const font = await request(`/assets/fonts/${name}`);
@@ -657,8 +681,13 @@ test('new pages, fonts, previews and errors carry APP_BASE_PATH', async () => {
     const targets = [...html.matchAll(/\b(?:href|action|formaction|src)="(\/[^"]*)"/g)].map((m) => m[1]!);
     expect(targets.length, path).toBeGreaterThan(5);
     for (const target of targets) expect(target.startsWith('/app/'), `${path} ${target}`).toBe(true);
-    expect(html).toContain('url("/app/assets/fonts/bricolage.woff2?v=');
-    expect(html).toContain('url("/app/assets/fonts/instrument-sans.woff2?v=');
+    const css = await stylesheet(html, at);
+    const cssPath = html.match(/<link rel="stylesheet" href="([^"]+)">/)![1]!;
+    for (const name of ['bricolage', 'instrument-sans']) {
+      const fontUrl = new URL(`fonts/${name}.woff2`, `http://localhost${cssPath}`);
+      expect(fontUrl.pathname).toBe(`/app/assets/fonts/${name}.woff2`);
+      expect(css).toContain(`url("fonts/${name}.woff2?v=`);
+    }
   }
   expect((await at('/app/nope')).status).toBe(404);
   const font = await at('/app/assets/fonts/instrument-sans.woff2');
@@ -709,7 +738,7 @@ test('stamps mark only exceptions; done things are quiet text', async () => {
   // A ready receipt has no stamp at all; one that needs you keeps it, tilted on its own page only.
   expect(await (await request(`/receipts/${ready.id}`)).text()).toContain(statusMark('matched'));
   expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(statusMark('needs'));
-  expect(bank).not.toMatch(/\.stamp[^{]*\{[^}]*rotate/);
+  expect(await stylesheet(bank)).not.toMatch(/\.stamp[^{]*\{[^}]*rotate/);
 });
 
 test('filter chips show only when they filter something', async () => {
@@ -764,12 +793,12 @@ test('rarely used things sit behind one More per object, named for screen reader
   expect(missing).toContain(button('exempt', { attrs: ' name="receipt_required" value="0"' }));
   for (const gone of ['What is a missing receipt?', 'Own-account transfers', 'Pair a transfer', 'Statements imported'])
     expect(missing).not.toContain(gone);
-  expect(bank).toContain('summary:focus-visible{');
+  expect(await stylesheet(bank)).toContain('summary:focus-visible{');
 });
 
 test('one type and spacing scale, 44px targets, and a footer clear of the tab bar', async () => {
   const html = await (await request('/')).text();
-  const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
+  const css = await stylesheet(html);
   expect(css).toContain('h1{font-family:var(--font-display);font-size:var(--text-2xl);');
   expect(css).toMatch(
     /@media\(max-width:720px\)\{:root\{--text-sm:0\.84375rem;--text-base:1rem;--text-2xl:1\.875rem;--btn-height:44px;\}\}/,
@@ -1004,7 +1033,7 @@ test('Approve stays above the phone keyboard: the receipt page sizes with it and
   expect(html).toContain('interactive-widget=resizes-content');
   expect(html).toContain('<script src="/assets/keyboard.js" defer></script>');
   // The bar sits above the keyboard height the script writes, on the pages that have a bar of fields.
-  expect(html).toContain('body.p-reviewItem .sbar{bottom:calc(var(--kb,0px)');
+  expect(await stylesheet(html)).toContain('body.p-reviewItem .sbar{bottom:calc(var(--kb,0px)');
   const script = await request('/assets/keyboard.js');
   expect(script.headers.get('Content-Type')).toContain('text/javascript');
   expect(await script.text()).toContain("setProperty('--kb'");

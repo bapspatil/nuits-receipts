@@ -30,11 +30,15 @@ import {
 import { FAVICON_SVG } from './icon';
 import { APP_JS, PUBLIC_PATHS, iconResponse, swJs, manifest, type IconPath } from './pwa';
 import {
+  APP_CSS,
+  APP_CSS_PATH,
   GRAIN_SVG,
   errorId,
   KEYBOARD_JS,
   fieldId,
   errorPage,
+  escape,
+  page,
   exportCsv,
   exportSalesCsv,
   month,
@@ -452,6 +456,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   if (request.method === 'GET' && path === '/import') return importPage(env);
   if (request.method === 'GET' && path === '/add') return addPage(env, url.searchParams);
+  if (request.method === 'GET' && path === APP_CSS_PATH)
+    return new Response(APP_CSS, {
+      headers: { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'private, max-age=31536000, immutable' },
+    });
   if (request.method === 'GET' && path === '/assets/speculation-rules.json')
     return new Response(SPECULATION_RULES, {
       headers: { 'Content-Type': 'application/speculationrules+json', 'Cache-Control': 'private, max-age=300' },
@@ -883,7 +891,13 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     );
     return redirect(withDone('ruleSaved', '/settings#rules'));
   }
-  throw new InputError('Not found', 404);
+  return page(
+    'rejected',
+    `<p>We couldn&#39;t find <code>${escape(base + path)}</code>.</p><div class="btns"><a href="/">Home</a><a href="/#q">Find</a></div>`,
+    404,
+    env,
+    { title: 'Nothing here' },
+  );
 }
 // Up to MAX_UPLOAD_FILES documents in one form post, each read on its own.
 // The Add page's script sends one file per request and asks for JSON.
@@ -969,7 +983,7 @@ const EXTENSIONS: Record<string, string> = {
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const HTML_CSP =
-  "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+  "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const INLINE_CSP =
   "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 // Where an error page's back link goes: the same-origin page that sent the
@@ -1103,7 +1117,8 @@ async function failure(request: Request, env: Env, error: unknown): Promise<Resp
   if (error instanceof ConfigError) return new Response(message, { status });
   try {
     const base = config(env).basePath;
-    const response = await errorPage(env, status, message, backLink(request, base), new URL(request.url).pathname);
+    const signedIn = await authorized(request, env).catch(() => null);
+    const response = await errorPage(env, status, message, backLink(request, base), !signedIn);
     return base ? rebase(response, base) : response;
   } catch {
     return new Response(message, { status });

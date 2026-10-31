@@ -949,7 +949,9 @@ export async function payments(
         pick: pair ? '' : bulkCheck(bar, t.id, `${t.merchant}, ${day(t.booking_date, false)}`),
         date: day(t.booking_date, false),
         title: escape(t.receipt_vendor || t.merchant),
-        meta: [t.receipt_vendor ? escape(t.merchant) : '', account, meta].filter(Boolean).join(' · '),
+        meta: [t.receipt_vendor && !sameName(t.receipt_vendor, t.merchant) ? escape(t.merchant) : '', account, meta]
+          .filter(Boolean)
+          .join(' · '),
         status,
         amount: amount(t.amount_minor, t.currency),
         actions: extra.length
@@ -1640,4 +1642,10 @@ export async function importPage(env: Env): Promise<Response> {
     detail: 'Import a bank statement',
     head: pageHead('Import a bank statement', '', BACK_BANK),
   });
+}
+
+/** A matched receipt's seller and the statement text name the same payee, ignoring case and spacing. */
+function sameName(a: string, b: string | null | undefined): boolean {
+  const norm = (v: string) => v.toLocaleLowerCase('fi').replace(/\s+/g, ' ').trim();
+  return norm(a) === norm(b ?? '');
 }

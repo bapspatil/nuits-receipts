@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import Papa from 'papaparse';
 import { FIND_CSS, findSheet } from './find';
 import { money, requireInput, type Receipt } from './domain';
@@ -63,7 +64,14 @@ export const PAGES = {
 } as const satisfies Record<string, { nav?: NavKey; title: string }>;
 export type PageKey = keyof typeof PAGES;
 // detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
-export type PageOptions = { detail?: string; title?: string; head?: string; style?: string; refresh?: number };
+export type PageOptions = {
+  detail?: string;
+  title?: string;
+  head?: string;
+  style?: string;
+  refresh?: number;
+  inlineShared?: boolean;
+};
 export type Counts = { todo: number; missing: number };
 
 // Its own query, so a database without the inbound_mail table still counts.
@@ -104,10 +112,9 @@ async function countNav(env: Env): Promise<Counts> {
   }
 }
 
-// Inline CSS is not touched by the base-path rewriter, so font URLs carry the
-// base path here. Tokens come from site/src/styles/theme.css.
-function styles(base: string): string {
-  const font = (name: string) => `url("${base}/assets/fonts/${name}.woff2?v=${version}") format("woff2")`;
+// URLs are relative to the stylesheet so they work under any app base path.
+function styles(): string {
+  const font = (name: string) => `url("fonts/${name}.woff2?v=${version}") format("woff2")`;
   return `@font-face{font-family:"Bricolage";src:${font('bricolage')};font-weight:600 800;font-display:swap}
 @font-face{font-family:"Instrument Sans";src:${font('instrument-sans')};font-weight:400 700;font-display:swap}
 @font-face{font-family:"DM Mono";src:${font('dm-mono')};font-weight:400;font-display:swap}
@@ -132,7 +139,7 @@ p{margin:0 0 var(--space-3)}
 code{font:500 .875em/1.4 var(--font-mono);background:var(--surface-sunken);padding:1px var(--space-2);border-radius:var(--radius-sm);overflow-wrap:anywhere}
 pre{font:400 var(--text-xs)/1.5 var(--font-mono);background:var(--surface-sunken);padding:var(--space-3);overflow:auto;border-radius:var(--radius-sm);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px}
 main:focus{outline:none}
-.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;background:url("${base}/assets/grain.svg")}
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;background:url("grain.svg")}
 header.top,nav.tabs,.bulkbar,.banner,.seg a[aria-current=page]{background:var(--glass);-webkit-backdrop-filter:var(--glass-filter);backdrop-filter:var(--glass-filter);border:1px solid var(--glass-border);box-shadow:var(--shadow-glass-edge),var(--shadow-glass)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass:var(--surface-raised);--glass-filter:none}}
 @media (prefers-reduced-transparency:reduce){:root{--glass:var(--surface-raised);--glass-filter:none}}
@@ -680,6 +687,9 @@ kbd{font:500 var(--text-sm)/1.4 var(--font-mono);background:var(--surface-sunken
 @media (min-width:48rem){.keys-sheet:not(.qfind){width:min(56rem,calc(100vw - 2rem));max-width:56rem}.keys-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--space-5)}}
 ${FIND_CSS}`;
 
+export const APP_CSS = styles() + SHEET_CSS;
+export const APP_CSS_PATH = `/assets/app.${createHash('sha256').update(APP_CSS).digest('hex').slice(0, 16)}.css`;
+
 // A list row the next action can land on: focusable by its #row- fragment, and described by the
 // banner when the page has one, so a screen reader reads what happened with the row it lands on.
 export const rowAttrs = (id: string) =>
@@ -721,7 +731,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><style>${styles(basePath)}${SHEET_CSS}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts, addHref(view))}${signOut}</div></header>${tabs(entry.nav, counts, addHref(view))}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}${findSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="stylesheet" href="${APP_CSS_PATH}">${options.inlineShared ? `<style>${APP_CSS.replaceAll('url("fonts/', `url("${basePath}/assets/fonts/`).replaceAll('url("grain.svg")', `url("${basePath}/assets/grain.svg")`)}</style>` : ''}${options.style ? `<style>${options.style}</style>` : ''}</head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts, addHref(view))}${signOut}</div></header>${tabs(entry.nav, counts, addHref(view))}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}${findSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {
@@ -792,21 +802,20 @@ export function chipRow(label: string, chips: readonly Chip[]): string {
 }
 
 // InputError and 500 responses, inside the layout. Status and message are unchanged.
-export function errorPage(env: Env, status: number, message: string, back: string, path: string): Promise<Response> {
-  if (status === 404)
-    return page(
-      'rejected',
-      `<p>We couldn&#39;t find <code>${escape(path)}</code>.</p><div class="btns"><a href="/">Home</a><a href="/#q">Find</a></div>`,
-      status,
-      env,
-      { title: 'Nothing here' },
-    );
+export function errorPage(
+  env: Env,
+  status: number,
+  message: string,
+  back: string,
+  inlineShared = false,
+): Promise<Response> {
   const view = status >= 500 ? 'failed' : 'rejected';
   return page(
     view,
     `<div class="alert" role="alert"><p><strong>${escape(message)}</strong></p></div><div class="btns">${buttonLink('back', back, { tone: 'primary' })}${buttonLink('home', '/')}</div>`,
     status,
     env,
+    { inlineShared },
   );
 }
 
