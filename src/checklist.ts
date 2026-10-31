@@ -100,5 +100,5 @@ export function setupChecklist(steps: readonly SetupStep[]): string | null {
   const folded = finished.length
     ? `<details class="finished"><summary>${finished.length} done</summary><ol class="steps checklist">${rows(finished)}</ol></details>`
     : '';
-  return `<section class="setup" aria-labelledby="setup-h"><h2 id="setup-h">Finish setting up <span>${done} of ${steps.length} done</span></h2><ol class="steps checklist">${rows(steps.filter((s) => !s.done))}</ol>${folded}<p class="small"><a href="/help">New here? See what the words mean.</a></p></section>`;
+  return `<section class="setup" aria-labelledby="setup-h setup-n"><div class="sethead"><h2 id="setup-h">Finish setting up</h2><p id="setup-n">${done} of ${steps.length} done</p></div><ol class="steps checklist">${rows(steps.filter((s) => !s.done))}</ol>${folded}<p class="small"><a href="/help">New here? See what the words mean.</a></p></section>`;
 }

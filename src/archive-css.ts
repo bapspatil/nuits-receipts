@@ -41,7 +41,7 @@ a.tagchip:hover{border-color:var(--accent);color:var(--accent)}
 .drawer a:hover{background:var(--surface-raised)}
 .drawer a[aria-current=page]{background:var(--surface-accent-quiet);font-weight:600}
 .drawer .n{font:500 var(--text-xs)/1 var(--font-num);font-variant-numeric:tabular-nums;color:var(--text-muted)}
-.dgroup h3{margin:0 0 var(--space-1);padding:0 var(--space-3);font-size:var(--text-base);color:var(--text-muted)}
+.dgroup h3{margin:0 0 var(--space-2);padding:0 var(--space-3);font-size:var(--text-base);color:var(--text-muted)}
 .years{display:grid;gap:var(--space-2)}
 .divider>summary{display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 var(--space-3);list-style:none;cursor:pointer;background:var(--surface-tab);border:1px solid var(--guilloche-line);border-bottom:0;border-radius:var(--radius-sm) var(--radius-sm) 0 0;width:max-content;min-width:60%}
 .divider>summary::-webkit-details-marker{display:none}

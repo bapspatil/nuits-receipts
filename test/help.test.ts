@@ -81,7 +81,7 @@ test('a fresh install shows the checklist with the first upload; the seeded acco
   await env.DB.prepare('DELETE FROM accounts WHERE is_default=0').run();
   const html = await (await request('/')).text();
   expect(html).toContain('<h1>Welcome</h1>');
-  expect(html).toMatch(/Finish setting up <span>\d of 5 done<\/span>/);
+  expect(html).toMatch(/Finish setting up<\/h2><p id="setup-n">\d of 5 done<\/p>/);
   expect(html).toContain('<b>Add your bank account</b>');
   expect(html).toContain('name="file"');
   await env.DB.prepare("UPDATE accounts SET label='Main account'").run();

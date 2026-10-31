@@ -459,7 +459,7 @@ test('home closes the month and lists what needs you, counting undated receipts'
   expect(first).toContain('<h1>Welcome</h1>');
   // A five-item setup checklist that counts what is done, then the upload.
   const checklist = first.match(/<section class="setup"[\s\S]*?<\/section>/)![0];
-  expect(checklist).toMatch(/Finish setting up <span>\d of 5 done<\/span>/);
+  expect(checklist).toMatch(/Finish setting up<\/h2><p id="setup-n">\d of 5 done<\/p>/);
   expect(
     [...checklist.matchAll(/<a href="([^"]+)"><span class="vh">[^<]*<\/span><b>([^<]+)<\/b>/g)].map((m) => m[1]),
   ).toEqual([
