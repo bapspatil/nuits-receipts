@@ -1,6 +1,197 @@
 {
   "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. Every release has its own three-panel strip (before, shipped, reaction) on the left page; a release with no strip yet shows its version big and loads no image. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
   "strips": {
+    "2.2.0": {
+      "src": "strip-2.2.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt recoils from a toppling pile of papers and envelopes, watches them fly by themselves into a filing cabinet, then waves at its own icon on a phone home screen.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "WOBBLE",
+          "x": 16,
+          "y": 8,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "FWOOSH!",
+          "x": 18,
+          "y": 40,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "I'm on the home screen!",
+          "x": 20,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "2.1.1": {
+      "src": "strip-2.1.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is squashed between crammed blocks, slides even spacers between them, then inspects a neat wall with equal gaps through a magnifying glass.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SQUISH",
+          "x": 80,
+          "y": 8,
+          "r": 8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "CLICK",
+          "x": 57,
+          "y": 38,
+          "r": -8,
+          "s": 0.45
+        },
+        {
+          "type": "bubble",
+          "text": "All even now.",
+          "x": 17,
+          "y": 71,
+          "w": 22,
+          "s": 1
+        }
+      ]
+    },
+    "2.1.0": {
+      "src": "strip-2.1.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt runs between pages with their add buttons in different corners, presses one plus button into the corner of a page, then points at a phone and a desktop with the button in the same place.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "HUH?",
+          "x": 60,
+          "y": 4,
+          "r": -8,
+          "s": 0.5
+        },
+        {
+          "type": "sfx",
+          "text": "CLUNK!",
+          "x": 14,
+          "y": 40,
+          "r": -10,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Always right there.",
+          "x": 19,
+          "y": 71,
+          "w": 22,
+          "s": 0.85
+        }
+      ]
+    },
+    "2.0.1": {
+      "src": "strip-2.0.1.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt yawns at a slow vault door while a snail passes, pulls a document out of a row of folders in a flash, then slides it back where a ribbon marks its place.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "CREAK...",
+          "x": 48,
+          "y": 8,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "ZIP!",
+          "x": 14,
+          "y": 40,
+          "r": -10,
+          "s": 0.65
+        },
+        {
+          "type": "bubble",
+          "text": "Right where I left off.",
+          "x": 17,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "2.0.0": {
+      "src": "strip-2.0.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt is lost in a corridor of closed doors, throws open a double door onto a wall of filing drawers, then reads in an armchair in front of the archive.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "CREAK",
+          "x": 33,
+          "y": 4,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "BAM!",
+          "x": 92,
+          "y": 45,
+          "r": -10,
+          "s": 0.5
+        },
+        {
+          "type": "bubble",
+          "text": "Everything in one place.",
+          "x": 17,
+          "y": 71,
+          "w": 24,
+          "s": 0.85
+        }
+      ]
+    },
+    "1.16.0": {
+      "src": "strip-1.16.0.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga strip: SLIP the receipt panics among five boxes spilling papers, slides them all into one tray next to a checklist, then smiles as a looping arrow catches a fallen paper back into the tray.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "FLAP FLAP",
+          "x": 70,
+          "y": 6,
+          "r": -8,
+          "s": 0.55
+        },
+        {
+          "type": "sfx",
+          "text": "SHHK!",
+          "x": 80,
+          "y": 40,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Undo saved me.",
+          "x": 17,
+          "y": 71,
+          "w": 22
+        }
+      ]
+    },
     "1.15.0": {
       "src": "strip-1.15.0.png",
       "median": 0,
@@ -749,6 +940,12 @@
     }
   },
   "titles": {
+    "2.2.0": "The pile files itself",
+    "2.1.1": "Even gaps",
+    "2.1.0": "One Add button",
+    "2.0.1": "Quick open, same place",
+    "2.0.0": "Home is the archive",
+    "1.16.0": "One To do, one Undo",
     "1.15.0": "Bulk select",
     "1.14.0": "Automatic matching",
     "1.13.0": "Automatic statement import",
