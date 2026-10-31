@@ -1103,7 +1103,7 @@ async function failure(request: Request, env: Env, error: unknown): Promise<Resp
   if (error instanceof ConfigError) return new Response(message, { status });
   try {
     const base = config(env).basePath;
-    const response = await errorPage(env, status, message, backLink(request, base));
+    const response = await errorPage(env, status, message, backLink(request, base), new URL(request.url).pathname);
     return base ? rebase(response, base) : response;
   } catch {
     return new Response(message, { status });

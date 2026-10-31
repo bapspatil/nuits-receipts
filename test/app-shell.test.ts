@@ -132,10 +132,10 @@ test('every page, including error pages, has the same four-item nav', async () =
   expect(missing.headers.get('Content-Type')).toContain('text/html');
   const missingHtml = await missing.text();
   expectShell(missingHtml, null);
-  expect(missingHtml).toContain(
-    '<div class="alert" role="alert"><p><strong>We couldn&#39;t find that page.</strong></p></div>',
-  );
-  expect(missingHtml).toContain(buttonLink('back', '/receipts?view=todo', { tone: 'primary' }));
+  expect(missingHtml).toContain('<h1>Nothing here</h1>');
+  expect(missingHtml).toContain('<code>/nope</code>');
+  expect(missingHtml).toContain('<a href="/">Home</a><a href="/#q">Find</a>');
+  expect(missingHtml).not.toContain('role="alert"');
   const body = htmlForm(await (await request(`/receipts/${flagged.id}`)).text(), `/receipts/${flagged.id}`);
   body.set('action', 'approve');
   const refused = await request(`/receipts/${flagged.id}`, {
@@ -739,7 +739,8 @@ test('filter chips show only when they filter something', async () => {
 });
 
 test('rarely used things sit behind one More per object, named for screen readers', async () => {
-  await seed();
+  const { ready } = await seed();
+  await env.DB.prepare('UPDATE receipts SET vendor=? WHERE id=?').bind('Fictional Seller Oy', ready.id).run();
   const bank = await (await request('/payments?month=2026-09&view=all')).text();
   expect(bank).not.toContain('Technical details');
   const more = [...bank.matchAll(/<details class="more"><summary class="btn ghost" aria-label="More for ([^"]+)">/g)];
@@ -750,6 +751,7 @@ test('rarely used things sit behind one More per object, named for screen reader
   const matchedRow = [...bank.matchAll(/<li class="row"[^>]*>[\s\S]*?<\/li>(?=<li class="row"|<\/ul>)/g)]
     .map((m) => m[0])
     .find((r) => r.includes('value="unlink"'))!;
+  expect(matchedRow).toContain('<p class="rt">Fictional Seller Oy</p><p class="meta">Sample Cloud Lantern Oy</p>');
   expect(matchedRow).toMatch(
     /<details class="more">[\s\S]*value="unlink"><svg[^>]*><use href="#i-unlink"\/><\/svg><span>Unmatch<\/span><\/button>/,
   );
@@ -770,7 +772,7 @@ test('one type and spacing scale, 44px targets, and a footer clear of the tab ba
   const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]!;
   expect(css).toContain('h1{font-family:var(--font-display);font-size:var(--text-2xl);');
   expect(css).toMatch(
-    /@media\(max-width:720px\)\{:root\{--text-sm:13\.5px;--text-base:16px;--text-2xl:30px;--btn-height:44px;\}\}/,
+    /@media\(max-width:720px\)\{:root\{--text-sm:0\.84375rem;--text-base:1rem;--text-2xl:1\.875rem;--btn-height:44px;\}\}/,
   );
   expect(css).toContain('h2{font-size:var(--text-lg);');
   expect(css).toContain('font:400 var(--text-base)/1.5 var(--font-ui)');

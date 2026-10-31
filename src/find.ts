@@ -13,6 +13,7 @@ export function findSheet(): string {
 export const FIND_CSS = `.qfind{width:min(36rem,calc(100vw - 2rem))}
 .qfind form[role=search]{display:grid;gap:var(--space-1)}
 .qfind input{width:100%;min-height:48px;font-size:var(--text-lg)}
+.qfind input::-webkit-search-cancel-button{display:none}
 .qfindlist{list-style:none;margin:var(--space-3) 0 0;padding:0;display:grid;gap:var(--space-1)}
 .qfindlist a{display:grid;gap:var(--space-1);min-height:44px;padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);color:var(--text);text-decoration:none}
 .qfindlist a span{font:400 var(--text-sm)/1.3 var(--font-num);color:var(--text-muted)}

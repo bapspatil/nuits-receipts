@@ -547,7 +547,7 @@ export function searchForm(q: ArchiveQuery, savable: boolean): string {
   const keep = (name: string, value: string | null) =>
     value ? `<input type="hidden" name="${name}" value="${escape(value)}">` : '';
   const base = { in: folderParam(q.folder), month: q.month, show: q.show };
-  return `<form class="find hfind" method="get" action="/" role="search">${keep('in', base.in)}${keep('month', base.month)}${keep('show', base.show)}<label class="vh" for="q">Search every document</label><input id="q" name="q" type="search" value="${escape(q.q)}" placeholder="Seller, amount, date or any word" maxlength="100" autocomplete="off">${button('search')}${q.q ? buttonLink('clearSearch', homeUrl({ ...base, q: '' }), { tone: 'ghost', label: 'Clear' }) : ''}</form>${
+  return `<form class="find hfind" method="get" action="/" role="search">${keep('in', base.in)}${keep('month', base.month)}${keep('show', base.show)}<label class="vh" for="q">Search every document</label><input id="q" name="q" type="search" value="${escape(q.q)}" placeholder="Seller, amount or word" maxlength="100" autocomplete="off">${button('search')}${q.q ? buttonLink('clearSearch', homeUrl({ ...base, q: '' }), { tone: 'ghost', label: 'Clear' }) : ''}</form>${
     savable
       ? `<details class="savesearch"><summary>${icon('bookmark-plus')}<span>Save search</span></summary><div class="body"><form method="post" action="/searches">${keep('query', homeUrl({ ...base, q: q.q }))}<label>Name<input name="name" required maxlength="60" value="${escape(q.q || folderName(q.folder))}"></label>${button('saveSearch', { tone: 'secondary', label: 'Save' })}</form></div></details>`
       : ''

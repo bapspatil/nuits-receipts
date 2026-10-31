@@ -182,7 +182,8 @@ Home keeps its name and holds every finance document: receipts, sales invoices, 
 
 | Width | Layout |
 | --- | --- |
-| 1100px and up | Drawer \| list \| preview. The drawer sits on the left, the list in the middle, and an opened document in a preview pane on the right. |
+| 1360px and up | Drawer \| list \| preview. The drawer sits on the left, the list in the middle, and an opened document in a preview pane on the right. |
+| 1100px to 1359px | Drawer and list. An open preview replaces the drawer. |
 | Narrower | The list, then **Folders** below it. An opened document takes the whole screen, with **Back to the list**. |
 
 Folders are virtual: each one is a filter built from the data (Everything, Starred, Recently opened, Saved searches, Years with their months, Kinds, Sellers, Clients, Tags, Opened lately), so nothing can be misfiled and there is nothing to tidy. A year, seller or client folder opens on an overview: the total in EUR, the file count, files without a euro amount, payments missing a receipt, and 12 monthly bars.

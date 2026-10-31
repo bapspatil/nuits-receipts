@@ -1,6 +1,6 @@
 // Home's archive, as a filing drawer: year dividers like tabbed index cards with their months
 // hanging below, the list on the app's sheet, and the opened document as a white slip with the
-// logo's torn foot and a ledger of its facts. Desktop (1100px and up): drawer | list | preview.
+// logo's torn foot and a ledger of its facts. At 1360px and up: drawer | list | preview.
 // Narrower: the list, then the folders; an opened document takes the whole width, with a way back.
 export const ARCHIVE_CSS = `
 @media (min-width:1100px){.p-home main{max-width:1560px}}
@@ -38,6 +38,7 @@ a.tagchip:hover{border-color:var(--accent);color:var(--accent)}
 .drawer{display:grid;gap:var(--space-4);align-content:start}
 .drawer ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-1)}
 .drawer a{display:flex;align-items:center;gap:var(--space-2);min-height:40px;padding:0 var(--space-3);border-radius:var(--radius-sm);color:var(--text);text-decoration:none}
+@media (pointer:coarse){.drawer a{min-height:44px}}
 .drawer a span:first-of-type{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .drawer a .i{flex:none;color:var(--text-muted)}
 .drawer a:hover{background:var(--surface-raised)}
@@ -87,7 +88,7 @@ table.csv{font:400 var(--text-sm)/1.4 var(--font-num)}
 .pane{position:sticky;top:var(--space-4)}
 .slip{max-height:calc(100vh - 2 * var(--space-4));overflow:auto}
 }
-@media (min-width:1680px){
+@media (min-width:1360px){
 .arch.opened{grid-template-columns:232px minmax(0,1fr) minmax(440px,.9fr)}
 .arch.opened>.drawer{display:grid}
 }

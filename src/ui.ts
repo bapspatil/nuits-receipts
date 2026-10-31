@@ -186,8 +186,7 @@ summary.btn{list-style:none}summary.btn::-webkit-details-marker{display:none}
 a.stamp,a.tag{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
 a.tag{color:var(--accent)}
 .card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-4)}
-.card.active{border-top:3px solid var(--accent)}
-.total h2{margin:0;font:inherit}.ready-phone{display:none}
+.total h2{margin:0;font:700 var(--text-xl)/1.1 var(--font-display)}.ready-phone{display:none}
 .total{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);font:500 var(--text-xl)/1.1 var(--font-num);margin-bottom:var(--space-2)}
 .alert{background:var(--danger-surface);color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);margin:0 0 var(--space-3)}
 .alert[role=note]{background:var(--warn-surface);color:var(--warn);border-color:var(--warn)}
@@ -300,6 +299,10 @@ tfoot th,tfoot td{border-bottom:0;border-top:1px solid var(--text);font:500 var(
 .next{margin:0 0 var(--space-5)}
 .next .btn.primary{min-height:calc(var(--btn-height) + var(--space-1));padding:0 var(--space-5)}
 .send .btns{margin:var(--space-3) 0}
+.send details.package-fold{background:none;border:0;border-top:1px solid var(--border);border-radius:0;margin:0}
+.send details.package-fold>summary{padding-inline:0}
+.send details.package-fold>.body{padding-inline:0}
+.send th a{display:inline-flex;align-items:center;min-height:44px}
 .fixes>details.more{margin-top:var(--space-4)}
 details.more>.body>p>a{display:inline-flex;align-items:center;min-height:44px}
 details.more>.body .btn.ghost{padding-inline:0;font-weight:400}
@@ -310,7 +313,7 @@ details.more>.body .btn.ghost{padding-inline:0;font-weight:400}
 .find{display:flex;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4)}.find input{flex:1 1 auto;min-width:0}
 .work{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-6);align-items:start}
 .doc{position:sticky;top:var(--space-4);background:var(--surface-sunken);border-radius:var(--radius-lg);padding:var(--space-4)}
-.doch{font:500 var(--text-xs)/1.4 var(--font-num);color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:0 0 var(--space-3)}
+.doch{font:600 var(--text-xs)/1.4 var(--font-ui);color:var(--text-muted);margin:0 0 var(--space-3)}
 .frame{display:block;background:var(--frame-bg);padding:0;max-height:calc(100vh - 10rem);overflow:auto}
 pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surface-raised);border:1px solid var(--border);font:400 var(--text-sm)/1.6 var(--font-mono);max-height:calc(100vh - 14rem)}
 .kv.sum{margin:var(--space-3) 0 0}.kv.sum>div{grid-template-columns:minmax(0,6rem) minmax(0,1fr);padding:var(--space-2) 0}
@@ -789,7 +792,15 @@ export function chipRow(label: string, chips: readonly Chip[]): string {
 }
 
 // InputError and 500 responses, inside the layout. Status and message are unchanged.
-export function errorPage(env: Env, status: number, message: string, back: string): Promise<Response> {
+export function errorPage(env: Env, status: number, message: string, back: string, path: string): Promise<Response> {
+  if (status === 404)
+    return page(
+      'rejected',
+      `<p>We couldn&#39;t find <code>${escape(path)}</code>.</p><div class="btns"><a href="/">Home</a><a href="/#q">Find</a></div>`,
+      status,
+      env,
+      { title: 'Nothing here' },
+    );
   const view = status >= 500 ? 'failed' : 'rejected';
   return page(
     view,
