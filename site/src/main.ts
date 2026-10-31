@@ -1,25 +1,31 @@
 import "./nav";
+import "./worklist";
 
 type Motion = "on" | "off";
 
 const root = document.documentElement;
 const wide = matchMedia("(min-width: 64rem)");
 let motion: Motion = root.dataset.motion === "off" ? "off" : "on";
-let field: { setAnimated(on: boolean): void } | null = null;
 let stopReel: (() => void) | null = null;
 let layer: { setAnimated(on: boolean): void } | null = null;
 
-// The reel only runs on wide screens with motion on. Narrow screens and
-// motion-off readers get the static page, which is the designed end state of
-// every scene, so there is nothing to undo on the way out.
+// The reel runs whenever motion is on, in a wide or a narrow cut that is
+// rebuilt when the width crosses 64rem. Motion-off readers get the static
+// page, which is the designed end state of every scene, so there is nothing
+// to undo on the way out.
+let reelWide: boolean | null = null;
 async function syncReel() {
-  const want = motion === "on" && wide.matches;
-  if (want && !stopReel) {
-    const { startReel } = await import("./reel");
-    if (motion === "on" && wide.matches && !stopReel) stopReel = startReel();
-  } else if (!want && stopReel) {
+  const want = motion === "on";
+  if (stopReel && (!want || reelWide !== wide.matches)) {
     stopReel();
     stopReel = null;
+  }
+  if (want && !stopReel) {
+    const { startReel } = await import("./reel");
+    if (motion === "on" && !stopReel) {
+      reelWide = wide.matches;
+      stopReel = startReel(!reelWide);
+    }
   }
 }
 
@@ -34,7 +40,6 @@ function setMotion(next: Motion, remember: boolean) {
   const button = document.querySelector<HTMLButtonElement>(".motion-switch")!;
   button.setAttribute("aria-pressed", String(next === "on"));
   button.querySelector(".motion-state")!.textContent = next;
-  field?.setAnimated(next === "on");
   layer?.setAnimated(next === "on");
   void syncReel();
 }
@@ -44,14 +49,6 @@ button.hidden = false;
 button.addEventListener("click", () => setMotion(motion === "on" ? "off" : "on", true));
 wide.addEventListener("change", () => void syncReel());
 setMotion(motion, false);
-
-const canvas = document.querySelector<HTMLCanvasElement>(".field");
-if (canvas && "gpu" in navigator) {
-  import("./field")
-    .then(({ startField }) => startField(canvas, motion === "on"))
-    .then((f) => (field = f))
-    .catch(() => {});
-}
 
 // The second motion layer (src/motion.ts) waits for load and an idle moment,
 // so it never competes with the hero for the first paint.

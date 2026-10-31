@@ -1,0 +1,883 @@
+/* The scenes new in the archive release: the pile reel (hero and How it
+   works in one stage), Month end, the Undo list and the app screens.
+
+   Every rule outside `.is-reel` is the finished page that no JavaScript,
+   reduced motion and the switch set to off all get. `.is-reel` is only ever
+   added by src/reel.ts. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.05em 0.4em 0.1em;
+  border: 1px solid var(--color-ink);
+  border-bottom-width: 2px;
+  border-radius: 0.3em;
+  background: var(--color-slip);
+  font: 600 0.9em/1.3 var(--font-ui);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+ * The pile. One stage: the copy column on the left (on top on a phone), the
+ * visual on the right. Static, the beats are a list beside a still of the
+ * heap that holds its place with CSS sticky; in the reel the stage is pinned
+ * and the beats take turns in one place.
+ * ------------------------------------------------------------------------- */
+
+.reel {
+  display: block;
+  padding: 0;
+}
+
+.reel-stage {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.5rem;
+  padding: clamp(2rem, 6vh, 4rem) var(--gutter) clamp(4rem, 10vh, 6rem);
+}
+
+.pile {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Hidden until it has drawn a real frame, so every failure keeps the still
+   with no error path to remember. */
+.pile:not([data-ready]) {
+  visibility: hidden;
+}
+
+.pile[data-ready] ~ .reel-visual .pile-still {
+  visibility: hidden;
+}
+
+/* Without a live canvas the reel swaps stills at the filing beat, so the
+   words and the picture agree. The static page only ever shows the heap. */
+.pile-still-filed,
+.reel-stage[data-still="filed"] .pile-still-heap {
+  visibility: hidden;
+}
+
+.reel-stage[data-still="filed"] .pile-still-filed {
+  visibility: visible;
+}
+
+.reel-copy {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 3.5rem;
+  align-content: start;
+}
+
+.beat-hero {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(3.4rem, 0.8rem + 9vw, 8.5rem);
+  line-height: 0.84;
+  letter-spacing: -0.04em;
+  margin-left: -0.05em;
+}
+
+.hero-title span {
+  display: block;
+}
+
+.hero-sub {
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.3125rem);
+  line-height: 1.45;
+  max-width: 30rem;
+  text-wrap: pretty;
+}
+
+/* The cost, printed as a total line between two perforations. */
+.hero-cost {
+  max-width: 27rem;
+  padding: 0.85rem 0;
+  font-weight: 600;
+  background:
+    var(--perforation) top / 100% 1px no-repeat,
+    var(--perforation) bottom / 100% 1px no-repeat;
+}
+
+.hero-note {
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+  max-width: 30rem;
+}
+
+.beats {
+  display: grid;
+  gap: 2.75rem;
+  counter-reset: beat;
+}
+
+.beat {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 30rem;
+}
+
+.beat-n {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-soft);
+}
+
+.beat-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 1.2rem + 4vw, 4.75rem);
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+}
+
+.beat p {
+  font-size: var(--text-lede);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.reel-visual {
+  position: relative;
+  aspect-ratio: 13 / 12;
+}
+
+.pile-still {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.pile-still img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The search the last beat types. A pill like the app's search field, ink
+   rule on slip, with the count of what it found. Decoration: the beat's
+   heading carries the words. */
+.query {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(25rem, 94%);
+  min-height: 3rem;
+  white-space: nowrap;
+  padding: 0 0.6rem 0 1rem;
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-slip);
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+/* A magnifier drawn with two shapes, so it takes the ink token. */
+.query-icon {
+  position: relative;
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.query-icon::after {
+  content: "";
+  position: absolute;
+  right: -0.4rem;
+  bottom: -0.35rem;
+  width: 0.45rem;
+  height: 2px;
+  background: currentColor;
+  rotate: 45deg;
+}
+
+.query-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.query-text::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 1px;
+  vertical-align: -0.2em;
+  background: currentColor;
+}
+
+.query-hits {
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-mint);
+  font-size: var(--text-small);
+}
+
+.is-reel .query:not(.is-done) .query-hits {
+  visibility: hidden;
+}
+
+.slip-found {
+  position: absolute;
+  z-index: 3;
+  right: 4%;
+  bottom: 2%;
+  width: min(16rem, 46%);
+  padding: 1.25rem 1.25rem 2.25rem;
+}
+
+@media (max-width: 63.99rem) {
+  .slip-found {
+    padding: 0.9rem 0.9rem 1.75rem;
+    font-size: 0.875rem;
+  }
+
+  .slip-found .slip-vendor {
+    font-size: 1rem;
+  }
+
+  .slip-found .stamp {
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .slip-found {
+    width: min(16rem, 40%);
+  }
+}
+
+.slip-found .stamp {
+  display: block;
+  width: fit-content;
+  margin: 0.75rem 0 0 auto;
+  font-size: 1.5rem;
+}
+
+@media (min-width: 64rem) {
+  .reel-stage {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(2rem, 4vw, 4.5rem);
+  }
+
+  .reel-copy {
+    gap: 6rem;
+  }
+
+  .beat-hero {
+    padding-top: 2vh;
+  }
+
+  /* Static: the heap holds its place while the beats scroll past it. */
+  .reel-visual {
+    position: sticky;
+    top: calc(var(--bar-h) + 1.5rem);
+    align-self: start;
+    aspect-ratio: auto;
+    height: calc(100svh - var(--bar-h) - 3rem);
+    min-height: 32rem;
+  }
+}
+
+/* The reel: the stage is the screen, and the beats share one place. */
+.is-reel .reel-stage {
+  height: 100svh;
+  min-height: 34rem;
+  overflow: clip;
+}
+
+.is-reel .beats {
+  display: grid;
+}
+
+.is-reel .beats > .beat {
+  grid-area: 1 / 1;
+}
+
+/* On a phone the pile fills the top of the screen and each beat is its own
+   plate of paper rising from the bottom edge, so a falling slip never passes
+   under a word. The hero is the tallest plate and covers the foot of the
+   heap; the later beats are short and give the stacks the room. */
+@media (max-width: 63.99rem) {
+  .is-reel .reel-stage {
+    display: block;
+    padding: 0;
+  }
+
+  .is-reel .reel-visual {
+    position: absolute;
+    top: calc(var(--bar-h) + 0.75rem);
+    left: var(--gutter);
+    right: var(--gutter);
+    height: calc(100% - var(--bar-h) - 16.5rem);
+    aspect-ratio: auto;
+  }
+
+  .is-reel .reel-copy {
+    position: absolute;
+    inset: auto 0 0;
+    display: grid;
+    gap: 0;
+  }
+
+  .is-reel .reel-copy > * {
+    grid-area: 1 / 1;
+    align-self: end;
+  }
+
+  .is-reel .beat-hero,
+  .is-reel .beat {
+    max-width: none;
+    padding: 1rem var(--gutter) 1.25rem;
+    background: var(--color-paper);
+    box-shadow: 0 -1px 0 var(--color-ink);
+  }
+
+  .is-reel .beat-hero {
+    gap: 0.9rem;
+  }
+
+  .is-reel .hero-title {
+    font-size: clamp(2.75rem, 1rem + 8vw, 4.5rem);
+  }
+
+  .is-reel .hero-sub {
+    font-size: 1.0625rem;
+  }
+
+  .is-reel .hero-note {
+    display: none;
+  }
+
+  .is-reel .beat-title {
+    font-size: clamp(2.25rem, 1.2rem + 5vw, 3.5rem);
+  }
+
+  .is-reel .beat p {
+    font-size: 1.0625rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .is-reel .reel-stage {
+    grid-template-rows: minmax(0, 1fr);
+    padding-top: calc(var(--bar-h) + 1.25rem);
+    padding-bottom: 2rem;
+  }
+
+  .is-reel .reel-copy {
+    gap: 0;
+    align-self: center;
+  }
+
+  .is-reel .reel-copy > * {
+    grid-area: 1 / 1;
+    align-self: center;
+  }
+
+  .is-reel .reel-visual {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+  }
+
+  .is-reel .hero-title {
+    font-size: clamp(3.4rem, 0.8rem + 7vw, 8rem);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Month end. The steps as a ruled index, the statement as the specimen.
+ * ------------------------------------------------------------------------- */
+
+.month-head {
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.month .title {
+  font-size: var(--title-xl);
+  max-width: 13ch;
+}
+
+.steps {
+  display: grid;
+  counter-reset: step;
+}
+
+.step {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem 0 1.5rem;
+  background: var(--perforation) top / 100% 1px no-repeat;
+  counter-increment: step;
+}
+
+.step-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2rem, 1.2rem + 2.5vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.step-name::before {
+  content: counter(step);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--color-ink-soft);
+}
+
+.step p {
+  max-width: var(--measure);
+}
+
+.month-note {
+  max-width: var(--measure);
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+.stamp-muted {
+  color: var(--color-ink-soft);
+  background: var(--color-paper);
+  border-style: dotted;
+}
+
+@media (min-width: 64rem) {
+  .month {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    row-gap: 3.5rem;
+  }
+
+  .month-head {
+    align-self: start;
+  }
+
+  .steps {
+    grid-column: 2;
+  }
+
+  .step {
+    grid-template-columns: 11rem minmax(0, 1fr);
+    column-gap: 2rem;
+    align-items: baseline;
+  }
+
+  .statement {
+    grid-column: 1 / -1;
+    width: min(100%, 60rem);
+    justify-self: center;
+    rotate: -0.6deg;
+  }
+
+  .month-note {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 60rem);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Undo. The copy and a working sample list.
+ * ------------------------------------------------------------------------- */
+
+.keys .title {
+  font-size: var(--title-xl);
+  max-width: 12ch;
+}
+
+.keys-copy {
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.keys-hint {
+  max-width: var(--measure);
+  line-height: 1.9;
+}
+
+.worklist {
+  position: relative;
+  display: grid;
+  align-content: start;
+  max-width: 38rem;
+  padding: 1.25rem 1.25rem 2.5rem;
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  --tooth: 10px;
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
+}
+
+.worklist-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 0.75rem;
+  border-bottom: var(--rule);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.worklist-count {
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.worklist-rows {
+  display: grid;
+}
+
+.wrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem 1rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-bottom: 1px dashed var(--color-guilloche);
+  transition:
+    transform 260ms var(--ease),
+    clip-path 260ms var(--ease);
+  clip-path: inset(-4px -4px -4px -4px);
+}
+
+.wrow-seller {
+  font-weight: 600;
+}
+
+.wrow-meta {
+  grid-row: 2;
+  font-size: var(--text-small);
+  color: var(--color-ink-soft);
+}
+
+/* A needs-you flag carries its word, never colour alone. */
+.wrow-flag {
+  grid-row: 3;
+  justify-self: start;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--color-stamp);
+  border-radius: var(--radius-pill);
+  color: var(--color-stamp);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.wrow-act {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-slip);
+  color: var(--color-ink);
+  font: 600 1rem var(--font-ui);
+  cursor: pointer;
+  transition: transform 90ms ease-out;
+}
+
+.wrow-act:hover {
+  background: var(--color-ink);
+  color: var(--color-slip);
+}
+
+.wrow-act:active {
+  transform: translateY(2px);
+}
+
+/* A resolved row is wiped out to the right while it slides, never faded. */
+.wrow.is-leaving {
+  transform: translateX(1.5rem);
+  clip-path: inset(-4px -4px -4px 100%);
+}
+
+@keyframes row-back {
+  from { clip-path: inset(-4px 100% -4px -4px); transform: translateX(-1rem); }
+  to { clip-path: inset(-4px -4px -4px -4px); transform: none; }
+}
+
+.wrow.is-back {
+  animation: row-back 320ms var(--ease) both;
+}
+
+.worklist-done {
+  padding: 1.25rem 0;
+  font-weight: 600;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.25rem;
+  margin-top: 1rem;
+  padding: 0 0.5rem 0 1rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-radius: var(--radius-slip);
+}
+
+.banner:has(.banner-text:empty) {
+  visibility: hidden;
+}
+
+.banner-text {
+  font-weight: 600;
+}
+
+.banner-undo {
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 2px solid var(--color-paper);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font: 600 1rem var(--font-ui);
+  cursor: pointer;
+}
+
+.banner-undo:hover {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.banner :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.worklist-foot {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink-soft);
+}
+
+@media (min-width: 64rem) {
+  .keys {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(2.5rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  .worklist {
+    rotate: 0.8deg;
+    margin-top: 2rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The app. Screens laid one on another like paper, then the phone.
+ * ------------------------------------------------------------------------- */
+
+.screens .title {
+  font-size: var(--title-xl);
+  max-width: 14ch;
+}
+
+.deck {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.card figure {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.6rem 0.6rem 1rem;
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  border-radius: var(--radius-slip);
+  transform-origin: 50% 0;
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-guilloche);
+}
+
+.card figcaption {
+  max-width: 44rem;
+  padding: 0 0.4rem;
+}
+
+.pocket {
+  display: grid;
+  gap: 2.5rem;
+  margin-top: 2rem;
+}
+
+.pocket-copy {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.pocket-copy p {
+  max-width: var(--measure);
+}
+
+.phones {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.75rem, 2vw, 2rem);
+  align-items: start;
+}
+
+/* The one rounded thing on the page: a phone has corners, a slip does not. */
+.phones img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 5px solid var(--color-ink);
+  border-radius: 1.25rem;
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+}
+
+.phones li:nth-child(2) {
+  margin-top: 3rem;
+}
+
+@media (min-width: 48rem) {
+  .deck {
+    gap: 0;
+    padding-bottom: 4rem;
+  }
+
+  /* Each screen sticks a step lower than the one before, so the stack shows
+     its edges, and the next one slides over it. CSS only: no script needed. */
+  .card {
+    position: sticky;
+    top: calc(var(--bar-h) + 1.5rem + var(--i) * 1.4rem);
+    padding-bottom: 12vh;
+  }
+
+  .card figure {
+    width: min(100%, 64rem);
+    margin-inline: auto;
+  }
+}
+
+@media (min-width: 64rem) {
+  .pocket {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    align-items: center;
+  }
+
+  .phones {
+    padding-block: 3rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Second pass: crops, the search pill's placeholder, and settled details.
+ * ------------------------------------------------------------------------- */
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* The pill shows the app's own placeholder until the last beat types. */
+.query-text:empty::before {
+  content: attr(data-placeholder-short);
+  color: var(--color-ink-soft);
+  font-weight: 500;
+}
+
+@media (min-width: 64rem) {
+  .query-text:empty::before {
+    content: attr(data-placeholder);
+  }
+}
+
+.slip-found .slip-caption {
+  position: static;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.slip-found {
+  padding-bottom: 1.75rem;
+}
+
+/* Each screen is shown whole: a crop that cuts the app's own words reads as
+   a broken screenshot, and the caption already says where to look. */
+.shot {
+  overflow: clip;
+  border: 1px solid var(--color-guilloche);
+}
+
+.card .shot img {
+  border: 0;
+}
+
+/* Phones show the top of the screen, where the app puts what matters. */
+.phones img {
+  aspect-ratio: 390 / 640;
+  object-fit: cover;
+  object-position: 50% 0;
+}
+
+@media (min-width: 48rem) {
+  .card {
+    padding-bottom: 6vh;
+  }
+
+  .deck {
+    padding-bottom: 0;
+  }
+}
+
+.beat-hero .hero-title {
+  margin-bottom: 0.75rem;
+}

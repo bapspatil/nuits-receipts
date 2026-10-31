@@ -2,7 +2,7 @@
 // Renders public/og.png from src/og.html, public/og-changelog.png from
 // src/og-changelog.html, and public/apple-touch-icon.png from
 // the favicon, through a throwaway Vite dev server so the real fonts and
-// tokens are used. Run after measure-field.mjs, which makes the field image.
+// tokens are used. Run after shoot-pile.mjs, which makes the heap image.
 import { createServer } from "vite";
 import { launch } from "./chrome.mjs";
 

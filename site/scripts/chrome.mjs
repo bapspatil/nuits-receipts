@@ -1,6 +1,9 @@
+import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
+import { chromePath } from "../../scripts/chrome-path.mjs";
 
-export const CHROME = process.env.CHROME ?? "/usr/bin/google-chrome";
+// CHROME, then a system Chrome on Linux CI, then the Chromium Playwright cached.
+export const CHROME = process.env.CHROME ?? (existsSync("/usr/bin/google-chrome") ? "/usr/bin/google-chrome" : chromePath());
 
 // SwiftShader WebGPU, so headless Chrome can render the field. The page itself
 // refuses software adapters; `?fx-force` is how the tooling opts back in.

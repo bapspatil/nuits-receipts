@@ -1,0 +1,667 @@
+/* Home page scenes kept from the first site: the statement, the demo player,
+   the cost specimen, the limits letter and the FAQ index. */
+
+/* The match. The statement is the specimen: a bank statement slip with its
+   caption as a header band, ruled columns, the amounts in display figures,
+   then the stamps it printed, tallied. */
+
+.statement {
+  --tooth: 10px;
+  --inset: clamp(1rem, 3vw, 2rem);
+  background: var(--color-slip);
+  box-shadow: var(--shadow-system);
+  padding-bottom: 2.5rem;
+  overflow-x: auto;
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
+}
+
+.statement table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 34rem;
+}
+
+.statement caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.9rem var(--inset);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.statement th {
+  text-align: left;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.statement td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--color-guilloche);
+}
+
+/* Ruled columns, like a printed statement. */
+.statement :is(th, td) + :is(th, td) {
+  border-left: 1px solid var(--color-ink);
+}
+
+.statement :is(th, td):first-child {
+  padding-left: var(--inset);
+}
+
+.statement :is(th, td):last-child {
+  padding-right: var(--inset);
+}
+
+.statement .num {
+  text-align: right;
+}
+
+.statement td.num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3125rem;
+  letter-spacing: -0.01em;
+}
+
+.statement .stamp {
+  font-size: 1rem;
+}
+
+.stamp-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  padding: 1.25rem var(--inset) 0;
+}
+
+.stamp-tally li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.stamp-count {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.stamp-tally .stamp {
+  font-size: 0.875rem;
+}
+
+.statement-foot {
+  margin-top: 1.25rem;
+  padding: 1rem var(--inset) 0;
+  border-top: 1px dashed var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.375rem;
+  line-height: 1.2;
+}
+
+/* Demo. A screening room: the section turns ink and the player sits in a
+   film strip, sprocket holes printed along its top and bottom edges. */
+
+.demo {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.demo :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.demo .title {
+  max-width: 10ch;
+}
+
+.demo-player {
+  /* 44px bar plus 8px of ink above it: Chrome sets a caption line a few pixels
+     past the video edge, and it must not sit under the bar. */
+  --player-plate: 52px;
+  display: grid;
+  gap: 1rem;
+  max-width: 64rem;
+}
+
+/* The strip is the container, so the controller's height formula below reads
+   the strip's width. Its padding is fixed, so the frame never shifts the
+   page when Media Chrome arrives. The holes are paper squares on the film
+   base, decoration on the box itself, so they take no layout. */
+.film {
+  container-type: inline-size;
+  padding-block: 28px;
+  /* Each 32px tile centres its 14px hole, and the tiles are spaced to fit
+     the strip, so the row ends on a whole hole with even margins at every
+     width instead of a hole cut in half against the edge. */
+  background:
+    linear-gradient(90deg, transparent 9px, var(--color-paper) 9px 23px, transparent 23px) 0 8px / 32px 12px space no-repeat,
+    linear-gradient(90deg, transparent 9px, var(--color-paper) 9px 23px, transparent 23px) 0 calc(100% - 8px) / 32px 12px space no-repeat,
+    var(--color-ink-soft);
+}
+
+.demo-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--color-ink);
+  background: var(--color-ink);
+}
+
+/* Media Chrome wraps the same <video>. Before it registers (or without
+   JavaScript) the controller is a plain 16/9 box around the native player, so
+   nothing moves when the components arrive. */
+.demo-player media-controller {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: calc((100cqw - 4px) * 9 / 16 + var(--player-plate) + 4px);
+  border: 2px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 600;
+  --media-font-family: var(--font-ui);
+  --media-font-size: var(--text-small);
+  --media-font-weight: 600;
+  --media-primary-color: var(--color-paper);
+  --media-secondary-color: var(--color-ink);
+  --media-text-color: var(--color-paper);
+  --media-icon-color: var(--color-paper);
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  --media-control-height: 24px;
+  --media-control-padding: 10px;
+  --media-focus-box-shadow: inset 0 0 0 2px var(--color-paper);
+  --media-range-bar-color: var(--color-mint);
+  --media-range-track-background: var(--color-ink-soft);
+  --media-range-thumb-background: var(--color-mint);
+  --media-range-thumb-border: 2px solid var(--color-ink);
+  --media-range-thumb-border-radius: 0;
+  --media-range-track-border-radius: 0;
+  --media-range-track-height: 6px;
+  --media-range-thumb-opacity: 1;
+  --media-tooltip-display: none;
+  --media-button-icon-transition: none;
+  --media-control-transition-in: none;
+  --media-control-transition-out: none;
+  --media-range-thumb-transition: none;
+  --media-range-track-transition: none;
+  --media-range-segment-transition: none;
+}
+
+.demo-player media-controller:not(:defined) > :not(video) {
+  display: none;
+}
+
+.demo-player media-controller video {
+  width: 100%;
+  height: calc(100% - var(--player-plate));
+  border: 0;
+  object-fit: contain;
+}
+
+.demo-player .player-bar {
+  width: 100%;
+  height: 44px;
+  align-items: center;
+  background: var(--color-ink);
+}
+
+.demo-player .player-big {
+  --media-control-height: 40px;
+  --media-control-padding: 16px;
+  --media-control-background: var(--color-ink);
+  --media-control-hover-background: var(--color-ink-soft);
+  border: 2px solid var(--color-paper);
+}
+
+/* The big button is for starting playback. While the film runs it would sit
+   over the picture, so it shows only while Media Chrome reports paused. */
+.demo-player media-controller:not([mediapaused]) .player-big {
+  display: none;
+}
+
+/* inkSoft fails on ink, so the caption is paper. */
+.demo-player figcaption {
+  max-width: 44rem;
+  font-size: var(--text-small);
+  color: var(--color-paper);
+}
+
+/* Cost. A specimen with annotation: the slip is the plate, the arithmetic
+   copy hangs beside it as margin notes on hairline leaders. */
+
+.cost {
+  background: var(--color-guilloche);
+}
+
+.cost-copy {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+}
+
+.cost .title {
+  font-size: var(--title-xl);
+  max-width: 14ch;
+}
+
+.cost .lede {
+  color: var(--color-ink);
+}
+
+.cost-copy > p {
+  position: relative;
+  max-width: var(--measure);
+}
+
+/* The caveat is a note pinned to the specimen: a slip of its own, ruled in
+   stamp red, which DESIGN.md allows as a fill and a rule but never as text. */
+.caveat {
+  padding: 1rem 1.25rem;
+  background: var(--color-slip);
+  border-left: 3px solid var(--color-stamp);
+  box-shadow: var(--shadow-system);
+}
+
+.slip-cost {
+  width: min(34rem, 100%);
+  rotate: -1.5deg;
+  padding: 2rem 2rem 3rem;
+}
+
+.slip-cost .slip-vendor {
+  font-size: 1.625rem;
+}
+
+.slip-cost .slip-seal {
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
+.tally {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.tally caption {
+  text-align: left;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  padding-bottom: 0.25rem;
+}
+
+.tally th {
+  text-align: left;
+  font-weight: 400;
+  padding: 0.2rem 1rem 0.2rem 0;
+}
+
+.tally td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tally-sum th,
+.tally-sum td {
+  font-weight: 600;
+  border-top: 1px dashed var(--color-ink);
+  padding-top: 0.35rem;
+}
+
+.slip-grand {
+  border-top: 2px solid var(--color-ink);
+  padding-top: 0.6rem !important;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.625rem;
+}
+
+/* The amount is one figure: it never breaks between "about" and the sum. */
+.slip-grand > :last-child {
+  white-space: nowrap;
+}
+
+/* Limits. A letter on a slip: the title stays on the ground, everything Baps
+   says to the reader is printed on the paper object. */
+
+.nope-letter {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.nope-slip {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 44rem;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem) clamp(2.5rem, 5vw, 3.5rem);
+}
+
+.nope-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.nope-list li {
+  position: relative;
+  padding-left: 2.25rem;
+  font-size: 1.125rem;
+}
+
+/* A struck-through box per line: the list is things it won't do. */
+.nope-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.35em;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid var(--color-stamp);
+  background: linear-gradient(45deg, transparent 45%, var(--color-stamp) 45% 55%, transparent 55%);
+}
+
+/* The required disclaimer sits on its own ruled plate inside the letter, so
+   it reads as a statement, not as one more line of the letter. */
+.disclaimer {
+  padding: 1rem 1.25rem;
+  background: var(--color-paper);
+  border-left: 3px solid var(--color-ink);
+  font-weight: 500;
+}
+
+.signoff {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.75rem, 1rem + 2vw, 2.5rem);
+  rotate: -4deg;
+  justify-self: end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-ink);
+}
+
+/* FAQ. An index: each question carries its number at display size, the
+   answer hangs under the question's column, and the plus sits in a ruled
+   square that turns to a cross. */
+
+.faq-list {
+  counter-reset: q;
+  border-top: 2px solid var(--color-ink);
+}
+
+.faq details {
+  counter-increment: q;
+  border-bottom: var(--rule);
+}
+
+.faq summary {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem 0;
+  min-height: 44px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
+  line-height: 1.15;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary::before {
+  content: counter(q, decimal-leading-zero);
+  font-size: clamp(1.75rem, 1.2rem + 1.5vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* The ruled square stays square; only the plus inside it turns. Turning the
+   whole box made a 62px diamond that poked past the column edge and the
+   row's padding whenever a question was open. */
+.faq-mark {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-ink);
+}
+
+.faq-mark::before {
+  content: "+";
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  transition: rotate 180ms var(--ease);
+}
+
+/* Colours swap instantly, as on the buttons. */
+.faq summary:hover .faq-mark {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.faq details[open] .faq-mark::before {
+  rotate: 45deg;
+}
+
+.faq details p {
+  padding: 0 3.75rem 1.5rem;
+  max-width: calc(var(--measure) + 7.5rem);
+  font-size: 1.125rem;
+}
+
+
+/* Narrow: each statement row becomes two lines, so the amount and the stamp
+   stay on screen instead of behind a horizontal scroll. */
+@media (max-width: 47.99rem) {
+  .statement table {
+    min-width: 0;
+  }
+
+  .statement thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .statement tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 1rem;
+    padding: 0.75rem var(--inset);
+    border-bottom: 1px solid var(--color-guilloche);
+  }
+
+  .statement td,
+  .statement td:is(:first-child, :last-child),
+  .statement :is(th, td) + :is(th, td) {
+    padding: 0;
+    border: 0;
+  }
+
+  .statement td:first-child {
+    grid-column: 1 / -1;
+    font-size: var(--text-small);
+    color: var(--color-ink-soft);
+  }
+
+  .statement td:nth-child(2) {
+    font-weight: 600;
+  }
+
+  .statement .num {
+    padding-right: 0;
+  }
+
+  .statement td:last-child {
+    grid-column: 1 / -1;
+    padding-top: 0.4rem;
+  }
+
+  /* The slip's own inset matches the hero slip here, and the seal shrinks to
+     its default size, so the tally keeps a usable label column on a phone
+     and the heading stops short of the seal instead of running under it. */
+  .slip-cost {
+    rotate: 0deg;
+    padding: 1.5rem 1.25rem 2.5rem;
+  }
+
+  .slip-cost .slip-seal {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .slip-cost .slip-vendor {
+    padding-right: 4rem;
+  }
+
+  .tally th {
+    padding-right: 0.5rem;
+  }
+
+  .slip-grand {
+    font-size: 1.125rem;
+  }
+}
+
+/* Close. A full-bleed statement: the largest type on the page, then the two
+   actions, then the footer tears off underneath. */
+
+.close {
+  gap: 2.5rem;
+  justify-items: start;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  padding-bottom: clamp(5rem, 14vh, 9rem);
+}
+
+.close .slate {
+  justify-self: stretch;
+}
+
+.close-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(3.5rem, 1rem + 10.5vw, 11rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  max-width: 11ch;
+}
+
+.close .button-secondary {
+  background: var(--color-ink);
+  border-color: var(--color-paper);
+  color: var(--color-paper);
+}
+
+.close .button:hover {
+  background: var(--color-paper);
+  border-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.close :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+
+@media (min-width: 64rem) {
+  /* The specimen on the left, its notes on the right, each note with a
+     hairline leader reaching back to the slip. */
+  .cost {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: center;
+  }
+
+  .cost-copy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .slip-cost {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .cost-copy > p::before {
+    content: "";
+    position: absolute;
+    top: 0.8em;
+    right: calc(100% + 0.75rem);
+    width: clamp(1.5rem, 3vw, 3.5rem);
+    border-top: 1px solid var(--color-ink);
+  }
+
+  .demo {
+    grid-template-columns: minmax(0, 0.34fr) minmax(0, 1fr);
+    column-gap: clamp(2rem, 4vw, 4rem);
+    align-items: start;
+  }
+
+  .demo-player {
+    max-width: none;
+  }
+
+  .slip-cost {
+    justify-self: end;
+  }
+
+  .nope-letter {
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    grid-template-rows: auto 1fr;
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  .nope-letter .title {
+    font-size: var(--title-xl);
+  }
+
+  .nope-slip {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    rotate: -1deg;
+  }
+
+  .faq {
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  /* The question index scrolls past a title that holds its place. CSS
+     sticky, not a pin, so it costs nothing without JavaScript. */
+  .faq .title {
+    position: sticky;
+    top: calc(var(--bar-h) + 2rem);
+    font-size: var(--title-xl);
+  }
+
+}

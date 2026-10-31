@@ -2,7 +2,22 @@
 
 ## Identity
 
-The page is money paper. Cheque-mint ground, petrol ink, white receipt slips with torn feet, and rubber stamps that say what happened to each payment. The memorable element is the stamp: it appears on the hero slip, on every row of the example statement and in the statement's own tally, and nowhere else.
+The page is money paper. Cheque-mint ground, petrol ink, white receipt slips with torn feet, and rubber stamps that say what happened to each payment. Since the archive release (v2.0) the page is built around one idea: the pile files itself.
+
+```
+Idea:        every receipt you ever had, filed by itself and found by one word
+Metaphor:    a filing drawer that does its own filing
+Signature:   the pile (src/pile.ts): a heap of slips is read, filed into year
+             drawers and searched, scrubbed by the scroll through one pinned stage
+Emotion:     relief; a mess becoming order without you touching it
+Motion verb: file (slips fly in an arc and land squared, cards lean back in a drawer)
+Screenshot:  three year drawers with seven "Cloud hosting" slips standing up out
+             of them under a search pill that reads "hosting, 7 found"
+Anchor:      v2.0 made Home the archive, with folders built from the data and
+             filing-drawer year dividers
+```
+
+Concepts considered: a till roll that prints down the page (portable to any receipt app), and a month calendar of stamped days (weak fit with the archive). The pile won on fit and on how little it could be moved to another product.
 
 Audience: freelancers and sole traders who already use Cloudflare and dread month end. Job of the page: say what the product is (every receipt and invoice, found in seconds, and the month closed), why it exists and what to click, in that order, then show the arithmetic.
 
@@ -36,44 +51,25 @@ The official Deploy to Cloudflare button is the one element outside the palette:
 
 Rules that fall out of it: guilloche and mint are fills. Stamp red is only ever a fill under white text or the colour of a stamp's own word. No state is shown by colour alone: every stamp carries its word.
 
-### The field is a background
+### The pile
 
-| Field | Picks (measured) | Swing | Text that survives on it |
-| --- | --- | --- | --- |
-| heroField | paper, guilloche | 1.28:1 | ink 8.34:1, inkSoft 5.38:1, stamp 4.95:1 |
-
-Picks come from `scripts/measure-field.mjs`, which renders the real shader in Chrome (SwiftShader WebGPU), counts every colour, and fails if any pixel is not an exact palette colour. Measured: 89% paper, 11% guilloche, nothing else.
+The only canvas on the home page. One instanced mesh of slips (150 wide, 84 on a phone) drawn by three.js in its own chunk, one draw call, painter's order instead of a depth buffer so tilted slips never slice through each other. Every slip's face comes from one atlas drawn at runtime on a 2D canvas from the tokens and the page's own fonts: receipts, sales invoices, statements and sent month packages from made-up sellers, plus a mint divider card with a tab per year. Each slip's printed date agrees with the drawer it is filed into.
 
 ```
-Treatment:  engraved guilloche lines, no fills. Two rosettes plus horizontal security waves.
-Placement:  hero only. Rosette behind the receipt slip (wide) or the top-right corner (narrow).
-            Quiet zone: no waves under the copy column.
-Palette:    two picks, paper and guilloche, hard select, no blending.
-Motion:     scroll position through the hero. Still when the reader is still. Off means frame 0.
-Field:      two-harmonic rosettes, radial distance in device pixels.
-Why:        the product is about money paper, and guilloche is how money paper proves it is real.
+Treatment:  paper slips, exact palette colours. Unread slips are dithered with
+            guilloche dots on their white paper (4x4 Bayer, 2 CSS px cells), never blended.
+Placement:  the right column of the first stage (wide), the top of the screen (phone).
+            Never under the copy: the copy column is clear on wide screens, and on a phone
+            each beat is its own plate of paper over the foot of the pile.
+Palette:    slip, ink, inkSoft, mint, stamp, guilloche, all read from CSS variables.
+Motion:     one state object { arrive, read, file, find, pull }, written by the reel's
+            scrubbed timeline and drawn on GSAP's ticker only when it changed.
+Why:        v2.0 made Home the archive; the pile is that sentence as a picture.
 ```
 
-Fallback: `measure-field.mjs` saves the same frames as `public/field-fallback-{wide,narrow}.png` (1-bit palette PNGs). No WebGPU, a software adapter, a failed chunk or no JavaScript all show those pixels.
+The still: `scripts/shoot-pile.mjs` renders the first frame (the seeded heap, before the late slips arrive) at 1440 and 390 wide into `public/pile/heap-{wide,narrow}.webp`. The heap is seeded, so the live canvas starts on the same pixels and the hand-over does not jump. No WebGL2, a software renderer (outside `?fx-force`), Save-Data, under 4 GB of device memory, reduced motion, the switch set to off and no JavaScript all keep the still. The canvas gets `data-ready` only after it has drawn a frame, and a lost context hands back to the still.
 
-| Field | Picks (measured) | Swing | Text that survives on it |
-| --- | --- | --- | --- |
-| inkField | ink, inkSoft | 1.55:1 | paper 6.88:1, slip 8.08:1 |
-
-Picks come from `scripts/measure-ink.mjs`, which renders `src/shaders/ink.glsl` in Chrome (SwiftShader WebGL) and fails on any colour that is not an exact token.
-
-```
-Treatment:  dot-matrix print, 3px square dots on a 6px grid, ordered dither. No lines, no fills.
-Placement:  the two ink sections only. How it works: printed rows streaming into ledger lines,
-            sparse on the left under the copy. The close: ink soaking in from the right edge.
-Palette:    two picks, ink and inkSoft, hard select, no blending.
-Motion:     rows step a whole cell at a time, like a print head; the bleed spreads with scroll
-            through the close and its edge breathes. Off means the settled frame.
-Field:      value noise and a 4x4 Bayer threshold per CSS-pixel cell.
-Why:        the receipts this page is about came out of thermal and dot-matrix printers.
-```
-
-One canvas and one WebGL context serve both sections: the canvas moves into whichever section is on screen. It is drawn at one device pixel per CSS pixel and shown pixelated, so the dots are the same at every DPR. It starts only when a section is within half a screen, runs at about 30 frames a second, stops off screen and in hidden tabs, and refuses software renderers outside the tooling (`?fx-force`). Fallback: `measure-ink.mjs` saves the settled frames as `public/ink-{rows,bleed}-{wide,narrow}.png` (1-bit, 1 to 2 KB each), shown unscaled. No WebGL, a software renderer, reduced motion, the switch set to off or no JavaScript all show those pixels.
+The search pill and the found slip are real HTML over the canvas: the pill is `aria-hidden` decoration (the beat's heading says it), the found slip is a figure with real text. At the end of the scene the GL slip lands exactly under the DOM slip, which then wipes in over it.
 
 Dark mode: not shipping. The page is a piece of paper.
 
@@ -88,11 +84,11 @@ Both are self-hosted Latin subsets (`scripts/fonts.sh`), 21 KB and 20 KB. Figure
 
 ## Illustrations
 
-Recraft line art in the ink of the page: bold filled ink outlines, white slip and mint fills, stamp red only where the drawing is a stamp. Colour comes from classes in `src/styles/motion.css`, never from the file. The set: an envelope with a slip (the problem), send, read and match icons (How it works) and an export sheet whose arrow turns into a tick (the close), all generated with one Recraft brand style and cleaned by `scripts/clean-recraft.mjs` (log in `src/assets/recraft/README.md`). The guilloche seal on the cost slip is computed by `scripts/make-seal.mjs` from the hero field's curve family, because Recraft's seals were not guilloche. They are inlined into the HTML at build time, so they paint without JavaScript.
+Recraft line art in the ink of the page: bold filled ink outlines, white slip and mint fills, stamp red only where the drawing is a stamp. Colour comes from classes in `src/styles/motion.css`, never from the file. The set left on the page: an export sheet whose arrow turns into a tick (the close), all generated with one Recraft brand style and cleaned by `scripts/clean-recraft.mjs` (log in `src/assets/recraft/README.md`). The guilloche seal on the cost slip is computed by `scripts/make-seal.mjs` from the curve family of the first site's guilloche field, because Recraft's seals were not guilloche. They are inlined into the HTML at build time, so they paint without JavaScript.
 
 ## Surface
 
-Two radii: 2px for slips, pills for buttons. One shadow, on slips and scraps only. Hairlines are 1px ink or a dashed perforation. No gradients as decoration, no glass, no blur, no translucency under text.
+Two radii: 2px for slips, pills for buttons. The one exception is the phone frames around the phone screenshots (1.25rem), because a phone has corners and a slip does not. One shadow, on slips, the app screens and the phones only. Hairlines are 1px ink or a dashed perforation. No gradients as decoration, no glass, no blur, no translucency under text.
 
 ## Motion
 
@@ -111,30 +107,41 @@ Two radii: 2px for slips, pills for buttons. One shadow, on slips and scraps onl
 | Ambient loops | 5.5 s bob, 9 s drift, 80 s seal, 1.1 s caret | ease-in-out, linear, steps |
 | Native scroll timelines | scroll position | linear |
 
-Storyboard (desktop, motion on; everything else gets the static end state):
+| Pile beat swap: the outgoing beat rises and wipes out, the next rises and wipes in | 0.3 and 0.35 of a scroll unit, overlapping | power2.in, power2.out |
+| A sample row leaves (Undo scene) | 260 ms, wiped out to the right while it slides | the site ease |
+| A row comes back on Undo | 320 ms, wiped in from the left | the site ease |
+
+Storyboard (motion on, every width; everything else gets the static end state):
 
 | Scene | Archetype | Camera | What changes while scrolling |
 | --- | --- | --- | --- |
-| Hero | full-bleed type over field | hold, not pinned | field rotates with scroll; the slip lifts away |
-| The problem | statement plus scattered scraps | assemble | scraps slide into one pile; the slip sinks into the envelope |
-| How it works | rail | track, pinned 1.4 screens | three steps pass under a held title, a meter tracks them, rows print behind |
-| The match | ledger | stamp, pinned 1.2 screens | stamps land row by row (narrow screens: native view timelines) |
-| Demo | screening room, ink | none | the player sits in a film strip; nothing moves until the reader presses play |
+| Hero and How it works | the pile, one stage | pinned 5.2 screens (4.4 on a phone) | hero, then four beats in one place: slips fall in (It comes in), a reading front cleans the heap (It gets read), slips fly into three year drawers (It files itself), a search types "hosting", seven matches stand up, the rest go grey, and the found slip flies out and becomes the real one (You find it) |
+| Month end | ruled index plus specimen | none; the title holds by CSS sticky | the statement's stamps land row by row |
+| Undo | copy beside a working sample list | none | nothing scrolls; the list answers clicks and j, k, a, u |
+| The app | a stack of paper | CSS sticky stack | each screen sinks and tilts a little as the next slides over it; the three phones ride at three speeds |
+| Demo | screening room, ink | none | nothing moves until the reader presses play |
 | Cost | specimen with margin notes | none | the cost slip rises into place |
-| So far | spec sheet, ruled rows | none | each row rises a little |
 | Limits | a letter on a slip | none | the won't-do boxes get struck through |
 | FAQ | numbered index, title held by CSS sticky | none | the plus turns to a cross |
-| Close | full-bleed statement | none | the words step down onto one baseline, ink bleeds in, the caret blinks, then the footer tears off: the end |
+| Close | full-bleed statement | none | the words step down onto one baseline, the caret blinks, then the footer tears off: the end |
 
-Every section title also wipes in word by word just before it arrives, and every illustration traces its ink outlines on, then fills them. A 3px reading-progress line runs along the top edge, driven by a native scroll timeline.
+Every section title also wipes in word by word just before it arrives. A 3px reading-progress line runs along the top edge, driven by a native scroll timeline.
 
-Rules: words never fade. A heading is split into words only when it is about to enter the viewport, and the wipe then runs to the end on its own clock, so a heading on screen is either whole or actively revealing. Illustrations keep their paper and mint regions painted while their ink traces, so a half-drawn icon is never an empty box. Loops pause off screen. Native scroll timelines sit behind `@supports (animation-timeline: view())` and `html[data-motion="on"]`, so a browser without them is never left at a keyframe's start. Nothing waits hidden for a trigger; scrubbed tweens only move content that is already painted (the one exception is the ledger stamps, which wipe in while their rows stay visible). Pins come from script only. Reduced motion, the on-page switch set to off, narrow screens and no JavaScript all get no pins, a still field and no wipe delays. Reduced motion, the switch set to off and no JavaScript also get no loops, no scroll timelines, no split-word wipes and no WebGL: the ink sections show their fallback print.
+Rules: words never fade. Beats and headings are revealed or removed only by clip-path wipes and translation. Nothing waits hidden for a trigger on the static page: the beats are a list, the search pill and the found slip are visible on the still. In the reel, the beats after the first, the pill and the found slip start clipped, because the pinned timeline owns them; a reel that fails to start never adds `is-reel`, so they are never clipped. Pins come from script only. Reduced motion, the on-page switch set to off and no JavaScript get no pins, no loops, no scroll timelines, no split-word wipes and no WebGL.
 
 ## Sections
 
-Every scene after the hero opens with a slate: a two-digit index, the scene's short name in spaced capitals, and a perforation running to the right edge. The slate is `aria-hidden` decoration; the h2 is the heading. It is ink on paper and paper on ink, so the page reads as one roll filed in order, 01 The problem to 09 Deploy.
+Every scene after the pile opens with a slate: a two-digit index, the scene's short name in spaced capitals, and a perforation running to the right edge. The slate is `aria-hidden` decoration; the h2 is the heading. It is ink on paper and paper on ink, so the page reads as one roll filed in order, 02 Month end to 09 Deploy.
 
-Each scene composes one paper object against its ground differently, so no two neighbours share a shape: the hero sets the title edge to edge with the slip hanging beside its short second line, clear of the first line's descenders and the sub and cost line as a two-column chit; the problem puts the scraps and the envelope on a ruled desk; How it works is printed tickets on a rail; the match is a bank statement slip with an ink header band, ruled columns and a tally of its stamps (counted from the example rows); the demo is the one ink scene that is not an ink field, a screening room with the player in a film strip; cost is the slip as a specimen with the copy hung beside it as margin notes; so far is a spec sheet of three ruled rows; limits is a letter printed on a slip; the FAQ is a numbered index; the close is the largest type on the page.
+Each scene composes one paper object against its ground differently, so no two neighbours share a shape: the pile is a heap and then a drawer beside a column of beats; Month end is a ruled index of three steps (Check, Match, Send) beside a held title, then the bank statement slip with its stamps and their tally (counted from the example rows); Undo is a working sample list on a slip beside the copy; the app is real screenshots laid one on another, then three phones; the demo is a screening room with the player in a film strip; cost is the slip as a specimen with the copy hung beside it as margin notes; limits is a letter printed on a slip; the FAQ is a numbered index; the close is the largest type on the page.
+
+## The app screens
+
+Real screens of the real app with made-up data, shot at 2x into `public/media/app/` (WebP, under 180 KB each). They are reshot whenever the app's UI changes, and their alt text says what the screen shows. Never a mock-up drawn in HTML.
+
+## The sample list
+
+`src/worklist.ts` makes the Undo scene's list behave like the app's To do: Approve removes the row, focus moves to the next open row, the banner (`role="status"`) names what happened, and Undo (or `u`) puts the row back. `j` and `k` move and `a` approves, but only while focus is inside the list, so the page never loses a keystroke. It saves nothing, and says so under the list. Without JavaScript the buttons do nothing and the list still reads as an example.
 
 ## The demo player
 
@@ -207,7 +214,7 @@ Reduced motion, the switch set to off and no JavaScript get an instant swap. thr
 - No cookies, no analytics. The motion switch's localStorage choice is the only stored value, and the privacy notice names it.
 - No Cloudflare logo except inside the official Deploy badge. No bank logos or bank colours.
 - No restyled, recoloured or wrapped Deploy button.
-- No stats, logos, quotes or counts that the maintainer has not measured.
+- No stats, logos, quotes or counts that the maintainer has not measured. "7 found" in the pile is the count of hosting slips the scene draws, not a claim.
 - No tax or VAT compliance claims.
 - No colour-only states.
 - No text in guilloche or mint.

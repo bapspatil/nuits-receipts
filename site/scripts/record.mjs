@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Screen recordings of a smooth top-to-bottom scroll at desktop 1440x900 and
-// mobile 390x844, motion on, with the live WebGPU and WebGL fields
+// mobile 390x844, motion on, with the live WebGL pile
 // (SwiftShader, via ?fx-force). Writes scroll-desktop.webm and
 // scroll-mobile.webm into OUT, plus .mp4 copies when ffmpeg is on the PATH.
 //

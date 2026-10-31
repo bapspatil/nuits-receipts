@@ -18,6 +18,8 @@ const BUDGETS = [
   ["book3d", 6 * KB, 5 * KB],
   ["gsap", 35 * KB, 30 * KB],
   ["three", 160 * KB, 140 * KB],
+  ["pile", 7 * KB, 6 * KB],
+  ["reel", 24 * KB, 21 * KB],
 ];
 
 const assets = join(dist, "assets");
