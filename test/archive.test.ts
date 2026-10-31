@@ -2,7 +2,7 @@
 // words, the marks a file carries, other documents, quick find, folder and package downloads.
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
-import { folderParam, homeUrl, parseFolder, type Folder } from '../src/archive';
+import { folderParam, homeUrl, overview, parseFolder, type Folder, type Overview } from '../src/archive';
 import { snapshotPackage } from '../src/files';
 import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
 
@@ -174,4 +174,37 @@ test('the one Add form keeps another document too, and every page has the same A
     expect(await page(path)).toContain('<a class="navadd" href="/add"');
   expect(await page('/receipts?view=all&kind=sales')).toContain('href="/add?kind=sales" class="tabadd"');
   expect(await page('/add?kind=other')).toContain('value="other" checked');
+});
+
+test('a folder chart keeps one bar size whether it has 0, 1, 2 or 12 months', () => {
+  const seller: Folder = { type: 'vendor', name: 'Sample Cloud Lantern Oy' };
+  const data = (eur: number[]): Overview => ({
+    months: eur.map((v, i) => ({ m: `2026-${String(i + 1).padStart(2, '0')}`, eur: v, n: 1 })),
+    n: eur.length,
+    eur: eur.reduce((a, b) => a + b, 0),
+    other: 0,
+    missing: null,
+  });
+  const svg = (html: string) => html.match(/<svg class="bars"[^>]*>/)?.[0] ?? null;
+  const bars = (html: string) => [...html.matchAll(/<rect x="(\d+)" y="[\d.]+" width="(\d+)" height="(\d+)"/g)];
+
+  // No months: no chart at all.
+  expect(svg(overview(data([]), seller))).toBeNull();
+
+  // Every case draws 28px bars, 36px apart, in a strip sized to its months, never stretched.
+  for (const [n, values] of [
+    [1, [12000]],
+    [2, [12000, 6000]],
+    [12, Array.from({ length: 12 }, (_, i) => (i + 1) * 1000)],
+  ] as const) {
+    const html = overview(data([...values]), seller);
+    const width = n * 36 - 8;
+    expect(svg(html)).toContain(`viewBox="0 0 ${width} 102" width="${width}" height="102"`);
+    const drawn = bars(html);
+    expect(drawn).toHaveLength(n);
+    expect(drawn.every((b) => b[2] === '28')).toBe(true);
+    // The tallest month fills the 72px plot; the others are in proportion to it.
+    expect(Math.max(...drawn.map((b) => Number(b[3])))).toBe(72);
+  }
+  expect(bars(overview(data([12000, 6000]), seller)).map((b) => b[3])).toEqual(['72', '36']);
 });

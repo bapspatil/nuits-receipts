@@ -53,7 +53,7 @@ a.tagchip:hover{border-color:var(--accent);color:var(--accent)}
 .overview .facts{display:flex;flex-wrap:wrap;gap:var(--space-5);margin:0}
 .overview dt{font-size:var(--text-sm);color:var(--text-muted)}
 .overview dd{margin:0;font:600 var(--text-lg)/1.2 var(--font-num);font-variant-numeric:tabular-nums}
-.bars{width:min(100%,432px);height:auto}
+.bars{max-width:100%;height:auto}
 .bars .mbar{fill:var(--accent)}
 .bars .lab{font:500 12px var(--font-num);fill:var(--text-muted);text-anchor:middle}
 .pane{position:relative;filter:drop-shadow(0 2px 6px rgb(33 28 22/.08))}

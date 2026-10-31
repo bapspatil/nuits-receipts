@@ -119,7 +119,7 @@ These make the app installable. See [Install the app](/how-to/install-the-app/).
 
 | Path | Sign-in | Returns |
 | --- | --- | --- |
-| `/manifest.webmanifest` | No | The web app manifest: `APP_NAME`, a short name of at most 12 characters for the home screen, the icons, an **Add a receipt** shortcut to `/add`, and the share target. It holds no data. |
+| `/manifest.webmanifest` | No | The web app manifest: `APP_NAME`, a short name of at most 16 characters for the home screen, the icons, an **Add a receipt** shortcut to `/add`, and the share target. It holds no data. |
 | `/sw.js` | Yes | The service worker. It answers only two requests: a page opened while the device is offline gets the offline page, and a share to `/share` is stashed for `/add`. It caches no app data. |
 | `/share` (POST) | Yes | The share target. The service worker normally takes the share; if it does not, the Worker redirects to `/add` and stores nothing. |
 | `/favicon.svg`, `/apple-touch-icon.png`, `/icons/icon-192.png`, `/icons/icon-512.png`, `/icons/icon-maskable-512.png` | No | The app icons. They hold no data. |

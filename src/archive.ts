@@ -598,6 +598,8 @@ export async function overviewData(env: Env, f: Folder): Promise<Overview | null
   };
 }
 // The header's bar strip: one labelled bar per month, so nothing rests on the bar's length alone.
+// The strip is drawn at its own size (36px a month), so one or two months keep the bar width of
+// twelve instead of stretching across the card. Only a narrow screen scales it down.
 export function overview(o: Overview, f: Folder): string {
   const year = f.type === 'year' ? f.year : null;
   const span = year
@@ -625,7 +627,7 @@ export function overview(o: Overview, f: Folder): string {
     .join('');
   const width = span.length * (w + gap) - gap;
   const what = f.type === 'client' ? 'Invoiced' : 'Spent';
-  return `<section class="overview" aria-label="${escape(folderName(f))} at a glance"><dl class="facts"><div><dt>${what}</dt><dd>EUR ${(o.eur / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div><div><dt>Files</dt><dd>${o.n}</dd></div>${o.other ? `<div><dt>Without a euro amount</dt><dd>${o.other}</dd></div>` : ''}${o.missing !== null ? `<div><dt>Payments missing a receipt</dt><dd>${o.missing}</dd></div>` : ''}</dl>${span.length ? `<svg class="bars" viewBox="0 0 ${width} ${h + 30}" role="img" aria-label="${escape(what)} by month"><g>${bars}</g><g>${labels}</g></svg>` : ''}</section>`;
+  return `<section class="overview" aria-label="${escape(folderName(f))} at a glance"><dl class="facts"><div><dt>${what}</dt><dd>EUR ${(o.eur / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div><div><dt>Files</dt><dd>${o.n}</dd></div>${o.other ? `<div><dt>Without a euro amount</dt><dd>${o.other}</dd></div>` : ''}${o.missing !== null ? `<div><dt>Payments missing a receipt</dt><dd>${o.missing}</dd></div>` : ''}</dl>${span.length ? `<svg class="bars" viewBox="0 0 ${width} ${h + 30}" width="${width}" height="${h + 30}" role="img" aria-label="${escape(what)} by month"><g>${bars}</g><g>${labels}</g></svg>` : ''}</section>`;
 }
 
 // ---------- The preview pane ----------
