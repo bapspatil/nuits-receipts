@@ -127,6 +127,31 @@ Variables changed only in the Cloudflare dashboard are replaced by `wrangler.jso
 
 If the build fails at the D1 migrations step with an authentication or permission error, see [Troubleshoot](/how-to/troubleshoot/).
 
+## After upgrading to v2.0.0
+
+v2.0.0 makes Home the archive of every finance document. It brings one new database migration, `0012_archive`, which the deploy applies like any other. It only adds: a column for each file's searchable words, and tables for other documents, tags, stars and notes, saved searches and recently opened files. No existing data is changed.
+
+Backups keep working the same way. `wrangler d1 export` still exports the whole database, which is why search does not use full-text search tables (the export refuses databases that have them).
+
+Files you added before the upgrade can be found by their details (seller, amounts, dates, file name) at once, but not yet by the words inside them. To index them:
+
+<Steps>
+  <Step title="Open the search settings">
+
+Open **Settings**, then **Advanced**, and find **Search**. It says how many older files can be found by their details but not yet by the words inside them.
+
+  </Step>
+  <Step title="Index the older files">
+
+Select **Index older files (N left)**. Each press reads 25 files. Press it again until the section says "Every file can be found by the words inside it."
+
+Home also reads a few older files on every visit, so the count goes down by itself over time. Pressing the button more than once does no harm: a file is indexed once.
+
+  </Step>
+</Steps>
+
+Bank statement PDFs imported before v2.0.0 were not kept, only the CSV they were converted to. Those statements show as a table. Old links to Receipts All (`/receipts?view=all`) now open Home. See [Find any document](/how-to/find-any-document/).
+
 ## Related
 
 - [Changelog](/reference/changelog/)

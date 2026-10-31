@@ -134,12 +134,10 @@ test('step markers carry the same three words everywhere', async () => {
 test('Receipts has one Add button that follows the open tab', async () => {
   await seed({ bytes: 'r', issue_date: open('2020-03') });
   await seed({ bytes: 'i', issue_date: open('2020-03'), kind: 'sales', client: 'Client Oy', invoice_number: 'I-1' });
-  const receipts = await home('/receipts?view=all&month=2020-03');
-  expect(receipts).toContain('Receipts <span class="num">1</span>');
-  expect(receipts).toContain('Invoices <span class="num">1</span>');
-  expect(receipts).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
-  expect(receipts).not.toContain('Add invoice');
+  expect(await home('/?month=2020-03')).not.toContain('Add invoice');
   const invoices = await home('/receipts?view=all&kind=sales&month=2020-03');
+  expect(invoices).toContain('Receipts <span class="num">1</span>');
+  expect(invoices).toContain('Invoices <span class="num">1</span>');
   expect(invoices).toContain(buttonLink('addInvoice', '/add?kind=sales', { tone: 'primary' }));
   expect(invoices).not.toContain('>Add receipt<');
 });

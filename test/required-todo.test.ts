@@ -76,7 +76,7 @@ test('an optional-only receipt is ready, a required one goes to To do, and the c
   expect(home).not.toContain('2 to check');
   expect(home).not.toContain('3 to check');
   expect(review).toContain('Receipts <span class="count">1<span class="vh"> to do</span>');
-  const receipts = await (await request('/receipts?view=all&month=2026-10')).text();
+  const receipts = await (await request('/?month=2026-10')).text();
   expect(receipts).toContain('Vendor 2');
 });
 

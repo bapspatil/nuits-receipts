@@ -42,6 +42,7 @@ import { SALES_DERIVED, salesReview } from './sales';
 import { hasTodoReason, REQUIRED_FIELDS, REQUIRED_SALES_FIELDS } from './flags';
 import { parseDocument } from './parse';
 import { undoAt, withUndo, type UndoAt } from './undo';
+import { SEARCH_TEXT_CHARS, searchText } from './search';
 
 export async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
   requireInput(stream, 'Empty request', 400);
@@ -181,6 +182,46 @@ export async function readableText(
     return null;
   }
 }
+// Search reads a document's words from search_text, written when it is read. Rows from before
+// the archive, and other documents, are indexed here a few at a time: Settings repeats it until
+// none are left, and Home tops up a few per visit. A file without words is indexed as ''.
+export const INDEX_BATCH = 25;
+export async function indexOlder(env: Env, limit = INDEX_BATCH): Promise<number> {
+  const [receipts, documents] = await Promise.all([
+    env.DB.prepare(
+      'SELECT id,original_key,media_type FROM receipts WHERE search_text IS NULL ORDER BY received_at DESC LIMIT ?',
+    )
+      .bind(limit)
+      .all<Pick<Receipt, 'id' | 'original_key' | 'media_type'>>(),
+    env.DB.prepare(
+      'SELECT id,original_key,media_type FROM documents WHERE search_text IS NULL ORDER BY received_at DESC LIMIT ?',
+    )
+      .bind(limit)
+      .all<Pick<Receipt, 'id' | 'original_key' | 'media_type'>>(),
+  ]);
+  const rows = [
+    ...receipts.results.map((r) => ({ ...r, table: 'receipts' })),
+    ...documents.results.map((r) => ({ ...r, table: 'documents' })),
+  ].slice(0, limit);
+  const texts = await Promise.all(rows.map((r) => readableText(env, r, SEARCH_TEXT_CHARS)));
+  if (rows.length)
+    await env.DB.batch(
+      rows.map((r, i) =>
+        env.DB.prepare(`UPDATE ${r.table} SET search_text=? WHERE id=? AND search_text IS NULL`).bind(
+          searchText(texts[i] ?? ''),
+          r.id,
+        ),
+      ),
+    );
+  return unindexedCount(env);
+}
+export async function unindexedCount(env: Env): Promise<number> {
+  return (
+    (await env.DB.prepare(
+      'SELECT (SELECT count(*) FROM receipts WHERE search_text IS NULL)+(SELECT count(*) FROM documents WHERE search_text IS NULL) n',
+    ).first<number>('n')) ?? 0
+  );
+}
 export async function getReceipt(env: Env, id: string): Promise<Receipt> {
   const row = await env.DB.prepare('SELECT * FROM receipts WHERE id=?').bind(id).first<Receipt>();
   requireInput(row, 'Receipt not found', 404);
@@ -229,6 +270,37 @@ export async function preserve(
     )
     .run();
   return getReceipt(env, id);
+}
+// A document that is not a receipt or a sales invoice (src/files.ts): its file, title, date and
+// words, and nothing to read with the model. The same bytes added twice are one document.
+export async function preserveDocument(
+  env: Env,
+  input: { bytes: Uint8Array; media: string; filename: string; title: string; date: string | null; words: string },
+): Promise<string> {
+  requireInput(
+    input.bytes.length <= (input.media === 'application/pdf' ? MAX_PDF_BYTES : MAX_IMAGE_BYTES),
+    'Document too large',
+    413,
+  );
+  requireInput(input.media === 'application/pdf' || input.media.startsWith('image/'), 'Choose a PDF or a photo', 415);
+  const id = await hash(input.bytes),
+    key = `documents/${id}`;
+  await env.ORIGINALS.put(key, input.bytes, { httpMetadata: { contentType: input.media } });
+  await env.DB.prepare(
+    'INSERT INTO documents (id,original_key,filename,media_type,title,doc_date,received_at,search_text) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',
+  )
+    .bind(
+      id,
+      key,
+      input.filename.slice(0, 200),
+      input.media,
+      input.title,
+      input.date,
+      new Date().toISOString(),
+      input.words,
+    )
+    .run();
+  return id;
 }
 export async function processReceipt(
   env: Env,
@@ -320,7 +392,7 @@ export async function processReceipt(
       (key) => facts[key as keyof Facts] !== claim[key as keyof Facts],
     );
     const update = env.DB.prepare(
-      `UPDATE receipts SET ${entries.map(([k]) => `${k}=?`).join(',')}, product=?,expense_type=?,status=?,ai_json=?,classification_json=?,review_reasons_json=?,lease_until=NULL,
+      `UPDATE receipts SET ${entries.map(([k]) => `${k}=?`).join(',')}, product=?,expense_type=?,status=?,ai_json=?,classification_json=?,review_reasons_json=?,search_text=?,lease_until=NULL,
       fx_eur_minor=CASE WHEN ? THEN NULL ELSE fx_eur_minor END,fx_requested_date=CASE WHEN ? THEN NULL ELSE fx_requested_date END
       WHERE id=? AND attempt_id=? AND revision=?`,
     ).bind(
@@ -331,6 +403,7 @@ export async function processReceipt(
       JSON.stringify(extracted.raw),
       JSON.stringify(extracted.classification),
       JSON.stringify([...new Set(reasons)]),
+      searchText(text),
       changed ? 1 : 0,
       changed ? 1 : 0,
       id,

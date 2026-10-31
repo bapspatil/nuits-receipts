@@ -77,13 +77,13 @@ test('J: a long search answers with the list, not a crash', async () => {
   const b = await seedBusyMonth();
   const vendor = 'Fake Long Name Trading Company of Northern Example Province Oy Ab';
   await env.DB.prepare('UPDATE receipts SET vendor=? WHERE id=?').bind(vendor, b.ready[0]!).run();
-  const hit = await request(`/receipts?q=${encodeURIComponent(vendor.slice(5, 65))}`);
+  const hit = await request(`/?q=${encodeURIComponent(vendor.slice(5, 65))}`);
   expect(hit.status).toBe(200);
-  expect(await hit.text()).toContain(`/receipts/${b.ready[0]}`);
-  const miss = await request(`/receipts?q=${encodeURIComponent(vendor + ' and more')}`);
+  expect(await hit.text()).toContain(`open=r%3A${b.ready[0]}`);
+  const miss = await request(`/?q=${encodeURIComponent(vendor + ' and more')}`);
   expect(miss.status).toBe(200);
   expect(await miss.text()).toContain('Nothing matches');
-  expect((await request(`/receipts?q=${'y'.repeat(5000)}`)).status).toBe(200);
+  expect((await request(`/?q=${'y'.repeat(5000)}`)).status).toBe(200);
 });
 
 // Receipts To do ids for a month, in the list's order, as the database holds them now.
@@ -193,7 +193,7 @@ test('A: a bulk post without its full list state is refused, and select-all on A
     view: 'all',
     q: 'unique searchable',
   });
-  expect(locationOf(hit)).toMatch(/^\/receipts\?view=all&q=unique\+searchable&done=discarded&n=2$/);
+  expect(locationOf(hit)).toMatch(/^\/\?q=unique\+searchable&done=discarded&n=2$/);
   const gone = await env.DB.prepare('SELECT id FROM receipts WHERE discarded_at IS NOT NULL ORDER BY id').all<{
     id: string;
   }>();
@@ -286,12 +286,14 @@ test('H: a receipt opened from a searched All list keeps the search on the way b
     .bind(b.ready[0]!)
     .first<string>('vendor'))!;
   const q = vendor.split(' ')[0]!;
-  const listPath = `/receipts?view=all&month=${b.month}&q=${encodeURIComponent(q)}`;
+  const listPath = `/?month=${b.month}&q=${encodeURIComponent(q)}`;
+  // A row opens in the preview, whose Open goes to the receipt's own page.
   const list = await get(listPath);
-  const href = list.match(/<a href="(\/receipts\/[0-9a-f]{64}[^"]*)"/)![1]!.replace(/&amp;/g, '&');
+  const preview = await get(list.match(/<a href="(\/\?[^"]*open=r%3A[0-9a-f]{64}[^"]*)"/)![1]!.replace(/&amp;/g, '&'));
+  const href = preview.match(/<a [^>]*href="(\/receipts\/[0-9a-f]{64}[^"]*)"/)![1]!.replace(/&amp;/g, '&');
   expect(href).toContain(`q=${encodeURIComponent(q)}`);
   const page = await get(href);
-  const back = page.match(/<a href="([^"]*)">‹ Receipts<\/a>/)?.[1]?.replace(/&amp;/g, '&');
+  const back = page.match(/<a href="([^"]*)">‹ Home<\/a>/)?.[1]?.replace(/&amp;/g, '&');
   expect(back).toBe(listPath);
   const res = await request('/discard', { method: 'POST', body: htmlForm(page, '/discard') });
   expect(locationOf(res).split('&done=')[0]).toBe(listPath);

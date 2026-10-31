@@ -1,4 +1,18 @@
 import type { Env } from './env';
+import {
+  addDocument,
+  fileOriginal,
+  filePage,
+  folderZip,
+  quickFind,
+  saveDocument,
+  sentPackageZip,
+  snapshotPackage,
+} from './files';
+import { markAction, removeSearch, saveSearch } from './marks';
+import { parseItem } from './archive';
+import { fileResponse } from './serve';
+import { PDF_JS, PDF_WORKER_JS, VIEWER_JS, VIEWER_VERSION } from './viewer';
 import { mergeDuplicates } from './dedupe';
 import { hash, InputError, MAX_PDF_BYTES, MAX_CSV_BYTES, EXPENSE_TYPES, normalize, requireInput } from './domain';
 import {
@@ -10,6 +24,7 @@ import {
   readBounded,
   receiveEmail,
   upload,
+  indexOlder,
 } from './receipts';
 import { FAVICON_SVG } from './icon';
 import { APP_JS, PUBLIC_PATHS, iconResponse, swJs, manifest, type IconPath } from './pwa';
@@ -27,6 +42,7 @@ import {
 } from './ui';
 import { BULK_CAP, BULK_JS } from './bulk';
 import { KEYS_JS } from './keys';
+import { FIND_JS } from './find';
 import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
 import { ADD_JS, ADD_SCOPE, addPage, invoicesPage, MAX_UPLOAD_FILES, PAID_SCOPE } from './invoices';
 import {
@@ -35,6 +51,7 @@ import {
   importPage,
   payments,
   previewable,
+  viewable,
   helpPage,
   FOLDER_SCOPE,
   NEW_ACCOUNT,
@@ -60,7 +77,7 @@ import { config, ConfigError, isProduct, MIN_PASSWORD_LENGTH, WEAK_PASSWORDS } f
 import { verifyAccessJwt } from './access';
 import { cachedSettings, FIELD, freshSettings, withDatabase, withSettings, type SettingKey } from './settings';
 import { approveSender, ignoreSender, removeApproved, senderAddress, unignoreSender } from './inbound';
-import { allReceiptsPage, todoPage } from './all';
+import { todoPage } from './all';
 import { discardReceipts, receiptIds, restoreReceipts } from './discard';
 import { parseUndo, undo, undoAt, withUndo, type UndoAt, type UndoOp } from './undo';
 import { resetSetting, saveSetup, SETUP_SCOPE } from './setup';
@@ -284,7 +301,12 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   }
   if (request.method === 'POST' && path === '/upload') return uploadFiles(request, env);
   if (request.method === 'GET' && path === '/')
-    return home(env, url.searchParams.has('month') ? month(url.searchParams.get('month')) : null, url.searchParams);
+    return home(
+      env,
+      url.searchParams.has('month') ? month(url.searchParams.get('month')) : null,
+      url.searchParams,
+      ctx,
+    );
   // Old addresses: the month close is Home now, and the phone's More menu is gone.
   const read = request.method === 'GET' || request.method === 'HEAD';
   if (read && path === '/month') return moved('/', url.search);
@@ -300,7 +322,8 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const all = params.get('view') === 'all' || (!params.has('view') && (params.has('show') || params.has('q')));
     if (!all) return todoPage(env, listState(params, { ...RECEIPTS_TODO, view: 'todo' }));
     if (params.get('kind') === 'sales') return invoicesPage(env, month(params.get('month')), params);
-    return allReceiptsPage(env, params);
+    // Receipts All is the archive on Home now.
+    return moved(listUrl(listState(params, { ...RECEIPTS_TODO, view: 'all' })));
   }
   if (request.method === 'POST' && path === '/discard') {
     const form = await formData(request, 16 * 1024);
@@ -376,6 +399,7 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     const form = await formData(request, 4096),
       selected = month(String(form.get('month') ?? ''));
     const at = await markSent(env, selected, String(form.get('receipts_hash') ?? ''), 'download');
+    ctx.waitUntil(snapshotPackage(env, selected, at, url.origin + base).catch(() => undefined));
     return redirect(withDone('sent', `/?month=${selected}#send`, { at }));
   }
   if (request.method === 'POST' && path === '/month/sent/undo') {
@@ -437,6 +461,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return new Response(KEYS_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
+  if (request.method === 'GET' && path === '/assets/find.js')
+    return new Response(FIND_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
+    });
   if (request.method === 'GET' && path === '/assets/bulk.js')
     return new Response(BULK_JS, {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
@@ -454,6 +482,18 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   if (request.method === 'GET' && path === '/sw.js')
     return new Response(swJs(MAX_UPLOAD_FILES), {
       headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' },
+    });
+  const module = MODULES[path];
+  if (request.method === 'GET' && module)
+    return new Response(module(), {
+      headers: {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        // The address carries the viewer's version, so a release never serves a stale copy.
+        'Cache-Control':
+          url.searchParams.get('v') === VIEWER_VERSION
+            ? 'private, max-age=31536000, immutable'
+            : 'private, max-age=300',
+      },
     });
   if (request.method === 'GET' && path === '/assets/app.js')
     return new Response(APP_JS, {
@@ -597,31 +637,54 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     if (isReady(before) && needsReview(after)) return redirect(withDone('movedBack', receiptUrl(id, state)));
     return redirect(withDone('saved', receiptUrl(id, state)));
   }
+  if (request.method === 'GET' && path === '/search.json') return quickFind(env, url.searchParams.get('q') ?? '');
+  if (request.method === 'GET' && path === '/files.zip') return folderZip(env, url.searchParams, url.origin + base);
+  const file = path.match(/^\/files\/([^/]{3,200})(\/original|\/package\.zip)?$/);
+  if (file?.[1]) {
+    const key = decodeURIComponent(file[1]);
+    if ((request.method === 'GET' || request.method === 'HEAD') && file[2] === '/original')
+      return fileOriginal(env, request, key, url.searchParams.get('view'));
+    if (request.method === 'GET' && file[2] === '/package.zip') {
+      const item = parseItem(key);
+      requireInput(item?.type === 'package', 'File not found', 404);
+      return sentPackageZip(env, item);
+    }
+    if (request.method === 'GET' && !file[2]) return filePage(env, key, ctx);
+    if (request.method === 'POST' && !file[2]) {
+      const item = parseItem(key);
+      requireInput(item?.type === 'document', 'File not found', 404);
+      return redirect(await saveDocument(env, item.id, await formData(request, 8192)));
+    }
+  }
+  if (request.method === 'POST' && path === '/documents')
+    return redirect(await addDocument(env, await formData(request, MAX_PDF_BYTES + 64 * 1024)));
+  if (request.method === 'POST' && /^\/marks\/(star|tag|untag|note)$/.test(path))
+    return redirect(await markAction(env, path, await formData(request, 8192)));
+  if (request.method === 'POST' && path === '/searches')
+    return redirect(await saveSearch(env, await formData(request, 4096)));
+  const search = path.match(/^\/searches\/(\d{1,9})\/delete$/);
+  if (request.method === 'POST' && search?.[1]) return redirect(await removeSearch(env, Number(search[1])));
+  if (request.method === 'POST' && path === '/settings/index') {
+    const left = await indexOlder(env);
+    return redirect(withDone('indexed', '/settings#search', { left }));
+  }
   const original = path.match(/^\/originals\/([a-f0-9]{64})$/);
-  if (request.method === 'GET' && original?.[1]) {
+  if ((request.method === 'GET' || request.method === 'HEAD') && original?.[1]) {
     const row = await getReceipt(env, original[1]);
     const email = url.searchParams.get('variant') === 'email';
-    // Inline view for the receipt page preview: raster images only, never PDF,
-    // SVG or email, with its own locked-down CSP.
-    const inline = url.searchParams.get('view') === 'inline';
-    requireInput(!inline || (!email && previewable(row)), 'No preview for this file type', 404);
+    const view = url.searchParams.get('view');
+    // Inline for the receipt page's <img>: raster images only, with its own locked-down CSP.
+    // Raw is the bytes the viewer reads: a PDF or an image, never HTML or email.
+    requireInput(view !== 'inline' || (!email && previewable(row)), 'No preview for this file type', 404);
+    requireInput(view !== 'raw' || (!email && viewable(row)), 'No view for this file type', 404);
     const key = email ? row.email_key : row.original_key;
     requireInput(key, 'Source email not found', 404);
-    const stored = await env.ORIGINALS.get(key);
-    requireInput(stored, 'Original not found', 404);
-    if (inline)
-      return new Response(stored.body, {
-        headers: {
-          'Content-Type': row.media_type,
-          'Content-Disposition': `inline; filename="${row.id}.${row.media_type.slice(6)}"`,
-          'Content-Security-Policy': INLINE_CSP,
-        },
-      });
-    return new Response(stored.body, {
-      headers: {
-        'Content-Type': email ? 'message/rfc822' : row.media_type,
-        'Content-Disposition': `attachment; filename="${row.id}.${row.media_type === 'application/pdf' ? 'pdf' : 'bin'}"`,
-      },
+    const type = email ? 'message/rfc822' : row.media_type;
+    const name = `${row.id}.${email ? 'eml' : (EXTENSIONS[row.media_type] ?? 'bin')}`;
+    return fileResponse(request, env, key, {
+      'Content-Type': type,
+      'Content-Disposition': `${view === 'inline' || view === 'raw' ? 'inline' : 'attachment'}; filename="${name}"`,
+      ...(view === 'inline' ? { 'Content-Security-Policy': INLINE_CSP } : {}),
     });
   }
   const payment = path.match(/^\/payments\/([a-f0-9]{64})$/);
@@ -879,13 +942,26 @@ function fontBytes(name: string): Uint8Array {
   }
   return bytes;
 }
+// The viewer and the PDF.js it imports from beside itself.
+const MODULES: Record<string, () => string> = {
+  '/assets/viewer.js': () => VIEWER_JS,
+  '/assets/pdf.mjs': () => PDF_JS,
+  '/assets/pdf-worker.mjs': () => PDF_WORKER_JS,
+};
+const EXTENSIONS: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'text/csv': 'csv',
+};
 // Non-HTML responses keep the original policy. App pages may also load the
 // self-hosted fonts, inline receipt images and their scripts from this origin.
 // Scripts are files, never inline.
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const HTML_CSP =
-  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+  "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const INLINE_CSP =
   "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 // Where an error page's back link goes: the same-origin page that sent the
@@ -1075,7 +1151,13 @@ async function serve(request: Request, env: Env, ctx?: Waiter): Promise<Response
     inner = stripped && checked && checked.href !== stripped.url ? new Request(checked, stripped) : stripped;
     // The query reaches the page shell (the feedback banner) through the request's own store.
     const own = inner;
-    if (own) state = { params: new URL(own.url).searchParams };
+    if (own) {
+      const url = new URL(own.url);
+      // Home is Receipts All now. Its address leaves the view out, but an Undo offered there needs it.
+      const params = new URLSearchParams(url.search);
+      if (url.pathname === '/' && !params.has('view')) params.set('view', 'all');
+      state = { params };
+    }
     response =
       own && state
         ? await requestState.run(state, () => route(own, env, base, waiter))

@@ -35,6 +35,10 @@ const phrases = [
   "integrates with",
   "upvote",
   "free to run",
+  "legally compliant archive",
+  "retention-compliant",
+  "GoBD",
+  "replaces your filing",
 ];
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const banned = [

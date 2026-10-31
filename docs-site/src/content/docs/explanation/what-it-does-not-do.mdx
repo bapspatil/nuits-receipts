@@ -1,6 +1,6 @@
 ---
 title: What it does not do
-description: Nuits Receipts is not bookkeeping, not advice and not an archive. What that means, and the no-warranty notice in plain words.
+description: Nuits Receipts is not bookkeeping, not advice and not a records system. What that means, and the no-warranty notice in plain words.
 sidebar:
   order: 9
 ---
@@ -19,11 +19,13 @@ Your accountant decides how each item is booked: whether it is deductible, which
 
 Nothing in the app or these docs is tax, VAT, accounting, legal or financial advice. A flag saying VAT does not add up is a note that the numbers disagree, not a ruling on how VAT applies. The sales-invoice checks know a few Finnish VAT rates and the idea of reverse charge, and they flag what looks inconsistent; they do not know your situation. Ask your accountant or tax adviser about anything that matters.
 
-## It is not an archive
+## It keeps your documents findable, not legally kept
 
-Originals are stored in an R2 bucket in your account, and the month ZIP gives you copies. That is a convenience, not a records system. The app has no retention policy, no immutability, no audit trail of its own beyond what it records about your corrections and settings, and no backup beyond what Cloudflare provides for R2 and D1. You can lose data by deleting the bucket, the database or the account.
+Home keeps every finance document the app holds, in folders that build themselves, searchable by their details and by the words inside PDFs. That makes a document easy to find again. It does not make the app a records system for the law.
 
-Keep your original receipts the way your local accounting law requires. That may mean a dedicated archive, your accountant's system, or paper. If you rely on the app's copies, back them up yourself.
+Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket.
+
+The app has no retention policy, no immutability, no audit trail of its own beyond what it records about your corrections and settings, and no backup beyond what Cloudflare provides for R2 and D1. You can lose data by deleting the bucket, the database or the account. Whether its copies are enough for your records is a question for your accountant or your local rules, not something the app decides. If you rely on the app's copies, back them up yourself, for example with `wrangler d1 export` and a copy of the bucket.
 
 ## It does not file or submit anything
 
@@ -39,7 +41,7 @@ It does not send VAT returns, tax filings or anything else to any authority. It 
 
 - One owner, one sign-in, one inbox per deployment. No roles, no shared access, no multi-company setup.
 - No mobile app.
-- No built-in OCR: scanned PDFs need a photo or typing in.
+- No built-in OCR: scanned PDFs need a photo or typing in. Search reads the text layer of PDFs, not the words in photos; a photo is found by the details the app read from it.
 - No bank connection: statements come in as CSV files you export and upload. The import works with banks that export CSV: there are presets for some layouts and a column mapper for others, and you map the columns once. It has been tested with Holvi exports so far.
 
 The exact sizes and counts are in [Limits](/reference/limits/).
@@ -51,7 +53,7 @@ This is the notice from the project's README, in plain words.
 - **No warranty.** Nuits Receipts is free, open-source software, provided "as is", without warranties or conditions of any kind, as the Apache License 2.0 sets out in sections 7 and 8. It may not work, may stop working, and may get things wrong.
 - **Not financial, tax or accounting advice.** Nothing it produces is.
 - **The AI can be wrong.** It can misread or miss vendors, amounts, VAT, dates and currencies. Bank matching is a suggestion, not a reconciliation you can rely on without checking.
-- **You are responsible** for checking every figure, for your own bookkeeping, tax and VAT filings, and for keeping your original receipts as your local accounting law requires.
+- **You are responsible** for checking every figure, for your own bookkeeping, tax and VAT filings, and for your own records. Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket.
 - **You run it.** It runs in your own Cloudflare account. Nuits does not receive, store or have access to your documents or data. You are responsible for your deployment, its security, its costs and the personal data in your receipts.
 - **Liability.** To the extent permitted by applicable law, Bapusaheb Shankaragouda Patil / Nuits is not liable for any loss arising from use of the software. Nothing in this notice limits liability that cannot be limited by law.
 

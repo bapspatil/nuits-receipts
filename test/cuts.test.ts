@@ -115,12 +115,12 @@ test('Receipts keeps Reading, Duplicate and Discarded behind one More filters, a
   )
     .bind('a'.repeat(64), 'receipts/a', 'b'.repeat(64), 'receipts/b')
     .run();
-  const page = await (await request('/receipts?view=all')).text();
+  const page = await (await request('/')).text();
   expect(page).toMatch(/<details class="filters"><summary>More filters<\/summary>[\s\S]*?Reading \(1\)/);
-  const reading = await request('/receipts?show=reading');
+  const reading = await request('/?show=reading');
   expect(reading.status).toBe(200);
   expect(await reading.text()).toContain('<details class="filters" open>');
-  for (const show of ['duplicate', 'discarded']) expect((await request(`/receipts?show=${show}`)).status).toBe(200);
+  for (const show of ['duplicate', 'discarded']) expect((await request(`/?show=${show}`)).status).toBe(200);
 });
 
 test('Home has no "N dated" link; the Check step already leads to the list', async () => {

@@ -22,10 +22,21 @@ export const KEY_GROUPS: readonly KeyGroup[] = [
     ],
   },
   {
+    title: 'On a PDF or a picture',
+    keys: [
+      { keys: ['+', '-'], does: 'Zoom in or out' },
+      { keys: ['0'], does: 'Fit to the width' },
+      { keys: ['r'], does: 'Turn a quarter' },
+      { keys: ['n', 'p'], does: 'Go to the next or the previous page' },
+      { keys: ['f'], does: 'Find in the PDF' },
+    ],
+  },
+  {
     title: 'Everywhere',
     keys: [
       { keys: ['u'], does: 'Undo, when the message at the top offers it' },
-      { keys: ['/'], does: 'Search, on a page that has a search field' },
+      { keys: ['⌘ K'], does: 'Find a file, on any page (Ctrl K off a Mac)' },
+      { keys: ['/'], does: 'Search: the page’s own field, or find a file' },
       { keys: ['?'], does: 'Show these shortcuts' },
       { keys: ['Esc'], does: 'Close this window' },
     ],
@@ -90,7 +101,7 @@ export const KEYS_JS = `(() => {
       if (field && shown(field)) {
         field.focus();
         field.select();
-      } else used = false;
+      } else document.dispatchEvent(new Event('quickfind'));
     } else if (key === '?' && sheet) sheet.showModal();
     else used = false;
     if (used) e.preventDefault();

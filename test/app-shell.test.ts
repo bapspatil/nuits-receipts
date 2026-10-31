@@ -102,9 +102,9 @@ test('every page, including error pages, has the same four-item nav', async () =
     ['/?month=2026-09&offset=100', '/'],
     ['/receipts?view=todo', '/receipts'],
     ['/receipts?view=todo&month=2026-09', '/receipts'],
-    ['/receipts?view=all', '/receipts'],
+    ['/?in=year:2026&q=a', '/'],
     ['/receipts', '/receipts'],
-    ['/receipts?show=needs&month=2026-09&q=a', '/receipts'],
+    ['/?show=needs&month=2026-09&q=a', '/'],
     ['/payments?month=2026-09', '/payments'],
     ['/payments?month=2026-09&view=todo', '/payments'],
     ['/settings', '/settings'],
@@ -207,7 +207,6 @@ test('each work screen has exactly one primary button, empty or busy', async () 
 test('empty screens say what is missing and offer one next step', async () => {
   for (const path of [
     '/receipts?view=todo',
-    '/receipts?view=all',
     '/payments?month=2026-09',
     '/receipts?view=all&kind=sales&month=2026-09',
   ]) {
@@ -219,7 +218,6 @@ test('empty screens say what is missing and offer one next step', async () => {
   // One line and one action: no hint paragraph, no badge.
   for (const path of [
     '/receipts?view=todo',
-    '/receipts?view=all',
     '/payments?month=2026-09',
     '/receipts?view=all&kind=sales&month=2026-09',
   ]) {
@@ -229,7 +227,7 @@ test('empty screens say what is missing and offer one next step', async () => {
     );
   }
   expect(await (await request('/receipts?view=todo')).text()).toContain(
-    `<div class="card empty"><h2>Nothing to do.</h2>${buttonLink('seeReceipts', '/receipts?view=all', { tone: 'primary' })}</div>`,
+    `<div class="card empty"><h2>Nothing to do.</h2>${buttonLink('seeReceipts', '/', { tone: 'primary' })}</div>`,
   );
   // No statement yet: Bank has no transfer or import sections to show.
   expect(await (await request('/payments?month=2026-09')).text()).not.toContain('id="transfers"');
@@ -288,60 +286,43 @@ test('empty Settings sections say what to add', async () => {
   expect(settings).toContain('No rules yet.');
 });
 
-test('Receipts and Invoices are two tabs of All with counts, always shown, and never in To do', async () => {
+test('Receipts and Invoices are two tabs on Invoices, with counts, and never in To do', async () => {
   const segment = (html: string) =>
     html.match(/<nav class="seg" aria-label="Receipts and invoices">([\s\S]*?)<\/nav>/)?.[1];
-  const shown = await (await request('/receipts?view=all')).text();
-  expect(segment(shown)).toBe(
-    '<ul><li><a href="/receipts?view=all" aria-current="page">Receipts <span class="num">0</span></a></li><li><a href="/receipts?view=all&amp;kind=sales">Invoices <span class="num">0</span></a></li></ul>',
-  );
+  // Receipts, all of them, are a folder on Home, which has no tabs of its own.
+  expect(segment(await (await request('/')).text())).toBeUndefined();
   const invoices = await (await request('/receipts?view=all&kind=sales')).text();
   expect(segment(invoices)).toMatch(
-    /<a href="\/receipts\?view=all&amp;kind=sales&amp;month=\d{4}-\d{2}" aria-current="page">Invoices <span class="num">0<\/span><\/a>/,
+    /<a href="\/\?in=kind:expense&amp;month=\d{4}-\d{2}">Receipts <span class="num">0<\/span><\/a><\/li><li><a href="\/receipts\?view=all&amp;kind=sales&amp;month=\d{4}-\d{2}" aria-current="page">Invoices <span class="num">0<\/span><\/a>/,
   );
   // The month carries across the tabs.
-  expect(segment(await (await request('/receipts?view=all&month=2026-09')).text())).toContain(
-    '<a href="/receipts?view=all&amp;kind=sales&amp;month=2026-09">Invoices <span class="num">0</span></a>',
+  expect(segment(await (await request('/receipts?view=all&kind=sales&month=2026-09')).text())).toContain(
+    '<a href="/?in=kind:expense&amp;month=2026-09">Receipts <span class="num">0</span></a>',
   );
   // To do has the view switch only: never two stacked switches, and no month arrows.
   const todo = await (await request('/receipts?view=todo&month=2026-09')).text();
   expect(segment(todo)).toBeUndefined();
   expect(todo).not.toContain('class="months"');
   expect(todo).toContain('<nav class="seg" aria-label="View">');
-  // Without an invoice address the tabs are still there.
-  const plain = { ...env, INVOICES_ADDRESS: '' } as Env;
-  const at = async (path: string) =>
-    (
-      await worker.fetch(new Request('http://localhost' + path, { headers: { Authorization: authorization } }), plain)
-    ).text();
-  expect(segment(await at('/receipts?view=all'))).toContain('>Invoices <span class="num">0</span></a>');
 });
 
-test('Receipts All leaves Needs you and Unknown sender to To do, and offers Add', async () => {
-  const empty = await (await request('/receipts?view=all')).text();
-  // Empty: Add receipt is the one primary, not also a head button.
-  expect(empty).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
-  expect(empty.match(/>Add receipt</g)).toHaveLength(1);
+test('Home lists every file, Needs you included, with the rarer filters behind More filters', async () => {
   const { ready } = await seed();
-  const html = await (await request('/receipts?view=all')).text();
-  expect(html).toContain(buttonLink('addReceipt', '/add', { tone: 'primary' }));
-  expect(html.match(/>Add receipt</g)).toHaveLength(1);
-  // No exceptions, no chips; one search field, no month input.
-  expect(html).not.toContain('aria-label="Show"');
+  const html = await (await request('/')).text();
+  expect(html).toContain('photo.png');
+  expect(html).toContain(`open=r%3A${ready.id}`);
+  // One search field, no month input.
+  expect(html.split('</main>')[0]!.match(/<input [^>]*type="search"/g)).toHaveLength(1);
   expect(html).not.toContain('type="month"');
-  expect(html).toContain('<input name="q" type="search"');
-  expect(html).toContain('<a href="/receipts?view=todo" data-view="todo" data-count="1">To do (1)</a>');
   await env.DB.prepare('UPDATE receipts SET duplicate_of=? WHERE id<>?').bind(ready.id, ready.id).run();
   const chips =
-    (await (await request('/receipts?view=all')).text()).match(
-      /<ul class="chips" aria-label="Show">([\s\S]*?)<\/ul>/,
-    )?.[1] ?? '';
+    (await (await request('/')).text()).match(/<ul class="chips" aria-label="Show">([\s\S]*?)<\/ul>/)?.[1] ?? '';
   expect([...chips.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual(['All', 'Duplicate (1)']);
   await env.DB.prepare('UPDATE receipts SET duplicate_of=NULL').run();
   // Old filter links still filter.
-  const needs = await (await request('/receipts?show=needs')).text();
+  const needs = await (await request('/?show=needs')).text();
   expect(needs).toContain('photo.png');
-  expect(needs).not.toContain('sample.pdf');
+  expect(needs).not.toContain(`open=r%3A${ready.id}`);
 });
 
 test('a receipt links back to where it lives', async () => {
@@ -349,9 +330,7 @@ test('a receipt links back to where it lives', async () => {
   expect(await (await request(`/receipts/${flagged.id}`)).text()).toContain(
     '<a href="/receipts?view=todo">‹ To do</a>',
   );
-  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain(
-    '<a href="/receipts?view=all">‹ Receipts</a>',
-  );
+  expect(await (await request(`/receipts/${ready.id}`)).text()).toContain('<a href="/">‹ Home</a>');
 });
 
 test('old Month and More addresses redirect, keeping the query exactly', async () => {
@@ -1004,10 +983,10 @@ test('amounts accept a decimal comma or point, and the hint echoes the document'
   expect(page).toContain('Type it as on the receipt, for example 30,00.');
   expect(page).toContain('As printed on the receipt, for example 25,5.');
   expect(page).toMatch(/class="doch">The text that was read<\/h2><pre class="paper" tabindex="0">Sample Print Shop/);
-  // A PDF is shown as its text, not embedded: the page's CSP allows no frames or objects.
+  // A PDF opens in the viewer, with its text as the fallback without script.
   const { ready } = await seed();
   expect(await (await request(`/receipts/${ready.id}`)).text()).toMatch(
-    /class="doch">The PDF, as text<\/h2><pre class="paper"/,
+    /class="doch">The PDF<\/h2><section class="viewer" data-viewer data-type="pdf"[^>]*>[\s\S]*?<div class="vfallback"><p class="small">As text:<\/p><pre class="paper"/,
   );
 });
 

@@ -83,7 +83,7 @@ test('Review and Invoices answer 302 to Receipts under the base path, keeping th
   // The pages they point at render, with the To do | All switch under the base path.
   const todo = await (await at('/app/receipts?view=todo&month=2026-09')).text();
   expect(todo).toContain('data-list="receipts-todo"');
-  expect(todo).toContain('href="/app/receipts?view=all&amp;month=2026-09" data-view="all"');
+  expect(todo).toContain('href="/app/?month=2026-09" data-view="all"');
   expect(await (await at('/app/receipts?view=all&kind=sales&month=2026-09')).text()).toContain(
     'href="/app/receipts?view=todo&amp;month=2026-09" data-view="todo"',
   );

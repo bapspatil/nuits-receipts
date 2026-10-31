@@ -35,12 +35,11 @@ async function approveFields(id: string): Promise<Record<string, string>> {
   };
 }
 
-test('the transition rule is on Receipts To do, Bank and the receipt page, and nowhere else', async () => {
+test('the transition rule is on Home, Receipts To do, Bank and the receipt page, and nowhere else', async () => {
   const b = await seedBusyMonth();
-  for (const path of ['/receipts?view=todo', `/payments?month=${b.month}`, `/receipts/${b.todo[0]}?from=todo`])
+  for (const path of ['/', '/receipts?view=todo', `/payments?month=${b.month}`, `/receipts/${b.todo[0]}?from=todo`])
     expect(await get(path), path).toContain(RULE);
-  for (const path of ['/', '/settings', '/help', '/receipts?view=all', '/add'])
-    expect(await get(path), path).not.toContain('@view-transition');
+  for (const path of ['/settings', '/help', '/add']) expect(await get(path), path).not.toContain('@view-transition');
   const css = await get('/receipts?view=todo');
   expect(css).toContain('@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}');
   expect(css).not.toContain('scroll-behavior:smooth');
@@ -97,6 +96,6 @@ test('a Reading receipt refreshes itself; a settled one does not; a Reading row 
   expect(await get(`/receipts/${id}?from=todo`)).not.toContain('http-equiv="refresh"');
   await env.DB.prepare("UPDATE receipts SET status='processing' WHERE id=?").bind(id).run();
   expect(await get(`/receipts/${id}`)).toContain('<meta http-equiv="refresh" content="10">');
-  expect(await get('/receipts?view=all&show=reading')).toMatch(/<a class="refresh" href="[^"]+">Refresh<\/a>/);
+  expect(await get('/?show=reading')).toMatch(/<a class="refresh" href="[^"]+">Refresh<\/a>/);
   expect(await get('/receipts?view=todo')).not.toContain('http-equiv="refresh"');
 });

@@ -1,16 +1,14 @@
-// Receipts, one page with two views. To do holds what needs the owner: mail from unknown senders,
-// receipts to check and overdue sales invoices. All is the archive, newest first.
+// Receipts To do: what needs the owner, mail from unknown senders, receipts to check and overdue
+// sales invoices. All, the archive, is Home (src/archive.ts).
 import type { Env } from './env';
 import { config } from './config';
-import { STATUS, type StatusKey } from './status';
 import { button, buttonLink, buttonSummary, statusMark } from './actions';
-import { DISCARD_REASONS, type DiscardReason, type Receipt, requireInput } from './domain';
-import { flagCards, flagFor, needsReview, needsReviewSql, readySql, reasonCodes, todoReasons } from './flags';
-import { restoreForm } from './discard';
+import { type Receipt } from './domain';
+import { flagCards, flagFor, needsReview, reasonCodes, todoReasons } from './flags';
 import { BULK_CAP, bulkBar, bulkCheck, bulkTools, RECEIPT_ACTIONS, type BulkList } from './bulk';
 import { BANK_UPTO } from './banking';
 import { mergePlan } from './dedupe';
-import { dueOn, invoiceName, iso } from './invoices';
+import { dueOn, iso } from './invoices';
 import { receiptName } from './match';
 import { heldCount, heldMail, type MailRow } from './inbound';
 import {
@@ -27,189 +25,34 @@ import {
 } from './worklist';
 import {
   amount,
-  chipRow,
   emptyState,
   escape,
-  monthHead,
   monthName,
-  tabCounts,
-  addButton,
   page,
   pageHead,
   plural,
   shortDay,
-  receiptsTabs,
   viewSwitch,
   VIEW_TRANSITION_CSS,
 } from './ui';
 import { row, rowList } from './row';
-
-export const PAGE_SIZE = 50;
-export const SHOW = {
-  ready: STATUS.ready.word,
-  needs: STATUS.needs.word,
-  reading: STATUS.reading.word,
-  duplicate: STATUS.duplicate.word,
-  discarded: STATUS.discarded.word,
-  sales: 'Sales invoices',
-  unknown: STATUS.newSender.word,
-} as const;
-export type Show = keyof typeof SHOW;
-// Only the exceptions are chips. Ready is the default, Sales has its own
-// segment, and Needs you and Unknown sender are To do's: all still filter
-// from the URL.
-const CHIPS = ['reading', 'duplicate', 'discarded'] as const;
-export type AllRow = {
-  type: 'receipt' | 'mail';
-  id: string;
-  received_at: string;
-  kind: string | null;
-  status: string;
-  duplicate_of: string | null;
-  discarded_at: string | null;
-  discard_reason: DiscardReason | null;
-  vendor: string | null;
-  filename: string | null;
-  client: string | null;
-  invoice_number: string | null;
-  total_minor: number | null;
-  currency: string | null;
-  issue_date: string | null;
-  sender: string | null;
-  subject: string | null;
-  review_reasons_json: string;
-};
-const WHERE: Record<Show, string> = {
-  ready: `type='receipt' AND ${readySql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
-  needs: `type='receipt' AND ${needsReviewSql()} AND duplicate_of IS NULL AND discarded_at IS NULL`,
-  reading: "type='receipt' AND status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL",
-  duplicate: "type='receipt' AND duplicate_of IS NOT NULL AND discarded_at IS NULL",
-  discarded: "type='receipt' AND discarded_at IS NOT NULL",
-  sales: "type='receipt' AND kind='sales' AND discarded_at IS NULL",
-  unknown: "type='mail'",
-};
-const RECEIPTS = `SELECT 'receipt' AS type,id,received_at,kind,status,duplicate_of,discarded_at,discard_reason,vendor,filename,client,invoice_number,total_minor,currency,issue_date,NULL AS sender,NULL AS subject,review_reasons_json FROM receipts`;
-const HELD = `SELECT 'mail',id,received_at,NULL,'held',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sender,subject,'[]' FROM inbound_mail WHERE state='held'`;
-
-// The All list's filter and its keyset cursor: the arrival time and id of the last row shown.
-export type AllQuery = { show: Show | null; month: string | null; q: string; before: Cursor | null };
-type Cursor = { at: string; id: string };
-const CURSOR = /^([0-9][0-9T:.+-]{9,34}Z?)_([a-f0-9-]{36,64})$/;
-
-// The list's filter as SQL over RECEIPTS and HELD, shared by the page and its bulk actions.
-export function allWhere(query: Omit<AllQuery, 'before'>): { where: string; binds: unknown[] } {
-  const where: string[] = [],
-    binds: unknown[] = [];
-  // Discarded rows show only under their own chip.
-  // Invoices have their own tab; a search looks in both.
-  where.push(
-    query.show ? WHERE[query.show] : `(type='mail' OR (discarded_at IS NULL${query.q ? '' : " AND kind<>'sales'"}))`,
-  );
-  if (query.month) {
-    // The document's month, like Home; undated ones by when they arrived.
-    where.push('substr(coalesce(issue_date,received_at),1,7)=?');
-    binds.push(query.month);
-  }
-  if (query.q) {
-    // instr, not LIKE: D1 refuses a LIKE pattern over 50 bytes, and a search may be 100 characters.
-    where.push(
-      "instr(lower(coalesce(vendor,'')||' '||coalesce(filename,'')||' '||coalesce(invoice_number,'')||' '||coalesce(client,'')||' '||coalesce(sender,'')||' '||coalesce(subject,'')),?)>0",
-    );
-    binds.push(query.q.toLowerCase());
-  }
-  return { where: where.join(' AND '), binds };
-}
-
-// One page of rows after the cursor (PAGE_SIZE + 1, so the caller knows if there is more).
-export async function allRows(env: Env, query: AllQuery): Promise<AllRow[]> {
-  const { where, binds } = allWhere(query);
-  const after = query.before ? ' AND (received_at,id)<(?,?)' : '';
-  const cursor = query.before ? [query.before.at, query.before.id] : [];
-  const sql = (held: boolean) =>
-    `SELECT * FROM (${RECEIPTS}${held ? ` UNION ALL ${HELD}` : ''}) WHERE ${where}${after} ORDER BY received_at DESC,id DESC LIMIT ?`;
-  try {
-    return (
-      await env.DB.prepare(sql(true))
-        .bind(...binds, ...cursor, PAGE_SIZE + 1)
-        .all<AllRow>()
-    ).results;
-  } catch (error) {
-    // Before the inbound_mail migration: receipts only.
-    if (!/inbound_mail/.test(String(error))) throw error;
-    return (
-      await env.DB.prepare(sql(false))
-        .bind(...binds, ...cursor, PAGE_SIZE + 1)
-        .all<AllRow>()
-    ).results;
-  }
-}
-
-// The receipt rows (never held mail) the filter matches, across pages: their
-// count for the bulk bar, or up to `limit` ids for a bulk action on all of them.
-export async function filterCount(env: Env, query: Omit<AllQuery, 'before'>): Promise<number> {
-  const { where, binds } = allWhere(query);
-  return (
-    (await env.DB.prepare(`SELECT count(*) n FROM (${RECEIPTS}) WHERE ${where}`)
-      .bind(...binds)
-      .first<number>('n')) ?? 0
-  );
-}
-export async function filterIds(env: Env, query: Omit<AllQuery, 'before'>, limit: number): Promise<string[]> {
-  const { where, binds } = allWhere(query);
-  return (
-    await env.DB.prepare(`SELECT id FROM (${RECEIPTS}) WHERE ${where} ORDER BY received_at DESC,id DESC LIMIT ?`)
-      .bind(...binds, limit)
-      .all<{ id: string }>()
-  ).results.map((r) => r.id);
-}
-
-// The state a row shows: a status key, and for a discard the reason that goes with it.
-export function chipOf(row: AllRow): { key: StatusKey; after?: string } {
-  if (row.type === 'mail') return { key: 'newSender' };
-  if (row.discarded_at)
-    return { key: 'discarded', after: row.discard_reason ? DISCARD_REASONS[row.discard_reason] : '' };
-  if (row.duplicate_of) return { key: 'duplicate' };
-  if (row.status === 'pending' || row.status === 'processing') return { key: 'reading' };
-  if (needsReview(row)) return { key: 'needs' };
-  return { key: 'ready' };
-}
-function rowName(row: AllRow): string {
-  if (row.type === 'mail') return row.sender ?? 'Unknown sender';
-  return row.kind === 'sales' ? invoiceName(row) : (row.vendor ?? row.filename ?? 'Receipt');
-}
-
-export function parseQuery(params: URLSearchParams): AllQuery {
-  const show = params.get('show') ?? '';
-  const month = params.get('month') ?? '';
-  requireInput(!month || /^\d{4}-(0[1-9]|1[0-2])$/.test(month), 'Choose a month like 2026-10');
-  const before = (params.get('before') ?? '').match(CURSOR);
-  return {
-    show: Object.hasOwn(SHOW, show) ? (show as Show) : null,
-    month: month || null,
-    q: (params.get('q') ?? '').trim().slice(0, 100),
-    before: before ? { at: before[1]!, id: before[2]! } : null,
-  };
-}
-function path(query: AllQuery, change: Partial<AllQuery>): string {
-  const next = { ...query, before: null, ...change };
-  const params = new URLSearchParams({ view: 'all' });
-  if (next.show) params.set('show', next.show);
-  if (next.month) params.set('month', next.month);
-  if (next.q) params.set('q', next.q);
-  if (next.before) params.set('before', `${next.before.at}_${next.before.id}`);
-  return `/receipts?${params}`;
-}
-const link = (query: AllQuery, change: Partial<AllQuery>) => escape(path(query, change));
+import { archiveQuery, filterCount } from './archive';
 
 // The To do | All switch of Receipts, under the month the page has. All counts the archive the
 // Receipts tab of All shows.
 export async function receiptsSwitch(env: Env, month: string | null, view: View): Promise<string> {
   const state: ListState = { ...RECEIPTS_TODO, month };
-  const [todo, all] = await Promise.all([
+  const [todo, all, invoices] = await Promise.all([
     openCount(env, LIST_DEFS.receipts!, state).then((c) => c.total),
-    filterCount(env, { show: null, month, q: '' }),
+    filterCount(env, { ...archiveQuery(new URLSearchParams()), month }),
+    filterCount(env, { ...archiveQuery(new URLSearchParams({ in: 'kind:sales' })), month }),
   ]);
-  return viewSwitch((v) => listUrl({ ...state, view: v }), { todo, all }, view);
+  // All is Home's archive now, so Invoices, the sales work list, is the switch's third link.
+  const href = escape(listUrl({ ...state, key: 'invoices', view: 'all' }));
+  return viewSwitch((v) => listUrl({ ...state, view: v }), { todo, all }, view).replace(
+    '</ul></nav>',
+    `<li><a href="${href}" data-view="invoices" data-count="${invoices}">Invoices (${invoices})</a></li></ul></nav>`,
+  );
 }
 
 // The first problem as one word, for the list. The full question is its tooltip.
@@ -331,106 +174,5 @@ export async function todoPage(env: Env, state: ListState): Promise<Response> {
     200,
     env,
     { head: pageHead('Receipts', start), style: VIEW_TRANSITION_CSS },
-  );
-}
-
-// Receipts All: the archive, newest first, a page at a time behind an Older cursor.
-export async function allReceiptsPage(env: Env, params: URLSearchParams): Promise<Response> {
-  const query = parseQuery(params);
-  const [rows, tally, tabTotals, total, switcher] = await Promise.all([
-    allRows(env, query),
-    env.DB.prepare(
-      "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
-    ).first<Record<'reading' | 'duplicate' | 'discarded', number>>(),
-    tabCounts(env, query.month),
-    filterCount(env, query),
-    receiptsSwitch(env, query.month, 'all'),
-  ]);
-  const more = rows.length > PAGE_SIZE;
-  const shown = rows.slice(0, PAGE_SIZE);
-  const filtered = !!(query.show || query.q);
-  const chipList = chipRow('Show', [
-    { href: link(query, { show: null }), label: 'All', current: !query.show },
-    ...CHIPS.map((k) => ({
-      href: link(query, { show: k }),
-      label: SHOW[k],
-      count: tally?.[k] ?? 0,
-      current: k === query.show,
-    })),
-  ]);
-  const chips = chipList
-    ? `<details class="filters"${query.show && (CHIPS as readonly string[]).includes(query.show) ? ' open' : ''}><summary>More filters</summary><div class="body">${chipList}</div></details>`
-    : '';
-  const find = `<form class="find" method="get" action="/receipts" role="search"><input type="hidden" name="view" value="all"><input name="q" type="search" value="${escape(query.q)}" aria-label="Search" placeholder="Seller or client" maxlength="100">${button('search')}${query.q ? buttonLink('clearSearch', path(query, { q: '' }), { tone: 'ghost', label: 'Clear' }) : ''}</form>`;
-  // The list as actions return to it: the filter and search, never the page.
-  const state: ListState = { ...RECEIPTS_TODO, view: 'all', show: query.show, month: query.month, q: query.q };
-  const bulk: BulkList = {
-    form: 'bulk-receipts',
-    action: '/receipts/bulk',
-    noun: ['receipt', 'receipts'],
-    total,
-    scope: listParams(state),
-    actions:
-      query.show === 'discarded'
-        ? [RECEIPT_ACTIONS.restore]
-        : [
-            RECEIPT_ACTIONS.discard,
-            RECEIPT_ACTIONS.retry,
-            RECEIPT_ACTIONS.kind(query.show === 'sales' ? 'sales' : 'expense'),
-          ],
-  };
-  const picks = shown.filter((r) => r.type === 'receipt').length;
-  const ul = rowList(
-    shown.map((r) => {
-      const chip = chipOf(r);
-      const href = escape(r.type === 'mail' ? `${listUrl(RECEIPTS_TODO)}#mail-${r.id}` : receiptUrl(r.id, state));
-      const reading = r.status === 'pending' || r.status === 'processing';
-      return row({
-        pick: r.type === 'receipt' ? bulkCheck(bulk, r.id, rowName(r)) : '',
-        date: r.type === 'mail' ? '' : r.issue_date ? escape(shortDay(r.issue_date)) : 'Undated',
-        title: `<a href="${href}">${escape(rowName(r))}</a>`,
-        status:
-          chip.key === 'ready' ? '' : statusMark(chip.key, { after: chip.after ? escape(chip.after) : undefined }),
-        amount: r.type === 'mail' || r.total_minor === null ? '' : amount(r.total_minor, r.currency),
-        actions: `${reading ? `<a class="refresh" href="${escape(listUrl(state))}">Refresh</a>` : ''}${r.discarded_at ? restoreForm(r.id, listUrl(state)) : ''}`,
-      });
-    }),
-  );
-  const last = shown[shown.length - 1];
-  const pages =
-    query.before || more
-      ? `<nav class="btns" aria-label="Pages">${query.before ? buttonLink('newest', path(query, { before: null })) : ''}${more && last ? buttonLink('older', path(query, { before: { at: last.received_at, id: last.id } })) : ''}</nav>`
-      : '';
-  const all = listUrl({ ...state, show: null, q: '', month: null });
-  const list = shown.length
-    ? `${picks ? `<div data-bulk-list="${bulk.form}">${bulkTools(bulk, picks)}${ul}</div>${bulkBar(bulk)}` : ul}${pages}`
-    : query.q
-      ? emptyState(
-          `Nothing matches &#8220;${escape(query.q)}&#8221;.`,
-          buttonLink('clearSearch', path(query, { q: '' }), { tone: 'primary' }),
-        )
-      : query.show === 'discarded'
-        ? emptyState('Nothing discarded.', buttonLink('showAll', all, { tone: 'primary' }))
-        : filtered || query.before
-          ? emptyState('Nothing here.', buttonLink('showAll', all, { tone: 'primary' }))
-          : query.month
-            ? emptyState(`Nothing dated ${escape(monthName(query.month, false))}.`, addButton('all', true))
-            : emptyState(
-                config(env).receiptAddress
-                  ? `No receipts yet. Forward to <code>${escape(config(env).receiptAddress)}</code>.`
-                  : 'No receipts yet.',
-                addButton('all', true),
-              );
-  const add = shown.length ? addButton('all', true) : '';
-  const tabs = receiptsTabs(tabTotals, 'all', query.month);
-  return page(
-    'receipts',
-    `${switcher}${tabs}${chips}${find}<div data-list="receipts-all" data-total="${total}">${list}</div>`,
-    200,
-    env,
-    {
-      detail: query.month ? monthName(query.month) : undefined,
-      head: query.month ? monthHead('/receipts?view=all', query.month, add) : pageHead('Receipts', add),
-    },
   );
 }

@@ -1,5 +1,6 @@
 // Sales invoices you sent: the Invoices list, payment status, the receipt
 // page's money-in matching, and the Add page (several files, either kind).
+import { documentForm } from './files';
 import { DEFAULT_TUNING, money, type Receipt } from './domain';
 import { creditFit, monthEurValues, type Transaction } from './banking';
 import type { Env } from './env';
@@ -319,7 +320,7 @@ export async function addPage(env: Env, params: URLSearchParams): Promise<Respon
   ].filter(Boolean);
   const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" id="f-file"${ariaFor(ADD_SCOPE, 'file')}></label>${errorLine(ADD_SCOPE)}<p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
-  }<script src="/assets/add.js" defer></script>`;
+  }<details class="card"><summary>Another finance document</summary><div class="body">${documentForm()}</div></details><script src="/assets/add.js" defer></script>`;
   return page('add', body, 200, env, {
     detail: 'Add',
     head: pageHead(

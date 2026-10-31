@@ -12,7 +12,8 @@ import { escape } from './ui';
 export type ListKey = 'receipts' | 'invoices' | 'bank';
 export type View = 'todo' | 'all';
 // The list a page shows and an action came from, under the names its URL uses. show is the
-// filter chip of Receipts All and Invoices; q is the search of Receipts All. There is no offset.
+// filter chip of the archive and Invoices; q is the archive's search and folder its folder (in=),
+// both on Home. There is no offset.
 export type ListState = {
   key: ListKey;
   view: View;
@@ -20,10 +21,14 @@ export type ListState = {
   show: string | null;
   q: string;
   upto: number;
+  folder: string | null;
 };
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const SHOW = /^[a-z]{1,20}$/;
+// A Home folder as its URL names it; src/archive.ts reads what it means.
+export const FOLDER_PARAM =
+  /^(year:(19|20)\d{2}|vendor:.{1,100}|client:.{1,100}|kind:[a-z]{4,10}|tag:.{1,40}|starred|recent)$/s;
 export const RECEIPTS_TODO: ListState = {
   key: 'receipts',
   view: 'todo',
@@ -31,6 +36,7 @@ export const RECEIPTS_TODO: ListState = {
   show: null,
   q: '',
   upto: BANK_UPTO,
+  folder: null,
 };
 
 export type Params = Pick<URLSearchParams, 'get'> | Pick<FormData, 'get'>;
@@ -41,6 +47,7 @@ export function listState(p: Params, fallback: Partial<ListState> & Pick<ListSta
   const view = read(p, 'view'),
     month = read(p, 'month'),
     show = read(p, 'show'),
+    folder = read(p, 'in'),
     upto = Number(read(p, 'upto'));
   return {
     ...RECEIPTS_TODO,
@@ -49,6 +56,7 @@ export function listState(p: Params, fallback: Partial<ListState> & Pick<ListSta
     ...(MONTH.test(month) ? { month } : {}),
     ...(SHOW.test(show) ? { show } : {}),
     ...(read(p, 'q') ? { q: read(p, 'q').slice(0, 100) } : {}),
+    ...(FOLDER_PARAM.test(folder) ? { folder } : {}),
     ...(Number.isSafeInteger(upto) && upto > 0 ? { upto: Math.min(upto, BULK_CAP) } : {}),
   };
 }
@@ -65,20 +73,23 @@ export function postedState(p: Params, key: ListKey, shows: (show: string) => bo
       read(p, 'show') === (s.show ?? '') &&
       (!s.show || shows(s.show)) &&
       read(p, 'q') === s.q &&
+      read(p, 'in') === (s.folder ?? '') &&
       (!upto || upto === String(s.upto)),
     'This page is out of date. Reload it and try again.',
     400,
   );
   return s;
 }
-// The list a receipt page was opened from: ?from=todo|all&month=M, and &q= from a searched All.
+// The list a receipt page was opened from: ?from=todo|all&month=M, and &q= and &in= from Home.
 // Without one, an open receipt belongs to To do and any other to All.
 export function receiptState(p: Params, open: boolean): ListState {
   const from = read(p, 'from');
   const view = from === 'todo' || from === 'all' ? from : open ? 'todo' : 'all';
-  return listState(new URLSearchParams({ view, month: read(p, 'month'), q: view === 'all' ? read(p, 'q') : '' }), {
-    key: 'receipts',
-  });
+  const all = view === 'all';
+  return listState(
+    new URLSearchParams({ view, month: read(p, 'month'), q: all ? read(p, 'q') : '', in: all ? read(p, 'in') : '' }),
+    { key: 'receipts' },
+  );
 }
 // Where a receipt page's own form returns: the page under the list it was opened from, rebuilt from
 // the fields receiptFields posted. A form without them (a page older than the server) gets the
@@ -89,13 +100,11 @@ export function receiptReturn(id: string, p: Params): string {
 
 // Each list's address. Empty parameters are left out, and upto only when it isn't the default.
 const PATHS: Record<ListKey, (s: ListState) => string> = {
+  // The archive, Receipts All before, is Home.
   receipts: (s) =>
-    query(
-      '/receipts',
-      s.view === 'todo'
-        ? { view: 'todo', month: s.month, upto: upto(s) }
-        : { view: 'all', show: s.show, month: s.month, q: s.q },
-    ),
+    s.view === 'todo'
+      ? query('/receipts', { view: 'todo', month: s.month, upto: upto(s) })
+      : query('/', { in: s.folder, month: s.month, show: s.show, q: s.q }),
   invoices: (s) => query('/receipts', { view: 'all', kind: 'sales', month: s.month, show: s.show }),
   bank: (s) => (s.month ? bankPath(s.month, s.view, s.upto) : query('/payments', { view: s.view, upto: upto(s) })),
 };
@@ -115,7 +124,13 @@ export function listUrl(state: ListState, o: { done?: Done; next?: string | null
 }
 // A receipt page that keeps the list it was opened from, so its count and Next use the same filter.
 export function receiptUrl(id: string, state: ListState): string {
-  return query(`/receipts/${id}`, { from: state.view, month: state.month, q: state.view === 'all' ? state.q : null });
+  const all = state.view === 'all';
+  return query(`/receipts/${id}`, {
+    from: state.view,
+    month: state.month,
+    q: all ? state.q : null,
+    in: all ? state.folder : null,
+  });
 }
 // The list state as form fields, for every form and bulk bar on a list.
 export function listParams(state: ListState): Record<string, string> {
@@ -125,6 +140,7 @@ export function listParams(state: ListState): Record<string, string> {
     month: state.month,
     show: state.show,
     q: state.q,
+    in: state.folder,
     upto: state.view === 'todo' ? String(state.upto) : null,
   };
   return Object.fromEntries(Object.entries(fields).filter((f): f is [string, string] => !!f[1]));
@@ -136,7 +152,8 @@ export function listFields(state: ListState): string {
 }
 // The receipt page's list, for every one of its own forms, under the names its URL uses.
 export function receiptFields(state: ListState): string {
-  const fields = { from: state.view, month: state.month, q: state.view === 'all' ? state.q : null };
+  const all = state.view === 'all';
+  const fields = { from: state.view, month: state.month, q: all ? state.q : null, in: all ? state.folder : null };
   return Object.entries(fields)
     .filter((f): f is [string, string] => !!f[1])
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${escape(v)}">`)
@@ -150,11 +167,11 @@ export function listFrom(path: string): ListState | null {
   const sales = url.pathname === '/invoices' || (url.pathname === '/receipts' && p.get('kind') === 'sales');
   const key = sales
     ? 'invoices'
-    : ({ '/receipts': 'receipts', '/review': 'receipts', '/payments': 'bank' } as const)[url.pathname];
+    : ({ '/': 'receipts', '/receipts': 'receipts', '/review': 'receipts', '/payments': 'bank' } as const)[url.pathname];
   if (url.origin !== 'http://app.invalid' || !key) return null;
   // Every list defaults to To do (Review was To do), except Invoices, which lives in All, and an
   // old Receipts link with a filter or a search, from before To do.
-  const all = sales || (key === 'receipts' && !p.has('view') && (p.has('show') || p.has('q')));
+  const all = sales || url.pathname === '/' || (key === 'receipts' && !p.has('view') && (p.has('show') || p.has('q')));
   return listState(p, { key, view: all ? 'all' : 'todo' });
 }
 // A posted return address made safe: a receipt page as it is, a list rebuilt from its state.

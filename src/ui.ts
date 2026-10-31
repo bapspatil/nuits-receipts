@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { FIND_CSS, findSheet } from './find';
 import { money, requireInput, type Receipt } from './domain';
 import { eurValues, type EurValue } from './banking';
 import type { Env } from './env';
@@ -43,6 +44,8 @@ export type NavKey = 'home' | 'receipts' | 'bank' | 'settings';
 // month, a vendor) after the title.
 export const PAGES = {
   home: { nav: 'home', title: 'Home' },
+  // An archive file that is not a receipt: a document, a statement, a sent package.
+  file: { nav: 'home', title: 'Home' },
   // A receipt opened to check it, from To do.
   reviewItem: { nav: 'receipts', title: 'Receipts' },
   receipts: { nav: 'receipts', title: 'Receipts' },
@@ -571,7 +574,8 @@ export async function tabCounts(env: Env, selected: string | null): Promise<TabC
 export function receiptsTabs(counts: TabCounts, active: 'all' | 'invoices', month: string | null = null): string {
   const link = (key: 'all' | 'invoices', href: string, label: string, n: number) =>
     `<li><a href="${href}${month ? `&amp;month=${month}` : ''}"${current(key === active)}>${label} <span class="num">${n}</span></a></li>`;
-  return `<nav class="seg" aria-label="Receipts and invoices"><ul>${link('all', '/receipts?view=all', 'Receipts', counts.receipts)}${link('invoices', '/receipts?view=all&amp;kind=sales', 'Invoices', counts.invoices)}</ul></nav>`;
+  // Receipts, all of them, are a folder of the archive on Home.
+  return `<nav class="seg" aria-label="Receipts and invoices"><ul>${link('all', '/?in=kind:expense', 'Receipts', counts.receipts)}${link('invoices', '/receipts?view=all&amp;kind=sales', 'Invoices', counts.invoices)}</ul></nav>`;
 }
 // The To do | All switch of a work list: two links, each with its count.
 export function viewSwitch(href: (view: View) => string, counts: Record<View, number>, active: View): string {
@@ -656,14 +660,16 @@ export const VIEW_TRANSITION_CSS = `@view-transition{navigation:auto}
 #${BANNER_ID}{view-transition-name:banner}.listhead{view-transition-name:listhead}.fixes{view-transition-name:fixes}
 [data-row]{scroll-margin-top:72px}
 [data-row]:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
-.keys-sheet{border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--surface-raised);color:var(--text);padding:var(--space-5);max-width:min(30rem,calc(100vw - 2rem))}
+form[aria-busy=true] .btn:disabled{cursor:progress}`;
+// The shortcuts sheet and quick find open on every page, so their rules are in every page's styles.
+const SHEET_CSS = `.keys-sheet{border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--surface-raised);color:var(--text);padding:var(--space-5);max-width:min(30rem,calc(100vw - 2rem))}
 .keys-sheet::backdrop{background:rgba(0,0,0,.35)}
 .keys-sheet h2{margin:0 0 var(--space-3)}.keys-sheet h3{margin:var(--space-4) 0 var(--space-2)}
 .keys-list{margin:0}.keys-list>div{display:flex;gap:var(--space-4);align-items:baseline;padding:var(--space-1) 0}
 .keys-list dt{flex:0 0 5.5rem}.keys-list dd{margin:0}
 kbd{font:500 var(--text-sm)/1.4 var(--font-mono);background:var(--surface-sunken);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 var(--space-2)}
 .keys-sheet form{margin-top:var(--space-4)}
-form[aria-busy=true] .btn:disabled{cursor:progress}`;
+${FIND_CSS}`;
 
 // A list row the next action can land on: focusable by its #row- fragment, and described by the
 // banner when the page has one, so a screen reader reads what happened with the row it lands on.
@@ -677,7 +683,7 @@ const BULK_SCRIPT = '<script src="/assets/bulk.js" defer></script>';
 // The script writes the keyboard's height to --kb, and the bar sits above it.
 const KEYBOARD_SCRIPT = '<script src="/assets/keyboard.js" defer></script>';
 // Shortcuts and the pending cue, on every page, once.
-const KEYS_SCRIPT = '<script src="/assets/keys.js" defer></script>';
+const KEYS_SCRIPT = '<script src="/assets/keys.js" defer></script><script src="/assets/find.js" defer></script>';
 export const KEYBOARD_JS = `(() => {
   const vv = window.visualViewport;
   if (!vv) return;
@@ -706,7 +712,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><style>${styles(basePath)}${SHEET_CSS}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}${findSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {

@@ -1,13 +1,16 @@
 # Nuits Receipts
 
+**Every receipt and invoice, found in seconds.**
+
 A self-hosted receipt and invoice reader that runs on Cloudflare Workers. You deploy it into your own Cloudflare account. It:
 
+- keeps every finance document in one place you can search: receipts, sales invoices, bank statements, other finance documents and the month packages you sent. Search covers the details it read and the words inside PDFs;
 - reads vendor, amounts, VAT and dates from your receipts (PDF uploads, photos, or receipts you forward by email);
 - suggests matches between receipts and bank transactions, and flags payments that have no receipt yet;
 - imports bank statements (CSV, XLSX or PDF) in one step: choose the file and press Import. It finds the account and the columns, and asks only when it can't ([import guide](https://receipts.nuits.net/docs/how-to/import-a-bank-csv/), [limits](https://receipts.nuits.net/docs/reference/limits/));
 - prepares a monthly CSV you can send to your accountant.
 
-You review everything; nothing is filed or submitted for you. It helps you get organised before you hand things to your accountant.
+You review everything; nothing is filed or submitted for you. It helps you close the month before you hand things to your accountant, and find any document again afterwards. Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket.
 
 > Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
 
@@ -19,7 +22,7 @@ You review everything; nothing is filed or submitted for you. It helps you get o
 
 > **No warranty. Not financial, tax or accounting advice.**
 > Nuits Receipts is free, open-source software provided "as is", without warranties or conditions of any kind, as set out in the Apache License 2.0 (sections 7 and 8). It reads documents with an AI extraction model (Cloudflare Workers AI "Clairic", currently a preview model), and it can misread or miss vendors, amounts, VAT, dates and currencies. Bank matching is a suggestion, not a reconciliation you can rely on without checking.
-> You are responsible for checking every figure, for your own bookkeeping, tax and VAT filings, and for keeping your original receipts as your local accounting law requires. Nuits Receipts is not an archive or a bookkeeping system. Ask your accountant or tax adviser about anything that matters.
+> You are responsible for checking every figure, for your own bookkeeping, tax and VAT filings, and for keeping your originals as your local law requires; Nuits Receipts keeps a copy in your own Cloudflare R2 bucket, and it is not a bookkeeping system. Ask your accountant or tax adviser about anything that matters.
 > You run it in your own Cloudflare account. Nuits does not receive, store or have access to your documents or data. You are responsible for your deployment, its security, its costs and the personal data in your receipts.
 > To the extent permitted by applicable law, Bapusaheb Shankaragouda Patil / Nuits is not liable for any loss arising from use of the software. Nothing in this notice limits liability that cannot be limited by law.
 
@@ -31,8 +34,20 @@ One Worker, server-rendered HTML, no cron jobs or queues:
 - Extraction uses Cloudflare's Clairic model on Workers AI (`@cf/cloudflare/clairic`). Cloudflare labels it a **preview** model, so its availability, behaviour and price may change. VAT arithmetic is checked in code, and uncertain rows are marked for review.
 - Each cost gets a product and an expense type from your vendor rules, falling back to Cloudflare's Clef model (`@cf/cloudflare/clef`).
 - Bank rows from your CSV, XLSX or PDF statements are matched to receipts automatically, by exact amount, original currency, ECB estimate or a small tip, and obvious non-purchases (tax, bank fees, cash, own transfers) are marked for you. Foreign-currency receipts without a bank match get an ECB reference rate.
-- Home shows the month: what still needs a check, which payments lack a receipt, and costs in EUR by product and type. It exports a CSV or a ZIP with every original and an index spreadsheet. Optionally it uploads the same files to a OneDrive folder.
-- Four places, the same on a computer and a phone: **Home**, **Receipts**, **Bank** and **Settings**. Receipts and Bank each have a **To do | All** switch. To do is what needs you, open items first: receipts missing a fact, overdue sales invoices and mail from new senders on Receipts, payments with no receipt on Bank. All is every document, or every payment, to browse.
+- Home is the archive of every finance document, with this month's close at the top. Search comes first. Below it, the month is a strip of three steps, **Check**, **Match** and **Send**: what still needs a check, which payments lack a receipt, and the month to send. Sending exports a CSV or a ZIP with every original and an index spreadsheet, and keeps a copy of what the accountant got. Optionally it uploads the same files to a OneDrive folder.
+- Four places, the same on a computer and a phone: **Home**, **Receipts**, **Bank** and **Settings**. Receipts keeps **To do**: receipts missing a fact, overdue sales invoices and mail from new senders, open items first. Bank has a **To do | All** switch: payments with no receipt, or every payment. Every document to browse is on Home, and old Receipts All links open there.
+
+## Find any document
+
+- **Folders that build themselves.** Home's drawer lists Everything, Starred, Recently opened, Saved searches, each year (as tabbed dividers) with its months, kinds, sellers, clients and tags. Each folder is a filter over your data, so nothing can be misfiled. Links such as `/?in=year:2026` or `/?in=vendor:Hetzner` open one directly.
+- **Search.** Seller, client, invoice number, filename, sender, subject, amounts, dates, and the words inside PDFs. There is no OCR of photos and no extra AI cost. Try `42.50`, `>100`, `100-200`, `march 2026`, `2026-03`, `kind:sales`, `tag:travel` or a quoted phrase.
+- **Quick find.** `Cmd+K` (`Ctrl+K` off a Mac) on any page opens a box with the first matches as you type.
+- **Read it in the app.** A PDF viewer of our own, built on a self-hosted PDF.js: zoom, fit, rotate, thumbnails, find in the PDF and print. No third-party viewer is involved. On a computer, an opened document shows in a preview pane beside the list.
+- **Stars, tags and notes** on every document, saved searches in the drawer, and **Download folder** for a ZIP of any folder or search (up to 900 files, with an index CSV).
+- **Overviews.** A year, seller or client folder shows the total in EUR, the file count and 12 monthly bars.
+- **Other finance documents.** On the Add page, **Another finance document** keeps a contract, a letter or a tax decision with a title and a date. These are never matched, packaged or counted in totals.
+
+Files from before v2.0.0 are found by their details at once. To search the words inside them too, press **Index older files** in Settings, under Advanced, until none are left. Details: [Find any document](https://receipts.nuits.net/docs/how-to/find-any-document/).
 
 ## Deploy
 
@@ -67,17 +82,7 @@ Add receipts, clear Receipts To do, import a bank statement, settle Bank To do, 
 
 - **A resolved row leaves the list.** Approve, Discard, Not a purchase, Match and the bulk actions take the row away, the next open one moves up, and the banner offers **Undo**. An action that can't be undone, such as Move to invoices or Disconnect from OneDrive, asks first.
 - **Select many at once.** Every list row has a tick box, and the bar above the list acts on the ticked rows, or on the whole list up to 500.
-- **Keyboard on a computer.** `j` and `k` move between rows, `x` ticks one, `Enter` opens it, `a` approves a receipt, `u` undoes, `/` searches, and `?` lists them all.
-
-### Install it on your phone or computer
-
-The app installs as its own window with its own icon, and needs no app store.
-
-- **iPhone or iPad (Safari):** open the app, tap Share, then Add to Home Screen.
-- **Mac (Safari):** File, then Add to Dock.
-- **Android or desktop Chrome and Edge:** open the app, then use the menu's Install app (or Add to Home screen).
-
-The installed app still needs a connection: offline it only shows a "You're offline" page, and it keeps nothing on the device. On Android, you can also share receipt PDFs and photos to the installed app from other apps. They open on the Add page, and nothing is uploaded until you choose what they are and press Add.
+- **Keyboard on a computer.** `j` and `k` move between rows, `x` ticks one, `Enter` opens it, `a` approves a receipt, `u` undoes, `/` searches, `Cmd+K` or `Ctrl+K` opens quick find, and `?` lists them all. In the PDF viewer, `+` and `-` zoom, `0` fits, `r` rotates, `n` and `p` change page, and `f` finds.
 
 ### Install it on your phone or computer
 

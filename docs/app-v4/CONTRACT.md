@@ -26,11 +26,11 @@ Selection: a row's checkbox is `input[name=id]` inside it, the select-all-on-pag
 | Page | URL |
 | --- | --- |
 | Receipts To do (default) | `/receipts?view=todo&month=&upto=` |
-| Receipts All | `/receipts?view=all&month=&q=&before=` |
+| Receipts All (the list on Home) | `/?in=&month=&q=&before=&open=`. `/receipts?view=all&month=&q=&before=` answers 302 to it with the same filter; with `kind=sales` it is still Invoices. |
 | Bank | `/payments?month=M&view=todo\|all&upto=` |
 | Receipt page | `/receipts/<id>?from=todo&month=` (`from=all&month=&q=` from the All list, so a search survives the way back) |
 
-`month` filters on the booking month for Bank. In Receipts To do it keeps receipts dated in that month plus every undated one (`substr(issue_date,1,7)=M OR issue_date IS NULL`), because an undated receipt belongs to no month yet and Home counts it with every month ("3 to check, plus 2 undated"). In Receipts All it keeps today's browse rule, `substr(coalesce(issue_date,received_at),1,7)=M`. Empty parameters are omitted.
+`month` filters on the booking month for Bank. In Receipts To do it keeps receipts dated in that month plus every undated one (`substr(issue_date,1,7)=M OR issue_date IS NULL`), because an undated receipt belongs to no month yet and Home counts it with every month ("3 to check, plus 2 undated"). In Receipts All (Home) it keeps today's browse rule, `substr(coalesce(issue_date,received_at),1,7)=M`. Empty parameters are omitted.
 
 ## Order
 

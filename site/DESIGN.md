@@ -4,14 +4,14 @@
 
 The page is money paper. Cheque-mint ground, petrol ink, white receipt slips with torn feet, and rubber stamps that say what happened to each payment. The memorable element is the stamp: it appears on the hero slip, on every row of the example statement and in the statement's own tally, and nowhere else.
 
-Audience: freelancers and sole traders who already use Cloudflare and dread month end. Job of the page: say what the product is, why it exists and what to click, in that order, then show the arithmetic.
+Audience: freelancers and sole traders who already use Cloudflare and dread month end. Job of the page: say what the product is (every receipt and invoice, found in seconds, and the month closed), why it exists and what to click, in that order, then show the arithmetic.
 
 ## Voice
 
 - Deadpan, plain, sentence case. Short sentences.
 - Lead with the problem. Clairic is credited, never the headline. Its preview disclaimer appears exactly twice on the home page, in How it works and in the small print; everywhere else it is plain "Clairic". `scripts/check-copy.mjs` enforces the count.
 - Cost is stated one way: "AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs." Never "free to run".
-- Describe a data tool, not a service or advice: it organises receipts, suggests matches, flags missing ones and prepares a CSV for your accountant. Wording rules come from the legal review, section 3, and `scripts/check-copy.mjs` enforces the banned list.
+- Describe a data tool, not a service or advice: it organises receipts, suggests matches, flags missing ones, prepares a CSV for your accountant and keeps every finance document findable on Home. Retention is stated one way: "Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket." Never call it a legal archive or say it replaces filing. Wording rules come from the legal review, section 3, and `scripts/check-copy.mjs` enforces the banned list.
 - Cloudflare is referred to, never part of the name: "runs on Cloudflare Workers". Banks are plain text, never logos, colours, "integration" or "partner".
 - Never: compliance claims, tax advice, invented numbers, testimonials, logos, user counts, elves.
 - The only figures on the page are the brief's measured ones. Anything the maintainer has not measured yet is left off the page.
