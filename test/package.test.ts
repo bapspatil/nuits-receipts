@@ -276,6 +276,9 @@ test('the send step offers the ZIP, then records the month as sent and spots lat
     /<a class="btn primary" href="\/month\/package.zip\?month=2026-10" download><svg[^>]*><use href="#i-download"\/><\/svg><span>Download ZIP \(\d+ KB\)<\/span><\/a>/,
   );
   expect(html).toContain('<span>Mark October as sent</span></button>');
+  expect(html).toContain('<p class="ready-summary">2 files · EUR 25.00</p>');
+  expect(html).toContain('<h2>Spent</h2>');
+  expect(html).toContain('<h3>Did you send it?</h3>');
   expect(html).toContain('<ul class="manifest" aria-label="Files in the package"><li>receipts-2026-10/</li>');
   expect(html.match(/class="[^"]*\bbtn primary\b/g)).toHaveLength(1);
   const shownHash = html.match(/name="receipts_hash" value="([a-f0-9]{64})"/)![1]!;

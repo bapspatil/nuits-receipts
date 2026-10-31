@@ -199,6 +199,7 @@ test('a folder chart keeps one bar size whether it has 0, 1, 2 or 12 months', ()
   const oneMonth = overview(data([12000]), seller);
   expect(oneMonth).toContain('February 2025: EUR 0.00');
   expect(oneMonth).toContain('January 2026: EUR 120.00');
+  expect(svg(oneMonth)).toContain('aria-label="Spent by month: January 2026 EUR 120.00"');
   expect(
     bars(overview(data([12000, 6000]), seller))
       .slice(-2)
