@@ -1310,7 +1310,7 @@ async function sendStep(
             '',
           )}</tbody><tfoot><tr><th scope="row" colspan="2">Total</th><td class="n">EUR ${money(s.total)}</td></tr></tfoot></table>${s.unchecked ? `<p class="small">${money(s.unchecked)} not checked yet.</p>` : ''}${s.estimated ? `<p class="small">${money(s.estimated)} at the ECB rate.</p>` : ''}</div></details>`
       : '';
-  const spent = `<div class="total"><span>Spent</span><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
+  const spent = `<div class="total"><h2>Spent</h2><span>EUR ${money(s.total)}</span></div>${s.noEur ? `<p class="small">${plural(s.noEur, 'receipt')} without a euro amount, not counted.</p>` : ''}`;
   const hint = settings.sendHint ? `<p class="small">${escape(settings.sendHint)}</p>` : '';
   const panel = (buttons: string, before = '') =>
     `<div class="card active send">${spent}${before}<div class="btns">${buttons}${csv}</div>${hint}${line}${didSend}${manifest}${byPart}</div>`;
@@ -1348,7 +1348,10 @@ async function sendStep(
       upload && upload.pending.length
         ? `${uploadForm(chosen, upload.plan.files.length - upload.pending.length ? 'Continue upload' : `Upload to ${folder}`, kind)}${zip(chosen, download)}`
         : zip(chosen, download, kind);
-    return { status: STATUS.ready.word, body: panel(buttons, destination) };
+    return {
+      status: STATUS.ready.word,
+      body: `<div class="ready-desktop">${panel(buttons, destination)}</div><div class="card active send ready-phone"><h2 class="vh">Spent</h2><p class="ready-summary">${plural(plan.files.length, 'file')} · EUR ${money(s.total)}</p><div class="btns">${zip(chosen, 'Download ZIP')}${markSent}</div><details><summary>Details</summary><div class="body">${destination}${upload && upload.pending.length ? uploadForm(chosen, 'Upload to OneDrive') : ''}${csv}${hint}${line}${manifest}${byPart}</div></details></div>`,
+    };
   }
   // Not ready: download anyway, behind one fold.
   const undated = plan.undated

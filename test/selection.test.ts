@@ -200,6 +200,8 @@ test('the bar and row checks are real form controls that work without the script
   );
   const tools = bulkTools(list, 25);
   expect(tools).toContain('<label class="pick" hidden><input type="checkbox" data-bulk-page>');
+  expect(tools).toContain('<span aria-hidden="true">All 25</span>');
+  expect(tools).toContain('Select all 25 receipts on this page');
   expect(tools).not.toContain('select=1');
   expect(tools).not.toContain('data-bulk-select');
   const dashes = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);

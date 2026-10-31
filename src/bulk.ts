@@ -115,7 +115,7 @@ export function bulkCheck(list: BulkList, id: string, name: string): string {
 // The select-all box for the page; the script reveals it.
 export function bulkTools(list: BulkList, pageCount: number): string {
   if (!pageCount) return '';
-  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label></div>`;
+  return `<div class="bulktools"><label class="pick" hidden><input type="checkbox" data-bulk-page><span aria-hidden="true">All ${pageCount}</span><span class="vh">Select all ${pageCount} ${escape(list.noun[pageCount === 1 ? 0 : 1])} on this page</span></label></div>`;
 }
 
 function actionHtml(action: BulkAction): string {
