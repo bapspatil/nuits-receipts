@@ -97,7 +97,9 @@ test('the manifest names the app and keeps every URL under the base path', async
     enctype: 'multipart/form-data',
     params: { files: [{ name: 'files', accept: ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] }] },
   });
-  expect(m.short_name.length).toBeLessThanOrEqual(12);
+  expect(m.short_name).toBe('Nuits Receipts');
+  expect(m.name).toBe('Nuits Receipts');
+  expect(m.short_name.length).toBeLessThanOrEqual(16);
 });
 
 test('pages link the manifest, touch icon and worker script, under the base path too', async () => {
@@ -105,7 +107,7 @@ test('pages link the manifest, touch icon and worker script, under the base path
   expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">');
   expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
   expect(html).toContain('<meta name="theme-color" content="#F3EDE2">');
-  expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Nuits">');
+  expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Nuits Receipts">');
   expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes">');
   expect(html).toContain('<meta name="mobile-web-app-capable" content="yes">');
   expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default">');
