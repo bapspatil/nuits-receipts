@@ -665,3 +665,9 @@
   }
 
 }
+
+/* The install clip sits under the phone shots, smaller than the main demo. */
+.install-player {
+  margin-block-start: 3rem;
+  max-width: 44rem;
+}

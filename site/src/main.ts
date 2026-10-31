@@ -64,12 +64,12 @@ function startLayer() {
 if (document.readyState === "complete") startLayer();
 else addEventListener("load", startLayer, { once: true });
 
-// The demo player upgrades from the native controls to Media Chrome when the
-// section is within a screen of view, or at once when the page opens on it.
-const demoVideo = document.querySelector<HTMLVideoElement>("#demo video");
-if (demoVideo) {
-  const upgrade = () => void import("./player").then(({ upgradePlayer }) => upgradePlayer(demoVideo)).catch(() => {});
-  if (location.hash === "#demo") upgrade();
+// Each player (the demo and the install clip) upgrades from the native
+// controls to Media Chrome when it is within a screen of view, or at once when
+// the page opens on the demo.
+for (const video of document.querySelectorAll<HTMLVideoElement>(".demo-player video")) {
+  const upgrade = () => void import("./player").then(({ upgradePlayer }) => upgradePlayer(video)).catch(() => {});
+  if (location.hash === "#demo" && video.closest("#demo")) upgrade();
   else {
     const watch = new IntersectionObserver(
       (entries) => {
@@ -79,6 +79,6 @@ if (demoVideo) {
       },
       { rootMargin: "100% 0px" },
     );
-    watch.observe(document.getElementById("demo")!);
+    watch.observe(video);
   }
 }
