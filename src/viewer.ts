@@ -31,14 +31,18 @@ export function viewer(
       : '';
   const tools = [
     button('zoomOut', { attrs: ' type="button" data-do="out" aria-label="Zoom out" title="Zoom out"' }),
+    `<output class="vzoom" data-desktop data-zoom aria-live="polite">100%</output>`,
+    button('zoomIn', { attrs: ' type="button" data-do="in" aria-label="Zoom in" title="Zoom in"' }),
+    button('fit', { attrs: ' type="button" data-do="fit"' }),
+    button('rotate', { attrs: ' type="button" data-desktop data-do="rotate"' }),
+    pdf ? `<span class="vpage-of" data-desktop data-pageof aria-live="polite"></span>` : '',
+    find,
+    o.compact ? '' : buttonLink('print', raw, { attrs: ' data-desktop target="_blank" rel="noopener"' }),
     `<details class="vmore"><summary class="btn ghost">${icon('ellipsis')}<span>More</span></summary><div class="vmore-body"><output class="vzoom" data-zoom aria-live="polite">100%</output>`,
     button('rotate', { attrs: ' type="button" data-do="rotate"' }),
     pdf ? `<span class="vpage-of" data-pageof aria-live="polite"></span>` : '',
     o.compact ? '' : buttonLink('print', raw, { attrs: ' target="_blank" rel="noopener"' }),
     `</div></details>`,
-    button('zoomIn', { attrs: ' type="button" data-do="in" aria-label="Zoom in" title="Zoom in"' }),
-    button('fit', { attrs: ' type="button" data-do="fit"' }),
-    find,
   ].join('');
   return `<section class="viewer${o.compact ? ' compact' : ''}" data-viewer data-type="${pdf ? 'pdf' : 'image'}" aria-label="${escape(o.label ?? (pdf ? 'The PDF' : 'The image'))}"><a data-raw href="${raw}" hidden>${escape(r.filename ?? 'Original')}</a><template data-bar><div class="vbar" role="toolbar" aria-label="Viewer">${tools}</div></template><div class="vfallback">${fallback}</div></section>`;
 }
@@ -50,15 +54,14 @@ export const VIEWER_CSS = `
 .viewer{position:relative;display:flex;flex-direction:column;gap:var(--space-2);min-width:0}
 .viewer[data-state=on] .vfallback{display:none}
 .vbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface-raised);position:sticky;top:var(--space-2);z-index:2}
-.vmore,.vmore-body,.vfind-menu{display:contents}.vmore>summary,.vfind-menu>summary{display:none}
-.vbar [data-do=out]{order:0}.vzoom{order:1}.vbar [data-do=in]{order:2}.vbar [data-do=fit]{order:3}.vbar [data-do=rotate]{order:4}.vpage-of{order:5}.vfind{order:6}.vmore-body>a{order:7}
+.vmore{display:none}.vfind-menu{display:contents}.vfind-menu>summary{display:none}
 .vbar .btn{min-height:36px;padding:0 var(--space-3);font-size:var(--text-base)}
 .vzoom,.vpage-of,.vfind output{font:500 var(--text-sm)/1 var(--font-num);font-variant-numeric:tabular-nums;color:var(--text-muted);min-width:4ch;text-align:center}
 .vfind{display:flex;align-items:center;gap:var(--space-2);margin-left:auto}
 .vfind input{width:min(240px,40vw);min-height:36px;font-size:var(--text-sm)}
 @media (max-width:600px){
 .vbar{flex-wrap:nowrap;justify-content:space-between}.vbar .btn{min-height:44px;padding:0 var(--space-2)}.vbar>[data-do]>span,.vbar>details>summary>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.vmore,.vfind-menu{display:block;position:static}.vmore{order:5}.vfind-menu{order:4}.vmore>summary,.vfind-menu>summary{display:flex;align-items:center;justify-content:center;list-style:none}.vmore>summary::-webkit-details-marker,.vfind-menu>summary::-webkit-details-marker{display:none}
+.vbar>[data-desktop]{display:none}.vbar>[data-do],.vbar>details>summary{width:44px;height:44px;min-width:44px;padding:0}.vmore,.vfind-menu{display:block;position:static;margin:0;border:0;background:none}.vmore>summary,.vfind-menu>summary{display:flex;align-items:center;justify-content:center;list-style:none}.vmore>summary::-webkit-details-marker,.vfind-menu>summary::-webkit-details-marker{display:none}
 .vmore-body,.vfind{position:absolute;top:100%;right:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);padding:var(--space-3);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-md)}.vfind input{width:min(240px,65vw);min-height:44px}
 }
 .vbody{display:flex;gap:var(--space-3);min-height:0}
@@ -126,7 +129,7 @@ async function start(root) {
   const src = root.querySelector('a[data-raw]').href;
   const ui = shell(root);
   const state = { zoom: 1, fit: true, rotation: 0 };
-  const zoomOut = ui.bar.querySelector('[data-zoom]');
+  const zoomOutputs = ui.bar.querySelectorAll('[data-zoom]');
   const show = () => {
     root.prepend(ui.bar);
     root.append(ui.body);
@@ -137,7 +140,7 @@ async function start(root) {
     show();
     const relayout = () => {
       api.layout();
-      zoomOut.textContent = Math.round(api.scale() * 100) + '%';
+      for (const output of zoomOutputs) output.textContent = Math.round(api.scale() * 100) + '%';
     };
     const act = (what) => {
       if (what === 'in' || what === 'out') {
@@ -209,7 +212,7 @@ async function pdfViewer(src, ui, state) {
     pages.push({ n, page, el, thumb, drawn: 0, task: null, text: null, words: null });
   }
   ui.thumbs.classList.toggle('many', pages.length > 1);
-  const pageOf = ui.bar.querySelector('[data-pageof]');
+  const pageOutputs = ui.bar.querySelectorAll('[data-pageof]');
   let scale = 1, current = 1, query = '';
   const visible = new Set();
   const draw = async (p) => {
@@ -248,7 +251,7 @@ async function pdfViewer(src, ui, state) {
   }, { root: ui.stage, rootMargin: '300px 0px' });
   const setCurrent = (n) => {
     current = n;
-    if (pageOf) pageOf.textContent = 'Page ' + n + ' of ' + pages.length;
+    for (const output of pageOutputs) output.textContent = 'Page ' + n + ' of ' + pages.length;
     for (const p of pages) p.thumb.setAttribute('aria-current', String(p.n === n));
   };
   for (const p of pages) seen.observe(p.el);
