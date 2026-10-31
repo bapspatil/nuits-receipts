@@ -6,7 +6,7 @@
     <title>Nuits Receipts: a receipt inbox that runs on Cloudflare Workers</title>
     <meta
       name="description"
-      content="Every receipt and invoice, found in seconds. A receipt inbox in your own Cloudflare account that matches your bank export and flags what&#39;s missing."
+      content="Every receipt and invoice, searchable in your own Cloudflare account. Import a bank statement and see which payments have no receipt."
     />
     <meta name="theme-color" content="#E6EFE9" />
     <link rel="canonical" href="https://receipts.nuits.net/" />
@@ -16,7 +16,7 @@
     <meta property="og:title" content="Nuits Receipts: every receipt and invoice, found in seconds" />
     <meta
       property="og:description"
-      content="A receipt inbox that runs in your own Cloudflare account. It keeps every finance document searchable, matches your bank export and flags what's missing. Open source."
+      content="An open-source receipt inbox that runs in your own Cloudflare account. Search every receipt and invoice, and see which bank payments have no receipt."
     />
     <meta property="og:image" content="https://receipts.nuits.net/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -58,15 +58,15 @@
                 <span class="wipe" style="--row: 1">receipt<span class="hero-dot">.</span></span>
               </h1>
               <p class="hero-sub wipe" style="--row: 2">
-                Every receipt, invoice and bank statement in one place you can search, in your own Cloudflare account.
-                It also matches your bank export and flags what's missing.
+                Your receipts, invoices and bank statements, searchable in your own Cloudflare account. Import a bank
+                statement and it shows which payments have no receipt.
               </p>
               <p class="hero-cost wipe" style="--row: 3">AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs.</p>
               <div class="ctas hero-ctas wipe" style="--row: 4">
                 <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bapspatil/nuits-receipts"><img src="/deploy-to-cloudflare.svg" alt="Deploy to Cloudflare" width="184" height="39" /></a>
                 <a class="button button-secondary" href="https://github.com/bapspatil/nuits-receipts">Star on GitHub</a>
               </div>
-              <p class="hero-note wipe" style="--row: 5">Open source under the Apache License 2.0. Not a service: you deploy your own copy.</p>
+              <p class="hero-note wipe" style="--row: 5">Open source. There's no hosted version: you deploy your own copy.</p>
             </div>
 
             <ol class="beats">
@@ -74,33 +74,32 @@
                 <span class="beat-n" aria-hidden="true">1/4</span>
                 <h2 class="beat-title">It comes in.</h2>
                 <p>
-                  Forward the email to your receipt address, upload a PDF or a photo, or share it from your phone. The Add
-                  button sits in the same place on every page.
+                  Forward receipt emails to your own receipt address, or upload a PDF or a photo. On Android, share one
+                  straight from any app.
                 </p>
               </li>
               <li class="beat" data-beat="2">
                 <span class="beat-n" aria-hidden="true">2/4</span>
                 <h2 class="beat-title">It gets read.</h2>
                 <p>
-                  Cloudflare's Clairic model on Workers AI (a preview model; its behaviour and pricing may change) reads
-                  the seller, date, totals and VAT, and the sums are checked in code. Anything it isn't sure of waits in
-                  Receipts To do, beside the original.
+                  Cloudflare's Clairic model on Workers AI (a preview model, so pricing may change) reads the seller, date,
+                  totals and VAT. Code checks the sums. Anything unclear waits for you in To do, next to the original.
                 </p>
               </li>
               <li class="beat" data-beat="3">
                 <span class="beat-n" aria-hidden="true">3/4</span>
                 <h2 class="beat-title">It files itself.</h2>
                 <p>
-                  Folders build themselves from what it read: years and months, sellers, clients, kinds and tags. Nothing
-                  can be misfiled, and there is nothing to tidy.
+                  Folders by year, month, seller, client, type and tag build themselves from what was read. There's nothing
+                  to sort by hand.
                 </p>
               </li>
               <li class="beat" data-beat="4">
                 <span class="beat-n" aria-hidden="true">4/4</span>
                 <h2 class="beat-title">You find it.</h2>
                 <p>
-                  Search a seller, an amount, a date or any word inside a PDF. Cmd+K (Ctrl+K off a Mac) finds a file from
-                  any page, and it opens in the app.
+                  Search by seller, amount, date or any word inside a PDF. Or press Cmd+K (Ctrl+K on Windows) on any page
+                  to jump straight to a file.
                 </p>
               </li>
             </ol>
@@ -137,28 +136,27 @@
       <section class="scene month" id="month" aria-labelledby="month-title">
         <div class="slate" aria-hidden="true"><span class="slate-n">02</span><span>Month end</span></div>
         <div class="month-head">
-          <h2 class="title" id="month-title">Check, Match, Send. Then it's closed.</h2>
+          <h2 class="title" id="month-title">Close the month in three steps.</h2>
           <p class="lede">
-            Home keeps the month as a strip of three steps above the archive. Each one shows what's left, and the strip
-            empties as you go.
+            Home shows the month as Check, Match and Send. Each step shows what's left, and empties as you go.
           </p>
         </div>
 
         <ol class="steps">
           <li class="step">
             <h3 class="step-name">Check</h3>
-            <p>Receipts To do lists only what needs you: a missing date, a VAT line that doesn't add up, mail from a new sender. Approve, and the next one moves up.</p>
+            <p>To do lists only what needs you: a missing date, a VAT line that doesn't add up, a new sender. Approve one and the next moves up.</p>
           </li>
           <li class="step">
             <h3 class="step-name">Match</h3>
             <p>
-              Choose a bank statement (CSV, XLSX or PDF) and press Import statement. It finds the account and the columns,
-              skips rows you imported before, and asks only when it can't tell. The whole import has an Undo.
+              Import a bank statement (CSV, XLSX or PDF) and each payment is paired with its receipt. It works out the
+              account and columns, skips rows you already imported, and the whole import can be undone.
             </p>
           </li>
           <li class="step">
             <h3 class="step-name">Send</h3>
-            <p>Download the month as a ZIP (every original, named by date and seller, plus an index spreadsheet) or just the CSV, then press I've sent it. A copy of what your accountant got stays on Home.</p>
+            <p>Download the month as a ZIP (every original, named by date and seller, plus a spreadsheet index) or as a CSV. Press I've sent it, and Home keeps a copy of what your accountant got.</p>
           </li>
         </ol>
 
@@ -187,8 +185,8 @@
           <p class="statement-foot">Two missing. You know exactly which two.</p>
         </div>
         <p class="month-note">
-          Matches are made by exact amount, by the original currency, by an ECB estimate or with a small tip. Tax, bank
-          fees, cash and your own transfers are marked Not a purchase for you.
+          It matches on the exact amount, the original currency, an ECB exchange-rate estimate, or the amount plus a
+          small tip. Tax, bank fees, cash and your own transfers are marked Not a purchase automatically.
         </p>
       </section>
 
@@ -197,12 +195,12 @@
         <div class="keys-copy">
           <h2 class="title" id="keys-title">Nothing asks “are you sure?”</h2>
           <p class="lede">
-            Approve, Discard, Match, Not a purchase and every bulk action run at once, and the banner offers Undo. Only
-            the few actions that lose something ask first.
+            Approve, Discard, Match, Not a purchase and bulk actions happen at once, with Undo in the banner. Only
+            actions that can't be undone ask first.
           </p>
           <p class="keys-hint">
-            On a computer the lists take <kbd>j</kbd> and <kbd>k</kbd> to move, <kbd>a</kbd> to approve,
-            <kbd>u</kbd> to undo and <kbd>?</kbd> for the rest. Try them on this sample list.
+            On a computer, press <kbd>j</kbd> and <kbd>k</kbd> to move, <kbd>a</kbd> to approve, <kbd>u</kbd> to
+            undo and <kbd>?</kbd> for every shortcut. Try them on this list.
           </p>
         </div>
 
@@ -234,9 +232,9 @@
               <button class="wrow-act" type="button">Approve<span class="visually-hidden"> Harbour Hardware</span></button>
             </li>
           </ul>
-          <p class="worklist-done" data-done hidden>Nothing needs you. The month can go.</p>
+          <p class="worklist-done" data-done hidden>All done. The month is ready to send.</p>
           <div class="banner" data-banner><p class="banner-text" role="status" data-banner-text></p><button class="banner-undo" type="button" data-undo hidden>Undo</button></div>
-          <p class="worklist-foot">A sample list on this page. It saves nothing.</p>
+          <p class="worklist-foot">A sample list. Nothing here is saved.</p>
         </div>
       </section>
 
@@ -247,31 +245,31 @@
           <li class="card" style="--i: 0">
             <figure>
               <div class="shot"><img src="/media/app/home-1760.webp" width="1760" height="1320" loading="lazy" decoding="async" alt="Home in October 2026: the search field, folders for 2026 and 2025 with their months and the kinds of document, a list of receipts and invoices with Needs you tags, and a Kaarna Rail Oy ticket for EUR 36.20 open in the preview with its PDF and its details." /></div>
-              <figcaption><strong>Home.</strong> Search first, then every document: folders that build themselves, the list, and the file itself with what was read from it.</figcaption>
+              <figcaption><strong>Home.</strong> Search, the folders, your documents, and the open file beside what was read from it.</figcaption>
             </figure>
           </li>
           <li class="card" style="--i: 1">
             <figure>
               <div class="shot"><img src="/media/app/search-1440.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Home with the search “tampere”, which appears only inside the PDFs: five Kaarna Rail Oy tickets from November 2025 to October 2026, tagged travel." /></div>
-              <figcaption><strong>Search.</strong> Seller, amount, date or any word inside a PDF. That word was only ever in the PDFs.</figcaption>
+              <figcaption><strong>Search.</strong> It reads inside PDFs: “tampere” appears only in the ticket PDFs, and it still finds them.</figcaption>
             </figure>
           </li>
           <li class="card" style="--i: 2">
             <figure>
               <div class="shot"><img src="/media/app/quickfind-1440.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Find a file dialog over Home with “nord” typed, listing eight Nordlicht Cloud Oy receipts from April to October 2026." /></div>
-              <figcaption><strong>Quick find.</strong> Cmd+K (Ctrl+K off a Mac) on any page. Arrows pick one, Enter opens it.</figcaption>
+              <figcaption><strong>Quick find.</strong> Cmd+K or Ctrl+K on any page. Arrow keys to pick, Enter to open.</figcaption>
             </figure>
           </li>
           <li class="card" style="--i: 3">
             <figure>
               <div class="shot"><img src="/media/app/overview-1440.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Nordlicht Cloud Oy folder: EUR 687.37 spent across 13 files, twelve monthly bars from November to October, and the receipts below." /></div>
-              <figcaption><strong>Overviews.</strong> A year, a seller or a client opens on its total, its file count and twelve monthly bars.</figcaption>
+              <figcaption><strong>Overviews.</strong> Open a year, seller or client to see its total, file count and spending by month.</figcaption>
             </figure>
           </li>
           <li class="card" style="--i: 4">
             <figure>
               <div class="shot"><img src="/media/app/bank-1440.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Bank in October 2026: 16 payments out, 8 matched, 2 not a purchase and 6 missing, with two likely matches ready to accept and a payment no receipt fits." /></div>
-              <figcaption><strong>Bank To do.</strong> Open payments first, month-wide. Accept the likely matches together, and the page refills.</figcaption>
+              <figcaption><strong>Bank To do.</strong> Payments with no receipt come first. Accept all the likely matches at once.</figcaption>
             </figure>
           </li>
         </ol>
@@ -281,11 +279,11 @@
             <h3 class="heading">On a phone, it's the same app.</h3>
             <p>
               A sidebar on a computer, a tab bar on a phone. Add it to your iPhone's Home Screen or your Mac's Dock, or
-              install it from Chrome or Edge. It opens in its own window with its own icon.
+              install it from Chrome or Edge, and it opens in its own window.
             </p>
             <p>
-              On Android, share a receipt PDF or photo to it from any app. It waits on the Add page, and nothing is
-              uploaded until you press Add. The app still needs a connection, and keeps nothing on the device.
+              On Android, shared receipts wait on the Add page and nothing uploads until you press Add. It needs a connection, and
+              keeps nothing on the device.
             </p>
           </div>
           <ul class="phones">
@@ -328,8 +326,8 @@
             </media-controller>
           </div>
           <figcaption id="demo-note">
-            57 seconds, with narration and captions, recorded before Home became the archive. Made-up example data.
-            Figures are read automatically and can be wrong.
+            57 seconds, narrated and captioned, with made-up data. Recorded on an earlier version, so Home looks
+            different today. Figures are read automatically and can be wrong.
           </figcaption>
         </figure>
       </section>
@@ -337,16 +335,15 @@
       <section class="scene cost" id="cost" aria-labelledby="cost-title">
         <div class="slate" aria-hidden="true"><span class="slate-n">06</span><span>Cost</span></div>
         <div class="cost-copy">
-          <h2 class="title" id="cost-title">AI reading: about 15 cents a month. Here's the arithmetic.</h2>
+          <h2 class="title" id="cost-title">About 15 cents a month for AI reading.</h2>
           <p class="lede">
-            Clairic costs $0.10 per million input tokens. Clef costs $0.24 per million and only runs when no vendor
-            rule matches. D1, R2 and Email Routing fit in Cloudflare's free allowances at this size. You pay your own
-            Cloudflare bill.
+            Clairic costs $0.10 per million input tokens. Clef, the fallback model, costs $0.24 per million and runs
+            only when no vendor rule matches. D1, R2 and Email Routing fit in Cloudflare's free allowances at this size.
+            It all lands on your own Cloudflare bill.
           </p>
           <p class="caveat">
-            <strong>One honest caveat.</strong> A PDF upload measured about 186 ms of CPU in production, far over the 10 ms the Workers
-            Free plan allows. If you upload PDFs, plan on Workers Paid, a $5 a month minimum for the whole account.
-            Forwarded email bodies may fit in Free.
+            <strong>One catch: PDFs.</strong> A PDF upload used about 186 ms of CPU in production. Workers Free allows
+            10 ms. If you upload PDFs, plan on Workers Paid ($5 a month per account). Forwarded emails may fit in Free.
           </p>
         </div>
 
@@ -364,7 +361,7 @@
               </tbody>
             </table>
             <table class="tally">
-              <caption>What the plan budgets, for schema, photos and retries</caption>
+              <caption>Budgeted, with room for photos and retries</caption>
               <tbody>
                 <tr><th scope="row">Clairic, 200 × 5,000 tokens</th><td>$0.10</td></tr>
                 <tr><th scope="row">Clef fallback, 50 × 2,000 tokens</th><td>≈ $0.024</td></tr>
@@ -379,7 +376,7 @@
             </table>
             <p class="slip-grand"><span>AI reading, with headroom</span><span>about $0.15</span></p>
             <table class="tally tally-plan">
-              <caption>Separate from the reading</caption>
+              <caption>Separate from AI reading</caption>
               <tbody>
                 <tr><th scope="row">Workers Paid, if you upload PDFs</th><td>$5 a month</td></tr>
               </tbody>
@@ -392,18 +389,18 @@
         <div class="slate" aria-hidden="true"><span class="slate-n">07</span><span>Limits</span></div>
         <div class="nope-letter">
           <h2 class="title" id="nope-title">What it doesn't do.</h2>
-          <p class="lede">I built this for my own receipts. Here's what it won't do for yours, at least not yet.</p>
+          <p class="lede">I built this for my own receipts, so it has limits. Here they are.</p>
           <div class="slip nope-slip">
             <p class="disclaimer">
               Nuits Receipts organises receipts and prepares a CSV for your accountant. It is not tax, VAT or accounting
               advice, and it does not do your bookkeeping. Figures are AI-extracted and you should check them.
             </p>
             <ul class="nope-list">
-              <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
-              <li>It imports statements from banks that provide a CSV, XLSX or PDF export. Holvi exports are the most tested; other banks' files less so.</li>
-              <li>Search reads the words inside PDFs, not inside photos. A photo is found by the details it read.</li>
+              <li>It doesn't file tax returns or submit anything on your behalf.</li>
+              <li>It imports bank statements as CSV, XLSX or PDF. Holvi exports are tested most, other banks less so.</li>
+              <li>Search reads words inside PDFs, not photos. A photo is found by the details read from it.</li>
               <li>It's for one person with one inbox.</li>
-              <li>It doesn't work offline. Installed, it shows a "You're offline" page and keeps nothing on the device.</li>
+              <li>It doesn't work offline.</li>
             </ul>
             <p class="signoff">Baps, who built it</p>
           </div>
@@ -412,60 +409,59 @@
 
       <section class="scene faq" id="faq" aria-labelledby="faq-title">
         <div class="slate" aria-hidden="true"><span class="slate-n">08</span><span>FAQ</span></div>
-        <h2 class="title" id="faq-title">Questions, answered plainly.</h2>
+        <h2 class="title" id="faq-title">Common questions.</h2>
         <div class="faq-list">
           <details>
             <summary>Which banks does it work with?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              Banks that let you export a statement as CSV, XLSX or PDF. Choose the file and press Import statement: it
-              finds the account and the columns, and asks only when it can't tell. Tested most with Holvi exports.
+              Banks that export statements as CSV, XLSX or PDF. Holvi is tested most. With other banks, it may ask you
+              which column is which.
             </p>
           </details>
           <details>
             <summary>Can I find an old receipt?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              Yes. Home keeps every finance document: receipts, sales invoices, bank statements and the month packages you
-              sent. Search by seller, amount, date or any word inside a PDF, or open a folder for a year, a seller or a
-              tag. Cmd+K (Ctrl+K off a Mac) finds a file from any page, and the PDF opens in the app.
+              Yes. Home keeps every receipt, sales invoice, bank statement and month package you sent. Search for it, or
+              browse folders by year, seller or tag.
             </p>
           </details>
           <details>
             <summary>What if I approve the wrong thing?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              Press Undo in the banner, or <kbd>u</kbd> on a computer. Approve, Discard, Match, Not a purchase, Mark paid,
-              a bank import and every bulk action can be undone. The few that can't, such as ignoring a sender, ask first.
+              Press Undo in the banner, or <kbd>u</kbd> on a computer. Almost everything can be undone, including Mark
+              paid, bank imports and bulk actions. The few that can't, such as ignoring a sender, ask first.
             </p>
           </details>
           <details>
             <summary>Is there a phone app?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              The web app installs on its own: Add to Home Screen on an iPhone or iPad, Add to Dock on a Mac, or Install
-              app in Chrome and Edge. There's no app store. It needs a connection to work.
+              Not in an app store. The web app installs instead: Add to Home Screen on an iPhone or iPad, Add to Dock on a
+              Mac, or Install app in Chrome or Edge.
             </p>
           </details>
           <details>
             <summary>Does Nuits see my data?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              No. It runs in your own Cloudflare account, with files in your R2 and data in your D1. Nuits never sees your
-              data. Two calls go outside the Worker: Cloudflare Workers AI, where Clairic reads each receipt, and frankfurter.dev for exchange rates,
-              which gets only a currency code and dates.
+              No. It runs in your own Cloudflare account: files in your R2, data in your D1. Nuits never sees your data.
+              Only two calls leave the Worker: each receipt goes to Cloudflare Workers AI to be read, and frankfurter.dev
+              gets a currency code and dates for exchange rates.
             </p>
           </details>
           <details>
             <summary>What do I need from Cloudflare?<span class="faq-mark" aria-hidden="true"></span></summary>
             <p>
-              An account, and a domain on Cloudflare if you want Email Routing to give you a receipt address. Uploads work
-              without email. PDF uploads measured about 186 ms of CPU in production against the Workers Free plan's 10 ms
-              limit, so plan on Workers Paid ($5 a month) if you upload PDFs.
+              An account. For a receipt email address you also need a domain on Cloudflare, for Email Routing. Uploads
+              work without one. If you upload PDFs, plan on Workers Paid ($5 a month), because reading a PDF goes over
+              the Free plan's CPU limit.
             </p>
           </details>
           <details>
             <summary>Is this tax advice?<span class="faq-mark" aria-hidden="true"></span></summary>
-            <p>No. It organises receipts and prepares a CSV for your accountant. Figures are AI-extracted, so check them.</p>
+            <p>No. Figures are read by AI and can be wrong, so check them. Your accountant or tax adviser has the final word.</p>
           </details>
           <details>
             <summary>Is it a SaaS?<span class="faq-mark" aria-hidden="true"></span></summary>
-            <p>No. You deploy your own copy and nobody else runs it for you. It's open source under the Apache License 2.0.</p>
+            <p>No. There's no hosted version and no sign-up. It's open source under the Apache License 2.0 and runs in your own Cloudflare account.</p>
           </details>
         </div>
       </section>
