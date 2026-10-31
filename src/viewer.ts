@@ -27,7 +27,7 @@ export function viewer(
   const raw = o.raw ?? `/originals/${r.id}?view=raw`;
   const find =
     pdf && !o.compact
-      ? `<details class="vfind-menu"><summary class="btn ghost" aria-label="Find in the document" title="Find in the document">${icon('search')}</summary><form class="vfind" data-find role="search"><label class="vh" for="vfind-${escape(r.id.slice(0, 8))}">Find in the document</label><input id="vfind-${escape(r.id.slice(0, 8))}" type="search" placeholder="Find in the document" maxlength="100" autocomplete="off"><output data-found aria-live="polite"></output></form></details>`
+      ? `<details class="vfind-menu"><summary class="btn ghost" aria-label="Find in the document" title="Find in the document">${icon('search')}<span>Find</span></summary><form class="vfind" data-find role="search"><label class="vh" for="vfind-${escape(r.id.slice(0, 8))}">Find in the document</label><input id="vfind-${escape(r.id.slice(0, 8))}" type="search" placeholder="Find in the document" maxlength="100" autocomplete="off"><output data-found aria-live="polite"></output></form></details>`
       : '';
   const tools = [
     button('zoomOut', { attrs: ' type="button" data-do="out" aria-label="Zoom out" title="Zoom out"' }),
@@ -57,7 +57,7 @@ export const VIEWER_CSS = `
 .vfind{display:flex;align-items:center;gap:var(--space-2);margin-left:auto}
 .vfind input{width:min(240px,40vw);min-height:36px;font-size:var(--text-sm)}
 @media (max-width:600px){
-.vbar{flex-wrap:nowrap;justify-content:space-between}.vbar .btn{min-height:44px;padding:0 var(--space-2)}.vbar [data-do=out] span,.vbar [data-do=in] span{display:none}
+.vbar{flex-wrap:nowrap;justify-content:space-between}.vbar .btn{min-height:44px;padding:0 var(--space-2)}.vbar>[data-do]>span,.vbar>details>summary>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .vmore,.vfind-menu{display:block;position:static}.vmore{order:5}.vfind-menu{order:4}.vmore>summary,.vfind-menu>summary{display:flex;align-items:center;justify-content:center;list-style:none}.vmore>summary::-webkit-details-marker,.vfind-menu>summary::-webkit-details-marker{display:none}
 .vmore-body,.vfind{position:absolute;top:100%;right:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);padding:var(--space-3);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-md)}.vfind input{width:min(240px,65vw);min-height:44px}
 }
