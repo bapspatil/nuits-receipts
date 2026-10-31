@@ -188,23 +188,46 @@ test('a folder chart keeps one bar size whether it has 0, 1, 2 or 12 months', ()
   const svg = (html: string) => html.match(/<svg class="bars"[^>]*>/)?.[0] ?? null;
   const bars = (html: string) => [...html.matchAll(/<rect x="(\d+)" y="[\d.]+" width="(\d+)" height="(\d+)"/g)];
 
-  // No months: no chart at all.
-  expect(svg(overview(data([]), seller))).toBeNull();
-
-  // Every case draws 28px bars, 36px apart, in a strip sized to its months, never stretched.
-  for (const [n, values] of [
-    [1, [12000]],
-    [2, [12000, 6000]],
-    [12, Array.from({ length: 12 }, (_, i) => (i + 1) * 1000)],
-  ] as const) {
-    const html = overview(data([...values]), seller);
-    const width = n * 36 - 8;
-    expect(svg(html)).toContain(`viewBox="0 0 ${width} 102" width="${width}" height="102"`);
+  for (const values of [[], [12000], [12000, 6000], Array.from({ length: 12 }, (_, i) => (i + 1) * 1000)]) {
+    const html = overview(data(values), seller);
+    expect(svg(html)).toContain('viewBox="0 0 424 102" width="424" height="102"');
     const drawn = bars(html);
-    expect(drawn).toHaveLength(n);
+    expect(drawn).toHaveLength(12);
     expect(drawn.every((b) => b[2] === '28')).toBe(true);
-    // The tallest month fills the 72px plot; the others are in proportion to it.
-    expect(Math.max(...drawn.map((b) => Number(b[3])))).toBe(72);
+    if (values.length) expect(Math.max(...drawn.map((b) => Number(b[3])))).toBe(72);
   }
-  expect(bars(overview(data([12000, 6000]), seller)).map((b) => b[3])).toEqual(['72', '36']);
+  const oneMonth = overview(data([12000]), seller);
+  expect(oneMonth).toContain('February 2025: EUR 0.00');
+  expect(oneMonth).toContain('January 2026: EUR 120.00');
+  expect(
+    bars(overview(data([12000, 6000]), seller))
+      .slice(-2)
+      .map((b) => b[3]),
+  ).toEqual(['72', '36']);
+});
+
+test('folder headings and navigation identify the open folder', async () => {
+  const id = idFrom(await uploadPdf());
+  await env.DB.prepare("UPDATE receipts SET vendor='Sample Seller', issue_date='2026-01-15' WHERE id=?").bind(id).run();
+  const current = new Date().toISOString().slice(0, 7);
+  for (const [folder, label, eyebrow] of [
+    ['vendor:Sample Seller', 'Sample Seller', 'SELLER'],
+    ['client:Example Client', 'Example Client', 'CLIENT'],
+    ['starred', 'Starred', 'STARRED'],
+    ['year:2026', '2026', 'YEAR'],
+  ]) {
+    const html = await page(`/?in=${encodeURIComponent(folder!)}`);
+    expect(html).toContain(`<title>${label} ·`);
+    expect(html).toContain(`<p class="folder-eyebrow">${eyebrow}</p><h1>${label}</h1>`);
+    expect(html).not.toContain(`<div class="lhead"><h2>${label}</h2>`);
+    if (folder === 'vendor:Sample Seller') {
+      const chart = html.match(/<svg class="bars"[\s\S]*?<\/svg>/)?.[0] ?? '';
+      expect(chart.match(/<rect /g)).toHaveLength(12);
+      expect(chart).toContain('January 2026');
+    }
+    if (folder === 'year:2026') {
+      expect(html).toContain('href="/?in=year%3A2025"');
+      expect(html).toContain('href="/?in=year%3A2027"');
+    } else expect(html).toContain(`href="/?month=${current}"`);
+  }
 });

@@ -49,14 +49,14 @@ export const SHEET_ID = 'keys-sheet';
 export function keysSheet(): string {
   const groups = KEY_GROUPS.map(
     (g) =>
-      `<h3>${escape(g.title)}</h3><dl class="keys-list">${g.keys
+      `<section><h3>${escape(g.title)}</h3><dl class="keys-list">${g.keys
         .map(
           (k) =>
             `<div><dt>${k.keys.map((key) => `<kbd>${escape(key)}</kbd>`).join(' ')}</dt><dd>${escape(k.does)}</dd></div>`,
         )
-        .join('')}</dl>`,
+        .join('')}</dl></section>`,
   ).join('');
-  return `<dialog id="${SHEET_ID}" class="keys-sheet" aria-labelledby="${SHEET_ID}-title"><h2 id="${SHEET_ID}-title">Keyboard shortcuts</h2>${groups}<p class="small">${escape(KEYS_NOTE)}</p><form method="dialog">${button('close')}</form></dialog>`;
+  return `<dialog id="${SHEET_ID}" class="keys-sheet" aria-labelledby="${SHEET_ID}-title"><header><h2 id="${SHEET_ID}-title" tabindex="-1">Keyboard shortcuts</h2><form method="dialog">${button('close')}</form></header><div class="keys-groups">${groups}</div><p class="small">${escape(KEYS_NOTE)}</p></dialog>`;
 }
 
 // Plain string like ADD_JS: the worker build has no DOM types.
@@ -102,7 +102,11 @@ export const KEYS_JS = `(() => {
         field.focus();
         field.select();
       } else document.dispatchEvent(new Event('quickfind'));
-    } else if (key === '?' && sheet) sheet.showModal();
+    } else if (key === '?' && sheet) {
+      sheet.showModal();
+      sheet.querySelector('h2').focus();
+      sheet.scrollTop = 0;
+    }
     else used = false;
     if (used) e.preventDefault();
   });

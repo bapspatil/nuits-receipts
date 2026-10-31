@@ -63,7 +63,7 @@ export const PAGES = {
 } as const satisfies Record<string, { nav?: NavKey; title: string }>;
 export type PageKey = keyof typeof PAGES;
 // detail: what this page is about, after the title. style: extra page CSS, appended to the shared sheet.
-export type PageOptions = { detail?: string; head?: string; style?: string; refresh?: number };
+export type PageOptions = { detail?: string; title?: string; head?: string; style?: string; refresh?: number };
 export type Counts = { todo: number; missing: number };
 
 // Its own query, so a database without the inbound_mail table still counts.
@@ -664,11 +664,13 @@ form[aria-busy=true] .btn:disabled{cursor:progress}`;
 // The shortcuts sheet and quick find open on every page, so their rules are in every page's styles.
 const SHEET_CSS = `.keys-sheet{border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--surface-raised);color:var(--text);padding:var(--space-5);max-width:min(30rem,calc(100vw - 2rem))}
 .keys-sheet::backdrop{background:rgba(0,0,0,.35)}
+.keys-sheet header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}.keys-sheet header h2{margin:0}.keys-sheet header form{margin:0}
 .keys-sheet h2{margin:0 0 var(--space-3)}.keys-sheet h3{margin:var(--space-4) 0 var(--space-2)}
 .keys-list{margin:0}.keys-list>div{display:flex;gap:var(--space-4);align-items:baseline;padding:var(--space-1) 0}
 .keys-list dt{flex:0 0 5.5rem}.keys-list dd{margin:0}
 kbd{font:500 var(--text-sm)/1.4 var(--font-mono);background:var(--surface-sunken);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 var(--space-2)}
 .keys-sheet form{margin-top:var(--space-4)}
+@media (min-width:48rem){.keys-sheet:not(.qfind){width:min(56rem,calc(100vw - 2rem));max-width:56rem}.keys-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--space-5)}}
 ${FIND_CSS}`;
 
 // A list row the next action can land on: focusable by its #row- fragment, and described by the
@@ -707,7 +709,7 @@ export async function page(
     : `${escape(appName)} v${version}`;
   const entry: { nav?: NavKey; title: string } = PAGES[view];
   const { title } = entry;
-  const heading = options.detail ? `${title} · ${options.detail}` : title;
+  const heading = options.title ?? (options.detail ? `${title} · ${options.detail}` : title);
   const said = saidNow();
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
