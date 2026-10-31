@@ -1,6 +1,6 @@
 ---
 /**
- * ImageZoom — one native <dialog> that shows a content image at full size.
+ * ImageZoom, one native <dialog> that shows a content image at full size.
  * Render it once in the docs layout; the client wraps each content image
  * that would get meaningfully bigger in a button that opens it.
  *
@@ -21,15 +21,34 @@ import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
 </script>
 
 <style is:global>
+  /* A screenshot is a slip: white paper round it, a 2px corner, the one
+     shadow. Its tooltip sits inside the slip's top corner. */
   [data-nb-zoom-trigger] {
     all: unset;
+    position: relative;
+    box-sizing: border-box;
     max-width: 100%;
+    padding: 0.5rem;
+    background: var(--nb-card);
+    border-radius: var(--nb-radius);
+    box-shadow: var(--nb-shadow-slip);
     cursor: zoom-in;
-    border-radius: 0.25rem;
+  }
+  [data-nb-zoom-trigger] > :is(img, picture) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  [data-nb-zoom-trigger] > .nb-tip {
+    top: 1rem;
+    inset-inline-end: 1rem;
+  }
+  [data-nb-zoom-trigger]:is(:hover, :focus-visible) > .nb-tip {
+    visibility: visible;
   }
   [data-nb-zoom-trigger]:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
+    outline: 2px solid var(--nb-ring);
+    outline-offset: 3px;
   }
   /* A Frame with an aspect ratio fills its box with the image; the button
      takes that place so the image still fills it. */
@@ -42,7 +61,7 @@ import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 0.5rem;
+    border-radius: var(--nb-radius);
   }
 
   /* Global: the dialog shows a clone of the page's image or <picture>. */
@@ -62,8 +81,7 @@ import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
     place-items: center;
   }
   .nb-zoom::backdrop {
-    background: color-mix(in oklch, var(--nb-background) 85%, transparent);
-    backdrop-filter: blur(4px);
+    background: var(--nb-background);
   }
   .nb-zoom picture {
     display: contents;
@@ -79,17 +97,17 @@ import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
     inset-inline-end: 1rem;
     display: grid;
     place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--nb-border);
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--nb-border-strong);
     background: var(--nb-card);
     color: var(--nb-foreground);
     cursor: pointer;
   }
   .nb-zoom-close:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
+    outline: 2px solid var(--nb-ring);
+    outline-offset: 3px;
   }
   @media (prefers-reduced-motion: no-preference) {
     .nb-zoom[open] .nb-zoom-img {

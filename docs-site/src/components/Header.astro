@@ -2,8 +2,6 @@
 import Logo from "./Logo.astro";
 import type { SidebarSection } from "@cloudflare/nimbus-docs/types";
 import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
-import { Button } from "./ui/button";
-import { LinkButton } from "./ui/link-button";
 import { ThemeToggle } from "./ui/theme-toggle";
 import SearchTrigger from "./ui/search/SearchTrigger.astro";
 import { config } from "virtual:nimbus/config";
@@ -60,84 +58,54 @@ const resolveSectionHref = (href: string): string =>
   withBase(href, import.meta.env.BASE_URL);
 ---
 
-<header class="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-lg">
-  <div class="mx-auto flex items-center justify-between gap-3 h-14 px-4 lg:px-6">
-    <div class="flex items-center gap-3 min-w-0">
-      <slot name="brand">
-        {/* The mark alone; the site title stays as the link's accessible name. */}
-        <a href={homeHref} class="relative flex shrink-0 items-center text-foreground transition-opacity hover:opacity-70 max-sm:after:absolute max-sm:after:-inset-2.5">
-          <Logo class="h-6 w-6 shrink-0" />
-          <span class="ms-2 hidden font-display text-[1.0625rem] font-bold tracking-tight sm:inline">{config.title}</span>
-          <span class="sr-only sm:hidden">{config.title}</span>
-        </a>
-      </slot>
+{/* The bar: an opaque paper plate with an ink rule and the cutter's teeth
+    hanging under it (styles/chrome.css), as on receipts.nuits.net. */}
+<header class="nb-bar">
+  <div class="nb-bar-row">
+    <slot name="brand">
+      <a href={homeHref} class="nb-wordmark">
+        <Logo class="nb-wordmark-mark" />
+        <span class="nb-wordmark-name">{config.title}</span>
+        <span class="nb-wordmark-docs">Docs</span>
+      </a>
+    </slot>
 
-      {showSections && (
-        <nav aria-label="Sections" class="hidden md:flex items-center gap-1 ms-4 ps-4 border-s border-border h-6 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {sections.map((section) => (
-            <a
-              href={resolveSectionHref(section.href)}
-              aria-current={section.isActive ? "page" : undefined}
-              class:list={[
-                "px-2 py-1 rounded-md text-[0.8125rem] font-medium no-underline transition-colors shrink-0 whitespace-nowrap",
-                section.isActive
-                  ? "text-foreground bg-accent"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
-              ]}
-            >
-              {section.label}
-            </a>
-          ))}
-        </nav>
-      )}
-    </div>
+    {showSections && (
+      <nav aria-label="Sections" class="nb-bar-sections max-md:hidden">
+        {sections.map((section) => (
+          <a href={resolveSectionHref(section.href)} aria-current={section.isActive ? "page" : undefined}>
+            {section.label}
+          </a>
+        ))}
+      </nav>
+    )}
 
-    <div data-header-actions class="flex items-center gap-3 md:gap-2 shrink-0">
+    <div data-header-actions class="nb-bar-actions">
       <slot name="actions" />
-      <a href="https://receipts.nuits.net/" class="hidden rounded-md px-2 py-1 text-[0.8125rem] font-medium text-muted-foreground no-underline transition-colors hover:bg-accent/60 hover:text-foreground sm:inline">Home</a>
+      <a href="https://receipts.nuits.net/" class="nb-bar-link max-md:hidden">Home</a>
       {config.search !== false && <SearchTrigger />}
       {config.github && (
-        <LinkButton
-          href={config.github}
-          variant="minimal"
-          shape="square"
-          size="sm"
-          aria-label="GitHub"
-          target="_blank"
-          rel="noopener"
-          class="text-muted-foreground"
-        >
-          <Icon name="ph:github-logo" class="w-4 h-4" />
-        </LinkButton>
+        <span class="nb-tipped max-md:hidden">
+          <a href={config.github} class="nb-pill nb-pill-icon" aria-label="GitHub" aria-describedby="nb-tip-github" target="_blank" rel="noopener">
+            <Icon name="ph:github-logo" class="nb-pill-glyph" />
+          </a>
+          <span class="nb-tip" role="tooltip" id="nb-tip-github">GitHub</span>
+        </span>
       )}
       <ThemeToggle />
       {showSidebar && (
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon="ph:list"
-          aria-label="Open navigation"
-          data-menu-btn
-          class="md:hidden text-muted-foreground"
-        />
+        <button type="button" class="nb-pill nb-pill-ink md:hidden" aria-haspopup="dialog" aria-expanded="false" data-menu-btn>
+          Menu
+        </button>
       )}
     </div>
   </div>
+  <div class="nb-bar-teeth" aria-hidden="true"></div>
   {/* Phones: the tabs on a row of their own under the bar. */}
   {showSections && (
-    <nav aria-label="Sections" data-nb-header-tabs class="md:hidden flex items-center gap-1 h-10 px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Sections" data-nb-header-tabs class="nb-bar-sections nb-bar-sections-row md:hidden">
       {sections.map((section) => (
-        <a
-          href={resolveSectionHref(section.href)}
-          aria-current={section.isActive ? "page" : undefined}
-          class:list={[
-            "px-2 py-1 rounded-md text-[0.8125rem] font-medium no-underline transition-colors shrink-0 whitespace-nowrap",
-            section.isActive
-              ? "text-foreground bg-accent"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
-          ]}
-        >
+        <a href={resolveSectionHref(section.href)} aria-current={section.isActive ? "page" : undefined}>
           {section.label}
         </a>
       ))}

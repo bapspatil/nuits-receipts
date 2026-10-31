@@ -9,7 +9,7 @@ interface Props extends HTMLAttributes<"nav"> {
   /** Max visible crumbs before collapsing middle items (default: 4) */
   maxVisible?: number;
   /**
-   * Whether the final crumb is the current page — rendered as non-interactive
+   * Whether the final crumb is the current page, rendered as non-interactive
    * text (default: true). When false, every crumb with an `href` is a link and
    * a single-crumb trail still renders.
    */
@@ -31,11 +31,11 @@ const tailItems = shouldCollapse ? items.slice(items.length - tailCount) : [];
 ---
 
 {items.length > (endsAtCurrentPage ? 1 : 0) && (
-  <nav aria-label="Breadcrumb" data-slot="breadcrumbs" class={cn("text-xs font-medium", className)} {...attrs}>
+  <nav aria-label="Breadcrumb" data-slot="breadcrumbs" class={cn("text-sm font-medium", className)} {...attrs}>
     <ol data-slot="breadcrumbs-list" class="flex flex-wrap items-center gap-y-0.5 text-muted-foreground">
       {headItems.map((crumb, i) => (
         <li data-slot="breadcrumbs-item" class="flex min-w-0 items-center">
-          {i > 0 && <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground/50">/</span>}
+          {i > 0 && <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground">/</span>}
           {isCurrent(!shouldCollapse && i === items.length - 1) || !crumb.href ? (
             <span aria-current={isCurrent(!shouldCollapse && i === items.length - 1) ? "page" : undefined} title={crumb.label} class="text-foreground truncate max-w-[12rem]">{crumb.label}</span>
           ) : (
@@ -48,7 +48,7 @@ const tailItems = shouldCollapse ? items.slice(items.length - tailCount) : [];
 
       {shouldCollapse && collapsedItems.length > 0 && (
         <li data-slot="breadcrumbs-item" class="flex min-w-0 items-center">
-          <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground/50">/</span>
+          <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground">/</span>
           <details class="relative group">
             <summary
               class="list-none cursor-pointer select-none rounded px-1 py-0.5 transition-colors hover:bg-accent hover:text-foreground [&::-webkit-details-marker]:hidden group-open:before:fixed group-open:before:inset-0 group-open:before:z-[39] group-open:before:cursor-default group-open:before:content-['']"
@@ -61,12 +61,12 @@ const tailItems = shouldCollapse ? items.slice(items.length - tailCount) : [];
                 crumb.href ? (
                   <a
                     href={resolveHref(crumb.href)}
-                    class="block truncate rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    class="block truncate rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                   >
                     {crumb.label}
                   </a>
                 ) : (
-                  <span class="block truncate rounded-md px-2.5 py-1.5 text-xs text-muted-foreground">
+                  <span class="block truncate rounded-md px-2.5 py-1.5 text-sm text-muted-foreground">
                     {crumb.label}
                   </span>
                 )
@@ -78,7 +78,7 @@ const tailItems = shouldCollapse ? items.slice(items.length - tailCount) : [];
 
       {shouldCollapse && tailItems.map((crumb, i) => (
         <li data-slot="breadcrumbs-item" class="flex min-w-0 items-center">
-          <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground/50">/</span>
+          <span aria-hidden="true" data-slot="breadcrumbs-separator" class="mx-1.5 text-muted-foreground">/</span>
           {isCurrent(i === tailItems.length - 1) || !crumb.href ? (
             <span aria-current={isCurrent(i === tailItems.length - 1) ? "page" : undefined} title={crumb.label} class="text-foreground truncate max-w-[12rem]">{crumb.label}</span>
           ) : (

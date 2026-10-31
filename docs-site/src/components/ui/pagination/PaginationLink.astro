@@ -1,6 +1,6 @@
 ---
 /**
- * PaginationLink — one half of the pagination bar: a caption, the page title
+ * PaginationLink, one half of the pagination bar: a caption, the page title
  * (the default slot), and the key that reaches it.
  */
 import { cn } from "@/lib/cn";
@@ -27,16 +27,16 @@ const caption = label ?? (isNext ? "Next" : "Previous");
   data-slot="pagination-link"
   class={cn(
     "nb-pagination-link relative flex min-w-0 flex-1 items-center gap-3 rounded-full py-1 no-underline",
-    "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+    "focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring",
     isNext ? "justify-end pe-2.5 ps-5 text-end" : "pe-5 ps-2.5",
     className,
   )}
   {...attrs}
 >
   {!isNext && <PaginationKey>[</PaginationKey>}
-  <span class="min-w-0">
-    <span data-slot="pagination-label" class="block text-[0.6875rem] leading-4 text-muted-foreground">{caption}</span>
-    <span data-slot="pagination-title" class="nb-pagination-title block text-sm leading-5 font-medium text-foreground"><slot /></span>
+  <span class="flex min-w-0 flex-col gap-2">
+    <span data-slot="pagination-label" class="nb-eyebrow block text-muted-foreground">{caption}</span>
+    <span data-slot="pagination-title" class="nb-pagination-title block text-sm leading-5 font-semibold text-foreground"><slot /></span>
   </span>
   {isNext && <PaginationKey>]</PaginationKey>}
 </a>

@@ -1,0 +1,79 @@
+---
+title: Install the app
+description: Install Nuits Receipts on a phone or computer so it opens in its own window, and share receipts into it from Android.
+sidebar:
+  order: 9.8
+  label: Install the app
+---
+
+Use this guide to put Nuits Receipts on your phone's home screen or your computer's dock, and to send receipt files to it from other Android apps. The installed app opens in its own window, with its own icon and name. There is no app store: the browser installs it from your own copy.
+
+## Prerequisites
+
+- A deployed copy you can sign in to. See [Deploy your own copy](/tutorials/deploy-your-own-copy/).
+- A browser that can install web apps.
+- For sharing: an Android phone with the app installed.
+
+## Install it
+
+<Steps>
+  <Step title="Open your copy and sign in">
+
+Open your copy's address in the browser on the device, and sign in with the password or through Cloudflare Access as usual.
+
+  </Step>
+  <Step title="Install it from the browser">
+
+Use your browser's **Install** or **Add to Home Screen** option. The app has no install button of its own.
+
+  </Step>
+  <Step title="Open it">
+
+Open the app from its icon. It opens on **Home**, in its own window without the browser's address bar.
+
+  </Step>
+</Steps>
+
+The icon's label is the app name, `APP_NAME`, when that name is 12 characters or fewer. A longer name is cut to its first word, or to 12 characters when that word is longer, so the default "Nuits Receipts" shows as "Nuits". If your system lists shortcuts for an app icon, the app offers one: **Add a receipt**, which opens **Add**.
+
+If you serve the app under a path, such as `/app`, the installed app covers that path only. See [Serve the app under a path](/how-to/serve-the-app-under-a-path/).
+
+## Know what works offline
+
+The installed app needs a connection, as the browser version does. It keeps no receipts, pages or settings on the device.
+
+When the device has no network and you open a page, the app shows **You're offline** with "This app needs a connection. Nothing is saved on this device." and a **Try again** link. Select **Try again** once you are back online.
+
+The app's service worker never handles a page while you are online, so it does not get in the way of the password prompt or the Cloudflare Access sign-in.
+
+:::caution
+Installing was tested in desktop Chrome. Sharing from Android, the password prompt in an app installed on an iPhone, and Cloudflare Access mode in an installed app have not been tested on a real device.
+:::
+
+## Share a receipt into the app on Android
+
+<Steps>
+  <Step title="Share the file">
+
+In another app, such as your file manager or your mail app, share a receipt PDF or photo and pick the app in the share sheet. The app takes PDF, PNG, JPEG and WebP files, up to 10 at a time. Other file types are left out, and files after the tenth are dropped.
+
+  </Step>
+  <Step title="Say what the files are">
+
+The app opens on **Add** with the files already in the form and the message "2 shared files ready. Choose what they are, then press Add." Under **What are these?**, choose **Receipts and bills**, **Invoices you sent** or **Other documents**.
+
+  </Step>
+  <Step title="Add them">
+
+Select **Upload**. Nothing is uploaded until you do. Each file is then read as if you had chosen it on the page. See [Add receipts](/how-to/add-receipts/).
+
+  </Step>
+</Steps>
+
+If **Add** opens with no files, the share reached the app before its service worker was running, and nothing was kept. Choose the files on that page instead.
+
+## Check that it worked
+
+- The app opens from its icon in a window of its own.
+- After sharing, **Add** lists each shared file as "Ready to add".
+- After **Upload**, the files appear in **Receipts** To do or on **Home**, as after any upload.

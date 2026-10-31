@@ -1,0 +1,72 @@
+{
+  "fonts": [
+    "Instrument Sans",
+    "Bricolage",
+    "JetBrains Mono Variable"
+  ],
+  "fontSizes": [
+    12,
+    14,
+    17,
+    20,
+    24,
+    32,
+    40
+  ],
+  "typeRules": [
+    {
+      "selector": "h1",
+      "sizes": [
+        32,
+        40
+      ]
+    },
+    {
+      "selector": "h2",
+      "sizes": [
+        24
+      ]
+    },
+    {
+      "selector": "h3",
+      "sizes": [
+        20
+      ]
+    },
+    {
+      "selector": "button, [role=button], .btn",
+      "sizes": [
+        12,
+        14
+      ]
+    }
+  ],
+  "minControlGap": 8,
+  "minControlInset": 8,
+  "minLayoutGap": 8,
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844
+    },
+    {
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "colorSchemes": [
+    "light",
+    "dark"
+  ],
+  "exceptions": [
+    {
+      "selector": ".sr-only, .sr-only *",
+      "rules": [
+        "content-clipping",
+        "text-contrast",
+        "font-size"
+      ],
+      "reason": "Visually hidden on purpose: the skip link before it is focused, the agent directive and the short labels phones read aloud. Nobody sees them, so they have no box to fit or colour to measure."
+    }
+  ]
+}

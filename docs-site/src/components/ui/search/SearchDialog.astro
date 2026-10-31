@@ -4,8 +4,8 @@ import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 ---
 
 <Dialog data-slot="search-dialog" aria-label="Search documentation" data-search-dialog>
-  <DialogContent class="max-w-xl bg-muted shadow-xl ring-border">
-    <div class="flex flex-col overflow-hidden rounded-t-lg bg-card border-b border-border">
+  <DialogContent class="max-w-xl bg-background ring-border-strong">
+    <div class="flex flex-col overflow-hidden bg-card border-b border-border-strong">
       <div class="flex items-center gap-3 border-b border-border px-4 py-3">
         <Icon name="ph:magnifying-glass" class="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
@@ -23,7 +23,7 @@ import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
           autocorrect="off"
           autocapitalize="none"
         />
-        <DialogClose class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <DialogClose class="rounded-full border border-border-strong bg-card px-3 py-1 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground">
           Esc
         </DialogClose>
       </div>

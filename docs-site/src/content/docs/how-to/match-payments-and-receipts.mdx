@@ -13,58 +13,69 @@ Use this guide to make sure every payment out in a month has a receipt, or a rea
 - A bank statement imported for the month. See [Import a bank CSV](/how-to/import-a-bank-csv/).
 - The receipts for that month in the app. Receipts still in **Receipts To do** are matched too and show **Needs you** next to the match until you approve them. See [Check and approve a receipt](/how-to/review-and-approve-a-receipt/).
 
-![The Bank page for September 2026 on To do, with one payment missing a receipt, its search box, Match and Not a purchase, and Start matching at the top](../../../assets/screenshots/payments.png)
+![The Bank page for September 2026 on To do, with the banner Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing. and Undo, and Sample Missing Vendor marked Missing with No receipt fits., Match and Not a purchase](../../../assets/screenshots/payments.png)
 
 ## Match the missing payments
 
 <Steps>
-  <Step title="Open the missing payments">
+  <Step title="Open To do on Bank">
 
-Select **Bank** in the sidebar (on a phone, the tab bar at the bottom) and pick the month. It opens on **Missing** when any payment out has no receipt; **All** shows every payment. The **Match** row on **Home** links here too, from **Find receipts**.
+Select **Bank** in the sidebar (on a phone, the tab bar at the bottom) and pick the month. It opens on **To do**: money out with no receipt, oldest first, under a count such as **4 to do**. **All** shows every payment in the month. The **Match** row on **Home** links here too when it says, for example, "2 missing". Select **Start matching** at the top to jump to the first open payment, or work down the list.
 
   </Step>
   <Step title="Compare the likely receipt">
 
-When a receipt looks like the payment, it is shown beside it as **Likely**, with the seller, date and amount. A small table puts the **Bank** and **Receipt** values side by side under **Compared**, so you can see what differs.
+When a receipt looks like the payment, it is shown under it as **Likely**, with the seller, date and amount. A small table puts the **Bank** and **Receipt** values for **Name**, **Date** and **Amount** side by side, and the **Compared** column says what differs.
 
   </Step>
   <Step title="Match it, or pick another">
 
-If it is the right receipt, select **Match**. If it does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), the app says why in a line beside **Match**. Read it before you match.
+If it is the right receipt, select **Match**. If the pair does not fit the usual rules (for example a card payment in another currency, or a payment booked long after the receipt date), a line under the table says why. Read it before you match.
 
-If it is the wrong receipt, open **Pick another receipt** and type the seller, date or amount. With no likely receipt, the payment says "No receipt fits." and shows the same search box and **Add receipt**. Choose one and select **Match**. You can also paste a receipt ID there.
+If it is the wrong receipt, open the payment's **More**, and under **Pick another receipt** type the seller, date or amount in the box. Choose one and select **Match**. With no likely receipt, the payment says "No receipt fits." and shows the same box under it. You can also paste a receipt ID there.
 
   </Step>
   <Step title="Match the rest at once">
 
 When several payments have an exact likely receipt, **Will match N payments** above the list shows each pair and why. Select **Match all N likely** (or **Match the likely one**) to match them together.
 
-To match only some of them, tick those payments and select **Match** in the bar. Payments without an exact likely receipt are skipped.
-
-The payment now shows a **Receipt** link instead of the **Missing** stamp.
-
   </Step>
 </Steps>
 
+A matched payment leaves **To do**, and the next one moves up. On **All** it shows **Matched** with a **Receipt** link. The banner offers **Undo**.
+
 You can also match from the receipt side. A receipt page shows **Payment?** when an unmatched payment fits it; select **Match**.
 
-If no receipt exists yet, the payment says "No receipt found yet." with **Add receipt**. Upload it; it is matched as soon as it is read.
+If no receipt exists yet, the payment says "No receipt found yet." Its **More** has **Add a receipt**, which opens **Add**. Upload the receipt there; it is matched as soon as it is read.
+
+## Work on several payments at once
+
+Every payment row on **Bank** has a tick box, on every screen size. Tick the payments, then pick an action in the bar that shows the count:
+
+| Action | What it does |
+| --- | --- |
+| **Match** | Matches each ticked payment to its exact likely receipt. Payments without one are skipped. |
+| **Not a purchase** | Marks each one as needing no receipt. |
+| **Needs a receipt** | Turns **Not a purchase** back. |
+| **Unmatch** | Removes each one's match. |
+
+The banner says how many changed and how many were skipped, and offers **Undo**. Shift-click ticks a range, and **Select all N payments** ticks every payment in the view and month. Own-account transfer rows have no tick box. See [Select several](/reference/app-pages/#select-several) and [Keyboard shortcuts](/reference/keyboard-shortcuts/).
 
 ## Mark payments that need no receipt
 
-Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Many are marked for you on import, with a label such as **Tax**, **Bank fee** or **Cash** next to **Not a purchase**; the import banner's **Undo not a purchase** turns them all back. For the rest, select **Not a purchase** on the payment. It now shows **Not a purchase** and no longer counts as missing. The banner offers **Undo**.
+Some money out has no receipt: tax payments, loan repayments, money you pay yourself. Many are marked for you on import, with a label such as **Tax**, **Bank fee** or **Cash** next to **Not a purchase**. For the rest, select **Not a purchase** under the payment. It leaves **To do**, no longer counts as missing, and the banner offers **Undo**.
 
-To reverse it, open the payment's **More** and select **Needs a receipt**. To mark or reverse several, tick them and select **Not a purchase** or **Needs receipt** in the bar.
+To reverse it, find the payment under **All**, open its **More** and select **Needs a receipt**.
 
 For money moved between two of your own accounts, pair the two sides instead, so both are explained together. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
 
 ## Undo a match
 
-On a matched payment, open **More** and select **Remove match**. The payment counts as missing again.
+Under **All**, open the matched payment's **More** and select **Unmatch**. The payment counts as missing again and goes back to **To do**.
 
 ## Check that it worked
 
-- The line at the top of **Bank** reads, for example, "12 out, 12 matched, 0 missing", and the page says **Every payment has a receipt.** with **Send** and the month, for example **Send September**.
+- The line at the top of **Bank** reads, for example, "12 out, 12 matched, 0 missing", and **To do** says **Every payment has a receipt.** with the month's next step, such as **Start checking** or **Send September**.
 - On **Home**, the **Match** row shows **Done**.
 - If other months still have gaps, **Bank** links them under "Also missing", for example "Also missing: August (2)".
 

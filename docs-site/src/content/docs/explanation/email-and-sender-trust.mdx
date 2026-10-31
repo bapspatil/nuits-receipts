@@ -28,11 +28,11 @@ Mail from a sender who is not on the list is not read and costs no AI reading. W
 For each Unknown sender item you can:
 
 - **Allow**: the exact address is added to your allowed senders, and this email plus any others waiting from them are read the normal way. Their future mail is read as soon as it arrives.
-- **Ignore**: their waiting mail is deleted, and future mail from them is logged but not kept. You can undo this in **Settings** > **Senders**.
+- **Ignore**: their waiting mail is deleted, and future mail from them is logged but not kept. Because it deletes mail, Ignore asks first, with **Ignore and delete**. To read them again later, use **Stop ignoring** in **Settings** > **Email** > **Email senders**.
 
 Limits keep a stranger from filling your storage: at most 50 Unknown sender emails wait at once and 10 from one sender, the same email (by Message-ID) is kept once, and the 20 MiB size limit applies. Mail over a limit is logged, not kept. The Worker's log names only the sender's domain, never the full address.
 
-**Receipts** shows the last 20 emails that reached the app and what happened to each, so you can see why a message did not turn into a receipt. See [App pages](/reference/app-pages/).
+**Settings** > **Email** > **Email senders** ends with **Mail we didn't keep**: the emails that reached the app but were not read, newest first, with the sender, the subject and the reason. It lets you see why a message did not turn into a receipt, and **Allow** a sender from there. Only these details are kept, never the message. See [App pages](/reference/app-pages/).
 
 If you set `FORWARD_COPY_TO`, every message that reaches the Worker is also forwarded there, from any sender, whether or not it is read. That is how one-time codes and other mail sent to the receipt address still reach a person. See [Forward a copy of incoming mail](/how-to/forward-a-copy-of-incoming-mail/).
 
@@ -56,7 +56,7 @@ Cloudflare's own rules apply before the Worker sees anything: Email Routing reje
 
 A message with an unknown verdict might be a genuine receipt from a sender with unusual mail settings. Dropping it would lose the receipt. Reading it would mean spending AI reading on, and putting into your books, a document nobody can vouch for.
 
-So the app keeps it and does nothing else. The whole message is stored and appears in review as "We couldn't verify who sent this email", unread. You can open the source email, decide it is genuine, and have it read. Nothing is sent to Workers AI until you do.
+So the app keeps it and does nothing else. The whole message is stored and waits in **Receipts To do**, unread, asking **Is this email genuine?** You can open the source email, decide it is genuine, and have it read. Nothing is sent to Workers AI until you do.
 
 This costs you a click now and then. In return, a spoofed message cannot trigger AI spend or slip a document into your month without you looking at it first.
 

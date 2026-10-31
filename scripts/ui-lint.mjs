@@ -100,30 +100,32 @@ const browser = await chromium.launch({ executablePath: chromePath() });
 const pages = [];
 let unfinished = 0;
 try {
-  for (const viewport of policy.viewports) {
-    const context = await browser.newContext({
-      viewport: { width: viewport.width, height: viewport.height },
-      httpCredentials: { username: user, password: rest.join(':') },
-      reducedMotion: 'reduce',
-    });
-    for (const path of PATHS) {
-      const page = await context.newPage();
-      const where = `${viewport.width}x${viewport.height}`;
-      try {
-        const response = await page.goto(BASE + path, { waitUntil: 'load' });
-        if (!response || response.status() >= 400) throw new Error(`HTTP ${response?.status()}`);
-        await markStacks(page);
-        const { findings } = await checkPage(page, policy);
-        pages.push({ path, viewport: where, findings });
-      } catch (error) {
-        unfinished++;
-        pages.push({ path, viewport: where, findings: [], error: String(error.message).split('\n')[0] });
-      } finally {
-        await page.close();
+  for (const colorScheme of policy.colorSchemes ?? ['light'])
+    for (const viewport of policy.viewports) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        httpCredentials: { username: user, password: rest.join(':') },
+        reducedMotion: 'reduce',
+        colorScheme,
+      });
+      for (const path of PATHS) {
+        const page = await context.newPage();
+        const where = `${viewport.width}x${viewport.height} ${colorScheme}`;
+        try {
+          const response = await page.goto(BASE + path, { waitUntil: 'load' });
+          if (!response || response.status() >= 400) throw new Error(`HTTP ${response?.status()}`);
+          await markStacks(page);
+          const { findings } = await checkPage(page, policy);
+          pages.push({ path, viewport: where, findings });
+        } catch (error) {
+          unfinished++;
+          pages.push({ path, viewport: where, findings: [], error: String(error.message).split('\n')[0] });
+        } finally {
+          await page.close();
+        }
       }
+      await context.close();
     }
-    await context.close();
-  }
 } finally {
   await browser.close();
 }

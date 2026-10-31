@@ -118,7 +118,7 @@ Seed row: `default-account`, label `Bank account`, currency `EUR`, default.
 
 ## `match_rejections`
 
-Pairs you took apart with **Remove match**. The matcher never links them again on its own; matching the pair by hand deletes the row.
+Pairs you took apart with **Unmatch**. The matcher never links them again on its own; matching the pair by hand deletes the row.
 
 | Column | Type | Rules | Meaning |
 | --- | --- | --- | --- |
@@ -224,7 +224,7 @@ Only keys listed in `FIELDS` in `src/settings.ts` are read.
 
 ## `inbound_mail`
 
-One row per email the Worker received, and every Unknown sender email that is waiting. Rows other than waiting ones are trimmed to the newest 500.
+One row per email the Worker received, and every email from a new sender that is waiting. Rows other than waiting ones are trimmed to the newest 500.
 
 | Column | Type | Rules | Meaning |
 | --- | --- | --- | --- |
@@ -275,4 +275,4 @@ All objects are in the `ORIGINALS` bucket.
 | `emails/<sha256>.eml` | `message/rfc822` | An email from an allowed sender passes the sender check or is held as unverified, or an email from a proven sender who is not approved is kept as Unknown sender. |
 | `imports/<sha256>.csv` | `text/csv` | A bank CSV is imported. |
 
-Objects are written once per content hash. The app deletes only the stored email of an Unknown sender item you ignore or delete, and only when no receipt uses it.
+Objects are written once per content hash. The app deletes only the stored email of a new sender's mail you ignore, and only when no receipt uses it.

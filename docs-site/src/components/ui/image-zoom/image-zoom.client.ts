@@ -29,6 +29,7 @@ mount("[data-nb-image-zoom]", (root) => {
     return width * fit >= shown * MIN_GAIN;
   };
 
+  let tips = 0;
   const wrap = (img: HTMLImageElement, display: string) => {
     const target = img.parentElement instanceof HTMLPictureElement ? img.parentElement : img;
     const button = document.createElement("button");
@@ -37,8 +38,15 @@ mount("[data-nb-image-zoom]", (root) => {
     button.setAttribute("aria-haspopup", "dialog");
     button.setAttribute("aria-label", img.alt ? `Enlarge image: ${img.alt}` : "Enlarge image");
     button.style.display = display === "inline" ? "inline-block" : "block";
+    // An icon-free button still gets a text tooltip, like the header's.
+    const tip = document.createElement("span");
+    tip.className = "nb-tip";
+    tip.setAttribute("role", "tooltip");
+    tip.id = `nb-zoom-tip-${++tips}`;
+    tip.textContent = "Enlarge";
+    button.setAttribute("aria-describedby", tip.id);
     target.replaceWith(button);
-    button.append(target);
+    button.append(target, tip);
   };
 
   const images = [...content.querySelectorAll<HTMLImageElement>("img")];

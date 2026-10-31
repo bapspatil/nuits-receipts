@@ -43,10 +43,10 @@ Workers observability is on in `wrangler.jsonc` with `head_sampling_rate` 1 (eve
 | `email_too_large` | An incoming email was over 20 MiB and was dropped. |
 | `sender_auth_failed` | A sender failed SPF or DMARC, and the mail was dropped. Logged with the sender's domain when the sender is not approved. |
 | `sender_unverified` | Mail from a sender who is not approved could not be proven, and was dropped. Logged with the domain only. |
-| `sender_not_allowed` | Mail from a sender who is not approved was kept as Unknown sender. Logged with the domain only. |
+| `sender_not_allowed` | Mail from a sender who is not approved was kept and shown as **New sender** in **Receipts** To do. Logged with the domain only. |
 | `sender_ignored` | Mail from an ignored sender was not kept. Logged with the domain only. |
-| `duplicate` | An Unknown sender email with the same Message-ID was already kept or read. |
-| `held_limit` | Too many Unknown sender emails were waiting, so this one was not kept. |
+| `duplicate` | A waiting email from a new sender with the same Message-ID was already kept or read. |
+| `held_limit` | Too many emails from new senders were waiting, so this one was not kept. |
 | `mail_log_failed` | The mail log row could not be written. Mail handling was not affected. |
 | `forward_copy_failed` | Forwarding to `FORWARD_COPY_TO` failed. Reading was not affected. |
 | `forward_copy_loop` | `FORWARD_COPY_TO` equals a receiving address, so no copy was sent. |

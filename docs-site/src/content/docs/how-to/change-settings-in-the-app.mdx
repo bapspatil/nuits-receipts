@@ -15,15 +15,17 @@ Use this guide to change most of the app's settings from **Settings**, without e
 
 ## What you can change here
 
+![Settings with the Business section open, showing App name, Your business names, Parts of the business, Default part, Payment terms, days and New account currency, each with its source under the field](../../../assets/screenshots/settings.png)
+
 | Section | Fields |
 | --- | --- |
 | **Business** | App name, Your business names, Parts of the business, Default part, Payment terms (days), New account currency, and **Vendor rules** |
 | **Email** | Receipt address, Invoice address, Forward a copy to, and **Email senders**: allowed senders (**Add** or **Remove**, no tick needed), ignored senders (**Stop ignoring**) and **Mail we didn't keep** |
 | **Bank** | Bank accounts |
 | **Sending** | Accountant, Export file name, Note under the month download, and OneDrive when it is set up |
-| **Advanced** | **Review & matching** (the review and matching thresholds), **Integrations** (source code link), **Set at deploy**, **Change history** and **About** |
+| **Advanced** | **Review & matching** (the review and matching thresholds), **Integrations** (source code link), **Set when deployed**, **Change history**, **Search** and **About** |
 
-Sign-in (Access settings, the password user name and the password), the base path, the reader mode, the OneDrive app and its secrets stay deploy-time. They are listed read-only under **Advanced > Set at deploy**, with secrets shown only as "Set" or "Not set". For every variable and where it can be changed, see [Configuration](/reference/configuration/).
+Sign-in (Access settings, the password user name and the password), the base path, the reader mode, the OneDrive app and its secrets stay deploy-time. They are listed read-only under **Advanced > Set when deployed**, with secrets shown only as "Set" or "Not set". For every variable and where it can be changed, see [Configuration](/reference/configuration/).
 
 ## Change a setting
 
@@ -35,7 +37,7 @@ Open **Settings** and open the section. There are five sections, **Business**, *
   </Step>
   <Step title="Edit the field">
 
-Each field is a label and an input. Hover over the input (or long-press it on a phone) to see its help.
+Each field is a label and an input. Hover over the input (or long-press it on a phone) to see its help. The line under it says where the value comes from: **Set in the app**, **Set when deployed** or **Built-in default**.
 
 For **Parts of the business**, rename a part in place, tick **Remove** to drop one, or type a new one in "Add a part". A part used by any receipt or vendor rule can be renamed but not removed.
 
@@ -59,18 +61,19 @@ After changing the receipt or invoice address, the app shows "Saved. Now update 
 
 ## Check it worked
 
-- The section shows "Saved." and **Reset** now shows next to the field.
+- The banner at the top says what was saved, such as "Saved your email settings." ("Saved your settings." when the save touched more than one section), and **Reset** now shows next to the field. A save that removed a part offers **Undo**, which puts the whole save back.
 - **Advanced > Change history** lists the change with the old and new value. Saves are recorded under your Access email, or `password` with password sign-in.
 
 ## Go back to the deploy value
 
-Press **Reset** next to the field. This deletes the app value, so the Worker variable (or the default) applies again. The section says the setting "is back to the deploy value" or "is back to the default". Resets are also kept in the change history.
+Press **Reset** next to the field. This deletes the app value, so the Worker variable (or the default) applies again. The banner says, for example, "Payment terms, days is back to the value set when deployed." or "... is back to the built-in default." Resets are also kept in the change history.
 
 Saving a value equal to the deploy value has the same effect: no app value is kept.
 
 ## Things to know
 
 - **A later deploy does not override an app value.** If you change a Worker variable and deploy while an app value exists, the app value still wins. Press **Reset** to use the deploy value.
+- **Row buttons do not save the form.** **Remove** on a sender, **Rename** on a bank account and the vendor rule buttons act at once and reload the page. Save typed changes first, or they are lost.
 - **Two tabs.** If someone saved in another tab since you opened the page, your save is refused with "Settings were changed in another tab or by someone else. Reload and try again."
 - **A saved value that stops being valid** (for example after a deploy changes another setting it depends on) is ignored with a warning on the field, and the deploy value or default is used. Press **Clear it** to remove it.
 - **Changing the invoice address.** Mail to the old address still counts as an invoice for 30 days.

@@ -40,7 +40,7 @@ A Worker variable has a value the app does not accept. The message names it. Fix
 
 Access mode is on, so the password no longer works. Sign in through your Access application, with an email listed in `ACCESS_ALLOWED_EMAILS`. See [Protect the app with Cloudflare Access](/how-to/protect-the-app-with-cloudflare-access/).
 
-### "Origin does not match" when you press a button
+### "That request came from another site, so we ignored it." when you press a button
 
 Form posts must come from the same address the app is served on. Open the app at its normal address, not through another hostname or a copied link to a different host. If you serve it under a path, see [Serve the app under a path](/how-to/serve-the-app-under-a-path/).
 
@@ -50,11 +50,11 @@ Form posts must come from the same address the app is served on. Open the app at
 
 Reading a PDF uses far more than the Workers Free plan's 10 ms of CPU time per request. Plan on Workers Paid ($5 a month) if you upload PDFs. Photos and forwarded email bodies may fit in Free.
 
-### "File signature and media type differ"
+### "That file isn't the kind it says it is."
 
 The file's contents do not match its type, for example a renamed file. Export or save it again as a real PDF, PNG, JPEG or WebP.
 
-### "Document too large" or a file that could not be added
+### "That file is too big." or a file that could not be added
 
 PDFs can be up to 10 MiB and 25 pages, photos up to 4 MiB, and an email up to 20 MiB. Shrink or split the file, or take a photo of the page that matters.
 
@@ -62,13 +62,13 @@ PDFs can be up to 10 MiB and 25 pages, photos up to 4 MiB, and an email up to 20
 
 Select **Refresh**. If it is still reading after two minutes, select **More** > **Read again**.
 
-### "Reading failed." on several receipts at once
+### **Try reading it again.** on several receipts at once
 
 Workers AI may be unavailable, or the Workers Free daily AI allowance may be used up, in which case calls fail until 00:00 UTC. Wait, then select **Read again** on each receipt.
 
-### "This PDF has no readable text."
+### **Type the numbers in, or upload a photo.** on a PDF
 
-The PDF is probably a scan; the app reads text PDFs only. Type the numbers in, or upload a photo of it with **More** > **Upload a copy** and mark the PDF as its duplicate. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+The card says "This PDF has no readable text. Probably a scan." The app reads text PDFs only. Type the numbers in, or upload a photo of it with **More** > **Upload a copy** (or with **Add**) and mark the PDF as its duplicate. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
 
 ### A forwarded email never appears
 
@@ -77,35 +77,35 @@ The PDF is probably a scan; the app reads text PDFs only. Type the numbers in, o
 - Look on **Receipts** for the flag **Is this email genuine?**: mail the app could not prove came from you waits there unread.
 - Check the Email Routing rule for the receipt address is **Send to a Worker** and points at this Worker. See [Set up email](/how-to/set-up-email/).
 
-### After **Read it**, the email says "We can't read this file type."
+### After **Read it**, the email shows **Upload a PDF or a photo.**
 
-The email is kept as a whole message, which the reader cannot read directly. Download it with **More** > **Download original**, save the receipt from it, and add it with **More** > **Upload a copy**. Then, on the email, set **Seller** to match the new receipt, pick the new receipt under **All fields** > **Duplicate of**, and select **Skip ›** to save it. This is how the app works today: an email it could not verify is kept whole and never read, and when you ask for it to be read it is treated as a single file the reader does not support, so it fails with `unsupported_document`. Its attachments are not read separately.
+The email is kept as a whole message, which the reader cannot read directly. Download it with **More** > **Download original**, save the receipt from it, and add it with **More** > **Upload a copy**. Then, on the email, set **Seller** to match the new receipt, pick the new receipt under **Other fields** > **Duplicate of**, and select **Skip** to save it. This is how the app works today: an email it could not verify is kept whole and never read, and when you ask for it to be read it is treated as a single file the reader does not support, so it fails with `unsupported_document`. Its attachments are not read separately.
 
-### "Stale receipt. Reload before saving."
+### "This receipt changed since you opened it. Reload and try again."
 
 The receipt changed since you opened it, for example because it was read again in another tab. Reload the page, check the values, and save again.
 
-### "Complete required facts before approval"
+### "Fill in the seller, date, currency, total, amount before VAT and VAT, then approve."
 
 Approval needs the seller, date, currency, total, before-VAT and VAT amounts. Fill in the empty ones; enter `0` for VAT if there is none. See [Check and approve a receipt](/how-to/review-and-approve-a-receipt/).
 
 ## Importing a bank CSV
 
-### "This file already belongs to another account"
+### "You already imported this file into a different account."
 
 The same file was imported into a different account. A file belongs to one account only. Pick that account, or check you exported the right statement.
 
-### "Preview expired or missing. Preview again."
+### "The check ran out of time. Check the file again."
 
-A preview is valid for 30 minutes. Start again from **Import statement** on **Bank**.
+A check in the column editor is valid for 30 minutes. Start again from **Import statement** on **Bank**.
 
-### "Mapping fields changed. Update preview before confirming."
+### "You changed the column settings. Choose Check again before you import."
 
 You changed the mapping after the last check. Select **Check again**, then import.
 
-### "Stable bank ID has conflicting facts"
+### "The bank gave two different payments the same ID. Check the file for repeated IDs."
 
-A payment with the same bank transaction ID is already in this account, but with a different date, amount or payee. Check that you chose the right account and the right file. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
+A payment with the same bank transaction ID is already in this account with a different date, amount or payee. Check that you chose the right account and the right file. See [Resolve duplicate warnings](/how-to/resolve-duplicate-warnings/).
 
 ### The amounts are the wrong sign, or dates are off by months
 
@@ -117,37 +117,37 @@ A large file can exceed the Workers Free limits. Split the statement into smalle
 
 ## Matching
 
-### "Approve receipt before matching"
+### "Approve this receipt first. Only approved receipts can be matched."
 
-A sales invoice is matched to money in only once it is approved, or when its only flag is the missing euro amount. Approve it first. Receipts for money out can be matched while still in Review. See [Check and approve a receipt](/how-to/review-and-approve-a-receipt/).
+A sales invoice is matched to money in only once it is approved, or when its only flag is the missing euro amount. Approve it first. Receipts for money out can be matched while still in **Receipts** To do. See [Check and approve a receipt](/how-to/review-and-approve-a-receipt/).
 
-### "Confirm match exceptions"
+### "This receipt and payment don't line up exactly. Press Match if they belong together."
 
-The receipt and payment do not fit the usual date and amount rules. The app says why beside **Match**. If the match is right, select **Match**.
+The receipt and payment do not fit the usual date and amount rules. The app says why in a line under the comparison table. If the match is right, select **Match**.
 
-### "Receipt is already matched"
+### "That receipt is already matched to another payment."
 
-A receipt can be matched to one payment only. On the other payment, open **More** and select **Remove match** first.
+A receipt can be matched to one payment only. On **Bank** under **All**, open the other payment's **More** and select **Unmatch** first.
 
 ### A match I made disappeared
 
 Saving a change to a receipt removes its bank match, and automatic matching runs again. Make the match again on **Bank**.
 
-### "Payment changed or belongs to an own-account transfer. Undo the pair first."
+### "This payment changed, or it is part of a transfer between your accounts. Undo the transfer first."
 
 The payment is one side of a transfer pair. Open its **More** and select **Undo transfer** first. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
 
-### "Transfer changed or unavailable; review both payments"
+### "One of these payments changed. Look at both payments again before you link them."
 
 The two sides must be in different accounts, have the same amount and currency, and neither can be matched, marked **Not a purchase**, or already paired.
 
 ## Sending the month
 
-### "This month is too big for one package"
+### "This month is too big for one package (N files, 900 max)."
 
 One package holds up to 900 files. Download the **CSV** and fetch the originals from the app.
 
-### "This month changed since you opened the page."
+### "This month changed since you opened the page. Reload it, check what you send, then mark it as sent."
 
 Something was added or corrected while the page was open. Reload it, check what you send, then select **Mark September as sent** (with your month) again.
 

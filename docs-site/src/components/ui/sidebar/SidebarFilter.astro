@@ -1,5 +1,5 @@
 ---
-/** SidebarFilter — text input that filters the adjacent Sidebar. Press "/" to focus. */
+/** SidebarFilter, text input that filters the adjacent Sidebar. Press "/" to focus. */
 import { cn } from "@/lib/cn";
 import type { HTMLAttributes } from "astro/types";
 
@@ -15,14 +15,14 @@ const { class: className, placeholder = "Filter…", ...attrs } = Astro.props;
     data-nb-sidebar-filter-input
     type="search"
     placeholder={placeholder}
-    class="peer w-full rounded-md border border-border bg-card py-1.5 ps-3 pe-9 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-ring [&:not(:placeholder-shown)]:pe-2"
+    class="peer min-h-10 w-full rounded-full border border-border-strong bg-card py-2 ps-4 pe-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring [&:not(:placeholder-shown)]:pe-4"
     aria-label="Filter navigation"
     autocomplete="off"
   />
-  {/* Shortcut hint — press "/" to focus. Hidden once the input is focused or has a value. */}
+  {/* Shortcut hint, press "/" to focus. Hidden once the input is focused or has a value. */}
   <kbd
     aria-hidden="true"
-    class="pointer-events-none absolute end-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded border border-border bg-muted px-1 font-mono text-[0.6875rem] font-medium leading-none text-muted-foreground transition-opacity duration-150 peer-focus:opacity-0 peer-[:not(:placeholder-shown)]:opacity-0 motion-reduce:transition-none"
+    class="pointer-events-none absolute end-3 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-[2px] border border-border bg-background px-1 font-mono text-xs font-medium leading-none text-muted-foreground transition-opacity duration-150 peer-focus:opacity-0 peer-[:not(:placeholder-shown)]:opacity-0 motion-reduce:transition-none"
     >/</kbd
   >
 </div>
