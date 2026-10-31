@@ -9,7 +9,7 @@ export const ARCHIVE_CSS = `
 .monthband>.steps a,.monthband>.steps li>div{min-height:0;row-gap:0;padding:var(--space-3)}
 .monthband>.steps b{font-size:var(--text-base)}
 .monthband>.steps a::after{top:var(--space-3);right:var(--space-3)}
-@media (max-width:720px){.monthband>.steps a,.monthband>.steps li>div{grid-template-columns:minmax(0,1fr);padding:var(--space-2) var(--space-3)}.monthband>.steps a::before,.monthband>.steps li>div::before,.monthband>.steps a::after{display:none}.monthband>.steps li>a>.vh,.monthband>.steps li>div>.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
+@media (max-width:720px){.monthband>.steps a,.monthband>.steps li>div{column-gap:var(--space-2);padding:var(--space-2) var(--space-3)}.monthband>.steps a::after{display:none}.monthband>.steps li>a>.vh,.monthband>.steps li>div>.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.monthband>.steps .now b::before{content:"NEXT";display:block;font:500 var(--text-xs)/1.4 var(--font-mono);letter-spacing:.08em;color:var(--accent)}.monthband>.steps .now>a::before,.monthband>.steps .now>div::before{margin-top:1.2em}.monthband>.steps .done>a::before,.monthband>.steps .done>div::before{color:var(--accent)}}
 .monthfold{margin:0 0 var(--space-4);background:none;border:0}
 .monthfold>summary{display:inline-flex;gap:var(--space-2);align-items:center;min-height:44px;padding:0 var(--space-4);border:1px solid var(--guilloche-line);border-radius:var(--radius-pill);background:var(--surface-tab);font-weight:600;cursor:pointer}
 .monthfold>summary span{font:500 var(--text-sm)/1 var(--font-num);color:var(--text-muted)}
@@ -25,6 +25,8 @@ export const ARCHIVE_CSS = `
 .alist{min-width:0}
 .tofolders{margin:0 0 var(--space-3)}
 .tofolders a{display:inline-flex;align-items:center;gap:var(--space-2);min-height:44px;font-weight:600}
+.folder-title{order:-1;flex:1 1 12rem}.folder-title h1{margin:0}
+.folder-eyebrow{margin:0;font:500 var(--text-xs)/1.4 var(--font-mono);letter-spacing:.08em;color:var(--text-muted)}
 .lhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3);margin:0 0 var(--space-3)}
 .lhead h2{margin:0;font-family:var(--font-display);font-stretch:82%;letter-spacing:-.015em}
 .alist .rt a{display:inline-flex;align-items:center;gap:var(--space-2)}

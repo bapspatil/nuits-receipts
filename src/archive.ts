@@ -15,7 +15,7 @@ import { invoiceName } from './invoices';
 import { FOLDER_PARAM, listParams, listUrl, RECEIPTS_TODO, receiptUrl, type ListState } from './worklist';
 import { DOC_KINDS, normaliseTag, parseQuery, searchSql, type DocKind, type Search } from './search';
 import { viewer } from './viewer';
-import { amount, chipRow, day, emptyState, escape, monthName, shortDay } from './ui';
+import { amount, chipRow, day, emptyState, escape, monthName, shiftMonth, shortDay } from './ui';
 import { row, rowList } from './row';
 
 export const PAGE_SIZE = 50;
@@ -598,13 +598,15 @@ export async function overviewData(env: Env, f: Folder): Promise<Overview | null
   };
 }
 // The header's bar strip: one labelled bar per month, so nothing rests on the bar's length alone.
-// The strip is drawn at its own size (36px a month), so one or two months keep the bar width of
-// twelve instead of stretching across the card. Only a narrow screen scales it down.
+// The strip always has twelve slots, ending at the latest month for a seller or client.
+// Only a narrow screen scales it down.
 export function overview(o: Overview, f: Folder): string {
   const year = f.type === 'year' ? f.year : null;
   const span = year
     ? Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
-    : o.months.map((m) => m.m).slice(-12);
+    : Array.from({ length: 12 }, (_, i) =>
+        shiftMonth(o.months.at(-1)?.m ?? new Date().toISOString().slice(0, 7), i - 11),
+      );
   const by = new Map(o.months.map((m) => [m.m, m]));
   const top = Math.max(1, ...span.map((m) => by.get(m)?.eur ?? 0));
   const w = 28,

@@ -10,11 +10,15 @@ test('keys.js is served, every page includes it once, and the shortcut sheet is 
     expect(html.split(SCRIPT_TAG).length - 1, path).toBe(1);
     expect(html.split('<dialog id="keys-sheet"').length - 1, path).toBe(1);
     expect(html, path).toMatch(/<dialog id="keys-sheet"(?![^>]*\sopen)[^>]*>/);
-    expect(html, path).toMatch(/<form method="dialog"><button[^>]*>.*?Close.*?<\/button><\/form><\/dialog>/s);
+    expect(html, path).toMatch(
+      /<header><h2 id="keys-sheet-title" tabindex="-1">Keyboard shortcuts<\/h2><form method="dialog"><button[^>]*>.*?Close.*?<\/button><\/form><\/header>/s,
+    );
   }
   const script = await request('/assets/keys.js');
   expect(script.headers.get('Content-Type')).toContain('text/javascript');
   const js = await script.text();
+  expect(js).toContain("sheet.querySelector('h2').focus()");
+  expect(js).toContain('sheet.scrollTop = 0');
   expect(js).toContain('(hover: none) and (pointer: coarse)');
   expect(js).toContain("addEventListener('pageshow'");
   expect(js).toContain("addEventListener('submit'");

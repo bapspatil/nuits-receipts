@@ -9,6 +9,7 @@ import {
   filterCount,
   folderName,
   folderParam,
+  homeUrl,
   openedData,
   overview,
   overviewData,
@@ -1116,7 +1117,7 @@ export async function home(
   // Rows from before the archive get their words a few at a time, after the page is sent.
   if (unindexed && ctx) ctx.waitUntil(indexOlder(env, 10).catch(() => 0));
   const checklist = setupChecklist(steps);
-  if (!ever?.r && !ever?.i && !ever?.d)
+  if (!ever?.r && !ever?.i && !ever?.d && aq.folder.type === 'all')
     return page('home', `${checklist ?? ''}${addForm(env, 'expense')}`, 200, env, { head: pageHead('Welcome') });
   const selected = requested ?? arrival!.month;
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
@@ -1183,7 +1184,18 @@ export async function home(
           { attrs: ' download' },
         )
       : '';
-  const listHead = `<div class="lhead"><h2>${escape(name)}</h2><div class="btns">${download}</div></div>${glance ? overview(glance, aq.folder) : ''}`;
+  const folderType = aq.folder.type;
+  const folderHeading =
+    folderType === 'vendor' || folderType === 'client' || folderType === 'year' || folderType === 'starred';
+  const folderTitle = folderName(aq.folder);
+  const eyebrow = folderType === 'vendor' ? 'SELLER' : folderType.toUpperCase();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const folderNav =
+    aq.folder.type === 'year'
+      ? `<a href="${escape(homeUrl({ in: `year:${aq.folder.year - 1}` }))}">${icon('chevron-left')}${aq.folder.year - 1}</a><a href="${escape(homeUrl({ in: `year:${aq.folder.year + 1}` }))}">${aq.folder.year + 1}${icon('chevron-right')}</a>`
+      : `<a href="/?month=${currentMonth}">${icon('chevron-left')}${escape(monthName(currentMonth))}</a>`;
+  const folderHead = `<div class="head"><div class="months" role="group" aria-label="Folder"><div class="folder-title"><p class="folder-eyebrow">${eyebrow}</p><h1>${escape(folderTitle)}</h1></div>${folderNav}</div></div>`;
+  const listHead = `<div class="lhead">${folderHeading && name === folderTitle ? '' : `<h2>${escape(name)}</h2>`}<div class="btns">${download}</div></div>${glance ? overview(glance, aq.folder) : ''}`;
   const list = archiveList(aq, rows, {
     total,
     tally,
@@ -1207,7 +1219,8 @@ export async function home(
     env,
     {
       detail: folder ? name : monthName(selected),
-      head: monthHead('/', selected),
+      title: folderHeading ? folderTitle : undefined,
+      head: folderHeading ? folderHead : monthHead('/', selected),
       style: `${ARCHIVE_CSS}${opened ? VIEWER_CSS : ''}`,
     },
   );
