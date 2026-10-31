@@ -299,7 +299,7 @@ export function planMatches(
   const used = new Set<string>(),
     tied = new Set<string>(),
     pairs: Pair[] = [];
-  for (let i = 0; i < edges.length; ) {
+  for (let i = 0; i < edges.length;) {
     let j = i;
     while (j < edges.length && edges[j]!.level === edges[i]!.level) j++;
     const open = edges.slice(i, j).filter((e) => !used.has(e.r.id) && !used.has(e.t.id));

@@ -32,10 +32,7 @@ export type BulkList = {
 
 export type Selection = { order: string[]; picked: string[]; anchor: string | null; all: boolean };
 export type SelectEvent =
-  | { type: 'toggle'; id: string; range: boolean }
-  | { type: 'page'; on: boolean }
-  | { type: 'all' }
-  | { type: 'clear' };
+  { type: 'toggle'; id: string; range: boolean } | { type: 'page'; on: boolean } | { type: 'all' } | { type: 'clear' };
 
 // Shipped to the browser as source, so it may not reference anything outside
 // its own body (no helpers, no named inner functions).

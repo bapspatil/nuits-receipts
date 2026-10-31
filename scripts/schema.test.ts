@@ -21,10 +21,9 @@ function healthy(db: Database) {
 
 function shape(db: Database) {
   const objects = db
-    .query<
-      { type: string; name: string; tbl_name: string; sql: string | null },
-      []
-    >("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name")
+    .query<{ type: string; name: string; tbl_name: string; sql: string | null }, []>(
+      "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name",
+    )
     .all();
   return objects.map((object) => ({
     ...object,
