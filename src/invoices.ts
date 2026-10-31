@@ -365,7 +365,7 @@ export const ADD_JS = `(() => {
   });
   input.addEventListener('change', list);
   // Files shared from another app were stashed by the service worker. They are only put in the
-  // form here: nothing is sent until the owner chooses what they are and presses Add.
+  // form here: nothing is sent until the owner chooses what they are and presses Upload.
   if (location.search.includes('shared=1') && window.caches && window.DataTransfer) {
     caches.open('nuits-share').then(async (cache) => {
       const keys = await cache.keys();
@@ -381,7 +381,7 @@ export const ADD_JS = `(() => {
       files.forEach((f) => data.items.add(f));
       input.files = data.files;
       list();
-      status.textContent = files.length + ' shared ' + (files.length === 1 ? 'file' : 'files') + ' ready. Choose what they are, then press Add.';
+      status.textContent = files.length + ' shared ' + (files.length === 1 ? 'file' : 'files') + ' ready. Choose what they are, then press Upload.';
     }).catch(() => {});
   }
   form.addEventListener('submit', async (ev) => {

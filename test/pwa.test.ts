@@ -170,5 +170,6 @@ test('Add renders as usual when files were shared, and never submits by itself',
   expect(html).toContain('<input required name="file" type="file" multiple');
   const script = await (await request('/assets/add.js')).text();
   expect(script).toContain("caches.open('nuits-share')");
-  expect(script).toContain('ready. Choose what they are, then press Add.');
+  expect(script).toContain('ready. Choose what they are, then press Upload.');
+  expect(script).not.toContain('press Add');
 });
