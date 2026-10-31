@@ -33,11 +33,14 @@ export function iconResponse(path: IconPath): Response {
   return new Response(bytes, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
 }
 
-// A Home Screen label is about 12 characters wide.
+// The Home Screen label. A name up to 16 characters is kept whole, so the default
+// "Nuits Receipts" shows in full; the system fits it to the icon width. A longer name
+// is cut to its first word, or to 16 characters when that word is longer.
+export const SHORT_NAME_MAX = 16;
 export function shortName(appName: string): string {
-  if (appName.length <= 12) return appName;
+  if (appName.length <= SHORT_NAME_MAX) return appName;
   const first = appName.split(/\s+/)[0]!;
-  return (first.length <= 12 ? first : appName.slice(0, 12)).trim();
+  return (first.length <= SHORT_NAME_MAX ? first : appName.slice(0, SHORT_NAME_MAX)).trim();
 }
 
 // The page surface, paper under a 5% grain. The bars float as glass over it, so the browser chrome
