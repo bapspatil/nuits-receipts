@@ -5,7 +5,8 @@ import { request } from './helpers';
 test('every page names a real nav section and carries its label as the title', () => {
   for (const [key, page] of Object.entries(PAGES)) {
     if (!('nav' in page)) continue;
-    const tab = NAV.find((t) => t.key === page.nav);
+    // Add is not a place in the list but a button in both bars, named Add.
+    const tab = page.nav === 'add' ? { label: 'Add' } : NAV.find((t) => t.key === page.nav);
     expect(tab, key).toBeTruthy();
     expect(page.title, key).toBe(tab!.label);
   }
@@ -16,7 +17,7 @@ test.each([
   ['/receipts?view=todo', 'Receipts', 'Receipts'],
   ['/receipts', 'Receipts', 'Receipts'],
   ['/receipts?view=all&kind=sales&month=2026-09', 'Receipts', 'Receipts · Invoices · September 2026'],
-  ['/add', 'Receipts', 'Receipts · Add'],
+  ['/add', 'Add', 'Add'],
   ['/payments?month=2026-09', 'Bank', 'Bank · September 2026'],
   ['/import', 'Bank', 'Bank · Import a bank statement'],
   ['/settings', 'Settings', 'Settings'],

@@ -155,3 +155,23 @@ test('a row opened from an older page keeps that page and lands back on its row'
   expect(opened).toContain(`href="/?before=${encodeURIComponent(cursor)}#row-${id}">‹ Back to the list</a>`);
   expect(opened).not.toContain('@view-transition');
 });
+
+test('the one Add form keeps another document too, and every page has the same Add', async () => {
+  const pdf = () =>
+    new File([Uint8Array.from(atob(env.SAMPLE_PDF), (c) => c.charCodeAt(0))], 'lease.pdf', { type: 'application/pdf' });
+  const receipts = await env.DB.prepare('SELECT count(*) n FROM receipts').first('n');
+  const one = await post('/upload', { kind: 'other', file: pdf() });
+  expect(locationOf(one)).toMatch(/^\/files\/d%3A[0-9a-f]{64}\?done=documentAdded/);
+  const body = new FormData();
+  body.set('kind', 'other');
+  body.set('file', pdf());
+  const json = await request('/upload', { method: 'POST', body, headers: { Accept: 'application/json' } });
+  const [file] = (await json.json<{ files: { href: string }[] }>()).files;
+  expect(file!.href).toMatch(/^\/files\/d%3A[0-9a-f]{64}$/);
+  expect(await env.DB.prepare('SELECT count(*) n FROM receipts').first('n')).toBe(receipts);
+  expect(await page('/?in=kind:other')).toContain('lease');
+  for (const path of ['/', '/receipts', '/payments', '/settings'])
+    expect(await page(path)).toContain('<a class="navadd" href="/add"');
+  expect(await page('/receipts?view=all&kind=sales')).toContain('href="/add?kind=sales" class="tabadd"');
+  expect(await page('/add?kind=other')).toContain('value="other" checked');
+});

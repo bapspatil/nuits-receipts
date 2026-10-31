@@ -32,16 +32,10 @@ export const MAX_FOLDER_FILES = 900;
 // ---------- Other documents ----------
 
 // A document that is not a receipt: stored and dated, its words indexed, never matched or counted.
-export async function addDocument(env: Env, form: FormData): Promise<string> {
-  const file = form.get('file');
-  requireInput(file instanceof File && file.size > 0, 'Choose a file', 400, 'file');
+// Without a title it is named after its file; the title and date can be changed on its page.
+export async function storeDocument(env: Env, file: File, title = '', date = ''): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const media = detect(bytes);
-  const title =
-    String(form.get('title') ?? '')
-      .trim()
-      .slice(0, 200) || file.name.replace(/\.[a-z0-9]{2,5}$/i, '');
-  const date = String(form.get('doc_date') ?? '').trim();
   requireInput(!date || /^\d{4}-\d{2}-\d{2}$/.test(date), 'Choose a date like 2026-10-31', 400, 'doc_date');
   let words = '';
   try {
@@ -53,11 +47,22 @@ export async function addDocument(env: Env, form: FormData): Promise<string> {
     bytes,
     media,
     filename: file.name,
-    title,
+    title: title.trim().slice(0, 200) || file.name.replace(/\.[a-z0-9]{2,5}$/i, ''),
     date: date || null,
     words: searchText(words),
   });
-  return withDone('documentAdded', `/files/${encodeURIComponent(`d:${id}`)}`);
+  return `/files/${encodeURIComponent(`d:${id}`)}`;
+}
+export async function addDocument(env: Env, form: FormData): Promise<string> {
+  const file = form.get('file');
+  requireInput(file instanceof File && file.size > 0, 'Choose a file', 400, 'file');
+  const href = await storeDocument(
+    env,
+    file,
+    String(form.get('title') ?? ''),
+    String(form.get('doc_date') ?? '').trim(),
+  );
+  return withDone('documentAdded', href);
 }
 export async function saveDocument(env: Env, id: string, form: FormData): Promise<string> {
   const title = String(form.get('title') ?? '')
@@ -323,9 +328,4 @@ export async function fileOriginal(env: Env, request: Request, key: string, view
     'Content-Type': pdf ? 'application/pdf' : 'text/csv; charset=utf-8',
     'Content-Disposition': `${view === 'raw' ? 'inline' : 'attachment'}; filename="statement-${item.id.slice(0, 8)}.${pdf ? 'pdf' : 'csv'}"`,
   });
-}
-
-// The Add page's third choice.
-export function documentForm(): string {
-  return `<form action="/documents" method="post" enctype="multipart/form-data"><h2>Any other document</h2><p class="small">A contract, a tax return, a letter. It is kept and searchable on Home, and never matched to a payment or put in a month package.</p><div class="fields"><label class="wide">File (PDF or photo)<input type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp" required></label><label>Title<input name="title" maxlength="200" placeholder="From the file name"></label><label>Date<input name="doc_date" type="date"></label></div>${button('addDocument')}</form>`;
 }

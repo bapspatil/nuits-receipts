@@ -45,7 +45,7 @@ One Worker, server-rendered HTML, no cron jobs or queues:
 - **Read it in the app.** A PDF viewer of our own, built on a self-hosted PDF.js: zoom, fit, rotate, thumbnails, find in the PDF and print. No third-party viewer is involved. On a computer, an opened document shows in a preview pane beside the list.
 - **Stars, tags and notes** on every document, saved searches in the drawer, and **Download folder** for a ZIP of any folder or search (up to 900 files, with an index CSV).
 - **Overviews.** A year, seller or client folder shows the total in EUR, the file count and 12 monthly bars.
-- **Other finance documents.** On the Add page, **Another finance document** keeps a contract, a letter or a tax decision with a title and a date. These are never matched, packaged or counted in totals.
+- **Other finance documents.** On the Add page, **Other documents** keeps a contract, a letter or a tax decision, named after its file; its title and date can be changed on its page. These are never matched, packaged or counted in totals.
 
 Files from before v2.0.0 are found by their details at once. To search the words inside them too, press **Index older files** in Settings, under Advanced, until none are left. Details: [Find any document](https://receipts.nuits.net/docs/how-to/find-any-document/).
 

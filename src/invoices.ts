@@ -1,6 +1,5 @@
 // Sales invoices you sent: the Invoices list, payment status, the receipt
 // page's money-in matching, and the Add page (several files, either kind).
-import { documentForm } from './files';
 import { DEFAULT_TUNING, money, type Receipt } from './domain';
 import { creditFit, monthEurValues, type Transaction } from './banking';
 import type { Env } from './env';
@@ -20,7 +19,6 @@ import {
   monthHead,
   monthName,
   tabCounts,
-  addButton,
   page,
   pageHead,
   plural,
@@ -218,7 +216,7 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
                 ? `Copy <code>${escape(settings.invoicesAddress)}</code> when you send one.`
                 : 'Set an invoice address in <a href="/settings#setup-email">Settings</a>.'
             }`,
-        addButton('invoices', true),
+        buttonLink('addInvoice', '/add?kind=sales', { tone: 'primary' }),
       );
   // Older: overdue invoices dated in other months. By id, since the two queries return their own objects.
   const inMonth = new Set(month.map((r) => r.id));
@@ -239,10 +237,9 @@ export async function invoicesPage(env: Env, selected: string, params: URLSearch
           .join(', ')}</p>`
       : ''
   }${month.length ? `<div class="csv">${buttonLink('csv', `/export-sales.csv?month=${selected}`, { attrs: ' download' })}<p class="small">${EXPORT_LINE}</p></div>` : ''}`;
-  const add = shown.length ? addButton('invoices', true) : '';
   return page('invoices', body, 200, env, {
     detail: `Invoices · ${monthName(selected)}`,
-    head: across ? pageHead(SHOWS[show], add) : monthHead('/receipts?view=all&kind=sales', selected, add),
+    head: across ? pageHead(SHOWS[show]) : monthHead('/receipts?view=all&kind=sales', selected),
   });
 }
 function firstFlag(r: Receipt): string {
@@ -309,27 +306,25 @@ export async function paymentBox(env: Env, r: SalesRow, fields: string): Promise
 export const MAX_UPLOAD_FILES = 10;
 // The Add form, as a failure scope names it.
 export const ADD_SCOPE = 'add';
-export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
+export type AddKind = 'expense' | 'sales' | 'other';
+export const addKind = (v: unknown): AddKind => (v === 'sales' || v === 'other' ? v : 'expense');
+// The one Add form, for receipts, invoices you sent and any other finance document. The Add
+// page and a new install's Welcome both show it; the kind picked decides where each file goes.
+export function addForm(env: Env, kind: AddKind): string {
   const settings = config(env);
-  const kind = params.get('kind') === 'sales' ? 'sales' : 'expense';
-  const option = (value: 'expense' | 'sales', title: string, sub: string) =>
+  const option = (value: AddKind, title: string, sub: string) =>
     `<label><input type="radio" name="kind" value="${value}"${kind === value ? ' checked' : ''}><span>${title}<span class="s">${sub}</span></span></label>`;
   const mail = [
     settings.receiptAddress ? `receipts to <code>${escape(settings.receiptAddress)}</code>` : '',
     settings.invoicesAddress ? `invoices you sent to <code>${escape(settings.invoicesAddress)}</code>` : '',
   ].filter(Boolean);
-  const body = `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" id="f-file"${ariaFor(ADD_SCOPE, 'file')}></label>${errorLine(ADD_SCOPE)}<p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
+  return `<p class="banner" role="status" id="add-status"></p><form action="/upload" method="post" enctype="multipart/form-data" class="add"><fieldset><legend>What are these?</legend><div class="kinds">${option('expense', 'Receipts and bills', 'Things the business paid for')}${option('sales', 'Invoices you sent', 'Money clients owe or paid you')}${option('other', 'Other documents', 'Contracts, tax returns, letters. Kept and searchable, never matched or sent')}</div></fieldset><div class="drop"><p style="margin:0"><strong>Drop files here</strong> or choose them</p><label><span class="vh">Files</span><input required name="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" id="f-file"${ariaFor(ADD_SCOPE, 'file')}></label>${errorLine(ADD_SCOPE)}<p class="small" style="margin:0">PDFs up to 10 MB, photos up to 4 MB, ${MAX_UPLOAD_FILES} at a time.</p></div><ul class="queue" aria-live="polite"></ul><p>${button('upload', { tone: 'primary', attrs: ' type="submit"' })}</p></form>${
     mail.length ? `<p class="small">Or forward ${mail.join(', and ')} from an allowed address.</p>` : ''
-  }<details class="card"><summary>Another finance document</summary><div class="body">${documentForm()}</div></details><script src="/assets/add.js" defer></script>`;
-  return page('add', body, 200, env, {
-    detail: 'Add',
-    head: pageHead(
-      'Add receipts or invoices',
-      '',
-      kind === 'sales'
-        ? { href: '/receipts?view=all&kind=sales', label: 'Invoices' }
-        : { href: '/receipts?view=todo', label: 'Receipts' },
-    ),
+  }<script src="/assets/add.js" defer></script>`;
+}
+export async function addPage(env: Env, params: URLSearchParams): Promise<Response> {
+  return page('add', addForm(env, addKind(params.get('kind'))), 200, env, {
+    head: pageHead('Add receipts, invoices or documents'),
   });
 }
 // Progressive enhancement for /add: drag and drop, one request per file and
@@ -413,7 +408,7 @@ export const ADD_JS = `(() => {
         if (res.ok && one && one.id) {
           ok++;
           const a = document.createElement('a');
-          a.href = base + '/receipts/' + one.id;
+          a.href = base + one.href;
           a.textContent = 'Open';
           set(items[i], 'Added · ', false, a);
         } else set(items[i], (one && one.error) || data.error || "Couldn't add it", true);

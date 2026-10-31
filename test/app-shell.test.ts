@@ -14,6 +14,9 @@ const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72
 // The same four destinations in the header and the phone tab bar, on every page.
 const NAV = ['/', '/receipts', '/payments', '/settings'];
 const LABELS = ['Home', 'Receipts', 'Bank', 'Settings'];
+// The phone's tab bar has Add in the middle; the sidebar has it above the four places.
+const TABS = ['/', '/receipts', '/add', '/payments', '/settings'];
+const TAB_LABELS = ['Home', 'Receipts', 'Add', 'Bank', 'Settings'];
 // Wording Legal never allows on a page. "any bank" is allowed only inside the footer sentence.
 const BANNED =
   /vat[- ]compliant|tax[- ]ready|100\s*% accurate|\bany[- ]bank\b|never leaves your account|no access to your data/i;
@@ -53,7 +56,8 @@ function navOf(html: string) {
   const nav = html.match(/<nav class="main" aria-label="Main">([\s\S]*?)<\/nav>/)?.[1] ?? '';
   return {
     links: [...nav.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1]),
-    current: nav.match(/<a href="([^"]*)" aria-current="page"/)?.[1] ?? null,
+    add: nav.match(/^<a class="navadd" href="([^"]*)"/)?.[1] ?? null,
+    current: nav.match(/<a (?:class="navadd" )?href="([^"]*)" aria-current="page"/)?.[1] ?? null,
   };
 }
 function tabsOf(html: string) {
@@ -76,9 +80,10 @@ function visible(html: string) {
     .replace(/<[^>]*>/g, ' ');
 }
 function expectShell(html: string, current: string | null) {
-  expect(navOf(html)).toEqual({ links: NAV, current });
+  expect(navOf(html)).toEqual({ links: NAV, add: expect.stringMatching(/^\/add/), current });
   const { links, current: currentTabs } = tabsOf(html);
-  expect(links).toEqual(NAV);
+  expect(links.map((l) => l!.replace(/\?.*/, ''))).toEqual(TABS);
+  expect(links[2]).toBe(navOf(html).add);
   expect(currentTabs).toEqual(current ? [current] : []);
   expect(html).not.toContain('href="/more"');
   expect(banned(html)).toBeNull();
@@ -111,8 +116,8 @@ test('every page, including error pages, has the same four-item nav', async () =
     ['/import', '/payments'],
     ['/receipts?view=all&kind=sales&month=2026-09', '/receipts'],
     ['/receipts?view=all&kind=sales&month=2026-09&show=overdue', '/receipts'],
-    ['/add', '/receipts'],
-    ['/add?kind=sales', '/receipts'],
+    ['/add', '/add'],
+    ['/add?kind=other', '/add'],
     [`/receipts/${ready.id}`, '/receipts'],
     [`/receipts/${flagged.id}`, '/receipts'],
   ];
@@ -255,12 +260,13 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
   await seed();
   const html = await (await request('/')).text();
   const { nav } = tabsOf(html);
-  expect([...nav.matchAll(/<\/span><span>([A-Za-z]+)<\/span><\/a>/g)].map((m) => m[1])).toEqual(LABELS);
+  expect([...nav.matchAll(/<\/span><span>([A-Za-z]+)<\/span><\/a>/g)].map((m) => m[1])).toEqual(TAB_LABELS);
   const header = html.match(/<nav class="main" aria-label="Main">([\s\S]*?)<\/nav>/)?.[1] ?? '';
   expect([...header.matchAll(/<a href="[^"]*"[^>]*><svg[\s\S]*?<\/svg>([A-Za-z]+)/g)].map((m) => m[1])).toEqual(LABELS);
   expect(header).toMatch(/Receipts <span class="count">\d+<span class="vh"> to do<\/span><\/span>/);
   expect(header).toMatch(/Bank <span class="count">1<span class="vh"> missing a receipt<\/span><\/span>/);
-  expect(nav.match(/<svg [^>]*aria-hidden="true"/g)).toHaveLength(4);
+  expect(nav.match(/<svg [^>]*aria-hidden="true"/g)).toHaveLength(5);
+  expect(header).toMatch(/^<a class="navadd" href="\/add"><svg[^>]*><use href="#i-plus"\/><\/svg>Add<\/a>/);
   expect(nav).toMatch(/href="\/receipts">.*?<span class="count">\d+<span class="vh"> to do<\/span><\/span>/);
   expect(nav).toMatch(/href="\/payments">.*?<span class="count">1<span class="vh"> missing a receipt<\/span>/);
   const phone = html.match(/@media \(max-width:879px\)\{([\s\S]*?)\n\}/)?.[1] ?? '';

@@ -71,7 +71,7 @@ import {
   undatedDocuments,
   type PackageOptions,
 } from './package';
-import { overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
+import { addForm, overdueInvoices, paymentBox, salesRows, salesStamp, salesStatus } from './invoices';
 import { TREATMENT_LABELS } from './sales';
 import { VAT_TREATMENTS } from './domain';
 import { connection, progress, redirectUri, type Connection } from './onedrive';
@@ -1117,13 +1117,7 @@ export async function home(
   if (unindexed && ctx) ctx.waitUntil(indexOlder(env, 10).catch(() => 0));
   const checklist = setupChecklist(steps);
   if (!ever?.r && !ever?.i && !ever?.d)
-    return page(
-      'home',
-      `${checklist ?? ''}<div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
-      200,
-      env,
-      { head: pageHead('Welcome') },
-    );
+    return page('home', `${checklist ?? ''}${addForm(env, 'expense')}`, 200, env, { head: pageHead('Welcome') });
   const selected = requested ?? arrival!.month;
   const unverified = queue.filter((r) => reasonCodes(r.review_reasons_json).includes('sender_unverified')).length;
   const todo = escape(listUrl(RECEIPTS_TODO));
