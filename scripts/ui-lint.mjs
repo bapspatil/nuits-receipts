@@ -28,7 +28,8 @@ const PATHS = given.length
   : [
       '/',
       '/receipts?view=todo',
-      '/receipts?view=all',
+      '/?in=year:2026',
+      '/?q=supply',
       '/receipts?view=all&kind=sales',
       '/payments',
       '/payments?view=todo',

@@ -1,5 +1,23 @@
 // Server-rendered screens. Every form keeps the action, field names and values
 // the POST handlers in src/index.ts expect; only labels and layout live here.
+import {
+  archiveList,
+  archiveQuery,
+  archiveRows,
+  drawer,
+  drawerData,
+  filterCount,
+  folderName,
+  folderParam,
+  openedData,
+  overview,
+  overviewData,
+  pane,
+  searchForm,
+} from './archive';
+import { ARCHIVE_CSS } from './archive-css';
+import { recordView } from './marks';
+import { viewer, VIEWER_CSS, VIEWER_SCRIPT } from './viewer';
 import { EXPENSE_TYPES, EXPONENTS, money, object, type Receipt, type Rule } from './domain';
 import {
   creditFit,
@@ -25,7 +43,8 @@ import { saveBar, setupParts } from './setup';
 import { setupChecklist, setupSteps } from './checklist';
 import { helpBody } from './help';
 import { droppedMail, hasRecentDropped, ignoredSenders, reasonAllows, reasonWords } from './inbound';
-import { readableText } from './receipts';
+import { INDEX_BATCH, indexOlder, readableText, unindexedCount } from './receipts';
+import { icon } from './icons';
 import { discardControl, restoreForm } from './discard';
 import {
   BULK_CAP,
@@ -140,6 +159,10 @@ type Payment = BankRow;
 const INLINE_IMAGES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 export function previewable(r: Pick<Receipt, 'media_type'>): boolean {
   return INLINE_IMAGES.includes(r.media_type);
+}
+// What the viewer draws: a PDF or a raster image.
+export function viewable(r: Pick<Receipt, 'media_type'>): boolean {
+  return r.media_type === 'application/pdf' || previewable(r);
 }
 
 export function reviewQueue(env: Env, state: ListState = RECEIPTS_TODO): Promise<Receipt[]> {
@@ -654,23 +677,28 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const statusGroup = group('This receipt', `${move}${always}`);
   const extras = `<details class="more"${failureFor(RECEIPT_RULE) ? ' open' : ''}>${buttonSummary('more')}<div class="body">${documentGroup}${statusGroup}</div></details>`;
   const pdf = r.media_type === 'application/pdf';
-  // A PDF is not embedded: the page's CSP allows no frames or objects. Its text is shown instead.
+  // A PDF is drawn by the viewer (src/viewer.ts); its text is the fallback without script.
   const open = `<p>${buttonLink('original', `/originals/${r.id}${!pdf && r.email_key && r.media_type === 'message/rfc822' ? '?variant=email' : ''}`)}</p>`;
   const docTitle = previewable(r)
     ? 'The original'
     : shown
       ? pdf
-        ? 'The PDF, as text'
+        ? 'The PDF'
         : 'The text that was read'
       : 'The original';
   const doc = previewable(r)
-    ? `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`
-    : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
+    ? viewer(
+        r,
+        `<a class="frame" href="/originals/${r.id}?view=inline"><img src="/originals/${r.id}?view=inline" alt="The original ${escape(r.filename)}"></a>`,
+      )
+    : pdf
+      ? `${viewer(r, shown ? `<p class="small">As text:</p><pre class="paper" tabindex="0">${escape(shown)}</pre>` : '')}${open}`
+      : `${shown ? `<pre class="paper" tabindex="0">${escape(shown)}</pre>` : ''}${open}`;
   const back = gone
     ? `<a href="${escape(listUrl({ ...list, view: 'all', show: 'discarded' }))}">‹ Discarded</a>`
     : sales && !needs && list.view === 'all'
       ? `<a href="${escape(listUrl({ ...list, key: 'invoices', month: r.issue_date?.slice(0, 7) ?? list.month }))}">‹ Invoices</a>`
-      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'To do' : 'Receipts'}</a>`;
+      : `<a href="${escape(listUrl(list))}">‹ ${list.view === 'todo' ? 'To do' : 'Home'}</a>`;
   const nextLink = !gone && !needs && next ? `<a href="${escape(receiptUrl(next, todo))}">Next to check ›</a>` : '';
   const skip =
     needs && next && next !== r.id ? button('skip', { attrs: ' form="fix" name="action" value="skip"' }) : '';
@@ -682,11 +710,11 @@ export async function receiptPage(env: Env, r: Receipt, params: Params): Promise
   const bar = `<div class="sbar" role="group" aria-label="Actions">${needs && position >= 0 ? `<span class="prog">${position + 1} of ${total} to check</span>` : ''}${skip}${discard}${extras}${unverified ? retryButton('read', 'primary', true) : ''}${reading ? buttonLink('refresh', receiptUrl(r.id, list), { tone: 'primary' }) : ''}${button(verb, { tone: primary, label: verbLabel, attrs: ` form="fix" name="action" value="${verb}"` })}</div>`;
   return page(
     needs && !gone ? 'reviewItem' : 'receipt',
-    `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>`,
+    `<div class="work"><section class="doc" aria-label="Original">${gone ? '' : '<a class="skip" href="#fix">Skip to the fields</a>'}<h2 class="doch">${docTitle}</h2>${doc}</section><section class="fixes" aria-label="Fields">${gone ? `${restore}${extras}` : `${form}${matches}${bar}`}</section></div>${viewable(r) ? VIEWER_SCRIPT : ''}`,
     200,
     env,
     {
-      style: VIEW_TRANSITION_CSS,
+      style: VIEW_TRANSITION_CSS + (viewable(r) ? VIEWER_CSS : ''),
       refresh: reading ? 10 : undefined,
       detail: receiptName(r),
       head: `<div class="crumbs">${back}${nextLink}</div><div class="head tight"><h1>${escape(receiptName(r))}</h1>${r.total_minor === null ? '' : `<span class="amt">${amount(r.total_minor, r.currency)}</span>`}${status}</div>`,
@@ -1029,27 +1057,66 @@ function nextStep(s: MonthState, selected: string): { key: ActionKey; href: stri
   return null;
 }
 
-// One status row per step (Check, Match, Send), and one panel for the current step.
-export async function home(env: Env, requested: string | null, params = new URLSearchParams()): Promise<Response> {
+// Home: the month's status, one row per step (Check, Match, Send) with one panel for the current
+// step, over the archive of every document (src/archive.ts): its folders, the list and the
+// preview pane. Browsing a folder or a search folds the month to its three steps.
+export async function home(
+  env: Env,
+  requested: string | null,
+  params = new URLSearchParams(),
+  ctx?: Pick<ExecutionContext, 'waitUntil'>,
+): Promise<Response> {
   const settings = config(env);
   // Everything loads at once, the month's own queries as soon as the month is
   // known. A new install doesn't need most of it, but its tables are empty.
   // No month in the address: open on the oldest one that is not sent.
   const opening = requested ? null : arrivalMonth(env);
   const undatedDocs = undatedDocuments(env);
-  const [ever, steps, arrival, s, queue, overdue] = await Promise.all([
+  const aq = archiveQuery(params);
+  const browsing = aq.folder.type !== 'all' || !!aq.q || !!aq.show || !!aq.before || !!aq.open;
+  const [
+    ever,
+    steps,
+    arrival,
+    s,
+    queue,
+    overdue,
+    ,
+    rows,
+    tally,
+    total,
+    folders,
+    glance,
+    opened,
+    suggestions,
+    unindexed,
+  ] = await Promise.all([
     env.DB.prepare(
-      "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i",
-    ).first<{ r: number; i: number }>(),
+      "SELECT (SELECT count(*) FROM receipts) r, (SELECT count(*) FROM imports WHERE status='complete') i, (SELECT count(*) FROM documents) d",
+    ).first<{ r: number; i: number; d: number }>(),
     setupSteps(env),
     opening,
     opening ? opening.then((a) => monthState(env, a.month)) : monthState(env, requested!),
     reviewQueue(env),
     overdueInvoices(env),
     undatedDocs,
+    archiveRows(env, aq),
+    env.DB.prepare(
+      "SELECT coalesce(sum(status IN ('pending','processing') AND duplicate_of IS NULL AND discarded_at IS NULL),0) AS reading, coalesce(sum(duplicate_of IS NOT NULL AND discarded_at IS NULL),0) AS duplicate, coalesce(sum(discarded_at IS NOT NULL),0) AS discarded FROM receipts",
+    ).first<Record<'reading' | 'duplicate' | 'discarded', number>>(),
+    filterCount(env, aq),
+    drawerData(env),
+    overviewData(env, aq.folder),
+    openedData(env, aq.open),
+    env.DB.prepare('SELECT DISTINCT tag FROM tags ORDER BY tag LIMIT 200')
+      .all<{ tag: string }>()
+      .then((r) => r.results.map((t) => t.tag)),
+    unindexedCount(env),
   ]);
+  // Rows from before the archive get their words a few at a time, after the page is sent.
+  if (unindexed && ctx) ctx.waitUntil(indexOlder(env, 10).catch(() => 0));
   const checklist = setupChecklist(steps);
-  if (!ever?.r && !ever?.i)
+  if (!ever?.r && !ever?.i && !ever?.d)
     return page(
       'home',
       `${checklist ?? ''}<div class="card active">${uploadForm(settings.receiptAddress, true)}</div>`,
@@ -1104,12 +1171,51 @@ export async function home(env: Env, requested: string | null, params = new URLS
     arrival && arrival.month !== arrival.current
       ? `<p class="lede why"><strong>${escape(short)} ${s.send.last && s.send.changed ? 'changed since you sent it' : "isn't sent yet"}.</strong> ${s.send.last && s.send.changed ? '<a href="#send">See what changed.</a>' : lacks(s, undated)} · <a href="/?month=${arrival.current}">Go to ${escape(monthName(arrival.current, false))}</a></p>`
       : '';
+  const stepsList = `<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? (browsing ? `/?month=${selected}#send` : '#send') : '')}</ol>`;
+  const monthPanel = browsing
+    ? `<details class="monthfold"><summary>${escape(monthName(selected))}: <span>${escape(send.status)}</span></summary><div class="body">${stepsList}</div></details>`
+    : `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}${next ? `<div class="next">${next}</div>` : ''}${stepsList}${send.body ? `<div id="send">${send.body}</div>` : ''}`;
+  const name = aq.q
+    ? `Search: ${aq.q}`
+    : aq.month && aq.folder.type === 'all'
+      ? monthName(aq.month)
+      : folderName(aq.folder) + (aq.month ? `, ${monthName(aq.month)}` : '');
+  const folder = aq.folder.type === 'all' && !aq.month && !aq.q ? '' : folderParam(aq.folder);
+  const download =
+    total > 0
+      ? buttonLink(
+          'downloadFolder',
+          `/files.zip?${new URLSearchParams(Object.entries({ in: folderParam(aq.folder) ?? '', month: aq.month ?? '', q: aq.q, show: aq.show ?? '' }).filter(([, v]) => v))}`,
+          { attrs: ' download' },
+        )
+      : '';
+  const listHead = `<div class="lhead"><h2>${escape(name)}</h2><div class="btns">${download}</div></div>${glance ? overview(glance, aq.folder) : ''}`;
+  const list = archiveList(aq, rows, {
+    total,
+    tally,
+    receiptAddress: settings.receiptAddress,
+    empty: settings.receiptAddress
+      ? `No documents yet. Forward receipts to <code>${escape(settings.receiptAddress)}</code>.`
+      : 'No documents yet.',
+  });
+  const indexNote =
+    unindexed && aq.q
+      ? `<p class="small">${plural(unindexed, 'older file')} not searchable by their words yet. <a href="/settings#search">Index them</a>.</p>`
+      : '';
+  const search = `<div class="hband">${searchForm(aq, browsing && !aq.open)}${indexNote}</div>`;
+  const archive = `<div class="arch${opened ? ' opened' : ''}">${drawer(folders, aq)}<section class="alist" aria-label="${escape(name)}"><p class="tofolders"><a href="#folders">${icon('folder')}<span>Folders</span></a></p>${listHead}${list}</section>${opened ? pane(opened, aq, suggestions) : ''}</div>`;
+  if (opened && aq.open && aq.open.type !== 'mail') ctx?.waitUntil(recordView(env, aq.open).catch(() => undefined));
+  // Search leads: Home is the archive first, with this month's close as a strip under the field.
   return page(
     'home',
-    `${checklist ?? ''}${why}${alert ? `<p class="alert" role="note">${alert}</p>` : ''}${next ? `<div class="next">${next}</div>` : ''}<ol class="steps" aria-label="Close ${escape(monthName(selected))}">${check}${match}${row(3, 'Send', send.status, send.body ? '#send' : '')}</ol>${send.body ? `<div id="send">${send.body}</div>` : ''}`,
+    `${search}<section class="monthband" aria-label="${escape(monthName(selected))}">${monthPanel}</section>${archive}${opened ? VIEWER_SCRIPT : ''}`,
     200,
     env,
-    { detail: monthName(selected), head: monthHead('/', selected) },
+    {
+      detail: folder ? name : monthName(selected),
+      head: monthHead('/', selected),
+      style: `${VIEW_TRANSITION_CSS}${ARCHIVE_CSS}${opened ? VIEWER_CSS : ''}`,
+    },
   );
 }
 
@@ -1298,6 +1404,7 @@ const SECTION_OF: Record<string, string> = {
   'setup-deploy': 'advanced',
   'setup-history': 'advanced',
   about: 'advanced',
+  search: 'advanced',
 };
 // Settings > OneDrive. Nothing at all unless MS_CLIENT_ID is set; one line
 // when a secret is missing; otherwise connect, folder and disconnect.
@@ -1436,13 +1543,22 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
       : undefined;
   const opened = new Set([SECTION_OF[anchor], params.has('routing') ? 'email' : '', refusedIn]);
   // The sections don't depend on each other, so they all load at once.
-  const [oneDrive, setup, accounts, rules, senders] = await Promise.all([
+  const [oneDrive, setup, accounts, rules, senders, unindexed] = await Promise.all([
     oneDrivePart(env, origin),
     setupParts(env, params),
     listAccounts(env.DB),
     env.DB.prepare('SELECT * FROM vendor_rules ORDER BY priority DESC,id LIMIT 200').all<Rule>(),
     sendersPart(env),
+    unindexedCount(env),
   ]);
+  // Search reads every file's words; files from before the archive are indexed here in batches.
+  const searchPart = sub(
+    'search',
+    'Search',
+    unindexed
+      ? `<p>${plural(unindexed, 'older file')} can be found by their details but not yet by the words inside them.</p><form method="post" action="/settings/index">${button('index', { label: `Index older files (${unindexed} left)` })}</form><p class="small">Each press reads ${INDEX_BATCH}. Home also reads a few on every visit.</p>`
+      : '<p>Every file can be found by the words inside it.</p>',
+  );
   const accountsPart = sub(
     'accounts',
     'Bank accounts',
@@ -1492,7 +1608,7 @@ export async function settingsPage(env: Env, params = new URLSearchParams(), ori
     ),
     section('bank', 'Bank', plural(accounts.length, 'account'), accountsPart),
     section('sending', 'Sending', escape(settings.accountantLabel), `${setup.sending}${oneDrive}`),
-    section('advanced', 'Advanced', '', `${setup.advanced}${sub('about', 'About', aboutBody(env))}`),
+    section('advanced', 'Advanced', '', `${setup.advanced}${searchPart}${sub('about', 'About', aboutBody(env))}`),
   ].join('');
   return page(
     'settings',

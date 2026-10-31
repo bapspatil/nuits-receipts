@@ -1,6 +1,7 @@
 // The structure of every control, read off the rendered pages of a busy month: each button and
 // button-link carries one icon and a visible word, no list row holds a primary, the registries
 // keep one icon per meaning, and each page's sprite holds the icons it uses and no others.
+import { FOLDER_ICONS, KINDS } from '../src/archive';
 import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { ACTIONS } from '../src/actions';
@@ -37,10 +38,10 @@ async function pages(): Promise<Record<string, string>> {
     `/?month=${b.month}`,
     '/receipts?view=todo',
     `/receipts?view=todo&month=${b.month}`,
-    '/receipts?view=all',
+    '/',
     `/receipts?view=all&kind=sales&month=${b.month}`,
-    '/receipts?view=all&show=discarded',
-    '/receipts?view=all&show=reading',
+    '/?show=discarded',
+    '/?show=reading',
     `/receipts/${b.todo[0]}?from=todo`,
     `/receipts/${b.todo[1]}?from=todo`,
     `/receipts/${b.sales[0]}?from=todo`,
@@ -121,6 +122,8 @@ test('every registry icon exists in the sprite, and every sprite icon is used by
   const wanted = new Set<string>([
     ...Object.values(ACTIONS).map((a) => a.icon),
     ...Object.values(STATUS).map((s) => s.icon),
+    ...Object.values(KINDS).map((k) => k.icon),
+    ...Object.values(FOLDER_ICONS),
     ...NAV,
   ]);
   for (const icon of wanted) expect(Object.keys(ICON_PATHS), icon).toContain(icon);

@@ -47,6 +47,14 @@ const logged = (p: URLSearchParams): Undo | null => {
     }
   );
 };
+// The Undo of a mark (a star or a tag): the same route with the opposite value, back to the page.
+const ITEM = /^(?:[rmds]:[A-Za-z0-9_-]{1,80}|p:\d{4}-\d{2}@[0-9T:.Z+-]{10,40})$/;
+const markUndo = (p: URLSearchParams, action: string, fields: Record<string, string>): Undo | null => {
+  const item = p.get('item') ?? '';
+  const back = p.get('back') ?? '';
+  if (!ITEM.test(item) || Object.values(fields).some((v) => !v)) return null;
+  return { action, fields: { item, ...fields, ...(back.startsWith('/') && !back.startsWith('//') ? { back } : {}) } };
+};
 // What an Undo brought back, per action.
 const UNDONE: Record<UndoOp, (n: number) => string> = {
   approve: (n) => `Approval undone for ${plural(n, 'receipt')}.`,
@@ -139,6 +147,24 @@ export const EVENTS = {
   },
   skipped: { text: () => 'Skipped. It stays in To do for later.' },
   saved: { text: () => 'Saved.' },
+  starred: { text: () => 'Starred.', undo: (p) => markUndo(p, '/marks/star', { on: '0' }) },
+  unstarred: { text: () => 'Star removed.', undo: (p) => markUndo(p, '/marks/star', { on: '1' }) },
+  tagged: {
+    text: (p) => `Tagged #${words(p, 'tag', 'tag')}.`,
+    undo: (p) => markUndo(p, '/marks/untag', { tag: words(p, 'tag', '') }),
+  },
+  untagged: {
+    text: (p) => `Tag #${words(p, 'tag', 'tag')} removed.`,
+    undo: (p) => markUndo(p, '/marks/tag', { tag: words(p, 'tag', '') }),
+  },
+  noteSaved: { text: () => 'Note saved.' },
+  searchSaved: { text: (p) => `Saved \u201c${words(p, 'name', 'search')}\u201d to your folders.` },
+  searchRemoved: { text: () => 'Search removed from your folders.' },
+  documentAdded: { text: () => 'Document added. Its words are searchable now.' },
+  indexed: {
+    text: (p) =>
+      count(p, 'left') ? `Indexed a batch. ${plural(count(p, 'left'), 'file')} left.` : 'Every file is searchable now.',
+  },
   movedBack: { text: () => 'Saved. It needs another look, so it moved back to To do.' },
   readAgain: { text: () => 'Reading it again. This can take a minute.' },
   uploaded: { text: () => "Uploaded. We're reading it now." },
@@ -403,12 +429,13 @@ export type Feedback = {
 // An Undo returns to the list it was offered on: the page's list state rides along in its form,
 // under the names the list URL uses (from, on a receipt page; kind=sales on Invoices), unless the
 // Undo sets them itself. An Undo of Settings names the section to land on.
-const LIST_PARAMS = ['view', 'from', 'month', 'upto', 'show', 'q', 'kind'] as const;
+const LIST_PARAMS = ['view', 'from', 'in', 'month', 'upto', 'show', 'q', 'kind'] as const;
 function onList(undo: Undo | null, params: URLSearchParams, section: string | null): Undo | null {
   if (!undo) return null;
   const fields: Record<string, string> = { ...undo.fields };
   if (section) fields.section = section;
-  for (const key of LIST_PARAMS) {
+  // Only the undo log's Undo returns to a list; the others name their own page.
+  for (const key of undo.action === '/undo' ? LIST_PARAMS : []) {
     const value = params.get(key);
     // kind is the list's only as Invoices' kind=sales; a match event's kind=receipt is its own.
     if (value && !(key in fields) && (key !== 'kind' || value === 'sales')) fields[key] = value.slice(0, 100);

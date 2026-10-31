@@ -186,6 +186,20 @@ export const MESSAGES: Readonly<Record<string, string>> = {
   'Receipt is already matched': 'That receipt is already matched to another payment.',
   'Vendor rule not found': "We couldn't find that rule. It may have been deleted.",
   'Not found': "We couldn't find that page.",
+
+  // archive
+  'Choose a date like 2026-10-31': 'Choose a date like 2026-10-31.',
+  'Give it a title': 'Give the document a title.',
+  'Document not found': "That document isn't there any more. Reload the page.",
+  'File not found': "We couldn't find that file. Go back to Home and open it again.",
+  'No view for this file type': "This file can't be shown here. Download it instead.",
+  'No PDF for this statement': 'Only the CSV of this statement was kept, so there is no PDF to show.',
+  'Type a tag of up to 40 characters': 'Type a tag of up to 40 characters.',
+  'Package copy missing': 'This package was sent before copies were kept. Download the month again from Home.',
+  'Folder empty': 'There are no files in this folder to download.',
+  'Choose a PDF or a photo': 'Choose a PDF or a photo of the document.',
+  'Give the search a name': 'Give the search a name.',
+  'Keep the note under 2000 characters': 'Keep the note under 2000 characters.',
   'Choose a file': 'Choose a file to upload.',
 
   // presets

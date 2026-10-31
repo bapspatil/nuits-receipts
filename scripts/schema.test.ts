@@ -125,7 +125,7 @@ test('schema/ accepts configured products and rejects invalid product lengths', 
 });
 
 test.skipIf(!existsSync('migrations'))(
-  'populated migrations/0001..0011 preserve every legacy value, link and constraint',
+  'populated migrations/0001..0012 preserve every legacy value, link and constraint',
   () => {
     using db = apply('migrations', '0003_duplicate_integrity.sql');
     seedLegacy(db);
@@ -207,6 +207,13 @@ test.skipIf(!existsSync('migrations'))(
       db.exec("INSERT INTO undo_log VALUES ('2026-10-30T10:00:00.000Z','discard','receipts','r1','{}',NULL)"),
     ).toThrow();
     db.exec('DELETE FROM undo_log');
+    // 0012: the archive. Every receipt starts unindexed, and the new tables start empty.
+    db.transaction(() => db.exec(readFileSync('migrations/0012_archive.sql', 'utf8')))();
+    expect(db.query('SELECT count(*) n FROM receipts WHERE search_text IS NOT NULL').get()).toEqual({ n: 0 });
+    expect(db.query('SELECT count(*) n FROM documents').get()).toEqual({ n: 0 });
+    db.exec("INSERT INTO tags VALUES ('r:r1','warranty')");
+    expect(() => db.exec("INSERT INTO tags VALUES ('r:r1','warranty')")).toThrow();
+    db.exec('DELETE FROM tags');
     healthy(db);
     using fresh = apply('schema');
     expect(shape(fresh)).toEqual(shape(db));
@@ -215,7 +222,7 @@ test.skipIf(!existsSync('migrations'))(
 );
 
 test.skipIf(!existsSync('migrations'))(
-  'schema/ and empty migrations/0001..0011 have identical tables, columns, indexes, triggers and foreign keys',
+  'schema/ and empty migrations/0001..0012 have identical tables, columns, indexes, triggers and foreign keys',
   () => {
     using fresh = apply('schema');
     using upgraded = apply('migrations');

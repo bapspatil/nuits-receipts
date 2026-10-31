@@ -71,7 +71,7 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(await (await request('/receipts')).text()).not.toContain('Vendor 1');
   // A reason stored before the choice went away is still shown.
   await env.DB.prepare("UPDATE receipts SET discard_reason='personal' WHERE id=?").bind(id(1)).run();
-  const list = await (await request('/receipts?show=discarded')).text();
+  const list = await (await request('/?show=discarded')).text();
   expect(list).toContain('Vendor 1');
   expect(list).toContain('Personal');
   expect(list).toContain('Restore');
@@ -83,7 +83,7 @@ test('discard leaves Review, totals, CSV, package, dedupe and the list; Undo bri
   expect(locationOf(undo)).toMatch(/^\/receipts\?view=todo&done=undone&op=discard&n=2#row-/);
   expect((await row(1))!.discarded_at).toBeNull();
   expect((await monthRows(env, '2026-10')).map((r) => r.id)).toEqual([id(1), id(2)]);
-  expect(await (await request('/receipts?show=discarded')).text()).toContain('Nothing discarded.');
+  expect(await (await request('/?show=discarded')).text()).toContain('Nothing discarded.');
 });
 
 test('a discarded row is never a merge primary and cannot be matched or edited', async () => {

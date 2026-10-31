@@ -5,7 +5,7 @@ import worker from '../src/index';
 import { preserve, receiveEmail } from '../src/receipts';
 import { authenticatedSender, dmarcPassDomain, headerFromAddress } from '../src/sender';
 import { MAX_HELD, MAX_HELD_PER_SENDER } from '../src/inbound';
-import { allRows, PAGE_SIZE } from '../src/all';
+import { archiveQuery, archiveRows, PAGE_SIZE } from '../src/archive';
 import { MAX_ALLOWED_SENDERS } from '../src/config';
 import type { Env } from '../src/env';
 import { authorization, locationOf, request, signed } from './helpers';
@@ -256,23 +256,23 @@ async function receipt(n: number, at: string, fields: Record<string, unknown> = 
   return row.id;
 }
 
-test('Receipts lists receipts and held mail newest first, with filters and paging', async () => {
+test('Home lists receipts and held mail newest first, with filters and paging', async () => {
   const ready = await receipt(1, '2026-09-03T10:00:00Z', { status: 'ready', vendor: 'Coffee Shop', total_minor: 450 });
   const needs = await receipt(2, '2026-10-02T10:00:00Z', { status: 'needs_review', vendor: 'Hosting Co' });
   const sales = await receipt(3, '2026-10-05T10:00:00Z', { status: 'ready', kind: 'sales', client: 'Acme' });
   const dup = await receipt(4, '2026-10-06T10:00:00Z', { status: 'ready', duplicate_of: ready });
   await deliver(mail());
-  const ids = async (query: Partial<Parameters<typeof allRows>[1]>) =>
-    (await allRows(env, { show: null, month: null, q: '', before: null, ...query })).map((r) => r.id);
-  const all = await ids({});
-  expect(all.slice(1)).toEqual([dup, needs, ready]);
-  expect((await allRows(env, { show: null, month: null, q: '', before: null }))[0]!.type).toBe('mail');
+  const rows = (query: Record<string, string>) => archiveRows(env, archiveQuery(new URLSearchParams(query)));
+  const ids = async (query: Record<string, string>) =>
+    (await rows(query)).filter((r) => r.type === 'receipt').map((r) => r.id);
+  expect(await ids({})).toEqual([dup, sales, needs, ready]);
+  expect((await rows({}))[0]!.type).toBe('mail');
   expect(await ids({ show: 'ready' })).toEqual([sales, ready]);
   expect(await ids({ show: 'needs' })).toEqual([needs]);
   expect(await ids({ show: 'duplicate' })).toEqual([dup]);
   expect(await ids({ show: 'sales' })).toEqual([sales]);
   expect(await ids({ show: 'reading' })).toEqual([]);
-  expect(await ids({ show: 'unknown' })).toHaveLength(1);
+  expect(await rows({ show: 'unknown' })).toHaveLength(1);
   // The month is the document's month; undated ones count where they arrived.
   expect(await ids({ month: '2026-09' })).toEqual([ready]);
   await env.DB.prepare("UPDATE receipts SET issue_date='2026-08-30' WHERE id=?").bind(needs).run();
@@ -280,50 +280,40 @@ test('Receipts lists receipts and held mail newest first, with filters and pagin
   expect(await ids({ month: '2026-10' })).not.toContain(needs);
   expect(await ids({ q: 'coffee' })).toEqual([ready]);
   expect(await ids({ q: 'acme' })).toEqual([sales]);
-  expect(await ids({ q: 'link.com' })).toHaveLength(1);
-  expect(await ids({ q: '%' })).toEqual([]);
+  expect(await rows({ q: 'link.com' })).toHaveLength(1);
+  expect(await rows({ q: '%' })).toEqual([]);
 
-  const html = await (await request('/receipts?view=all')).text();
-  expect(html).toContain('<h1>Receipts</h1>');
-  expect(html).toContain(`href="/receipts/${needs}?from=all"`);
+  const html = await (await request('/')).text();
+  expect(html).toContain(`href="/?open=r%3A${needs}#preview"`);
   expect(html).toContain('<span class="date">30 Aug</span>');
   expect(html).toContain(`<span class="rs">${statusMark('needs')}</span>`);
-  // Rows show the document date only; held mail is Review's, with no mail log here.
-  expect(html).not.toContain('Received ');
-  expect(html).not.toContain('Recent mail');
-  const september = await (await request('/receipts?view=all&month=2026-09')).text();
-  expect(september).toContain('<h1>September 2026</h1>');
-  expect(september).toContain(`href="/receipts/${ready}?from=all&amp;month=2026-09"`);
-  expect(september).not.toContain(`href="/receipts/${needs}?`);
-  expect(html.indexOf(`/receipts/${dup}`)).toBeLessThan(html.indexOf(`/receipts/${ready}`));
-  expect((await request('/receipts?view=all&month=2026-13')).status).toBe(422);
+  const september = await (await request('/?month=2026-09')).text();
+  expect(september).toContain(`href="/?month=2026-09&amp;open=r%3A${ready}#preview"`);
+  expect(september).not.toContain(`open=r%3A${needs}`);
+  expect(html.indexOf(`open=r%3A${dup}`)).toBeLessThan(html.indexOf(`open=r%3A${ready}`));
+  expect((await request('/?month=2026-13')).status).toBe(422);
 
   // Paging: Older is a cursor at the last row shown, never an offset.
   for (let i = 10; i < 10 + PAGE_SIZE; i++) await receipt(i, `2026-08-01T00:00:${String(i % 60).padStart(2, '0')}Z`);
-  const first = await (await request('/receipts?view=all')).text();
+  const first = await (await request('/')).text();
   expect(first).not.toContain('offset=');
   const older = first.match(
-    /<a class="btn secondary" href="(\/receipts\?view=all&amp;before=[^"]+)"><svg[^>]*><use href="#i-chevrons-right"\/><\/svg><span>Older<\/span><\/a>/,
+    /<a class="btn secondary" href="(\/\?before=[^"]+)">(?:(?!<\/a>).)*<span>Older<\/span><\/a>/,
   )?.[1];
   expect(older).toBeDefined();
   const second = await (await request(older!.replaceAll('&amp;', '&'))).text();
   expect(second).toContain('Newest');
   expect(second).not.toContain('>Older<');
-  expect([
-    ...second.matchAll(
-      /<li class="row"><label class="pick">.*?<\/label>(?:<span class="date">[^<]*<\/span>)?<div class="rb"><p class="rt"><a href="\/receipts\/[0-9a-f]{64}\?from=all"/g,
-    ),
-  ]).toHaveLength(4);
+  expect([...second.matchAll(/<li class="row"/g)]).toHaveLength(5);
 });
 
-test('Receipts empty states: one line and one action', async () => {
-  const html = await (await request('/receipts?view=all')).text();
-  expect(html).toContain('<h2>No receipts yet. Forward to <code>receipts@example.com</code>.</h2>');
-  expect(await (await request('/receipts?view=all&month=2026-09')).text()).toContain(
-    '<h2>Nothing dated September.</h2>',
-  );
-  const search = await (await request('/receipts?q=xyz')).text();
+test('Home empty states: one line and one way out', async () => {
+  await receipt(1, '2026-09-03T10:00:00Z', { status: 'ready', vendor: 'Coffee Shop' });
+  const search = await (await request('/?q=xyz')).text();
   expect(search).toContain(
-    `<h2>Nothing matches &#8220;xyz&#8221;.</h2>${buttonLink('clearSearch', '/receipts?view=all', { tone: 'primary' })}`,
+    `<h2>Nothing matches &#8220;xyz&#8221;.</h2>${buttonLink('clearSearch', '/', { tone: 'secondary' })}`,
+  );
+  expect(await (await request('/?in=year:2020')).text()).toContain(
+    `<h2>Nothing here.</h2>${buttonLink('showAll', '/', { tone: 'secondary' })}`,
   );
 });

@@ -136,8 +136,8 @@ test('Ignore lists the senders once and deletes their mail; an approved sender i
     .bind(crypto.randomUUID())
     .run();
   const rows = await held();
-  const res = await bulk({ op: 'ignore', id: rows.map((r) => r.id), back: '/receipts?view=all&show=unknown' });
-  expect(locationOf(res)).toBe('/receipts?view=all&show=unknown&done=mailIgnored&n=3&senders=2&skipped=1');
+  const res = await bulk({ op: 'ignore', id: rows.map((r) => r.id), back: '/?show=unknown' });
+  expect(locationOf(res)).toBe('/?show=unknown&done=mailIgnored&n=3&senders=2&skipped=1');
   expect(await (await request(res.headers.get('Location')!)).text()).toContain(
     'Ignored 2 senders. 3 emails deleted. 1 skipped.',
   );

@@ -131,9 +131,8 @@ export const journeys = [
         'total: 125.50',
       ]);
       await rec.click(nav(page, '/receipts'));
-      // Receipts opens on To do; the kind tabs are in All.
-      await rec.click(page.locator('main a[data-view="all"]'));
-      await rec.click(page.locator('main nav.seg a[href*="kind=sales"]'));
+      // Receipts opens on To do; Invoices is the switch's third link.
+      await rec.click(page.locator('main a[data-view="invoices"]'));
       await rec.click(link(page, 'Add invoice'));
       if (!(await page.locator('input[name=kind][value=sales]').isChecked()))
         await rec.click(page.locator('input[name=kind][value=sales]'));
@@ -174,6 +173,40 @@ export const journeys = [
       rec.note(file ? `Downloaded ${file.suggestedFilename()}` : 'No download started');
       await page.waitForLoadState('load');
       await rec.click(button(page, 'Mark as sent').or(page.getByRole('button', { name: /sent/ })));
+    },
+  },
+  {
+    name: 'g. An old receipt found, read, starred and filed',
+    async run(page, rec) {
+      // Quick find from a page that has no search of its own.
+      await rec.goto('/payments?month=2026-09');
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
+      rec.clicks++;
+      await rec.fill(page.locator('#find-q'), 'lantern');
+      await page.locator('#find-list a').first().waitFor();
+      rec.note(
+        `Quick find lists: ${(await page.locator('#find-list').innerText()).replace(/\s+/g, ' ').slice(0, 120)}`,
+      );
+      await page.keyboard.press('Enter');
+      rec.clicks++;
+      await page.waitForURL(/open=r%3A/);
+      rec.note(`Opened in the preview: ${(await page.locator('.pane h2').innerText()).trim()}`);
+      await rec.click(page.locator('.pane').getByRole('button', { name: 'Star' }));
+      await rec.click(page.locator('#banner').getByRole('button', { name: 'Undo' }));
+      await rec.fill(page.locator('.pane .tagform input[name=tag]'), 'travel');
+      await rec.click(page.locator('.pane .tagform').getByRole('button'));
+      await rec.goto('/?in=tag:travel');
+      rec.note(`The travel folder holds ${await page.locator('main li.row').count()} file(s)`);
+      await rec.click(page.locator('main li.row a').first());
+      await rec.click(page.locator('.pane').getByRole('link', { name: 'Open' }));
+      // A receipt that came as an email body has no PDF, so no viewer; the note says which.
+      await page.waitForLoadState('load');
+      const viewer = page.locator('[data-viewer]');
+      rec.note(
+        (await viewer.count())
+          ? `Viewer: ${await viewer.first().getAttribute('data-type')}, ${(await viewer.first().getAttribute('data-state')) ?? 'starting'}`
+          : `No viewer: ${(await page.locator('.doch').first().innerText()).trim()}`,
+      );
     },
   },
 ];
@@ -273,11 +306,15 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
   const flagged = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
   await page.goto(base + '/receipts?view=all&kind=sales&month=2026-09');
   const invoice = await page.locator('main a[href^="/receipts/"]').first().getAttribute('href');
-  await page.goto(base + '/receipts?view=all&month=2026-09');
+  // Home's rows open in its preview; the receipt's own page is /receipts/<id>.
+  await page.goto(base + '/?month=2026-09');
   const ready = await page
-    .locator('main a[href^="/receipts/"]')
+    .locator('main li.row a[href*="open=r%3A"]')
     .evaluateAll(
-      (links, skip) => links.map((a) => a.getAttribute('href')).find((h) => h && !skip.includes(h)),
+      (links, skip) =>
+        links
+          .map((a) => `/receipts/${new URL(a.href).searchParams.get('open').slice(2)}`)
+          .find((h) => !skip.some((s) => s && s.startsWith(h))),
       [flagged, invoice],
     );
   await keyboardCheck(page, base);
@@ -288,7 +325,9 @@ export async function tourScreens(page, base, { sendEmail, receiptHtml }) {
     { name: 'home-arrival', path: '/' },
     { name: 'home-oct', path: `/?month=${new Date().toISOString().slice(0, 7)}` },
     { name: 'receipts-todo', path: '/receipts?view=todo' },
-    { name: 'receipts', path: '/receipts?view=all&month=2026-09' },
+    { name: 'archive', path: '/?in=year:2026' },
+    { name: 'archive-search', path: '/?q=lantern' },
+    { name: 'archive-open', path: `/?open=r%3A${ready.slice('/receipts/'.length)}` },
     { name: 'receipt-ready', path: ready },
     { name: 'invoice-paid', path: invoice },
     { name: 'bank', path: '/payments?month=2026-09&view=all' },

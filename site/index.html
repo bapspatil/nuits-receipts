@@ -6,17 +6,17 @@
     <title>Nuits Receipts: a receipt inbox that runs on Cloudflare Workers</title>
     <meta
       name="description"
-      content="Stop chasing receipts. A receipt inbox that runs in your own Cloudflare account, matches your bank export and flags what's missing. AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs."
+      content="Every receipt and invoice, found in seconds. A receipt inbox that runs in your own Cloudflare account, keeps every finance document searchable, matches your bank export and flags what's missing. AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs."
     />
     <meta name="theme-color" content="#E6EFE9" />
     <link rel="canonical" href="https://receipts.nuits.net/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Nuits Receipts" />
     <meta property="og:url" content="https://receipts.nuits.net/" />
-    <meta property="og:title" content="Nuits Receipts: stop chasing receipts" />
+    <meta property="og:title" content="Nuits Receipts: every receipt and invoice, found in seconds" />
     <meta
       property="og:description"
-      content="A receipt inbox that runs in your own Cloudflare account, matches your bank export and flags what's missing. Open source."
+      content="A receipt inbox that runs in your own Cloudflare account. It keeps every finance document searchable, matches your bank export and flags what's missing. Open source."
     />
     <meta property="og:image" content="https://receipts.nuits.net/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -50,13 +50,13 @@
       <section class="hero" id="top" aria-labelledby="hero-title">
         <canvas class="field" aria-hidden="true"></canvas>
         <h1 class="hero-title" id="hero-title">
-          <span class="wipe" style="--row: 0">Stop chasing</span>
-          <span class="wipe" style="--row: 1">receipts<span class="hero-dot">.</span></span>
+          <span class="wipe" style="--row: 0">Find every</span>
+          <span class="wipe" style="--row: 1">receipt<span class="hero-dot">.</span></span>
         </h1>
         <div class="hero-chit">
           <p class="hero-sub wipe" style="--row: 2">
-            A receipt inbox that runs in your own Cloudflare account, matches your bank export and flags what's
-            missing.
+            Every receipt, invoice and bank statement in one place you can search, in your own Cloudflare account. It
+            also matches your bank export and flags what's missing.
           </p>
           <p class="hero-cost wipe" style="--row: 3">AI reading costs about 15 cents a month. You may need Workers Paid ($5) for PDFs.</p>
         </div>
@@ -93,7 +93,7 @@
             A PDF in your inbox. A photo on your phone. A paper one in a coat pocket. Then the month ends, the bank
             export has a line for every payment, and your accountant would like a receipt for each of them.
           </p>
-          <p class="pull"><span>Nuits Receipts puts them in one inbox and tells you which ones you still owe.</span></p>
+          <p class="pull"><span>Nuits Receipts puts them in one inbox, tells you which ones you still owe, and finds any of them again in seconds.</span></p>
         </div>
         <div class="desk">
           <ul class="scatter" data-loop aria-label="Where receipts usually end up">
@@ -138,7 +138,8 @@
             <p>
               Import a CSV from your bank in three steps; you map the columns once. Sure matches are made for you,
               likely ones are shown side by side, and payments with no receipt are flagged. Home then takes the
-              month through Check, Match and Send, ending in a ZIP and a CSV for your accountant.
+              month through Check, Match and Send, ending in a ZIP and a CSV for your accountant. Afterwards every
+              file stays on Home, in folders by year, seller and kind, searchable down to the words inside a PDF.
             </p>
           </li>
         </ol>
@@ -303,6 +304,8 @@
             <ul class="nope-list">
               <li>It won't file anything for you. Not your taxes, not your receipts in a drawer.</li>
               <li>Bank CSV column mapping is new. It has been tested with Holvi exports so far, and other banks' files are less tested.</li>
+              <li>Search reads the words inside PDFs, not inside photos. A photo is found by the details it read.</li>
+              <li>Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket.</li>
               <li>It's for one person with one inbox.</li>
               <li>There's no mobile app.</li>
             </ul>
@@ -320,6 +323,14 @@
             <p>
               It imports CSV exports. There are presets for some banks and a column mapper for other layouts, so you map
               the columns once. Tested with Holvi exports so far.
+            </p>
+          </details>
+          <details>
+            <summary>Can I find an old receipt?<span class="faq-mark" aria-hidden="true"></span></summary>
+            <p>
+              Yes. Home keeps every finance document: receipts, sales invoices, bank statements and the month packages you
+              sent. Search by seller, amount, date or any word inside a PDF, or open a folder for a year, a seller or a
+              tag. Cmd+K (Ctrl+K off a Mac) finds a file from any page, and the PDF opens in the app.
             </p>
           </details>
           <details>

@@ -22,11 +22,12 @@ When a surface guide and this file disagree, this file wins on brand and identit
 
 ### What it is
 
-**Nuits Receipts** is a receipt inbox that runs on Cloudflare Workers. Freelancers and sole traders deploy their own copy into their own Cloudflare account. Receipts arrive by email or upload, AI reads them, the app suggests matches against the bank statement and flags what is missing, and at month end it prepares a ZIP and a CSV for the accountant.
+**Nuits Receipts** is a receipt inbox that runs on Cloudflare Workers. Freelancers and sole traders deploy their own copy into their own Cloudflare account. Receipts arrive by email or upload, AI reads them, the app suggests matches against the bank statement and flags what is missing, and at month end it prepares a ZIP and a CSV for the accountant. Every finance document it holds (receipts, sales invoices, bank statements, other finance papers and the month packages that were sent) stays findable and readable on Home: search the details and the words inside a PDF, browse folders that build themselves, and read the file in the app.
 
 - **Audience:** freelancers and sole traders who already use Cloudflare and dread month end. The second readers are their accountants, and the contributors who change the code.
-- **The job it does:** gets the month closed without a fight.
-- **What it is not:** bookkeeping, tax or VAT advice, an archive, or a service someone else runs for you. The owner checks every figure and the accountant decides.
+- **The job it does:** gets the month closed without a fight, and finds any document again in seconds.
+- **What it is not:** bookkeeping, tax or VAT advice, a records system with a retention policy, OCR for photos, or a service someone else runs for you. The owner checks every figure and the accountant decides.
+- **Retention:** "Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket." Use this line word for word wherever retention comes up.
 
 ### Names
 
@@ -66,6 +67,8 @@ These lines came out of the legal and copy reviews. Use them word for word or no
 | Privacy | "Nuits never sees your data." | "never leaves your account", "stays in your account", "bank-grade", "secure by design" |
 | Banks | "Imports CSV exports from banks that provide one: presets for some layouts and a column mapper for others." Name a bank only when a preset ships for it. | "any bank" without a qualifier, "integration", "partner", "official", bank logos or bank colours |
 | Accuracy and law | "Check every figure. Not tax or accounting advice. No warranty. Not affiliated with Cloudflare or any bank." | "VAT-compliant", "compliant", "tax-ready", "audit-proof", "100% accurate", "never miss", "guaranteed", "does your bookkeeping", "replaces your accountant", "calculates your VAT", "integrates with" |
+| Keeping documents | "Keep originals as your local law requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket." | "legally compliant archive", "retention-compliant", "GoBD", "replaces your filing" |
+| Search | "Searches the details it read and the words inside PDFs. Photos are found by their details." | OCR as a feature, "reads the words in your photos" |
 | AI models | "Clairic", plus once per surface that it is a Cloudflare preview model. | Clairic as the headline |
 | Proof | Measured figures only, or nothing. | testimonials, "trusted by", "thousands of", user counts, logos, placeholders |
 
@@ -168,6 +171,30 @@ These principles come from the app, and they apply to any product surface built 
 6. **Undo before confirm.** An action that can be undone runs at once and offers Undo. Only an action that loses data asks first.
 7. **Say what happened.** After every action, a banner names what changed and offers Undo when it can.
 8. **Desktop and phone are equal.** A sidebar on a computer, a tab bar on a phone, targets of at least 44px, and a way back on every screen.
+
+### Home: the month, then the archive
+
+Home keeps its name and holds every finance document: receipts, sales invoices, bank statements, other finance documents and the month packages that were sent. From the top:
+
+1. **Search first.** One large field, "Seller, amount, date or any word". It searches the details the app read (seller, client, invoice number, filename, sender, subject, amounts, dates) and the words inside PDFs. Cmd+K (Ctrl+K off a Mac) opens quick find on any page.
+2. **This month's close** as a compact strip of three steps, Check, Match and Send, with the setup checklist while setup is unfinished. The month's work stays one tap away, but it no longer fills the page.
+3. **The archive**: the drawer of folders, the list, and the preview.
+
+| Width | Layout |
+| --- | --- |
+| 1100px and up | Drawer \| list \| preview. The drawer sits on the left, the list in the middle, and an opened document in a preview pane on the right. |
+| Narrower | The list, then **Folders** below it. An opened document takes the whole screen, with **Back to the list**. |
+
+Folders are virtual: each one is a filter built from the data (Everything, Starred, Recently opened, Saved searches, Years with their months, Kinds, Sellers, Clients, Tags, Opened lately), so nothing can be misfiled and there is nothing to tidy. A year, seller or client folder opens on an overview: the total in EUR, the file count, files without a euro amount, payments missing a receipt, and 12 monthly bars.
+
+**The filing-drawer look.** It is the money-paper idea applied to a drawer, drawn in the app's own tokens (`src/archive-css.ts`):
+- **Year dividers** are tabbed index cards. The tab is a slightly darker warm-paper tone (`--surface-tab`) edged with a guilloche hairline, and the year is set in Bricolage at display weight. The year's months hang below the tab on the raised sheet.
+- **The preview** is a white slip with the logo's zigzag torn foot. Its facts sit in a ledger of dashed rules, figures in DM Mono with tabular numerals, above the document itself.
+- One soft shadow lifts the slip. Nothing else in the drawer is raised.
+
+**The viewer** is the same everywhere a file opens (the receipt page, the preview pane, file pages): a self-hosted PDF.js viewer with zoom, fit, rotate, a page counter, thumbnails for long PDFs, find in the PDF and print. Pictures get zoom and rotate. Without script, or when the viewer fails, the PDF's text and a Download link show instead, so the page still works.
+
+Stars, tags and a note belong to every document. Star and tag changes run at once and offer Undo, as every other reversible action does.
 
 ### Controls and states in the app
 

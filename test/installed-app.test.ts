@@ -16,7 +16,7 @@ test('screens that are not a tab have a way back to their list or to Home', asyn
   ]);
   // The receipt page already has its crumb; the tabs are their own way out.
   const row = await seed({ status: 'ready' });
-  expect(crumb(await (await request(`/receipts/${row.id}`)).text())?.[1]).toMatch(/Receipts|To do/);
+  expect(crumb(await (await request(`/receipts/${row.id}`)).text())?.[1]).toMatch(/Home|To do/);
 });
 
 test('the question and the import preview go back to Bank', async () => {

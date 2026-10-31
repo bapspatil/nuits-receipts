@@ -1,4 +1,5 @@
 import { EXPONENTS, hash, InputError, MAX_CSV_BYTES, minor, money, requireInput } from './domain';
+import { keepStatementPdf } from './files';
 import type { Env } from './env';
 import { validateAccountChoice, type AccountChoice } from './accounts';
 import {
@@ -117,7 +118,12 @@ export async function readBytes(env: Env, form: FormData): Promise<Uint8Array> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     // A spreadsheet or PDF statement becomes a CSV here; every later step reads that CSV.
     if (isXlsx(bytes)) return xlsxToCsv(bytes).catch(fileField);
-    if (isPdf(bytes)) return pdfToCsv(env, bytes).catch(fileField);
+    if (isPdf(bytes)) {
+      const csv = await pdfToCsv(env, bytes).catch(fileField);
+      // The PDF stays beside the CSV it became, for the statement's page on Home.
+      await keepStatementPdf(env, bytes, csv);
+      return csv;
+    }
     return bytes;
   }
   return bytesFromForm(form);

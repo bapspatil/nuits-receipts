@@ -35,12 +35,15 @@ section is for and lists its pages with `<CardGrid>`/`<Card href>` or a list.
   Ranges use a hyphen or "to".
 - Say what the app does, not what it guarantees. It *suggests* matches, *prepares* a
   CSV, *reads* receipts with AI. Figures are AI-extracted and the user checks them.
-  It is not tax, VAT or accounting advice and not a bookkeeping system or archive.
+  It is not tax, VAT or accounting advice and not a bookkeeping system. It keeps every
+  document findable on Home; for retention say exactly "Keep originals as your local law
+  requires. Nuits Receipts keeps a copy in your own Cloudflare R2 bucket."
 - Banned (the build fails on them): "VAT-compliant", "tax-ready", "audit-proof",
   "100% accurate", "never miss", "guaranteed", "bank-grade", "secure by design",
   "does your bookkeeping", "replaces your accountant", "calculates your VAT",
   "integrates with", "free to run", "compliant", "integration", "partner",
-  "official", "never leaves your account", "stays in your account". Say
+  "official", "never leaves your account", "stays in your account",
+  "legally compliant archive", "retention-compliant", "GoBD", "replaces your filing". Say
   "Nuits never sees your data" for the privacy point. Say "connect" or "upload to
   OneDrive" rather than "integration".
 - Product name is "Nuits Receipts". Never put "Cloudflare" in the product name.
@@ -146,6 +149,7 @@ Use it every month:
 - `how-to/pair-an-own-account-transfer`
 - `how-to/sort-costs-with-vendor-rules`
 - `how-to/send-the-month-to-your-accountant` (ZIP or CSV, I've sent it, changes after sending)
+- `how-to/find-any-document` (Home's folders, search syntax, quick find, saved searches, tags, notes, stars, Download folder, other documents)
 - `how-to/troubleshoot`
 For accountants:
 - `how-to/open-a-month-package` (what to open first, how to check totals against originals)
@@ -163,6 +167,7 @@ For contributors:
 - `reference/bank-csv-import` (mapping fields, accepted formats, presets, dedupe rules)
 - `reference/receipt-fields-and-flags` (extracted fields, statuses, every review flag and what triggers it)
 - `reference/app-pages` (every page in the app: path and what it shows)
+- `reference/pdf-viewer` (the viewer's buttons, keys, fallback and assets)
 - `reference/limits` (file sizes, types, Cloudflare plan limits)
 - `reference/outside-calls` (every outbound call: who, when, what is sent)
 - `reference/data-model` (D1 tables and R2 keys, for contributors)
@@ -178,5 +183,5 @@ For contributors:
 - `explanation/email-and-sender-trust` (allowlist, SPF, why unproven mail is kept unread)
 - `explanation/privacy-and-your-data` (your account, what Nuits sees, logs, outside calls)
 - `explanation/running-costs`
-- `explanation/what-it-does-not-do` (not bookkeeping, not advice, not an archive; your accountant decides)
+- `explanation/what-it-does-not-do` (not bookkeeping, not advice, not a records system; your accountant decides)
 - `explanation/for-accountants` (how the figures were produced, what to trust, what to check)

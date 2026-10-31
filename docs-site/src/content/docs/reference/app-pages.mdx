@@ -14,7 +14,7 @@ Every page has the same four links, in this order, each with an icon. On a wide 
 | Link | Path | Badge | Marked on |
 | --- | --- | --- | --- |
 | Home | `/` | | Home |
-| Receipts | `/receipts` | Number of items in Receipts To do | Receipts To do and All, Invoices, Add, and a document |
+| Receipts | `/receipts` | Number of items in Receipts To do | Receipts To do, Invoices, Add, and a document |
 | Bank | `/payments` | Number of payments missing a receipt | Bank and the bank statement import |
 | Settings | `/settings` | | Settings |
 
@@ -22,23 +22,26 @@ In Access mode the header also shows **Sign out**, which goes to `/cdn-cgi/acces
 
 Every page ends with a short notice: check every figure, it is not tax or accounting advice, there is no warranty, and the app is not affiliated with Cloudflare or with any bank.
 
-**Receipts** and **Bank** each have a **To do | All** switch at the top, with the count of each. To do is the default: what needs you, open items first. All is everything, to browse. In Receipts All, a second switch picks **Receipts** or **Invoices**, and the month arrows show.
+**Bank** has a **To do | All** switch at the top, with the count of each. To do is the default: what needs you, open items first. All is every payment in the month. **Receipts** keeps To do as its work queue; browsing every document is on **Home**, and old Receipts All links open there.
 
-Month screens (Home, Bank, Invoices, and Receipts All with `month`) use the month as their title, between links to its neighbours: ‹ Aug  September 2026  Oct ›.
+Quick find opens on every page with `Cmd+K` (`Ctrl+K` off a Mac), or `/` on a page without its own search field. It lists the first matches from `/search.json` as you type.
+
+Month screens (Home's month strip, Bank and Invoices) use the month as their title, between links to its neighbours: ‹ Aug  September 2026  Oct ›.
 
 ## Pages
 
 | Path | Title | Query parameters | What it shows |
 | --- | --- | --- | --- |
-| `/` | The month, or "Welcome" on first run | `month`, `anyway`, `undated`, `changes`, `sent`, `upload`, `wait` | Until setup is done, the checklist **Finish setting up** ("1 of 5 done"): business name, Email Routing, accountant, bank account and first bank statement, each linking to where it is done, and the link "New here? See what the words mean." to **Help**. On first run, an upload form with **Upload** and **Add several**. Otherwise three rows, **Check**, **Match** and **Send**, each marked Done, Next or To do with a short status such as "1 to check, 1 undated", "All checked", "1 missing", "No statement", "All matched", "Ready" or "Sent 24 Oct", and one primary button for the next step: **Add receipt**, **Start checking**, **Import statement** or **Start matching**. When the month is ready, the total spent, **Download ZIP** (with its size), **CSV** and, under "Did you send it?", **Mark September as sent** (with the month's name). Before that, the same are under **Download anyway**, with the total spent, a box to add undated receipts, a CSV link, **In the ZIP** and **By part**. After sending, **On to October ›**, **Download again** and **CSV**; if the month changed since, **Download changes** and **Download all**. An alert links to overdue invoices or unverified emails, and a last line such as "2 receipts, 1 invoice dated September ›" opens Receipts All for the month. |
+| `/` | Home, or "Welcome" on first run | `in` (the folder: `year:2026`, `vendor:<name>`, `client:<name>`, `kind:expense`, `kind:sales`, `kind:other`, `kind:statement`, `kind:package`, `tag:<tag>`, `starred` or `recent`), `q` (the [search](/how-to/find-any-document/#search)), `before` (the cursor for older rows), `open` (the document shown in the preview pane), `show`, `month`, `anyway`, `undated`, `changes`, `sent`, `upload`, `wait` | First a search field, **Seller, amount, date or any word**, with **Save search**. Then the month as a strip of three steps, described below. Then the archive: on a screen 1100 pixels wide or more, the drawer of folders (**Everything**, **Starred**, **Recently opened**, **Saved searches**, the years with their months, **Kinds**, **Sellers**, **Clients**, **Tags**, **Opened lately**), the list, 50 rows per page with older rows behind a cursor, and the preview pane for `open`, with the document's viewer, its details, **Star**, its tags with **Add a tag**, and **Note**. Narrower, the list, then **Folders**; an opened document fills the screen with **Back to the list**. A year, seller or client folder starts with its overview: total in EUR, **Files**, **Without a euro amount**, **Payments missing a receipt** and 12 monthly bars. **Download folder** gets the folder or search as a ZIP. The month strip: until setup is done, the checklist **Finish setting up** ("1 of 5 done"): business name, Email Routing, accountant, bank account and first bank statement, each linking to where it is done, and the link "New here? See what the words mean." to **Help**. On first run, an upload form with **Upload** and **Add several**. Otherwise three rows, **Check**, **Match** and **Send**, each marked Done, Next or To do with a short status such as "1 to check, 1 undated", "All checked", "1 missing", "No statement", "All matched", "Ready" or "Sent 24 Oct", and one primary button for the next step: **Add receipt**, **Start checking**, **Import statement** or **Start matching**. When the month is ready, the total spent, **Download ZIP** (with its size), **CSV** and, under "Did you send it?", **Mark September as sent** (with the month's name). Before that, the same are under **Download anyway**, with the total spent, a box to add undated receipts, a CSV link, **In the ZIP** and **By part**. After sending, **On to October ›**, **Download again** and **CSV**; if the month changed since, **Download changes** and **Download all**. An alert links to overdue invoices or unverified emails, and a last line such as "2 receipts, 1 invoice dated September ›" opens Home's list for the month. |
 | `/month` | | any | Redirects (temporarily, 302) to `/` with the same query string. |
 | `/more` | | | Redirects (temporarily, 302) to `/settings`. |
 | `/review`, `/review/merge` | | any | Redirect (302) to Receipts To do, keeping `month`. |
-| `/invoices` | | any | Redirects (302) to Receipts All with the Invoices switch, keeping `month`. |
+| `/invoices` | | any | Redirects (302) to Invoices (`/receipts?view=all&kind=sales`), keeping `month`. |
 | `/receipts` (To do, the default) | "N to do", or "All checked" | `view=todo`, `month` (receipts dated in the month plus every undated one), `upto` (rows shown, 50 more each time, up to 500), `done` (result banners) | Mail from new senders first, each with **Allow** and **Ignore** (Ignore asks first). Then receipts that need a required fact and sales invoices past their due date, undated first, then the oldest, under a header such as "50 of 132 to do" with the page's one primary, **Start checking**. Each row has the name, amount, date and one status. **Show 50 more** adds the next rows. With nothing open, "All checked" and the month's next step. |
-| `/receipts?view=all` | "Receipts", or the month with `month` | `view=all`, `month`, `q` (seller or client, also file name, invoice number, sender and subject; searches every month), `show`: `reading`, `duplicate` or `discarded`, `kind=sales` (Invoices), `before` (the cursor for older rows) | Every receipt, newest received first, 50 per page with **Older** and **Newest**. Each row has the name, the amount, the date (or "Undated") and its status. One search field with **Search**, and **Add receipt**. **Merge N duplicates** shows when copies are waiting. |
+| `/receipts?view=all` | | `month`, `q`, `show`, `before` | Redirects (302) to Home with the same filter. With `kind=sales`, it is Invoices (below). |
+| `/files/<key>` | The file's title or name | | A file that is not a receipt or invoice: an other document (its viewer, **Download**, and its title and date to edit), a bank statement (the PDF in the viewer when it was kept, then **The rows imported** as a table, and **Download PDF** or **Download CSV**), or a sent month package (**The index as sent**, **Download the ZIP as sent**, or **Download the month as it is now** for a month sent before v2.0.0). |
 | `/receipts/<id>` | The document's seller or file name | `from` (`todo` or `all`), `month`, `q`: the list it was opened from; `done` (result banners) | **The original** beside the fields. The crumb leads back to the list it came from (**‹ To do**, **‹ Receipts** or **‹ Invoices**). While it needs you, a **Needs you** stamp, the fields to fill first, and a bar at the bottom with its place ("1 of 2 to check"), **Skip**, **Discard**, **More** and **Approve receipt** (**Approve invoice** for a sales invoice). On a phone the bar stays above the keyboard. **Approve receipt** saves and opens the next open item of the same list and month; after the last, the list. **Save** for a ready document, with **Next to check ›** when one waits, and **Read it** for an email that could not be verified. **Payment?** lists likely bank payments, each with **Match** and, when the pair is not exact, its reason. A discarded document shows **Discarded**, the crumb **‹ Discarded** and **Restore**. **More** has two groups: the document (**Read again**, **Move to invoices** or **Move to receipts**, the original, **Always file as**) and its status. Move asks first, since it clears facts. A sales invoice shows its money in, with **Paid another way?**, instead of **Payment?**. |
-| `/add` | Add receipts or invoices | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or **Invoices you sent**, and the email addresses to forward to. |
+| `/add` | Add receipts or invoices | `kind`: `sales`; `added`, `failed` (result counts) | Upload of up to 10 files at once, as **Receipts and bills** or **Invoices you sent**, and the email addresses to forward to. **Another finance document** keeps one file (PDF or photo) with a title and a date; it is never read for amounts, matched, packaged or counted. |
 | `/payments` | The month | `month`, `view`: `todo` (the default) or `all`, `upto` (To do rows shown, 50 more each time, up to 500), `done` (result banners, including the import's) | Bank rows booked in the month from completed imports, under a line for the whole month such as "4 out, 2 matched, 1 not a purchase, 1 missing". **To do** lists money out with no receipt, oldest first, with a count such as "50 of 60 to do", the page's one primary, **Start matching**, and **Show 50 more**; with nothing open, "Every payment has a receipt." and the month's next step. **All** lists the whole month. Each row has the name, amount, date and one status: **Missing**, **Matched** with a **Receipt** or **Invoice** link, "Transfer to `<account>`" or "Transfer from `<account>`", **Not a purchase**, or money in. A missing payment shows its likely receipt with **Match** (and the reason when the pair is not exact), a search for another receipt, and **Not a purchase**. Exact likely pairs are offered together with **Match all**. Each row's **More** holds **Unmatch**, **Needs a receipt**, the account and payment ID and, on unmatched money out, the own-account pairing form. "Also missing: August (2)" links to other months. |
 | `/import` | Import a bank statement | | The [bank import](/reference/bank-csv-import/): a file field and **Import statement**. It asks which account only when it cannot tell. |
 | `/import/anyway` | Import anyway | `import` | Adds the payments skipped as already imported, as extra payments. |
@@ -58,20 +61,20 @@ In page order. Each section is a fold, closed by default, with a one-line summar
 | Email | `#email` | Receipt address, or "Off", and the number of allowed senders | Receipt address, invoice address, forward copy address, and **Email senders** (`#senders`): allowed senders with **Remove**, an address box with **Add**, ignored senders with **Stop ignoring**, and **Mail we didn't keep** (`#mail`), the latest 50 emails that were not read, with **Allow**. |
 | Bank | `#bank` | Number of accounts | Bank accounts with bank and currency, and **Add account**. |
 | Sending | `#sending` | Accountant name | Accountant, export file name, the note under the month download, and **OneDrive** when `MS_CLIENT_ID` is set (**Connect**, the folder, and **Disconnect**, which asks first). |
-| Advanced | `#advanced` | | The review and matching thresholds, the source code link, read-only deploy values, the change history, and **About** (`#about`): the no-warranty notice, the data line, the licence and the trademark lines. |
+| Advanced | `#advanced` | | **Search**: how many older files are not yet searchable by their words, with **Index older files (N left)**, 25 per press. The review and matching thresholds, the source code link, read-only deploy values, the change history, and **About** (`#about`): the no-warranty notice, the data line, the licence and the trademark lines. |
 
 Each field is a label and an input; its help is the field's tooltip. **Reset** shows next to a value set in the app. See [Configuration](/reference/configuration/).
 
 ## Select several
 
-Receipts To do and All, Invoices, Bank and the sender lists in **Settings > Email** have a tick box on every row, on every screen size. Ticking a row shows a bar with the count ("3 selected"), **Clear** and the list's actions. An action that cannot be undone asks first.
+Receipts To do, Home's list, Invoices, Bank and the sender lists in **Settings > Email** have a tick box on every row, on every screen size. Ticking a row shows a bar with the count ("3 selected"), **Clear** and the list's actions. An action that cannot be undone asks first.
 
 Shift-click ticks a range, `x` ticks the focused row and Esc clears. **Select all N** ticks every row under the list's filter and month, across pages; above 500 it reads **Select the first 500**, in the list's order. These need JavaScript; without it, the boxes and the bar work for the rows on the page.
 
 | List | Actions |
 | --- | --- |
 | Receipts To do | **Approve** (receipts missing a required fact are skipped), **Discard** |
-| Receipts All | **Discard**, **Read again**, **Move to invoices** or **Move to receipts**. Under Discarded, only **Restore**. |
+| Home's list (receipts only) | **Discard**, **Read again**, **Move to invoices** or **Move to receipts**. Under Discarded, only **Restore**. |
 | Invoices | **Mark paid**, **Discard**, **Read again** |
 | Bank | **Match** (only payments with an exact likely receipt), **Not a purchase**, **Needs a receipt**, **Unmatch** |
 | Settings > Email senders | **Remove** for allowed senders, **Stop ignoring** for ignored ones |
@@ -85,7 +88,11 @@ The banner says how many changed and how many were skipped, and offers **Undo**.
 | `/export.csv` | `month` | [Receipts CSV](/reference/export-csv/) for the month. |
 | `/export-sales.csv` | `month` | [Sales CSV](/reference/export-csv/#sales-csv-columns) for the month. |
 | `/month/package.zip` | `month`, `anyway`, `undated`, `changes` | [Month package](/reference/month-package/) ZIP. |
-| `/originals/<id>` | `variant=email`: the source email instead of the document. `view=inline`: show a PNG, JPEG or WebP image in the browser. | The original, as a download unless `view=inline`. |
+| `/originals/<id>` | `variant=email`: the source email instead of the document. `view=inline`: show a PNG, JPEG or WebP image in the browser. `view=raw`: the PDF or picture itself, for the [PDF viewer](/reference/pdf-viewer/), never an email; supports `Range` and `ETag`. | The original, as a download unless `view=inline` or `view=raw`. Never cached. |
+| `/files.zip` | The Home folder and search: `in`, `q`, `month`, `show` | The receipts, invoices and other documents it shows, in `Year/Month` folders, with `00-index.csv`. Up to 900 files; a bigger folder is refused with a message to narrow it. |
+| `/files/<key>/original` | `view=raw` for the viewer | The file behind a file page. |
+| `/files/<key>/package.zip` | | The month package as it was sent. |
+| `/search.json` | `q` | The first matches for quick find. |
 
 ## Form actions
 
@@ -96,6 +103,11 @@ Each form posts to one of these paths and then redirects (303).
 | `/accounts`, `/accounts/<id>` | Add or rename a bank account. | `/settings#accounts` |
 | `/transfers`, `/transfers/<id>/undo` | Pair or undo an own-account transfer. | Bank for the month the money left, `#transfers` |
 | `/receipts/bulk`, `/payments/bulk`, `/senders/bulk` | Run one [bulk action](#select-several) on the ticked rows, or with `all=1` on every row the list's filter matches. A post without its list state is refused with 400. | The list it came from, at the next open row, with a result banner and **Undo** |
+| `/documents` | Add another finance document. | Its file page |
+| `/files/<key>` | Change an other document's title or date. | Its file page |
+| `/marks/star`, `/marks/tag`, `/marks/untag`, `/marks/note` | Star or unstar, add or remove a tag, or save a note on any document. Star and tag changes offer **Undo**. | Home as it was, with the document open |
+| `/searches`, `/searches/<id>/delete` | Save or remove a saved search. | Home |
+| `/settings/index` | Index the words of the next 25 older files. | `/settings` |
 | `/rules` | Add a vendor rule. | The receipt it was made from, else `/settings#rules` |
 | `/rules/<id>`, `/rules/<id>/delete` | Change or delete a vendor rule. Unknown IDs return 404; a rule with the same seller and context text returns 409. | `/settings#rules` |
 

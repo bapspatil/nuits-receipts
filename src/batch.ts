@@ -22,7 +22,7 @@ import { BULK_MAX, likelyPairs, matchableReceipts, matchLikely, unlinkMatches } 
 import { withDone, type EventKey } from './events';
 import { undoAt, withUndo, type UndoAt, type UndoOp } from './undo';
 import { kindWrites, paidFields, processReceipt } from './receipts';
-import { filterIds, parseQuery, SHOW } from './all';
+import { filterIds, SHOW, stateQuery } from './archive';
 import {
   cursorFor,
   landing,
@@ -199,11 +199,7 @@ async function allOf(env: Env, s: ListState): Promise<string[]> {
     return (await invoiceRows(env, month(s.month), invoiceShow(s.show))).shown.slice(0, BULK_CAP).map((r) => r.id);
   if (s.view === 'todo')
     return (await openRows<{ id: string }>(env, LIST_DEFS.receipts!, s, BULK_CAP)).map((r) => r.id);
-  return filterIds(
-    env,
-    parseQuery(new URLSearchParams({ show: s.show ?? '', month: s.month ?? '', q: s.q })),
-    BULK_CAP,
-  );
+  return filterIds(env, stateQuery(s), BULK_CAP);
 }
 const RECEIPTS: Endpoint = {
   ops: OPS,

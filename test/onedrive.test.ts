@@ -448,8 +448,8 @@ test('uploads run in batches of ten and continue without JavaScript', async () =
   const page = await (await at(await signed('/app/?month=2026-10&anyway=1&done=driveMore&n=10&of=12', '/app'))).text();
   expect(page).toContain('10 of 12 uploaded.');
   expect(page).toContain('<input type="hidden" name="anyway" value="1">');
-  // No refresh and no script the flow depends on; keys.js and app.js only enhance the page.
-  expect(page).not.toMatch(/http-equiv|<script(?! src="\/app\/assets\/(keys|app)\.js")/);
+  // No refresh and no script the flow depends on; keys.js, find.js, bulk.js and app.js only enhance the page.
+  expect(page).not.toMatch(/http-equiv|<script(?! src="\/app\/assets\/(keys|find|bulk|app)\.js")/);
   const second = await post('/app/month/onedrive-upload', { month: '2026-10', anyway: '1' });
   expect(locationOf(second)).toBe('/app/?month=2026-10&anyway=1&done=driveDone&n=12&of=12#send');
   expect(await env.DB.prepare('SELECT count(*) n FROM onedrive_uploads').first('n')).toBe(12);

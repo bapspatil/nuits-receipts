@@ -17,12 +17,19 @@ One Cloudflare Worker with server-rendered HTML. No SPA, ORM, cron triggers or q
 | `src/undo.ts` | The undo log: which actions can be undone, their snapshots and the restore. |
 | `src/actions.ts`, `src/status.ts`, `src/icons.ts`, `src/row.ts` | The control and status registries, the generated Lucide sprite, and the one row every list renders. |
 | `src/keys.ts` | Desktop keyboard shortcuts, the `?` sheet and the pending cue on submit, served at `/assets/keys.js`. |
+| `src/archive.ts`, `src/archive-css.ts` | Home's archive: the item kinds (`DOC_KINDS`), the virtual folders (`parseFolder`), the drawer, the list, the overviews and the preview pane, and the filing-drawer CSS. |
+| `src/search.ts` | Search: `parseQuery` (words, quoted phrases, amounts, ranges, dates, `kind:`, `tag:`), `searchSql`, and the normalised `search_text` each file is indexed into. |
+| `src/viewer.ts` | The document viewer on self-hosted PDF.js (`/assets/viewer.js`, `/assets/pdf.mjs`, `/assets/pdf-worker.mjs`). |
+| `src/find.ts` | Quick find, Cmd+K or Ctrl+K on every page, served at `/assets/find.js` and fed by `/search.json`. |
+| `src/files.ts` | Other documents, kept statement PDFs, sent package snapshots, file pages, the folder ZIP and the quick-find lookup. |
+| `src/marks.ts` | Stars, tags, notes, saved searches and recent views. |
+| `src/serve.ts` | File responses for originals: `Range`, `ETag` and the private, no-store headers. |
 | `schema/` | Bootstrap schema for a new installation, applied by `bun run deploy`. |
 | `migrations/` | Upgrade chain for databases created before `schema/` (ledger `d1_migrations`). Applied files are never changed. See `migrations/README.md`. |
 
 ## Bulk actions
 
-`src/bulk.ts` renders the one shared select component (row tick boxes, the select tools and the action bar) and the action labels for each list, and builds the client script served at `/assets/bulk.js`. The script embeds the pure selection reducer `select` from the same file, so the tests and the browser run the same code. `src/batch.ts` holds the server side: a registry of ops per route (`/receipts/bulk`, `/payments/bulk`, `/senders/bulk`), one id parser per route at the boundary, and the same per-row guards as the single actions. With `all=1` the server resolves the ids from the list's own filter instead of trusting the page. `BULK_CAP` is 500 ids per request and per `all=1`; ops that call the model (Read again, Move) take `AI_CAP` (10) per request, and the script sends them in chunks. Without JavaScript the tick boxes and bar are a plain form. App pages now send `script-src 'self'`; scripts are files, never inline.
+`src/bulk.ts` renders the one shared select component (row tick boxes, the select tools and the action bar) and the action labels for each list, and builds the client script served at `/assets/bulk.js`. The script embeds the pure selection reducer `select` from the same file, so the tests and the browser run the same code. `src/batch.ts` holds the server side: a registry of ops per route (`/receipts/bulk`, `/payments/bulk`, `/senders/bulk`), one id parser per route at the boundary, and the same per-row guards as the single actions. With `all=1` the server resolves the ids from the list's own filter instead of trusting the page. `BULK_CAP` is 500 ids per request and per `all=1`; ops that call the model (Read again, Move) take `AI_CAP` (10) per request, and the script sends them in chunks. Without JavaScript the tick boxes and bar are a plain form. App pages now send `script-src 'self'` and `worker-src 'self'` (for the PDF.js worker), with no `frame-src`; scripts are files, never inline.
 
 ## Service worker
 
@@ -52,14 +59,36 @@ The import's completion goes through `withUndo` as `op: 'import'` with the impor
 
 ## Work lists
 
-Receipts and Bank each render one work list in two views, To do and All, from one model in `src/worklist.ts`. `ListState` is the list (`receipts`, `invoices` or `bank`), the view, the month, the search and `upto`. `ListDef` holds, per list, its stable order (ending in `id`) and its open set as an SQL predicate with its own binds. Receipts To do is a receipt that needs a required fact or a sales invoice past its due date, and Bank To do is money out with no receipt that is not a transfer leg. Mail from new senders shows above Receipts To do as its own rows, outside the count.
+Receipts and Bank each render one work list in two views, To do and All (Receipts All is Home's archive list, see below), from one model in `src/worklist.ts`. `ListState` is the list (`receipts`, `invoices` or `bank`), the view, the month, the search and `upto`. `ListDef` holds, per list, its stable order (ending in `id`) and its open set as an SQL predicate with its own binds. Receipts To do is a receipt that needs a required fact or a sales invoice past its due date, and Bank To do is money out with no receipt that is not a transfer leg. Mail from new senders shows above Receipts To do as its own rows, outside the count.
 
 - **To do** filters in SQL and renders the first `upto` rows (50, then "Show 50 more", at most `BULK_CAP`, 500). There is no offset, so a resolved row drops out and the next open row moves up. The header count, the To do and All switch counts, select-all and the bulk bar all read the same predicate, month-wide.
-- **All** is for browsing. Receipts All pages newest first with a keyset cursor (Older, Newest), never an offset. Bank All lists the whole month, oldest first, and moves by month.
+- **All** is for browsing. Receipts All is the list on Home (`/`, `data-list="receipts-all"`), newest first with a keyset cursor, never an offset; `/receipts?view=all` redirects there with its filter (except `kind=sales`, which is Invoices). Bank All lists the whole month, oldest first, and moves by month.
 - **Every action returns through `listUrl`**, single or bulk: the same list, view, month and search, the signed `done=` event, and `#row-<id>` of the next open row. `nextOpen` runs after the save, from where the acted-on row stood before it (the cursor is captured before the write). Approve on a receipt goes to the next open receipt in the same filter; Skip on the last one ends on the list. A bulk post whose list state is missing answers 400, never a guessed list.
 - `/review` and `/review/merge` answer 302 to Receipts To do.
 
 The observable contract (`data-list`, `data-total`, `data-row`, the URLs) is in `docs/app-v4/CONTRACT.md`, and `test/worklists.test.ts` holds the ten list invariants on a seeded busy month.
+
+## Home and the archive
+
+Home (`/`) keeps the month on top, as a compact strip of Check, Match and Send with the setup checklist while it is unfinished, under one search field. Below it is the archive of every finance document: receipts, sales invoices (`receipts`), other documents (`documents`), bank statements (imports, with the PDF kept beside the CSV from v2.0.0 on; older PDF imports only kept the CSV) and sent month packages (a snapshot of the send, kept when a month is marked sent). Each is an item with a key (`r:`, `d:`, `s:`, `p:<month>@<sent_at>`), which is what marks, tags and recent views are keyed by.
+
+Folders are virtual: `?in=` is a filter (`year:`, `vendor:`, `client:`, `kind:`, `tag:`, `starred`, `recent`), so nothing is filed by hand. The page is drawer, list and preview at 1100px and up; the preview is server-rendered for `?open=<item>` and reached by normal navigation with view transitions. Narrower, an opened item takes the whole width with a way back.
+
+Search is one `search_text` column per row (lower case, spaces collapsed, capped at 32,000 characters) holding the extracted fields and the PDF text layer, matched with one `instr()` per word. D1 refuses `LIKE` patterns over 50 bytes, and FTS5 virtual tables were ruled out because `wrangler d1 export` refuses databases that have them. Photos have no text layer, so they are found by their fields; there is no OCR. Rows from before the archive have `search_text IS NULL` and are indexed in batches of 25 by `POST /settings/index` and a few on each Home visit; indexing is idempotent and needs no cron. Migration `0012_archive` (`schema/0009_archive.sql` for new installs) adds the column and the `documents`, `marks`, `tags`, `saved_searches` and `recent_views` tables.
+
+The viewer renders PDFs with self-hosted PDF.js (eval and XFA off) from `/originals/<id>?view=raw` or `/files/<key>/original?view=raw`, which serve the PDF or image bytes (never email), with `Range` and `ETag`, still `private, no-store`. The server renders the fallback (the PDF's text, or the image) and the toolbar in a `<template>`; the script swaps in the pages only once the document has loaded. The browser's own PDF viewer in a frame was ruled out (iOS Safari shows only page one, and the CSP would need `frame-src`).
+
+| Route | Does |
+| --- | --- |
+| `GET /search.json` | Quick find's first matches. |
+| `GET /files.zip` | A folder or search as a ZIP: `Year/Month` folders and `00-index.csv`, up to 900 files. |
+| `GET`, `POST /files/<key>` | A file page (other document, statement, package); POST edits an other document's title and date. |
+| `GET /files/<key>/original`, `GET /files/<key>/package.zip` | The file behind it, and a sent package as it was sent. |
+| `POST /documents` | Add another finance document. |
+| `POST /marks/(star\|tag\|untag\|note)` | Marks on any item. Star and tag changes have Undo. |
+| `POST /searches`, `POST /searches/<id>/delete` | Save or remove a saved search. |
+| `POST /settings/index` | Index the next batch of older files. |
+| `GET /assets/viewer.js`, `/assets/pdf.mjs`, `/assets/pdf-worker.mjs`, `/assets/find.js` | The viewer, PDF.js and its worker, and quick find. |
 
 ## Live updates
 
@@ -69,7 +98,7 @@ A resolved row leaves by a cross-document view transition, with no script moving
 
 Every button and button-link renders from `ACTIONS` in `src/actions.ts`: one label, one Lucide icon and one tone per action key, shared by single buttons, the bulk bar and Undo. Only a view's one main action is primary ("Start checking", "Start matching"), and it sits in the list header, never in a row. Undoable actions are secondary or ghost; red is only for permanent delete behind a confirm step. `STATUS` in `src/status.ts` gives each state one word, tone and icon (Needs you, Reading, New sender, Overdue, Missing, Ready, Matched, Not a purchase, Sent, Discarded, Duplicate, Paid, Unpaid), and Help's "Words you see" is typed over its keys. `src/icons.ts` is generated by `bun run sprite` (`scripts/app-sprite.mjs`) from `lucide-static` and emitted once per page as an inline `<symbol>` sprite. `test/actions.test.ts` renders every page and fails when a button lacks an icon or a word, or a row holds a primary.
 
-`row()` in `src/row.ts` is the one row component: tick box, title (a link stretched over the row), meta line, amount, status and row actions. Receipts To do and All, held mail, Bank and the Settings lists all use it.
+`row()` in `src/row.ts` is the one row component: tick box, title (a link stretched over the row), meta line, amount, status and row actions. Receipts To do, Home's archive list, held mail, Bank and the Settings lists all use it.
 
 ## The look
 
@@ -77,7 +106,7 @@ The look is the Mix from `docs/app-v4/mockups/`: Warm paper's palette and type (
 
 ## Keyboard
 
-`src/keys.ts` adds one keydown listener and one submit listener on every page, served at `/assets/keys.js`: `j` and `k` move between rows, `Enter` opens one, `a` and `s` approve and skip on a receipt, `u` posts the banner's Undo, `/` focuses search and `?` opens the sheet. `x` and Escape stay in `bulk.js`. The keys are off while typing and on touch-only devices. The same table (`KEY_GROUPS`) prints the sheet and the Help page. A post form's submit button shows a pending cue so a second press does nothing.
+`src/keys.ts` adds one keydown listener and one submit listener on every page, served at `/assets/keys.js`: `j` and `k` move between rows, `Enter` opens one, `a` and `s` approve and skip on a receipt, `u` posts the banner's Undo, `/` focuses the page's search field (or opens quick find where there is none) and `?` opens the sheet. Cmd+K or Ctrl+K opens quick find (`src/find.ts`), and the viewer adds `+`, `-`, `0`, `r`, `n`, `p` and `f`. `x` and Escape stay in `bulk.js`. The keys are off while typing and on touch-only devices. The same table (`KEY_GROUPS`) prints the sheet and the Help page. A post form's submit button shows a pending cue so a second press does nothing.
 
 ## Data rules
 

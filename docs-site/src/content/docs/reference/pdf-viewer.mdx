@@ -1,0 +1,65 @@
+---
+title: PDF viewer
+description: The viewer that shows PDFs and pictures in the app, its buttons, its keys and what shows when it cannot run.
+sidebar:
+  order: 7.5
+  label: PDF viewer
+---
+
+The app shows documents in a viewer of its own, built on PDF.js. PDF.js is served by your Worker from the app's own address, like every other script. No third-party viewer or service is involved, and the file is read from your R2 bucket through the app.
+
+## Where it shows
+
+| Place | What the viewer has |
+| --- | --- |
+| A receipt or invoice page, `/receipts/<id>` | Every button below. |
+| A file page, `/files/<key>` (other documents, bank statements) | Every button below. |
+| Home's preview pane, on a screen 1100 pixels wide or more | **Zoom out**, **Zoom in**, **Fit**, **Rotate** and the page counter. No thumbnails, find or print. |
+
+## Buttons
+
+| Control | Does | PDFs | Pictures |
+| --- | --- | --- | --- |
+| **Zoom out**, **Zoom in** | Changes the size. The current zoom shows between them, such as `100%`. | Yes | Yes |
+| **Fit** | Fits the page to the width of the viewer. This is where it starts. | Yes | Yes |
+| **Rotate** | Turns the document a quarter turn clockwise. | Yes | Yes |
+| Page counter | Shows the page you are on and the number of pages. | Yes | No |
+| Thumbnails | A strip of small pages beside the document, for a PDF with more than one page, on a screen 1100 pixels wide or more. Select one to go to that page. | Yes | No |
+| **Find in the document** | Finds a word or phrase in the PDF's text, highlights every match and shows how many there are. | Yes | No |
+| **Print** | Opens the original in a new tab, to print with your browser. | Yes | Yes |
+
+## Keys
+
+On a computer, while the focus is not in a text field:
+
+| Key | Does |
+| --- | --- |
+| `+` (or `=`) | Zoom in |
+| `-` | Zoom out |
+| `0` | Fit to width |
+| `r` | Rotate |
+| `n` | Next page |
+| `p` | Previous page |
+| `f` | Find in the document |
+
+The keys act on the first viewer on the page. They are off while a dialog, such as quick find or the `?` sheet, is open.
+
+## When the viewer cannot run
+
+The page is complete before the viewer starts. Without JavaScript, or if the PDF cannot be drawn, the viewer is not shown and the page keeps what the server sent:
+
+- For a PDF: the text read from the PDF, and a link to download the original.
+- For a picture: the picture itself.
+
+A bank statement imported as a PDF before v2.0.0 has no PDF kept: only the CSV it was converted to, which its page shows as a table. Statement PDFs uploaded from v2.0.0 on are kept and open in the viewer.
+
+## What it loads
+
+| Path | What it is |
+| --- | --- |
+| `/assets/viewer.js` | The viewer. |
+| `/assets/pdf.mjs`, `/assets/pdf-worker.mjs` | PDF.js and its worker, served by the Worker. The worker is why the app's content security policy allows `worker-src 'self'`. |
+| `/originals/<id>?view=raw` | The receipt's file, for the viewer only. It answers with the PDF or picture itself (never an email), supports `Range` requests, and is never cached (`private, no-store`). |
+| `/files/<key>/original?view=raw` | The same, for other documents and bank statement PDFs. |
+
+PDF.js runs with script evaluation and XFA forms turned off.
