@@ -1214,7 +1214,7 @@ export async function home(
     {
       detail: folder ? name : monthName(selected),
       head: monthHead('/', selected),
-      style: `${VIEW_TRANSITION_CSS}${ARCHIVE_CSS}${opened ? VIEWER_CSS : ''}`,
+      style: `${ARCHIVE_CSS}${opened ? VIEWER_CSS : ''}`,
     },
   );
 }

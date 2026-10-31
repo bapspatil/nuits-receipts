@@ -49,6 +49,12 @@ export const FOLDER_ICONS = {
   saved: 'bookmark',
 } as const satisfies Record<string, IconName>;
 
+// A row's #row- anchor: a receipt's bare id, the one every list action lands on; any other key
+// with its punctuation made safe for an id and a fragment.
+export const rowKey = (r: Pick<ArchiveRow, 'type' | 'id' | 'item'>) =>
+  r.type === 'receipt' ? r.id : r.item.replace(/[^\w-]/g, '-');
+const cursorParam = (c: Cursor | null) => (c ? `${c.day}_${c.at}_${c.item}` : null);
+
 // An item key names one archive row across tables: r:<receipt id>, m:<held mail id>,
 // d:<document id>, s:<import id>, p:<month>@<sent at>.
 export type Item =
@@ -483,15 +489,14 @@ export function archiveList(
       const href = escape(
         r.type === 'mail'
           ? itemPath({ type: 'mail', id: r.id })
-          : homeUrl({ ...base, before: null, open: r.item }) + `#preview`,
+          : // The page and the row stay: the list keeps its place beside the preview.
+            homeUrl({ ...base, before: cursorParam(q.before), open: r.item }) + `#row-${rowKey(r)}`,
       );
       const reading = r.status === 'pending' || r.status === 'processing';
       const name = rowName(r);
       const tags = tagsOf(r);
       return row({
-        // A receipt keeps its bare id, the #row- anchor every list action lands on; other keys
-        // become a CSS name, as the row's view transition is named after its key.
-        key: r.type === 'receipt' ? r.id : r.item.replace(/[^\w-]/g, '-'),
+        key: rowKey(r),
         pick: r.type === 'receipt' ? bulkCheck(bulk, r.id, name) : '',
         date: r.type === 'mail' ? '' : r.type === 'receipt' && !r.issue_date ? 'Undated' : escape(shortDay(r.day)),
         title: `<a href="${href}"${q.open && itemKey(q.open) === r.item ? ' aria-current="true"' : ''}>${icon(kind.icon)}<span>${escape(name)}</span></a>${r.starred_at ? `<span class="starred" title="Starred">${icon('star')}<span class="vh">Starred</span></span>` : ''}`,
@@ -674,8 +679,17 @@ export function pane(o: Opened, q: ArchiveQuery, tagSuggestions: string[]): stri
   const kind = KINDS[kindOf(r)];
   const name = rowName(r);
   const state = stateOf(q);
-  const here = homeUrl({ in: folderParam(q.folder), month: q.month, show: q.show, q: q.q, open: r.item });
-  const close = homeUrl({ in: folderParam(q.folder), month: q.month, show: q.show, q: q.q });
+  const here = homeUrl({
+    in: folderParam(q.folder),
+    month: q.month,
+    show: q.show,
+    q: q.q,
+    before: cursorParam(q.before),
+    open: r.item,
+  });
+  const close =
+    homeUrl({ in: folderParam(q.folder), month: q.month, show: q.show, q: q.q, before: cursorParam(q.before) }) +
+    `#row-${rowKey(r)}`;
   const chip = chipOf(r);
   const rowsOf = (pairs: [string, string][]) =>
     pairs

@@ -284,11 +284,11 @@ test('Home lists receipts and held mail newest first, with filters and paging', 
   expect(await rows({ q: '%' })).toEqual([]);
 
   const html = await (await request('/')).text();
-  expect(html).toContain(`href="/?open=r%3A${needs}#preview"`);
+  expect(html).toContain(`href="/?open=r%3A${needs}#row-${needs}"`);
   expect(html).toContain('<span class="date">30 Aug</span>');
   expect(html).toContain(`<span class="rs">${statusMark('needs')}</span>`);
   const september = await (await request('/?month=2026-09')).text();
-  expect(september).toContain(`href="/?month=2026-09&amp;open=r%3A${ready}#preview"`);
+  expect(september).toContain(`href="/?month=2026-09&amp;open=r%3A${ready}#row-${ready}"`);
   expect(september).not.toContain(`open=r%3A${needs}`);
   expect(html.indexOf(`open=r%3A${dup}`)).toBeLessThan(html.indexOf(`open=r%3A${ready}`));
   expect((await request('/?month=2026-13')).status).toBe(422);

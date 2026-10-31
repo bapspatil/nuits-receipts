@@ -35,11 +35,14 @@ async function approveFields(id: string): Promise<Record<string, string>> {
   };
 }
 
-test('the transition rule is on Home, Receipts To do, Bank and the receipt page, and nowhere else', async () => {
+test('the transition rule is on Receipts To do, Bank and the receipt page, and nowhere else', async () => {
   const b = await seedBusyMonth();
-  for (const path of ['/', '/receipts?view=todo', `/payments?month=${b.month}`, `/receipts/${b.todo[0]}?from=todo`])
+  for (const path of ['/receipts?view=todo', `/payments?month=${b.month}`, `/receipts/${b.todo[0]}?from=todo`])
     expect(await get(path), path).toContain(RULE);
-  for (const path of ['/settings', '/help', '/add']) expect(await get(path), path).not.toContain('@view-transition');
+  // Not Home: its rows change place when the preview opens, and morphing 50 named rows cost
+  // Chrome seconds of style work on every click.
+  for (const path of ['/', '/?open=r%3Ax', '/settings', '/help', '/add'])
+    expect(await get(path), path).not.toContain('@view-transition');
   const css = await get('/receipts?view=todo');
   expect(css).toContain('@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}');
   expect(css).not.toContain('scroll-behavior:smooth');

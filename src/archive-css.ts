@@ -92,5 +92,6 @@ table.csv{font:400 var(--text-sm)/1.4 var(--font-num)}
 @media (max-width:1099px){
 .drawer{order:2}
 .arch.opened>.drawer,.arch.opened>.alist{display:none}
+main:has(.arch.opened)>.hband,main:has(.arch.opened)>.monthband{display:none}
 }
 `;
