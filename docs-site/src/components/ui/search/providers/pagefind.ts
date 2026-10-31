@@ -39,7 +39,7 @@ let pagefind: PagefindApi | undefined;
  * deprecated-version page. Search defaults to current and non-deprecated
  * results.
  *
- * Versions are still searchable individually — readers on a v0 page
+ * Versions are still searchable individually, readers on a v0 page
  * who explicitly search from there can opt the UI into a version-scoped
  * filter. The default exclusion is just for the top-level search.
  *

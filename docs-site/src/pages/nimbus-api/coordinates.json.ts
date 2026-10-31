@@ -1,5 +1,5 @@
 /**
- * `/nimbus-api/coordinates.json` — this site's published coordinate manifest,
+ * `/nimbus-api/coordinates.json`: this site's published coordinate manifest,
  * fetched by other sites that cite its APIs via `apiReferences[]`.
  */
 

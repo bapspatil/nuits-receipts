@@ -19,7 +19,7 @@ function initTabContainer(container: HTMLElement): () => void {
     container.querySelectorAll("[data-nb-tabs-trigger]"),
   ).filter((t) => (t as HTMLElement).closest("[data-nb-tabs]") === container);
   const synthesize = existingTriggers.length === 0;
-  // Only this container's own panels — exclude a nested <Tabs>'s panels,
+  // Only this container's own panels, exclude a nested <Tabs>'s panels,
   // whose nearest [data-nb-tabs] ancestor is the inner container.
   const panels = Array.from(
     container.querySelectorAll<HTMLElement>("[data-nb-tabs-content]"),
@@ -71,8 +71,8 @@ function initTabContainer(container: HTMLElement): () => void {
     indicator,
     sync: syncKey ? { key: `ui-synced-tabs__${syncKey}` } : undefined,
     // Keep the active tab within the horizontally-scrollable (scrollbar-hidden)
-    // strip's visible range. Fires on every activate() — including the initial
-    // paint and a synced/restored selection — so a right-edge active tab can't
+    // strip's visible range. Fires on every activate(), including the initial
+    // paint and a synced/restored selection, so a right-edge active tab can't
     // render off-screen with no affordance. Scrolls by the overhang (not
     // scrollIntoView, which would also scroll the page vertically), which
     // works in both directions; RTL scrollLeft runs negative.

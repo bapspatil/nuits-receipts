@@ -26,7 +26,7 @@
  *   2. `@theme` block exposes them to Tailwind so utilities like
  *      `bg-card`, `text-foreground`, `border-border` work
  *   3. Dark mode uses the `[data-mode="dark"]` attribute
- *   4. All colors use oklch for perceptual uniformity
+ *   4. Every colour is one of the site's tokens (site/tokens.json)
  *
  * Naming convention:
  *   - Surfaces paired with foregrounds: `card` / `card-foreground`
@@ -36,132 +36,139 @@
  *     `shadow-lg`, etc. as color names: they collide with built-ins)
  * ============================================================ */
 
-/* ---- Light mode (default) ---- */
+/* ---- Light mode (default) ----
+   The palette is the marketing site's (site/tokens.json): paper ground, white
+   slips, petrol ink, inkSoft for secondary text. Guilloche and mint are fills
+   and lines, never text; stamp red is a fill under white text or a stamp's own
+   word. Ratios are in DESIGN.md. */
 :root {
 	color-scheme: light;
 
-	/* Surfaces (paired with foregrounds for contrast) */
-	--nb-background: #F3F8F5;
-	--nb-foreground: #0D3A36;
+	--nb-paper: #E6EFE9;
+	--nb-slip: #FFFFFF;
+	--nb-ink: #0D3A36;
+	--nb-ink-soft: #355650;
+	--nb-guilloche: #C2D8CB;
+	--nb-mint: #9FD3BC;
+	--nb-stamp: #A8123F;
+	--nb-on-stamp: #FFFFFF;
 
-	--nb-card: #FFFFFF;
+	--nb-background: var(--nb-paper);
+	--nb-foreground: var(--nb-ink);
+
+	--nb-card: var(--nb-slip);
 	--nb-card-foreground: var(--nb-foreground);
 
-	--nb-muted: #E9F1EC;
-	/* 4.5:1 or better on every light surface, inline code included. */
-	--nb-muted-foreground: #355650;
+	--nb-muted: var(--nb-guilloche);
+	--nb-muted-foreground: var(--nb-ink-soft);
 
-	--nb-accent: #E1ECE6;
+	--nb-accent: var(--nb-guilloche);
 	--nb-accent-foreground: var(--nb-foreground);
 
-	/* Primary action / brand */
-	--nb-primary: #0D3A36;
-	--nb-primary-foreground: #F3F8F5;
-	--nb-primary-hover: #1B524C;
+	--nb-primary: var(--nb-ink);
+	--nb-primary-foreground: var(--nb-paper);
+	--nb-primary-hover: var(--nb-ink-soft);
 
-	/* Brand: Nimbus steel, the accent of the Chrome palette: a grey with a
-	   trace of blue, so it reads apart from the pure-neutral ink. Used only
-	   for wayfinding: where you are (current page, section, tab) and what you
-	   can act on (focus, link hover). */
-	--nb-brand: #0D3A36;
-	/* The current page's fill: a light wash of the brand. */
-	--nb-brand-wash: color-mix(in oklch, var(--nb-brand) 8%, transparent);
+	/* Wayfinding is ink and weight, never a colour of its own. */
+	--nb-brand: var(--nb-ink);
+	--nb-brand-wash: transparent;
 
-	/* Borders / focus */
-	--nb-border: #D3E3DA;
-	--nb-border-strong: #C2D8CB;
-	--nb-selected: #D3E3DA;
-	/* Inline code's tint. */
-	--nb-code-tint: color-mix(in oklch, var(--nb-foreground) 4.5%, transparent);
-	--nb-ring: #0D3A3699;
+	/* Two kinds of line: quiet guilloche rules inside a surface, ink
+	   hairlines where the paper is cut. */
+	--nb-border: var(--nb-guilloche);
+	--nb-border-strong: var(--nb-ink);
+	--nb-selected: var(--nb-guilloche);
+	--nb-code-tint: color-mix(in srgb, var(--nb-guilloche) 55%, var(--nb-slip));
+	--nb-ring: var(--nb-ink);
 
-	/* Status colors: paired (saturated for text/border + muted for bg) */
-	--nb-info: #1D4E89;
-	--nb-info-foreground: #1D4E89;
-	--nb-info-muted: #1D4E891F;
+	/* Status colours stay on the palette: ink text, with mint and stamp as
+	   fills. Each status also carries its word. */
+	--nb-info: var(--nb-ink);
+	--nb-info-foreground: var(--nb-ink);
+	--nb-info-muted: var(--nb-slip);
 
-	--nb-success: #1B6B47;
-	--nb-success-foreground: #1B6B47;
-	--nb-success-muted: #1B6B471A;
+	--nb-success: var(--nb-ink);
+	--nb-success-foreground: var(--nb-ink);
+	--nb-success-muted: var(--nb-mint);
 
-	--nb-warning: #8A4A00;
-	/* Darker than the line colour so text on the warning tint reads at 4.5:1. */
-	--nb-warning-foreground: #8A4A00;
-	--nb-warning-muted: #8A4A001F;
+	--nb-warning: var(--nb-stamp);
+	--nb-warning-foreground: var(--nb-stamp);
+	--nb-warning-muted: var(--nb-slip);
 
- 	--nb-danger: #A8123F;
- 	--nb-danger-foreground: #A8123F;
- 	--nb-danger-muted: #A8123F1A;
- 
-	/* API method palette: shared source of truth for the method chip across the
-	   sidebar, endpoint card, and code rail (api-sidebar / api-layout /
-	   api-code-rail). Each method maps onto a status token for text and tint.
-	   The line is 25% of the status's solid colour, which has no token. */
+	--nb-danger: var(--nb-stamp);
+	--nb-danger-foreground: var(--nb-stamp);
+	--nb-danger-muted: var(--nb-slip);
+
+	/* API method palette (unused by these docs, kept for the registry). */
 	--nb-m-get: var(--nb-success);
 	--nb-m-get-tint: var(--nb-success-muted);
-	--nb-m-get-line: #1B6B4740;
+	--nb-m-get-line: var(--nb-border);
 	--nb-m-post: var(--nb-info);
 	--nb-m-post-tint: var(--nb-info-muted);
-	--nb-m-post-line: #1D4E8940;
-	/* A step darker than the warning colour: 4.5:1 on its own tint. */
-	--nb-m-put: #8A4A00;
+	--nb-m-post-line: var(--nb-border);
+	--nb-m-put: var(--nb-warning);
 	--nb-m-put-tint: var(--nb-warning-muted);
-	--nb-m-put-line: #8A4A0040;
+	--nb-m-put-line: var(--nb-border);
 	--nb-m-delete: var(--nb-danger);
 	--nb-m-delete-tint: var(--nb-danger-muted);
-	--nb-m-delete-line: #A8123F40;
+	--nb-m-delete-line: var(--nb-border);
 	--nb-m-other: var(--nb-muted-foreground);
 	--nb-m-other-tint: var(--nb-accent);
 	--nb-m-other-line: var(--nb-border);
- 
- 	/* Layout */
-	--nb-sidebar-width: 18.75rem;
-	--nb-toc-width: 18rem;
-	--nb-content-max: 43.5rem;
-	/* The sticky header's height: taller on phones when the section tabs take
-	   a row of their own (set below). Sticky bars and scroll margins read it. */
-	--nb-header-height: 3.5rem;
-	/* Used only by the API reference (registry: api-layout); harmless elsewhere. */
+
+	/* Layout */
+	--nb-sidebar-width: 18rem;
+	--nb-toc-width: 16rem;
+	--nb-content-max: 45rem;
+	/* The bar: 44px controls on 12px of paper above and below, plus its 1px
+	   ink rule. The cutter's teeth hang below it and overlap the page. */
+	--nb-header-height: 4.3125rem;
+	--nb-tooth: 5px;
 	--nb-code-rail-width: 34rem;
 
-	/* Typography: Bricolage and Instrument Sans are self-hosted below (hashed, base-aware URLs);
-	   JetBrains Mono via @fontsource-variable in BaseLayout.astro */
 	--nb-font-sans:
 		"Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--nb-font-display:
-		"Bricolage", "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+		"Bricolage", "Arial Narrow", system-ui, sans-serif;
 	--nb-font-mono:
 		"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Code",
 		"Source Code Pro", Menlo, Consolas, monospace;
-	/* Type scale: one ratio, √1.5, stepping up from the 16px body. Two steps
-	   make 1.5, so body → h2 → h1 is the same interval twice and lands on
-	   whole pixels: 16 → 24 → 36, with h3 at the half step (19.6 → 20).
-	   Line heights sit on the 4px grid. Weight falls as size rises, since a
-	   larger glyph needs less stroke to carry the same visual weight. */
-	--nb-h1-size: 2.25rem;
-	--nb-h1-leading: 2.75rem;
-	--nb-h1-weight: 700;
-	--nb-h1-tracking: -0.025em;
+	/* One type scale for the whole docs site, in px: 12, 14, 17, 20, 24, 32,
+	   40. Body 17/28, small 14/20, label 12/16 in spaced capitals. Headings
+	   are Bricolage at the site's narrow width. Written down in DESIGN.md and
+	   enforced by ui-policy.json. */
+	--nb-h1-size: 2rem;
+	--nb-h1-leading: 2.25rem;
+	--nb-h1-weight: 800;
+	--nb-h1-tracking: -0.02em;
 	--nb-h2-size: 1.5rem;
-	--nb-h2-leading: 2rem;
+	--nb-h2-leading: 1.75rem;
 	--nb-h2-weight: 700;
-	--nb-h2-tracking: -0.018em;
+	--nb-h2-tracking: -0.01em;
 	--nb-h3-size: 1.25rem;
 	--nb-h3-leading: 1.75rem;
-	--nb-h3-weight: 600;
-	--nb-h3-tracking: -0.012em;
+	--nb-h3-weight: 700;
+	--nb-h3-tracking: -0.005em;
 	--nb-h4-weight: 600;
 
-	/* Corners: surfaces (cards, callouts, code blocks, buttons, sidebar rows)
-	   share one radius; small marks inside them (inline code, badges in a
-	   title bar) use the smaller one. Change these two to re-round the site. */
-	--nb-radius: 0.5rem;
-	--nb-radius-sm: 0.25rem;
+	/* Two radii, as on the site: 2px for slips, cards, code and asides, a
+	   pill for buttons. */
+	--nb-radius: 2px;
+	--nb-radius-sm: 2px;
+	--nb-radius-pill: 999px;
 
-	/* Shadows */
-	--nb-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
-	--nb-shadow: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
-	--nb-shadow-lg: 0 4px 12px oklch(0 0 0 / 0.08), 0 2px 4px oklch(0 0 0 / 0.04);
+	/* One shadow, on slips only. */
+	--nb-shadow-slip: 0 18px 40px -18px rgb(13 58 54 / 0.35);
+	--nb-shadow-sm: none;
+	--nb-shadow: none;
+	--nb-shadow-lg: var(--nb-shadow-slip);
+}
+
+@media (min-width: 64rem) {
+	:root {
+		--nb-h1-size: 2.5rem;
+		--nb-h1-leading: 2.75rem;
+	}
 }
 
 /* Wider content area on large displays (e.g. MacBook Pro 16″) */
@@ -171,61 +178,54 @@
 	}
 }
 
-/* ---- Dark mode ---- */
+/* ---- Dark mode ----
+   The site has no dark mode. Here the page turns over: ink ground, paper
+   text, slips a step lighter than the ground. Same rules: mint and
+   guilloche never carry small text on paper, stamp red only as a fill. */
 [data-mode="dark"] {
 	color-scheme: dark;
 
-	--nb-background: #0A2623;
-	--nb-foreground: #E6EFE9;
+	--nb-background: var(--nb-ink);
+	--nb-foreground: var(--nb-paper);
 
-	--nb-card: #0F312D;
+	--nb-card: #164A45;
 	--nb-card-foreground: var(--nb-foreground);
 
-	--nb-muted: #071C1A;
-	--nb-muted-foreground: #A7C4BA;
+	--nb-muted: #1F5650;
+	--nb-muted-foreground: var(--nb-guilloche);
 
-	--nb-accent: #1A433E;
+	--nb-accent: #1F5650;
 	--nb-accent-foreground: var(--nb-foreground);
 
-	--nb-primary: #9FD3BC;
-	--nb-primary-foreground: #0A2623;
-	--nb-primary-hover: #B7E0CE;
+	--nb-primary: var(--nb-paper);
+	--nb-primary-foreground: var(--nb-ink);
+	--nb-primary-hover: var(--nb-guilloche);
 
-	--nb-brand: #9FD3BC;
-	--nb-brand-wash: color-mix(in oklch, var(--nb-brand) 10%, transparent);
+	--nb-brand: var(--nb-paper);
 
-	--nb-border: #1D443F;
-	--nb-border-strong: #2E5B55;
+	--nb-border: #2E5B55;
+	--nb-border-strong: var(--nb-paper);
 	--nb-selected: #2E5B55;
-	--nb-code-tint: color-mix(in oklch, var(--nb-foreground) 6%, transparent);
-	--nb-ring: #9FD3BC99;
+	--nb-code-tint: #1F5650;
+	--nb-ring: var(--nb-paper);
 
-	--nb-info: #9CC2F2;
-	--nb-info-foreground: #9CC2F2;
-	--nb-info-muted: #9CC2F22E;
+	--nb-info: var(--nb-paper);
+	--nb-info-foreground: var(--nb-paper);
+	--nb-info-muted: #164A45;
 
-	--nb-success: #8FDDB5;
-	--nb-success-foreground: #8FDDB5;
-	--nb-success-muted: #8FDDB529;
+	--nb-success: var(--nb-mint);
+	--nb-success-foreground: var(--nb-mint);
+	--nb-success-muted: #164A45;
 
-	--nb-warning: #F0B866;
-	--nb-warning-foreground: #F0B866;
-	--nb-warning-muted: #F0B8662E;
+	--nb-warning: #FF93AE;
+	--nb-warning-foreground: #FF93AE;
+	--nb-warning-muted: #164A45;
 
- 	--nb-danger: #FF93AE;
- 	--nb-danger-foreground: #FF93AE;
- 	--nb-danger-muted: #FF93AE24;
- 
-	/* API method palette: dark lines; text and tint follow the status tokens. */
-	--nb-m-post-line: #9CC2F240;
-	--nb-m-get-line: #8FDDB540;
-	--nb-m-put: var(--nb-warning);
-	--nb-m-put-line: #F0B86640;
-	--nb-m-delete-line: #FF93AE40;
- 
- 	--nb-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
-	--nb-shadow: 0 1px 3px oklch(0 0 0 / 0.3), 0 1px 2px oklch(0 0 0 / 0.2);
-	--nb-shadow-lg: 0 4px 12px oklch(0 0 0 / 0.4), 0 2px 4px oklch(0 0 0 / 0.2);
+	--nb-danger: #FF93AE;
+	--nb-danger-foreground: #FF93AE;
+	--nb-danger-muted: #164A45;
+
+	--nb-shadow-slip: 0 18px 40px -18px rgb(0 0 0 / 0.6);
 }
 
 /* ---- Tailwind theme mapping ----
@@ -276,8 +276,11 @@
 	--font-mono: var(--nb-font-mono);
 	--font-display: var(--nb-font-display);
 
-	--radius-lg: var(--nb-radius);
+	--radius-xs: var(--nb-radius-sm);
 	--radius-sm: var(--nb-radius-sm);
+	--radius-md: var(--nb-radius);
+	--radius-lg: var(--nb-radius);
+	--radius-xl: var(--nb-radius);
 
 	--shadow-sm: var(--nb-shadow-sm);
 	--shadow-default: var(--nb-shadow);
@@ -287,16 +290,32 @@
 /* ---- Minimal overrides the plugin doesn't cover ---- */
 html {
 	font-family: var(--nb-font-sans);
+	background-color: var(--nb-background);
+	color: var(--nb-foreground);
 }
 
+/* Bricolage pinned to the site's display cut: optical size 96, width 82. */
 h1,
 h2,
 h3 {
 	font-family: var(--nb-font-display);
+	font-variation-settings: "opsz" 96, "wdth" 82;
+}
+
+/* Figures line up in every table, as on the site. */
+td,
+th {
+	font-variant-numeric: tabular-nums;
+}
+
+[data-numeric] {
+	text-align: end;
 }
 
 body {
 	opacity: 1;
+	font-size: 1.0625rem;
+	line-height: 1.75rem;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -306,8 +325,8 @@ body {
 }
 
 ::selection {
-	background: color-mix(in oklch, var(--nb-primary) 10%, transparent);
-	color: var(--nb-foreground);
+	background: var(--nb-mint);
+	color: var(--nb-ink);
 }
 
 /* ---- Focus indicators ---- */
@@ -320,11 +339,12 @@ body {
 	::after {
 		outline-color: var(--nb-ring);
 		outline-width: 2px;
-		outline-offset: 2px;
+		outline-offset: 3px;
 	}
+	/* Focus is ink, 2px, 3px clear of the control, everywhere. */
 	:focus-visible {
 		outline: 2px solid var(--nb-ring);
-		outline-offset: 2px;
+		outline-offset: 3px;
 	}
 }
 
@@ -372,7 +392,7 @@ body {
 pre.astro-code {
 	position: relative;
 	margin: 1rem 0;
-	padding: 0.75rem 1rem;
+	padding: 1rem;
 	border-radius: var(--nb-radius);
 	border: 1px solid var(--nb-border);
 	background-color: var(--nb-card);
@@ -402,14 +422,14 @@ pre.astro-code span {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 1.75rem;
-	height: 1.75rem;
+	width: 2rem;
+	height: 2rem;
 	margin: 0;
 	padding: 0;
-	border: 1px solid var(--nb-border);
-	border-radius: 0.375rem;
+	border: 1px solid var(--nb-border-strong);
+	border-radius: var(--nb-radius-pill);
 	background: var(--nb-card);
-	color: var(--nb-muted-foreground);
+	color: var(--nb-foreground);
 	cursor: pointer;
 	opacity: 0;
 	transition:
@@ -423,8 +443,8 @@ pre.astro-code span {
 	opacity: 1;
 }
 .nb-code-copy:hover {
-	color: var(--nb-foreground);
-	background: var(--nb-muted);
+	color: var(--nb-primary-foreground);
+	background: var(--nb-primary);
 }
 .nb-code-copy svg {
 	width: 0.875rem;
@@ -436,14 +456,9 @@ pre.astro-code span {
 /* In a titled block the copy button lives in the title bar, centred in its
    36px, and is always there. */
 .nb-code-figure-titled .nb-code-copy {
-	top: 0.25rem;
-	right: 0.375rem;
-	border-color: transparent;
-	background: transparent;
+	top: 0.125rem;
+	right: 0.25rem;
 	opacity: 1;
-}
-.nb-code-figure-titled .nb-code-copy:hover {
-	background: var(--nb-accent);
 }
 /* No hover on touch screens: show the button, and let the language badge
    give way to it. */
@@ -500,9 +515,9 @@ pre.astro-code span {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
-	padding: 0.5rem 2.75rem 0.5rem 0.75rem;
-	border-bottom: 1px solid var(--nb-border);
-	background: color-mix(in oklch, var(--nb-muted) 50%, transparent);
+	padding: 0.5rem 2.75rem 0.5rem 1rem;
+	/* The slip's perforation, under its title like a receipt's vendor line. */
+	border-bottom: 1px dashed var(--nb-border-strong);
 	font-family: var(--nb-font-mono);
 	font-size: 0.75rem;
 	line-height: 1.25rem;
@@ -537,16 +552,17 @@ pre.astro-code span {
 	position: absolute;
 	top: 0.5rem;
 	right: 0.625rem;
-	padding: 0.0625rem 0.375rem;
+	padding: 0.125rem 0.375rem;
 	border-radius: var(--nb-radius-sm);
-	background: var(--nb-muted);
+	background: var(--nb-card);
 	color: var(--nb-muted-foreground);
-	font-family: var(--nb-font-mono);
-	font-size: 0.6875rem;
-	letter-spacing: 0.02em;
+	font-family: var(--nb-font-sans);
+	font-size: 0.75rem;
+	line-height: 1rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	pointer-events: none;
-	opacity: 0.75;
 	transition: opacity 0.15s ease;
 	z-index: 1;
 }
@@ -592,8 +608,8 @@ pre.astro-code .line {
 
 /* Highlighted lines (`{1,3-5}` meta or `// [!code highlight]`). */
 pre.astro-code .line.highlighted {
-	background: color-mix(in oklch, var(--nb-info) 12%, transparent);
-	box-shadow: inset 2px 0 0 var(--nb-info);
+	background: var(--nb-code-tint);
+	box-shadow: inset 3px 0 0 var(--nb-border-strong);
 }
 
 /* Diff lines (`// [!code ++]` / `// [!code --]`). */
@@ -661,7 +677,10 @@ pre.astro-code .highlighted-word {
    any `li > a` in a sidebar, a group row its `details > summary`, and a
    group's list its `details > ul`. The `.nb-sidebar-*` classes still work for
    a row placed elsewhere. In the components layer so Tailwind utilities on a
-   row (a `line-through`) still win. */
+   row (a `line-through`) still win.
+
+   No fills. The page you are on is marked twice, never by colour alone: a
+   heavier ink rule at its edge and a heavier weight. Hover underlines. */
 @layer components {
 	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a),
 	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary) {
@@ -669,17 +688,18 @@ pre.astro-code .highlighted-word {
 		min-height: 2rem;
 		align-items: center;
 		gap: 0.5rem;
-		border-radius: var(--nb-radius);
-		padding: 0.25rem 0.75rem;
-		font-size: 0.8125rem;
+		border-radius: 0;
+		padding: 0.375rem 0.75rem;
+		font-size: 0.875rem;
+		line-height: 1.25rem;
 		font-weight: 500;
 		color: var(--nb-muted-foreground);
 		overflow-wrap: break-word;
 	}
 	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a) {
 		text-decoration: none;
+		text-underline-offset: 0.22em;
 	}
-	/* Operation rows: the method chip sits closer to the edge. */
 	:is([data-nb-api-nav], [data-nb-nav-results]) li > a:has(> i[data-m]) {
 		padding-inline: 0.25rem;
 	}
@@ -691,21 +711,22 @@ pre.astro-code .highlighted-word {
 	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary)::-webkit-details-marker {
 		display: none;
 	}
-	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a):hover,
+	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a):hover {
+		color: var(--nb-foreground);
+		text-decoration-line: underline;
+		text-decoration-thickness: 1px;
+	}
 	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary):hover {
-		background-color: var(--nb-accent);
 		color: var(--nb-foreground);
 	}
-	/* You are here: the one place the sidebar uses the brand. */
 	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a)[aria-current="page"] {
-		background-color: var(--nb-brand-wash);
-		color: var(--nb-brand);
+		color: var(--nb-foreground);
+		font-weight: 700;
+		box-shadow: inset 3px 0 0 var(--nb-border-strong);
 	}
-	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a):focus-visible,
-	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary):focus-visible {
-		outline-offset: -2px;
+	:is(.nb-sidebar-link, :is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a)[aria-current="page"]:dir(rtl) {
+		box-shadow: inset -3px 0 0 var(--nb-border-strong);
 	}
-	/* The group holds the current page. */
 	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary)[data-nb-active] {
 		color: var(--nb-foreground);
 	}
@@ -717,17 +738,12 @@ pre.astro-code .highlighted-word {
 		height: 1rem;
 		margin-inline: auto -1px;
 		background-color: currentColor;
-		opacity: 0.4;
 		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M96 48l80 80-80 80' fill='none' stroke='black' stroke-width='24' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
 			no-repeat center / contain;
-	}
-	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary):hover::after {
-		opacity: 1;
 	}
 	details[open] > :is(.nb-sidebar-row, summary)::after {
 		rotate: 90deg;
 	}
-	/* Right to left, the closed caret points the other way and opens downward. */
 	:is(.nb-sidebar-row, :is([data-nb-sidebar], [data-nb-api-nav]) details > summary):dir(rtl)::after {
 		rotate: 180deg;
 	}
@@ -737,37 +753,30 @@ pre.astro-code .highlighted-word {
 	:is(.nb-sidebar-list, :is([data-nb-sidebar], [data-nb-api-nav]) details > ul) {
 		display: flex;
 		flex-direction: column;
-		gap: 1px;
-		margin: 0.125rem 0 0;
+		gap: 0;
+		margin: 0.25rem 0 0.5rem;
 		margin-inline-start: 0.75rem;
 		border-inline-start: 1px solid var(--nb-border);
 		padding: 0;
-		padding-inline-start: 0.5rem;
 		list-style: none;
 	}
-	/* Safari still lays out closed <details> content in large trees. */
 	:is([data-nb-sidebar], [data-nb-api-nav]) details:not([open]) > ul {
 		display: none;
 	}
-	/* 14px rows to sit with the 16px body, in the docs and API sidebars alike,
-	   so rows land on the same pixels on both. An on-demand API sidebar and its
-	   filter results have no data-nb-sidebar wrapper, so they're named too. */
-	:is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) :is(li > a, details > summary) {
-		font-size: 0.875rem;
-		line-height: 1.25rem;
-		font-weight: 450;
-	}
-	:is([data-nb-sidebar], [data-nb-api-nav], [data-nb-nav-results]) li > a[aria-current="page"] {
-		font-weight: 500;
-	}
-	/* A top-level group reads as a section heading, set apart from the loose
-	   pages above it; consecutive groups keep the row spacing. */
-	[data-nb-sidebar] .top-level > li:not(:has(> details)) + li:has(> details) {
+	/* A top-level group reads as a section label: spaced capitals, like the
+	   site's slates, with a perforation above it. */
+	[data-nb-sidebar] .top-level > li > details {
 		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px dashed var(--nb-border-strong);
 	}
 	[data-nb-sidebar] .top-level > li > details > summary {
 		color: var(--nb-foreground);
-		font-weight: 500;
+		font-size: 0.75rem;
+		line-height: 1rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 }
 
@@ -818,23 +827,12 @@ body:not(:has([data-mobile-sidebar])) [data-menu-btn] {
 /* Phones: the section tabs sit on a second header row. */
 @media (max-width: 47.999rem) {
 	:root:has([data-nb-header-tabs]) {
-		--nb-header-height: 6rem;
+		--nb-header-height: 6.8125rem;
 	}
 }
 
-/* Phones: small controls get an invisible 44px hit area. The header's icon
-   controls draw at 32-34px; the 12px gap between them on phones
-   (Header.astro) keeps neighbouring hit areas from overlapping. */
+/* Phones: Copy page and View as Markdown are 28px rows, 44px to a finger. */
 @media (max-width: 47.999rem) {
-	[data-header-actions] > :is(a, button) {
-		position: relative;
-	}
-	[data-header-actions] > :is(a, button)::after {
-		content: "";
-		position: absolute;
-		inset: -6px;
-	}
-	/* Copy page and View as Markdown: 28px rows, 44px to a finger. */
 	[data-nb-page-actions] > :is(a, button) {
 		position: relative;
 	}

@@ -1,6 +1,6 @@
 ---
 /**
- * Steps — ordered list with numbered circles and connecting lines.
+ * Steps, ordered list with numbered circles and connecting lines.
  * Wrap a markdown ordered list, or only <Step> children; put any intro
  * text before <Steps>. Set `start` to offset the counter.
  */
@@ -57,7 +57,7 @@ const steps = stepMode ? content.slice(firstStep) : content;
     counter-increment: step;
     position: relative;
     min-height: var(--_marker);
-    /* Cancel the prose li margin — step rhythm comes from padding. */
+    /* Cancel the prose li margin, step rhythm comes from padding. */
     margin: 0;
     padding-block: 0 1.5rem;
     padding-inline: calc(var(--_marker) + 0.75rem) 0;
@@ -76,19 +76,21 @@ const steps = stepMode ? content.slice(firstStep) : content;
     top: max(0px, calc((1lh - var(--_marker)) / 2));
     width: var(--_marker);
     height: var(--_marker);
+    /* An index box like the site's slates: ink rule, no fill, so text
+       beside it always sits on the page itself. */
     border-radius: var(--nb-radius);
-    background: var(--nb-accent);
     color: var(--nb-foreground);
-    border: 1px solid var(--nb-border-strong);
-    font-size: 0.6875rem;
-    font-weight: 600;
+    border: 1.5px solid var(--nb-border-strong);
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
     line-height: 1;
     display: grid;
     place-items: center;
     z-index: 1;
   }
 
-  /* Connecting line — runs from below the marker to the bottom of the step. */
+  /* Connecting line, from from below the marker to the bottom of the step. */
   .steps > :global(ol > li:not(:last-child))::after {
     content: "";
     position: absolute;
@@ -96,8 +98,8 @@ const steps = stepMode ? content.slice(firstStep) : content;
     top: var(--_marker);
     top: calc(max(0px, (1lh - var(--_marker)) / 2) + var(--_marker));
     bottom: 0;
-    width: 1.5px;
-    background: var(--nb-border);
+    /* A perforation down to the next step. */
+    border-inline-start: 1.5px dashed var(--nb-border-strong);
   }
 
   .steps > :global(ol > li > p:first-child > strong:only-child) {

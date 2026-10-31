@@ -1,21 +1,21 @@
 /* Docs markdown styling scoped to docs content containers only.
-   Every size and line height is a whole pixel on a 4px grid: body 16/28,
-   small text 14/24, headings from the --nb-h* tokens in globals.css. */
+   Sizes come from the one docs scale (DESIGN.md): body 17/28 like the site's
+   body, small text 14/20, headings from the --nb-h* tokens in globals.css. */
 
 .docs-content {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.75rem;
   color: var(--nb-foreground);
   /* Break a long unbroken token (URL, hash, no-space string) so it wraps within
      the content column instead of leaking past the page width. Inherited, so it
      covers headings, paragraphs, list items, and inline code; `pre` code blocks
-     are unaffected (their `white-space: pre` doesn't wrap — they scroll instead,
+     are unaffected (their `white-space: pre` doesn't wrap, they scroll instead,
      via `pre.astro-code { overflow-x: auto }`), and wide tables keep their own
      `.nb-table-scroll` handling. */
   overflow-wrap: break-word;
 }
 
-/* Vertical rhythm — every direct child gets spacing by default.
+/* Vertical rhythm, every direct child gets spacing by default.
    Components can override with their own margin utilities (my-4, mt-6, etc.)
    because :where() keeps specificity at (0,1,0) and utilities come later. */
 .docs-content > :where(:not(:first-child)) {
@@ -56,18 +56,18 @@
 
 .docs-content :where(blockquote:not([class])) {
   padding-inline-start: 1rem;
-  border-inline-start: 2px solid var(--nb-border-strong);
+  border-inline-start: 3px solid var(--nb-border-strong);
   color: var(--nb-muted-foreground);
 }
 
 .docs-content :where(hr:not([class])) {
   border: 0;
-  border-top: 1px solid var(--nb-border);
+  border-top: 1px dashed var(--nb-border-strong);
   margin: 2.5rem 0;
 }
 
-/* Component boundary — elements with a class attribute are component-owned.
-   Markdown never adds classes to h1–h6 or p; components always do. */
+/* Component boundary, elements with a class attribute are component-owned.
+   Markdown never adds classes to h1 to h6 or p; components always do. */
 .docs-content :where(h1, h2, h3, h4, h5, h6, p):where([class]) {
   margin: 0;
   font-size: inherit;
@@ -83,12 +83,16 @@
   margin-top: 0;
 }
 
+/* A section starts after a perforation, the site's slate rule, lightly:
+   no index number, no spaced capitals, just the tear line above. */
 .docs-content :where(h2:not([class])) {
   font-size: var(--nb-h2-size);
   line-height: var(--nb-h2-leading);
   font-weight: var(--nb-h2-weight);
   letter-spacing: var(--nb-h2-tracking);
   margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--nb-border-strong);
 }
 
 .docs-content :where(h3:not([class])) {
@@ -121,7 +125,7 @@
   }
 }
 
-/* Typographic wrapping — balance multi-line headings (no orphan words),
+/* Typographic wrapping, balance multi-line headings (no orphan words),
    pretty-wrap body copy (no single-word last lines). Progressive
    enhancement; unsupported browsers ignore both. */
 .docs-content :where(h1:not([class]), h2:not([class]), h3:not([class]), h4:not([class])) {
@@ -153,8 +157,9 @@
   color: var(--nb-foreground);
 }
 
-/* Inline code: a quiet tint, no outline. 14px on a 16px line, so a run of
-   code reads as part of the sentence rather than a row of buttons. */
+/* Inline code: a quiet guilloche tint, no outline, a step smaller than the
+   sentence, so a run of code reads as part of it rather than a row of
+   buttons. */
 .docs-content :where(code:not([class])):not(:where(pre *)) {
   font-family: var(--nb-font-mono);
   direction: ltr;
@@ -186,7 +191,7 @@
   font-family: var(--nb-font-mono);
 }
 
-/* Shiki-rendered code blocks — wider vertical margin than base rhythm
+/* Shiki-rendered code blocks, wider vertical margin than base rhythm
    because code blocks are visually dense. Inline code-token styling
    (background, padding) is reset because Shiki spans already carry
    their own colors via inline styles. */
@@ -215,10 +220,10 @@
   border-radius: 0;
 }
 
-/* Tables: 14/20 cells on a 41px row, an unfilled header in secondary text,
-   and lines only between rows. Fills its column; scroll is owned by the
-   `.nb-table-scroll` wrapper (injected by the tableScroll() hast plugin),
-   since `overflow` is ignored on a table. */
+/* Tables: a white slip, 14/20 cells, the header in spaced capitals over an
+   ink rule, guilloche lines between rows. Fills its column; scroll is owned
+   by the `.nb-table-scroll` wrapper (injected by the tableScroll() hast
+   plugin), since `overflow` is ignored on a table. */
 .docs-content :where(table:not([class])) {
   display: table;
   width: 100%;
@@ -228,6 +233,7 @@
   border-spacing: 0;
   border-radius: var(--nb-radius);
   border: 1px solid var(--nb-border);
+  background: var(--nb-card);
   table-layout: auto;
   font-size: 0.875rem;
   line-height: 1.25rem;
@@ -252,9 +258,19 @@
 }
 
 .docs-content :where(th:not([class])) {
-  font-weight: 500;
-  color: var(--nb-muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nb-foreground);
+  border-bottom-color: var(--nb-border-strong);
   white-space: nowrap;
+}
+
+/* Figures (marked by BaseLayout) sit right, in tabular digits. */
+.docs-content td[data-numeric] {
+  text-align: end;
 }
 
 /* Code in a cell is usually an identifier: keep it whole and let the table
@@ -281,14 +297,13 @@
   color: var(--nb-foreground);
   text-decoration-line: underline;
   text-decoration-color: var(--nb-border-strong);
-  text-underline-offset: 4px;
+  text-underline-offset: 0.22em;
   text-decoration-thickness: 1px;
-  font-weight: 500;
-  transition: text-decoration-color 0.15s;
+  font-weight: 600;
 }
 
 .docs-content :where(a:not([class]):hover) {
-  text-decoration-color: var(--nb-brand);
+  text-decoration-thickness: 2px;
 }
 
 .docs-content :where(strong:not([class])) {
@@ -316,17 +331,17 @@
   white-space: nowrap;
   color: var(--nb-foreground);
   background: var(--nb-card);
-  border-radius: 0.3125rem;
+  border-radius: var(--nb-radius);
   box-shadow: 0 0 0 1px var(--nb-border-strong), 0 1px 0 1px var(--nb-border-strong);
   vertical-align: 0.0625rem;
 }
 
-/* Inline highlight — harmonized with ::selection instead of the
+/* Inline highlight, harmonized with ::selection instead of the
    browser's fluorescent yellow. `box-decoration-break` keeps the tint
    coherent when the highlight wraps across lines. */
 .docs-content :where(mark:not([class])) {
-  background: color-mix(in oklch, var(--nb-primary) 10%, transparent);
-  color: var(--nb-foreground);
+  background: var(--nb-mint);
+  color: var(--nb-ink);
   line-height: 1;
   border-radius: var(--nb-radius-sm);
   padding: 0.125rem 0.25rem;
@@ -335,11 +350,12 @@
 }
 
 /* Native disclosure. Scope guard: FileTree builds classless <details>
-   internally (`.file-tree :global(details)`), so exclude its subtree —
+   internally (`.file-tree :global(details)`), so exclude its subtree ,
    without this the rows below would grow double carets and borders. */
 .docs-content :where(details:not([class]):not(.file-tree *)) {
   border: 1px solid var(--nb-border);
   border-radius: var(--nb-radius);
+  background: var(--nb-card);
   padding: 0.625rem 1rem;
 }
 
@@ -358,7 +374,7 @@
   display: none;
 }
 
-/* Trailing chevron — label left, indicator right, matching Collapsible. */
+/* Trailing chevron, label left, indicator right, matching Collapsible. */
 .docs-content :where(details:not([class]):not(.file-tree *) > summary)::after {
   content: "";
   flex-shrink: 0;
@@ -382,7 +398,7 @@
   color: var(--nb-muted-foreground);
 }
 
-/* Definition lists — a term, then its description in secondary text. */
+/* Definition lists, a term, then its description in secondary text. */
 .docs-content :where(dt:not([class])) {
   font-weight: 600;
 }
@@ -399,7 +415,7 @@
 .docs-content :where([data-footnotes]) {
   margin-top: 3rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--nb-border);
+  border-top: 1px dashed var(--nb-border-strong);
   font-size: 0.875rem;
   line-height: 1.5rem;
   color: var(--nb-muted-foreground);

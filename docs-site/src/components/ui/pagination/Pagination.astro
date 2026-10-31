@@ -1,6 +1,6 @@
 ---
 /**
- * Pagination — previous/next page links as one surface. A highlight slides to
+ * Pagination, previous/next page links as one surface. A highlight slides to
  * whichever half you point at, and [ / ] move between pages from the keyboard.
  *
  * Pass `prevNext` for the docs default, or compose your own links:
@@ -46,7 +46,7 @@ const next = composed ? undefined : prevNext?.next;
       data-nb-pagination
       data-slot="pagination-bar"
       data-keys={keys ? undefined : "false"}
-      class="nb-pagination-bar group/pager relative flex min-h-14 items-stretch rounded-full border border-border bg-card p-1 shadow-sm"
+      class="nb-pagination-bar group/pager relative flex min-h-14 items-stretch rounded-full border border-border-strong bg-card p-1"
     >
       <span
         data-slot="pagination-highlight"

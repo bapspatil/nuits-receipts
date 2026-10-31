@@ -6,6 +6,7 @@ import instrumentSans from "../assets/fonts/instrument-sans.woff2?url";
 import bricolage from "../assets/fonts/bricolage.woff2?url";
 import "../styles/globals.css";
 import "../styles/prose.css";
+import "../styles/chrome.css";
 import { ClientRouter } from "astro:transitions";
 import { config } from "virtual:nimbus/config";
 import {
@@ -141,7 +142,7 @@ const resolvedMarkdownUrl =
   <body class="min-h-screen bg-background text-foreground antialiased">
     <a
       href="#main-content"
-      class="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-100 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:no-underline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+      class="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-3 focus:z-100 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-full focus:bg-primary focus:px-4 focus:text-sm focus:font-semibold focus:text-primary-foreground focus:no-underline"
     >
       Skip to content
     </a>
@@ -152,6 +153,28 @@ const resolvedMarkdownUrl =
     <Footer />
     {config.search !== false && <SearchDialog />}
 
+    {/* Escape hides a header tooltip until the pointer or focus moves on.
+        Numeric table cells (amounts, counts) are set right-aligned, like a
+        column of figures on a receipt; the check is the one lintapple uses. */}
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        const tipsOn = () => root.removeAttribute("data-tips-off");
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") root.setAttribute("data-tips-off", "");
+        });
+        document.addEventListener("pointermove", tipsOn, { passive: true });
+        document.addEventListener("focusin", tipsOn);
+        const markNumbers = () => {
+          for (const td of document.querySelectorAll(".docs-content td")) {
+            const text = td.textContent.trim();
+            if (/\d/.test(text) && /^[+−-]?[\d\s,.:%$€£]+$/.test(text)) td.setAttribute("data-numeric", "");
+          }
+        };
+        markNumbers();
+        document.addEventListener("astro:after-swap", markNumbers);
+      })();
+    </script>
     <script>
       import { codeCopy, headingAnchors } from "@cloudflare/nimbus-docs/client";
       codeCopy();

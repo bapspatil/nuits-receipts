@@ -1,6 +1,6 @@
 ---
 /**
- * Card — a titled panel, optionally with an icon. With `href`, the whole card
+ * Card, a titled panel, optionally with an icon. With `href`, the whole card
  * is the link.
  *
  *   <Card title="Write a page" icon="ph:pencil-simple">Create an .mdx file.</Card>
@@ -33,23 +33,23 @@ const Title = href ? "p" : "h3";
   data-slot="card"
   href={href}
   class={cn(
-    "my-4 block rounded-lg bg-card p-5 shadow-sm ring ring-border",
-    href && "group text-inherit no-underline transition-[box-shadow] hover:shadow-default hover:ring-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    "my-4 block rounded-[2px] bg-card p-5 ring ring-border",
+    href && "group text-inherit no-underline hover:ring-border-strong focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring",
     className,
   )}
   {...attrs}
 >
   {hasIcon && (
-    <div data-slot="card-icon" class="mb-2.5 text-brand">
+    <div data-slot="card-icon" class="mb-3 text-foreground">
       <slot name="icon">{icon && <Icon name={icon} class="block size-6" />}</slot>
     </div>
   )}
   {hasTitle && (
-    <Title data-slot="card-title" class={cn("m-0 text-base font-semibold leading-snug text-foreground", href && "transition-colors group-hover:text-primary")}>
+    <Title data-slot="card-title" class={cn("m-0 font-display text-xl leading-7 font-bold text-foreground [font-variation-settings:'opsz'_96,'wdth'_82]", href && "underline-offset-[0.22em] group-hover:underline")}>
       <slot name="title">{title}</slot>
     </Title>
   )}
-  <div data-slot="card-content" class:list={["text-sm leading-normal text-muted-foreground", hasTitle && "mt-1.5"]}>
+  <div data-slot="card-content" class:list={["text-sm leading-5 text-muted-foreground", hasTitle && "mt-2"]}>
     <slot />
   </div>
 </Tag>

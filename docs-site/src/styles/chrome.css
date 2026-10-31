@@ -1,0 +1,405 @@
+/* The chrome: the bar, the pills, tooltips and the footer stub.
+
+   The same paper as receipts.nuits.net (site/src/styles/chrome.css). The bar
+   is an opaque plate of paper with an ink rule and the cutter's teeth hanging
+   from it; the footer is the stub, a white slip whose torn top edge bites up
+   into the page. No glass, no blur, no translucency under text. */
+
+/* In the components layer, so Tailwind utilities on the same element (a
+   breakpoint's `hidden`) still win. */
+@layer components {
+
+/* ---- Bar ---- */
+
+.nb-bar {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	background: var(--nb-background);
+	border-bottom: 1px solid var(--nb-border-strong);
+}
+
+/* The cutter: a row of ink teeth hanging from the rule. An element, not a
+   pseudo element, so contrast checks can still read the bar's own text. */
+.nb-bar-teeth {
+	position: absolute;
+	inset-inline: 0;
+	top: 100%;
+	height: var(--nb-tooth);
+	background: conic-gradient(from -45deg at 50% 100%, var(--nb-border-strong) 90deg, transparent 0) 0 0 / calc(var(--nb-tooth) * 2) var(--nb-tooth) repeat-x;
+	pointer-events: none;
+}
+
+.nb-bar-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: calc(var(--nb-header-height) - 1px);
+	padding: 0 1rem;
+}
+
+@media (min-width: 64rem) {
+	.nb-bar-row {
+		gap: 0.75rem;
+		padding: 0 1.5rem;
+	}
+}
+
+.nb-wordmark {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	min-width: 0;
+	min-height: 44px;
+	margin-inline-end: auto;
+	color: var(--nb-foreground);
+	text-decoration: none;
+}
+
+.nb-wordmark-mark {
+	flex: none;
+	width: 1.375rem;
+	height: 1.375rem;
+}
+
+.nb-wordmark-name {
+	font-family: var(--nb-font-display);
+	font-variation-settings: "opsz" 96, "wdth" 82;
+	font-weight: 800;
+	font-size: 1.25rem;
+	line-height: 1.75rem;
+	letter-spacing: -0.01em;
+	white-space: nowrap;
+}
+
+/* A stamp word: red ink on paper, boxed, never a fill here. */
+.nb-wordmark-docs {
+	padding: 0.125rem 0.375rem;
+	border: 1.5px solid currentColor;
+	border-radius: var(--nb-radius);
+	color: var(--nb-danger-foreground);
+	font-size: 0.75rem;
+	line-height: 1rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+@media (max-width: 39.999rem) {
+	.nb-wordmark-docs {
+		display: none;
+	}
+}
+
+.nb-bar-actions {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.nb-bar-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 0.5rem;
+	color: var(--nb-foreground);
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	font-weight: 600;
+	text-decoration: none;
+	text-underline-offset: 0.22em;
+}
+
+.nb-bar-link:hover {
+	text-decoration-line: underline;
+	text-decoration-thickness: 2px;
+}
+
+/* Section tabs, when a site has more than one collection. The current one
+   is underlined and bold, never marked by colour alone. */
+.nb-bar-sections {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.nb-bar-sections-row {
+	padding: 0 1rem 0.5rem;
+}
+
+.nb-bar-sections a {
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+	min-height: 44px;
+	padding: 0 0.5rem;
+	color: var(--nb-muted-foreground);
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	font-weight: 600;
+	text-decoration: none;
+	text-underline-offset: 0.22em;
+}
+
+.nb-bar-sections a:hover,
+.nb-bar-sections a[aria-current] {
+	color: var(--nb-foreground);
+	text-decoration-line: underline;
+	text-decoration-thickness: 2px;
+}
+
+.nb-bar-sections a[aria-current] {
+	font-weight: 700;
+}
+
+/* ---- Pills ---- */
+
+.nb-pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	min-height: 44px;
+	padding: 0 1rem;
+	border: 1px solid var(--nb-border-strong);
+	border-radius: var(--nb-radius-pill);
+	background: var(--nb-card);
+	color: var(--nb-foreground);
+	font: inherit;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	font-weight: 600;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition: transform 90ms ease-out, background-color 160ms linear, color 160ms linear;
+}
+
+.nb-pill:hover {
+	background: var(--nb-primary);
+	color: var(--nb-primary-foreground);
+}
+
+.nb-pill:active {
+	transform: translateY(2px);
+}
+
+.nb-pill-ink {
+	background: var(--nb-primary);
+	border-color: var(--nb-primary);
+	color: var(--nb-primary-foreground);
+}
+
+.nb-pill-ink:hover {
+	background: var(--nb-primary-hover);
+	border-color: var(--nb-primary-hover);
+}
+
+.nb-pill-icon {
+	width: 44px;
+	padding: 0;
+}
+
+.nb-pill-glyph {
+	flex: none;
+	width: 1.125rem;
+	height: 1.125rem;
+}
+
+/* Search: a pill with its label from tablets up; the glass alone on a
+   phone. Its tooltip names it and gives the shortcut. */
+@media (max-width: 47.999rem) {
+	.nb-pill-search {
+		width: 44px;
+		padding: 0;
+	}
+
+	.nb-pill-search .nb-pill-label {
+		display: none;
+	}
+}
+
+.nb-tip kbd {
+	font: inherit;
+}
+
+/* ---- Tooltips ----
+   A text tooltip under each icon-only control, on hover and keyboard focus.
+   Escape hides it until the pointer or focus moves (BaseLayout). */
+
+.nb-tipped {
+	position: relative;
+	display: inline-flex;
+}
+
+.nb-tip {
+	position: absolute;
+	top: calc(100% + 0.75rem);
+	inset-inline-end: 0;
+	z-index: 40;
+	padding: 0.25rem 0.5rem;
+	border-radius: var(--nb-radius);
+	background: var(--nb-primary);
+	color: var(--nb-primary-foreground);
+	font-size: 0.75rem;
+	line-height: 1rem;
+	font-weight: 600;
+	white-space: nowrap;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.nb-tipped:has(> :hover, > :focus-visible) > .nb-tip {
+	visibility: visible;
+}
+
+:root[data-tips-off] .nb-tip {
+	visibility: hidden;
+}
+
+/* ---- Footer: the stub ---- */
+
+.nb-stub {
+	position: relative;
+	margin-top: 4rem;
+	padding: 3rem 1rem 2rem;
+	background: var(--nb-card);
+	color: var(--nb-foreground);
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+}
+
+/* The torn edge: slip teeth biting up into the paper above. */
+.nb-stub-tear {
+	position: absolute;
+	inset-inline: 0;
+	bottom: 100%;
+	height: 10px;
+	background: conic-gradient(from 135deg at 50% 0, var(--nb-card) 90deg, transparent 0) 0 0 / 20px 10px repeat-x;
+	pointer-events: none;
+}
+
+.nb-stub-inner {
+	display: grid;
+	gap: 2rem;
+	max-width: 72rem;
+	margin: 0 auto;
+}
+
+.nb-stub-head {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.nb-stub-name {
+	display: flex;
+	align-items: center;
+	gap: 0.25em;
+	font-family: var(--nb-font-display);
+	font-variation-settings: "opsz" 96, "wdth" 82;
+	font-weight: 800;
+	font-size: 2.5rem;
+	line-height: 2.5rem;
+	letter-spacing: -0.03em;
+}
+
+.nb-stub-mark {
+	flex: none;
+	width: 0.7em;
+	height: 0.7em;
+}
+
+.nb-stub-nav ul {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	column-gap: 1.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.nb-stub-nav li {
+	border-top: 1px dashed var(--nb-border-strong);
+}
+
+.nb-stub-nav a {
+	display: flex;
+	align-items: center;
+	min-height: 44px;
+	color: var(--nb-foreground);
+	font-weight: 600;
+	text-decoration: none;
+	text-underline-offset: 0.22em;
+}
+
+.nb-stub-nav a:hover {
+	text-decoration-line: underline;
+	text-decoration-thickness: 2px;
+}
+
+/* The terms, ruled like the back of a receipt. */
+.nb-stub-print {
+	display: grid;
+	gap: 0.5rem;
+	padding-top: 1.25rem;
+	border-top: 2px solid var(--nb-border-strong);
+	color: var(--nb-muted-foreground);
+}
+
+.nb-stub-print strong {
+	color: var(--nb-foreground);
+	font-weight: 600;
+}
+
+.nb-stub-print a {
+	color: var(--nb-foreground);
+	text-decoration: underline;
+	text-underline-offset: 0.22em;
+}
+
+.nb-stub-print a:hover {
+	text-decoration-thickness: 2px;
+}
+
+@media (min-width: 48rem) {
+	.nb-stub {
+		padding-inline: 1.5rem;
+	}
+
+	.nb-stub-head {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 28rem);
+		align-items: end;
+	}
+
+	.nb-stub-print {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: 3rem;
+	}
+
+	.nb-stub-print > :first-child {
+		grid-column: 1 / -1;
+	}
+}
+
+/* ---- Shared marks ---- */
+
+/* A dashed perforation rule, as between the site's sections. */
+.nb-perforation {
+	border-top: 1px dashed var(--nb-border-strong);
+}
+
+/* An eyebrow: a small label in spaced capitals, like the site's slates. */
+.nb-eyebrow {
+	color: var(--nb-foreground);
+	font-size: 0.75rem;
+	line-height: 1rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+}

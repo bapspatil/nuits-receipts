@@ -1,6 +1,6 @@
 ---
 /**
- * TOC — on-this-page nav with scroll-spy. Static rail rendered inline
+ * TOC, on-this-page nav with scroll-spy. Static rail rendered inline
  * (border-s + S-curve SVGs at indent changes); animated active indicator
  * lives in toc.client.ts.
  */
@@ -17,19 +17,19 @@ const { headings, class: className, ...attrs } = Astro.props;
 
 {headings.length > 0 && (
   <div data-slot="toc" data-nb-toc class={cn("toc-container", className)} {...attrs}>
-    <h2 class="mb-2 text-sm font-semibold text-foreground">On this page</h2>
+    <p class="nb-eyebrow mb-3">On this page</p>
     <nav aria-label="Table of contents" class="relative">
       <svg
         data-nb-toc-rail
         aria-hidden="true"
-        class="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+        class="pointer-events-none absolute inset-y-0 start-0 h-full w-1 overflow-visible"
         fill="none"
       >
         <path
           data-nb-toc-rail-active
-          class="stroke-brand opacity-0 transition-[stroke-dasharray,stroke-dashoffset,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ready=true]:opacity-100 data-[initial=true]:transition-opacity motion-reduce:transition-opacity"
-          stroke-width="2"
-          stroke-linecap="round"
+          class="stroke-foreground opacity-0 transition-[stroke-dasharray,stroke-dashoffset,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ready=true]:opacity-100 data-[initial=true]:transition-opacity motion-reduce:transition-opacity"
+          stroke-width="3"
+          stroke-linecap="butt"
         />
       </svg>
 
@@ -62,11 +62,11 @@ const { headings, class: className, ...attrs } = Astro.props;
                 href={`#${h.slug}`}
                 data-nb-toc-link
                 data-nb-slug={h.slug}
-                class="grid grid-cols-1 border-s-2 border-border ps-5 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground no-underline transition-colors duration-150 hover:border-foreground/20 hover:text-foreground aria-[current=true]:font-medium aria-[current=true]:text-foreground"
+                class="grid grid-cols-1 border-s-2 border-border ps-4 py-1.5 text-sm leading-5 text-muted-foreground no-underline underline-offset-[0.22em] transition-colors duration-150 hover:text-foreground hover:underline aria-[current=true]:font-bold aria-[current=true]:text-foreground"
                 style={`margin-inline-start: calc(${indent}rem - 0.125rem);`}
               >
                 <span class="col-start-1 row-start-1 [overflow-wrap:anywhere]">{h.text}</span>
-                <span aria-hidden="true" class="col-start-1 row-start-1 invisible font-medium [overflow-wrap:anywhere]">{h.text}</span>
+                <span aria-hidden="true" class="col-start-1 row-start-1 invisible font-bold [overflow-wrap:anywhere]">{h.text}</span>
               </a>
               {goingShallower && (
                 <svg

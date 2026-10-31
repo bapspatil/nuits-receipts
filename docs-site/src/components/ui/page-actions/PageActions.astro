@@ -15,7 +15,7 @@ const resolvedMarkdownUrl = markdownUrl
   : undefined;
 
 const baseBtn =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-transparent px-2 py-1 text-muted-foreground no-underline transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
+  "inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-transparent px-2 py-1 text-muted-foreground no-underline transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-3";
 
 // Extra actions (the layout passes Connect MCP) render after the built-in
 // ones. Rendered here so an action that renders nothing adds no separator.
@@ -32,7 +32,7 @@ const formattedDate = lastUpdated
     data-slot="page-actions"
     data-pagefind-ignore
     data-md-url={resolvedMarkdownUrl}
-    class={cn("not-prose -ms-2 flex flex-wrap items-center gap-y-1 text-[0.8125rem] leading-5", className)}
+    class={cn("not-prose -ms-2 flex flex-wrap items-center gap-y-1 text-sm leading-5", className)}
     {...attrs}
   >
     {/* Phones get the short forms ("Oct 12, 2026", "Markdown"), so the row stays on one line. */}
@@ -44,7 +44,7 @@ const formattedDate = lastUpdated
     )}
 
     {markdownUrl && lastUpdated && (
-      <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground/40 sm:inline">|</span>
+      <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground sm:inline">|</span>
     )}
 
     {markdownUrl && (
@@ -55,7 +55,7 @@ const formattedDate = lastUpdated
           <span data-nb-page-actions-label aria-live="polite">Copy page</span>
         </button>
 
-        <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground/40 sm:inline">|</span>
+        <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground sm:inline">|</span>
 
         <a
           href={resolvedMarkdownUrl}
@@ -72,7 +72,7 @@ const formattedDate = lastUpdated
     )}
 
     {extra && (markdownUrl || lastUpdated) && (
-      <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground/40 sm:inline">|</span>
+      <span aria-hidden="true" data-slot="page-actions-separator" class="hidden select-none text-muted-foreground sm:inline">|</span>
     )}
     {extra && <Fragment set:html={extra} />}
   </div>
