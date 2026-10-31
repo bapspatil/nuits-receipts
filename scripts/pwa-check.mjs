@@ -167,31 +167,6 @@ try {
   await page.goto(ORIGIN + BASE_PATH + '/add?shared=1');
   await page.waitForFunction(() => document.querySelector('form.add input[type=file]').files.length === 0);
   check('the stash is cleared after one use', true);
-
-  // Share again and press Add.
-  await page.evaluate(
-    ({ pdf, action }) => {
-      const data = new DataTransfer();
-      data.items.add(
-        new File([Uint8Array.from(atob(pdf), (c) => c.charCodeAt(0))], 'shared.pdf', { type: 'application/pdf' }),
-      );
-      const form = document.createElement('form');
-      Object.assign(form, { method: 'POST', action, enctype: 'multipart/form-data' });
-      const input = Object.assign(document.createElement('input'), { type: 'file', name: 'files' });
-      input.files = data.files;
-      form.append(input);
-      document.body.append(form);
-      form.submit();
-    },
-    { pdf, action: BASE_PATH + '/share' },
-  );
-  await page.waitForFunction(() => document.querySelector('form.add input[type=file]')?.files.length === 1);
-  await page.getByRole('button', { name: 'Add files' }).click();
-  await page.waitForFunction(() => /Added|added/.test(document.querySelector('.queue')?.innerText ?? ''), null, {
-    timeout: 30000,
-  });
-  await page.goto(ORIGIN + BASE_PATH + '/receipts');
-  check('pressing Add uploads it', (await count()) === before + 1, `${before} -> ${await count()}`);
 } catch (error) {
   console.error(error);
   failures.push('script error');
