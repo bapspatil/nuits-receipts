@@ -4,7 +4,8 @@ import { eurValues, type EurValue } from './banking';
 import type { Env } from './env';
 import { config } from './config';
 import { version } from '../package.json';
-import { PALETTE, TOKENS_CSS } from './tokens';
+import { TOKENS_CSS } from './tokens';
+import { THEME_COLOR, shortName } from './pwa';
 import { feedback } from './events';
 import { isReady, needsReview } from './flags';
 import { LIST_DEFS, RECEIPTS_TODO, type View } from './worklist';
@@ -514,8 +515,6 @@ html:has(.bulkbar[data-count]:not([data-count="0"])){scroll-padding-bottom:6rem}
 // The paper's 5% grain, from the Mix mockup. A file, not a data: URL, since the page CSP allows
 // images from 'self' only. Served at /assets/grain.svg.
 export const GRAIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .05 0"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>`;
-// The tab icon, the same file as site/public/favicon.svg. Served at /favicon.svg.
-export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${PALETTE.paper}"/><path d="M5 2h14v19l-2.33-1.5L14.33 21 12 19.5 9.67 21l-2.34-1.5L5 21z" fill="${PALETTE.petrol900}"/><path d="M8 7h8M8 10.5h8M8 14h5" stroke="${PALETTE.paper}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
 const NAV_ICONS = {
   home: 'house',
@@ -707,7 +706,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}SPRITE</body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><style>${styles(basePath)}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {

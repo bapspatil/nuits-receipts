@@ -20,7 +20,7 @@ test('only app pages may load same-origin fonts, images and scripts; other respo
   const html = await request('/');
   expect(html.headers.get('Content-Type')).toContain('text/html');
   expect(html.headers.get('Content-Security-Policy')).toBe(
-    "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   );
   expect(html.headers.get('Cache-Control')).toBe('private, no-store');
   const original =

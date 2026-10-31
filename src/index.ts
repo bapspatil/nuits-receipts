@@ -11,8 +11,9 @@ import {
   receiveEmail,
   upload,
 } from './receipts';
+import { FAVICON_SVG } from './icon';
+import { APP_JS, PUBLIC_PATHS, iconResponse, swJs, manifest, type IconPath } from './pwa';
 import {
-  FAVICON_SVG,
   GRAIN_SVG,
   errorId,
   KEYBOARD_JS,
@@ -247,6 +248,15 @@ function cookie(request: Request, name: string): string | null {
 const RECEIPT_PAGE = /^\/receipts\/[a-f0-9]{64}$/;
 const TAB_PAGES = new Set(['/', '/add', '/help', '/import', '/payments', '/receipts', '/settings']);
 async function route(request: Request, env: Env, base: string, ctx: Waiter): Promise<Response> {
+  // The icons hold no data and are fetched without the page's credentials (iOS touch icon).
+  // An exact-path list, so nothing else is ever public.
+  const publicPath = new URL(request.url).pathname;
+  if (request.method === 'GET' && PUBLIC_PATHS.has(publicPath))
+    return publicPath === '/favicon.svg'
+      ? new Response(FAVICON_SVG, {
+          headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
+        })
+      : iconResponse(publicPath as IconPath);
   const who = await authorized(request, env);
   if (!who)
     // No Basic challenge in Access mode, so browsers never show a password prompt.
@@ -264,6 +274,10 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
   // the tabs too; its counts join the getReceipt wave, which stays first because the page's own
   // queries need the receipt's facts (kind, vendor, amount, status).
   if (request.method === 'GET' && (TAB_PAGES.has(path) || RECEIPT_PAGE.test(path))) void navCounts(env);
+  // A file shared from another Android app lands here only when the service worker did not
+  // take it. Nothing is read or stored; the owner adds the files themselves. A share
+  // navigation may carry no Origin, so this comes before the Origin check.
+  if (request.method === 'POST' && path === '/share') return redirect('/add');
   if (!['GET', 'HEAD'].includes(request.method)) {
     requireInput(request.method === 'POST', 'Method not allowed', 405);
     requireInput(request.headers.get('Origin') === url.origin, 'Origin does not match', 403);
@@ -433,9 +447,17 @@ async function route(request: Request, env: Env, base: string, ctx: Waiter): Pro
     return new Response(GRAIN_SVG, {
       headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },
     });
-  if (request.method === 'GET' && path === '/favicon.svg')
-    return new Response(FAVICON_SVG, {
-      headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=86400' },
+  if (request.method === 'GET' && path === '/manifest.webmanifest')
+    return new Response(manifest(config(env).appName, base), {
+      headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' },
+    });
+  if (request.method === 'GET' && path === '/sw.js')
+    return new Response(swJs(MAX_UPLOAD_FILES), {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' },
+    });
+  if (request.method === 'GET' && path === '/assets/app.js')
+    return new Response(APP_JS, {
+      headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'private, max-age=300' },
     });
   const font = path.match(/^\/assets\/fonts\/([a-z-]+\.woff2)$/);
   if (request.method === 'GET' && font?.[1] && FONT_FILES[font[1]])
@@ -863,7 +885,7 @@ function fontBytes(name: string): Uint8Array {
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const HTML_CSP =
-  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+  "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const INLINE_CSP =
   "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 // Where an error page's back link goes: the same-origin page that sent the
