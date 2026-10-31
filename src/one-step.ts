@@ -61,8 +61,8 @@ async function banksOf(env: Env, headers: string[]): Promise<string[]> {
   const found = [...(await savedPresets(env, headers)), ...suggestMappings(headers, config(env).defaultCurrency)].map(
     (p) => p.bank_name.trim(),
   );
-  return [...new Set(found.filter(Boolean).map((b) => b.toLowerCase()))].map(
-    (lower) => found.find((b) => b.toLowerCase() === lower)!,
+  return [...new Set(found.filter(Boolean).map((b) => b.toLowerCase()))].map((lower) =>
+    found.find((b) => b.toLowerCase() === lower)!,
   );
 }
 

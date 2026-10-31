@@ -17,8 +17,7 @@ export type AmountColumns =
   | { kind: 'split'; debit: number; credit: number }
   | { kind: 'direction'; amount: number; direction: number; debit: string[]; credit: string[] };
 export type CurrencyColumns =
-  | { kind: 'default'; currency: string }
-  | { kind: 'column'; column: number; blankDefault: string | null };
+  { kind: 'default'; currency: string } | { kind: 'column'; column: number; blankDefault: string | null };
 export const DATE_FORMATS = ['ISO', 'DD.MM.YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'ISO_OR_DOTTED', 'D MMM YYYY'] as const;
 export type DateFormat = (typeof DATE_FORMATS)[number];
 export type CsvMapping = {

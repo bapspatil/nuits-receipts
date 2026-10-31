@@ -27,15 +27,7 @@ export type FlagField =
   | 'vat_treatment'
   | 'reference_number';
 export type FlagGroup =
-  | 'Seller'
-  | 'Date'
-  | 'Amounts'
-  | 'Details'
-  | 'Euro amount'
-  | 'Filing'
-  | 'Duplicate'
-  | 'Source'
-  | 'Other';
+  'Seller' | 'Date' | 'Amounts' | 'Details' | 'Euro amount' | 'Filing' | 'Duplicate' | 'Source' | 'Other';
 export type Flag = {
   group: FlagGroup;
   title: string;
