@@ -46,6 +46,56 @@ if (!user || !rest.length) {
 }
 const policy = validatePolicy(JSON.parse(readFileSync(POLICY, 'utf8')));
 
+// lintapple measures the gap between blocks only inside a data-ui-stack, and the pages carry no
+// such marks. Every element in main whose children stack as blocks gets one here, so two blocks
+// that touch (a button sitting on the box under it) are found on every page without marking
+// each one by hand. Rows of a list or a table are left out: they are ruled, not spaced.
+const markStacks = (page) =>
+  page.evaluate(() => {
+    const blocky = (el) => {
+      const s = getComputedStyle(el);
+      return (
+        !s.display.startsWith('inline') &&
+        s.display !== 'none' &&
+        s.display !== 'contents' &&
+        s.position !== 'absolute' &&
+        s.position !== 'fixed'
+      );
+    };
+    // What a fold holds is checked open: lintapple skips a closed one, and the Send step and most
+    // of Settings live in folds.
+    // A menu that opens over the page (a row's More) is not a fold and stays shut.
+    for (const el of document.querySelectorAll('main details:not(.bulkbar details)')) {
+      el.open = true;
+      const over = [...el.children].some(
+        (c) => c.tagName !== 'SUMMARY' && ['absolute', 'fixed'].includes(getComputedStyle(c).position),
+      );
+      if (over) el.open = false;
+    }
+    // The phone's tab bar floats over the page, so axe cannot tell what is behind the row under
+    // it. It joins the page's flow at the end for the check; its own labels are still checked.
+    for (const el of document.querySelectorAll('nav.tabs')) el.style.position = 'static';
+    // A visually hidden heading is a 1px box lintapple still counts; nobody sees it.
+    for (const el of document.querySelectorAll('main :is(h1, h2, h3, h4).vh')) el.inert = true;
+    for (const el of [document.querySelector('main'), ...document.querySelectorAll('main *')]) {
+      if (!el || el.closest('table, ul, ol, dl, svg, pre, .textLayer, [hidden]')) continue;
+      // One surface drawn in parts: a disclosure's summary over its body, a folder tab over its
+      // card, and the Settings and Help sections, which share their borders.
+      if (el.matches('details') || el.querySelector(':scope > details.sect')) continue;
+      // Rows ruled apart by a line, like the fields of a Settings section, touch on purpose.
+      const kids = [...el.children].filter(blocky);
+      const ruled = (k) => ['Top', 'Bottom'].some((side) => parseFloat(getComputedStyle(k)[`border${side}Width`]) > 0);
+      if (kids.length > 1 && kids.slice(0, -1).every(ruled)) continue;
+      const s = getComputedStyle(el);
+      const column =
+        s.display === 'block' ||
+        s.display === 'flow-root' ||
+        (s.display.endsWith('flex') && s.flexDirection.startsWith('column')) ||
+        (s.display.endsWith('grid') && s.gridTemplateColumns.split(' ').length === 1);
+      if (column && [...el.children].filter(blocky).length > 1) el.setAttribute('data-ui-stack', '');
+    }
+  });
+
 const browser = await chromium.launch({ executablePath: chromePath() });
 const pages = [];
 let unfinished = 0;
@@ -62,6 +112,7 @@ try {
       try {
         const response = await page.goto(BASE + path, { waitUntil: 'load' });
         if (!response || response.status() >= 400) throw new Error(`HTTP ${response?.status()}`);
+        await markStacks(page);
         const { findings } = await checkPage(page, policy);
         pages.push({ path, viewport: where, findings });
       } catch (error) {
