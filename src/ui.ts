@@ -37,7 +37,7 @@ export const DATA_LINE = "Runs in your own Cloudflare account. Nuits doesn't rec
 export const MISSING_PAYMENTS =
   "FROM bank_transactions t JOIN imports i ON i.id=t.import_id WHERE i.status='complete' AND t.amount_minor<0 AND t.receipt_required=1 AND t.receipt_id IS NULL";
 
-export type NavKey = 'home' | 'receipts' | 'bank' | 'settings';
+export type NavKey = 'home' | 'add' | 'receipts' | 'bank' | 'settings';
 // Every page's place in the nav and its tab title, in one table, so the
 // highlighted tab and the title can't drift apart: a page's title is its nav
 // label. A page names itself with one of these keys and adds a detail (a
@@ -51,7 +51,7 @@ export const PAGES = {
   receipts: { nav: 'receipts', title: 'Receipts' },
   receipt: { nav: 'receipts', title: 'Receipts' },
   invoices: { nav: 'receipts', title: 'Receipts' },
-  add: { nav: 'receipts', title: 'Receipts' },
+  add: { nav: 'add', title: 'Add' },
   bank: { nav: 'bank', title: 'Bank' },
   import: { nav: 'bank', title: 'Bank' },
   settings: { nav: 'settings', title: 'Settings' },
@@ -145,6 +145,7 @@ nav.main svg.i{color:var(--accent)}
 nav.main a:hover{background:var(--surface-page)}
 nav.main a[aria-current=page]{color:var(--accent);font-weight:600;background:var(--surface-accent-quiet)}
 nav.main .count{margin-left:auto}
+nav.main a.navadd{justify-content:center;box-shadow:inset 0 -2px 0 rgb(0 0 0/.28),0 1px 2px rgb(33 28 22/.2);margin:0 0 var(--space-3);background:var(--btn-primary-bg);color:var(--btn-primary-text);font-weight:600}nav.main a.navadd svg.i{color:currentColor}nav.main a.navadd:hover{background:var(--accent-hover)}nav.main a.navadd[aria-current=page]{box-shadow:0 0 0 2px var(--surface-raised),0 0 0 4px var(--accent)}
 .count{display:inline-grid;place-items:center;min-width:26px;background:var(--accent);color:var(--text-on-accent);border-radius:var(--radius-pill);font:500 var(--text-xs)/1.5 var(--font-num);padding:0 var(--space-2)}
 .sign-out{margin-top:auto;font-size:var(--text-sm);color:var(--text-muted);min-height:44px;display:flex;align-items:center;padding:0 var(--space-3)}
 @media (min-width:880px){body{padding-left:calc(var(--sidebar-width) + 12px)}header.top{position:fixed;top:12px;bottom:12px;left:12px;z-index:6;width:var(--sidebar-width);border-radius:var(--radius-glass);overflow-y:auto}}
@@ -466,13 +467,14 @@ body.p-reviewItem{padding-bottom:0}body.p-reviewItem .sbar{bottom:calc(var(--kb,
 header.top{display:none}
 nav.main,.sign-out{display:none}
 nav.tabs{display:block;position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;border-radius:32px;padding:0 var(--space-1)}
-nav.tabs ul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-width:560px;margin:auto;padding:0;list-style:none}
+nav.tabs ul{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));max-width:560px;margin:auto;padding:0;list-style:none}
 nav.tabs a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-1);min-height:64px;border-radius:28px;padding:var(--space-2) var(--space-1) var(--space-1);text-decoration:none;color:var(--text-muted);font:500 var(--text-xs)/1.2 var(--font-ui);text-align:center;-webkit-tap-highlight-color:transparent}
 nav.tabs a[aria-current=page]{color:var(--accent);font-weight:600}
 nav.tabs a:active{background:var(--surface-accent-quiet)}
 nav.tabs a:focus-visible{outline-offset:-4px}
 nav.tabs .ti{position:relative;display:flex}
 nav.tabs svg{width:24px;height:24px}
+nav.tabs .tabadd .ti{place-items:center;width:48px;height:32px;margin:calc(var(--space-1) * -1) 0;border-radius:16px;background:var(--accent);color:var(--text-on-accent)}nav.tabs .tabadd{color:var(--text)}
 nav.tabs .count{position:absolute;z-index:1;top:-5px;left:15px;min-width:20px;padding:0 var(--space-1);line-height:1.3;box-shadow:0 0 0 2px var(--surface-raised)}
 body.p-reviewItem nav.tabs{display:none}
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) :is(nav.tabs,.sbar){display:none}
@@ -521,6 +523,7 @@ export const GRAIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" he
 
 const NAV_ICONS = {
   home: 'house',
+  add: 'plus',
   receipts: 'receipt',
   bank: 'landmark',
   settings: 'sliders-horizontal',
@@ -540,20 +543,23 @@ export const NAV: readonly { key: NavKey; href: string; label: string }[] = [
   { key: 'bank', href: '/payments', label: 'Bank' },
   { key: 'settings', href: '/settings', label: 'Settings' },
 ];
+// Add is in both bars on every page, the same button in the same place: first in the sidebar,
+// the middle of the phone's tab bar. From Invoices it opens with Invoices you sent picked.
+export const addHref = (view: PageKey) => (view === 'invoices' ? '/add?kind=sales' : '/add');
 
-function nav(active: NavKey | undefined, counts: Counts): string {
+function nav(active: NavKey | undefined, counts: Counts, add: string): string {
   const badge = badges(counts);
-  return `<nav class="main" aria-label="Main"><ul>${NAV.map(
+  return `<nav class="main" aria-label="Main"><a class="navadd" href="${add}"${current(active === 'add')}>${icon(NAV_ICONS.add)}Add</a><ul>${NAV.map(
     (t) =>
       `<li><a href="${t.href}"${current(t.key === active)}>${icon(NAV_ICONS[t.key])}${t.label}${badge[t.key] ?? ''}</a></li>`,
   ).join('')}</ul></nav>`;
 }
-function tabs(active: NavKey | undefined, counts: Counts): string {
+function tabs(active: NavKey | undefined, counts: Counts, add: string): string {
   const badge = badges(counts);
-  return `<nav class="tabs" aria-label="Main"><ul>${NAV.map(
-    (t) =>
-      `<li><a href="${t.href}"${current(t.key === active)}><span class="ti">${icon(NAV_ICONS[t.key])}${badge[t.key] ?? ''}</span><span>${t.label}</span></a></li>`,
-  ).join('')}</ul></nav>`;
+  const tab = (t: { key: NavKey; href: string; label: string }) =>
+    `<li><a href="${t.href}"${current(t.key === active)}${t.key === 'add' ? ' class="tabadd"' : ''}><span class="ti">${icon(NAV_ICONS[t.key])}${badge[t.key] ?? ''}</span><span>${t.label}</span></a></li>`;
+  const all = [...NAV.slice(0, 2), { key: 'add' as const, href: add, label: 'Add' }, ...NAV.slice(2)];
+  return `<nav class="tabs" aria-label="Main"><ul>${all.map(tab).join('')}</ul></nav>`;
 }
 
 // Receipts and Invoices are two tabs of one page, always shown, each with its
@@ -585,12 +591,6 @@ export function viewSwitch(href: (view: View) => string, counts: Record<View, nu
         `<li><a href="${escape(href(v))}" data-view="${v}" data-count="${counts[v]}"${current(v === active)}>${v === 'todo' ? 'To do' : 'All'} (${counts[v]})</a></li>`,
     )
     .join('')}</ul></nav>`;
-}
-// The one Add button of the Receipts page; its label and target follow the open tab.
-export function addButton(active: 'all' | 'invoices', primary: boolean): string {
-  const [key, href] =
-    active === 'invoices' ? (['addInvoice', '/add?kind=sales'] as const) : (['addReceipt', '/add'] as const);
-  return buttonLink(key, href, { tone: primary ? 'primary' : 'secondary' });
 }
 // The words of a step marker, for screen readers: the same three everywhere.
 export function stepWord(state: StepState): string {
@@ -712,7 +712,7 @@ export async function page(
   const event = said ? `${said.text.replace(/\.$/, '')} · ` : '';
   const head = options.head ?? pageHead(escape(heading));
   const counts = await navCounts(env);
-  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><style>${styles(basePath)}${SHEET_CSS}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts)}${signOut}</div></header>${tabs(entry.nav, counts)}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}${findSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
+  const markup = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ''}<title>${escape(event + heading)} · ${escape(appName)}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="${THEME_COLOR}"><meta name="apple-mobile-web-app-title" content="${escape(shortName(appName))}"><style>${styles(basePath)}${SHEET_CSS}${options.style ?? ''}</style></head><body class="p-${view}"><div class="grain"></div><a class="skip" href="#main">Skip to content</a><header class="top"><div class="bar"><a class="brand" href="/">${escape(appName)}</a>${nav(entry.nav, counts, addHref(view))}${signOut}</div></header>${tabs(entry.nav, counts, addHref(view))}<main id="main" tabindex="-1">${head}${failureSummary()}${feedbackBanner()}${body}${body.includes(' data-bulk-list=') ? BULK_SCRIPT : ''}${view === 'reviewItem' || view === 'receipt' ? KEYBOARD_SCRIPT : ''}${KEYS_SCRIPT}</main><footer class="foot"><p class="notice">${escape(FOOTER_NOTICE)}</p><p>${release} · <a href="/help">Help</a></p></footer>${keysSheet()}${findSheet()}SPRITE<script src="/assets/app.js" defer></script></body></html>`;
   return new Response(
     markup.replace('SPRITE', () => sprite(markup)),
     {

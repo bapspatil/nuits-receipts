@@ -9,11 +9,8 @@ const crumb = (html: string) => html.match(/<div class="crumbs"><a href="([^"]+)
 test('screens that are not a tab have a way back to their list or to Home', async () => {
   expect(crumb(await (await request('/help')).text())).toEqual(['/', 'Home']);
   expect(crumb(await (await request('/import')).text())).toEqual(['/payments', 'Bank']);
-  expect(crumb(await (await request('/add')).text())).toEqual(['/receipts?view=todo', 'Receipts']);
-  expect(crumb(await (await request('/add?kind=sales')).text())).toEqual([
-    '/receipts?view=all&amp;kind=sales',
-    'Invoices',
-  ]);
+  // Add is in both bars, so it needs no crumb.
+  expect(crumb(await (await request('/add?kind=sales')).text())).toBeUndefined();
   // The receipt page already has its crumb; the tabs are their own way out.
   const row = await seed({ status: 'ready' });
   expect(crumb(await (await request(`/receipts/${row.id}`)).text())?.[1]).toMatch(/Home|To do/);

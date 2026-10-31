@@ -91,7 +91,6 @@ export const ACTIONS = {
   open: { label: 'Open', icon: 'folder-open', tone: 'secondary' },
   downloadFolder: { label: 'Download folder', icon: 'archive', tone: 'ghost' },
   index: { label: 'Index older files', icon: 'file-search', tone: 'secondary' },
-  addDocument: { label: 'Add document', icon: 'file-text', tone: 'secondary' },
   folders: { label: 'Folders', icon: 'folder', tone: 'secondary' },
   signOut: { label: 'Sign out', icon: 'log-out', tone: 'secondary' },
 } as const satisfies Record<string, Action>;

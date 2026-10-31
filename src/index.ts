@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import {
   addDocument,
+  storeDocument,
   fileOriginal,
   filePage,
   folderZip,
@@ -44,7 +45,7 @@ import { BULK_CAP, BULK_JS } from './bulk';
 import { KEYS_JS } from './keys';
 import { FIND_JS } from './find';
 import { paymentsBulk, receiptsBulk, sendersBulk, type Caller } from './batch';
-import { ADD_JS, ADD_SCOPE, addPage, invoicesPage, MAX_UPLOAD_FILES, PAID_SCOPE } from './invoices';
+import { ADD_JS, ADD_SCOPE, addKind, addPage, invoicesPage, MAX_UPLOAD_FILES, PAID_SCOPE } from './invoices';
 import {
   afterLastReview,
   home,
@@ -892,20 +893,25 @@ async function uploadFiles(request: Request, env: Env): Promise<Response> {
     const files = form.getAll('file').filter((f): f is File => f instanceof File && f.size > 0);
     requireInput(files.length > 0, 'Choose a file');
     requireInput(files.length <= MAX_UPLOAD_FILES, `Add up to ${MAX_UPLOAD_FILES} files at a time`);
-    const kind = form.get('kind') === 'sales' ? 'sales' : 'expense';
-    const results: { name: string; id?: string; error?: string }[] = [];
+    const kind = addKind(form.get('kind'));
+    const results: { name: string; id?: string; href?: string; error?: string }[] = [];
     for (const file of files)
       try {
-        const row = await upload(env, new Uint8Array(await file.arrayBuffer()), file.name, file.type, kind);
-        results.push({ name: file.name, id: row.id });
+        // Another finance document is kept on Home; a receipt or an invoice goes to be read.
+        const href =
+          kind === 'other'
+            ? await storeDocument(env, file)
+            : `/receipts/${(await upload(env, new Uint8Array(await file.arrayBuffer()), file.name, file.type, kind)).id}`;
+        results.push({ name: file.name, id: href.split('/').pop(), href });
       } catch (error) {
         // One bad file doesn't stop the rest; a single upload keeps the old errors.
         if (!(error instanceof InputError) || files.length === 1) throw error;
         results.push({ name: file.name, error: error.message });
       }
     if (json) return Response.json({ files: results });
-    const added = results.filter((r) => r.id);
-    if (results.length === 1 && added[0]) return redirect(withDone('uploaded', `/receipts/${added[0].id}`));
+    const added = results.filter((r) => r.href);
+    if (results.length === 1 && added[0])
+      return redirect(withDone(kind === 'other' ? 'documentAdded' : 'uploaded', added[0].href!));
     return redirect(
       withDone('filesAdded', `/add?kind=${kind}`, { added: added.length, failed: results.length - added.length }),
     );
