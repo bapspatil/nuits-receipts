@@ -420,8 +420,8 @@ test('flagged fields are one compact row: the question labels the input, its sen
   expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
   expect(await stylesheet(html)).toMatch(/\n\.sbar\{position:sticky;bottom:var\(--space-4\);/);
   const css = await stylesheet(html);
-  expect(css).toContain('.fix{padding-bottom:7rem}');
-  expect(css).toContain('html:has(.sbar){scroll-padding-bottom:7rem}');
+  expect(css).toContain('.fix{padding-bottom:calc(7rem + var(--space-4))}');
+  expect(css).toContain('html:has(.sbar){scroll-padding-bottom:calc(7rem + var(--space-4))}');
   expect(css).toContain(
     '@media (min-width:1200px) and (max-width:1359px){.sbar{padding-left:var(--space-2);gap:0 var(--space-1)}.sbar .prog{flex-basis:100%;',
   );
