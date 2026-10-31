@@ -76,18 +76,19 @@ Open `http://localhost:8787` in your browser. It asks for a user name and passwo
 - **User name:** `owner`
 - **Password:** the one you put in `.dev.vars`
 
-The app opens on its **Welcome** page, with the heading **Let's get your first receipt in**.
+The app opens on **Welcome**, with a **Finish setting up** list and, under it, the Add form.
 
 ## Upload a sample receipt
 
 The repository ships synthetic receipts in `scripts/sample-receipts/`.
 
-1. On the Welcome page, under **Receipt (PDF or photo)**, choose `scripts/sample-receipts/sample.pdf` from your clone.
-2. Press **Upload**.
+1. On Welcome, under **What are these?**, leave **Receipts and bills** selected.
+2. Choose `scripts/sample-receipts/sample.pdf` from your clone.
+3. Press **Upload**.
 
-The app opens the receipt's page. Its title is **Sample Cloud Lantern Oy**, it shows **EUR 125.50**, and it has a **Save** button rather than flags to check. The test extractor read the seller, date, amounts and VAT from the PDF's text.
+The file shows **Added · Open**. Press **Open** to see the receipt's page. Its title is **Sample Cloud Lantern Oy**, it shows **EUR 125.50**, and it has a **Save** button rather than flags to check. The test extractor read the seller, date, amounts and VAT from the PDF's text.
 
-Open **Home** in the sidebar (on a phone, the tab bar at the bottom), and use ‹ and › beside the month title to reach September 2026. **Check** shows **Done**, and **Spent** under **Download anyway** shows **EUR 125.50**.
+Open **Home** in the sidebar (on a phone, the tab bar at the bottom). It opens on September 2026, the oldest month not sent yet. In the month's steps, **Check** says **All checked**. Open **Download anyway** and **Spent** shows **EUR 125.50**. Below the steps, the receipt is in Home's list of documents.
 
 ## Run the tests
 

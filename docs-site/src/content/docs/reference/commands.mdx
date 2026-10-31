@@ -30,6 +30,7 @@ Scripts that call Wrangler set `WRANGLER_SEND_METRICS=false`. `dev`, `migrate` a
 | `check` | `typecheck`, `lint`, `test`, `test:scripts` in order | Stops at the first failure. |
 | `smoke` | `bash scripts/smoke.sh && bash scripts/smoke-email.sh` | Drives a running `bun run dev` server with `curl`: sign-in, upload, import, matching, export and email. |
 | `eval` | `bun scripts/eval-extraction.ts` | Runs recorded Clairic answers through the extraction pipeline and reports field accuracy and review counts. No network. |
+| `ui-lint` | `node scripts/ui-lint.mjs` | Lints the pages of a running copy against `scripts/ui-policy.json` with lintapple, at each viewport the policy names. Flags: `--base <url>`, `--out <file>`, `--budget <n>`, then the paths to check. Signs in with `AUTH=<user>:<password>`. Exits 1 when the findings exceed the budget (0 without `--budget`), and 2 when a page could not be checked. |
 
 ### `smoke` environment variables
 
@@ -48,6 +49,17 @@ Output is written to `.audit/smoke/` and `.audit/smoke-email/`.
 | `--dir <dir>` | `test/fixtures/receipts` | Fixture folder. Each fixture is `<name>.txt` or `<name>.pdf` plus `<name>.json` with the expected values and a recorded Clairic response. |
 | `--src <dir>` | `src` | Source folder to evaluate, for comparing two checkouts. |
 | `--json` | off | Machine-readable output. |
+
+## Generate source files
+
+Each of these writes files under `src/` that are committed. Rerun one after changing its input.
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `tokens` | `node scripts/app-tokens.mjs` | Reads `src/tokens.json` and writes `src/tokens.ts`, the app's CSS custom properties. `scripts/app-tokens.test.ts` fails when the two differ. |
+| `icons` | `bun scripts/app-icons.mjs` | Renders the install icons from the app glyph in `src/icon.ts` into `src/app-icons.ts`, and copies them to `docs/pwa/`. Uses the Chromium that Playwright cached unless `CHROME` is set. |
+| `sprite` | `node scripts/app-sprite.mjs` | Fetches `lucide-static` with `npm pack` and writes `src/icons.ts`, the path data of every icon the app draws. `node scripts/app-sprite.mjs <dir>` reads the SVGs from a folder instead. |
+| `vendor:pdfjs` | `node scripts/vendor-pdfjs.mjs` | Copies the two minified PDF.js builds from `pdfjs-dist` to `src/vendor/`, for the [PDF viewer](/reference/pdf-viewer/). Run it after a `pdfjs-dist` update. |
 
 ## Deploy
 

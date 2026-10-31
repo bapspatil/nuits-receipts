@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-The monthly view and the export show every cost in euros, whatever currency the receipt is in. A receipt can get its euro amount from four places, and the app always says which one it used. This page explains the order and the reasoning behind it.
+The month's **Spent** total and the export show every cost in euros, whatever currency the receipt is in. A receipt can get its euro amount from four places, and the app always says which one it used. This page explains the order and the reasoning behind it.
 
 ## The order of precedence
 
@@ -16,7 +16,7 @@ For each receipt, the first of these that exists is used:
 3. **The receipt itself, if it is in euros.** No conversion needed.
 4. **An ECB reference rate.** The receipt's total converted at the European Central Bank's reference rate for its issue date.
 
-If none of these exist, the receipt has no euro amount yet. It is flagged, and it is left out of the month's euro total (the monthly view says how many receipts that affects) until one of the four arrives.
+If none of these exist, the receipt has no euro amount yet. It is flagged, and it is left out of the month's euro total until one of the four arrives. Under **Spent**, Home says how many receipts that affects.
 
 The export's `eur_source` column records which source each row used: `manual`, `bank`, `native`, `ecb` or `missing`. For ECB rows, `fx_rate_date` says which day's rate was applied. See [Export CSV](/reference/export-csv/).
 
@@ -24,7 +24,7 @@ The export's `eur_source` column records which source each row used: `manual`, `
 
 What you can deduct, and what your books show, is normally what you actually paid. When a US dollar subscription is charged to a euro card, the euro amount on your statement includes the card scheme's exchange rate and any fee your bank added. That is the real cost. A reference rate is only an estimate of it.
 
-So a foreign-currency receipt starts with an ECB estimate, and when you import the statement and the payment is matched, the bank's euro amount replaces it. The monthly view shows how much of the total is still an estimate: "converted at the ECB rate until your bank statement confirms it".
+So a foreign-currency receipt starts with an ECB estimate, and when you import the statement and the payment is matched, the bank's euro amount replaces it. The receipt page says where its euro amount came from, for example "ECB rate" with the rate's date, or "from your bank". When you have more than one part, the month's **By part** table on Home says how much of the total is still at the ECB rate.
 
 A match only replaces the estimate when the bank account is in euros. A payment from a dollar account is still in dollars, so the receipt keeps its ECB conversion.
 
@@ -34,7 +34,7 @@ Rates come from [Frankfurter](https://frankfurter.dev), a free service that repu
 
 The request carries only a currency code and two dates. No amounts, sellers or receipt content are sent. Each rate is stored in your database after the first lookup, so the same currency and date is only asked for once.
 
-If Frankfurter cannot be reached, the receipt is flagged "No euro amount yet". The lookup is tried again the next time the receipt is read or saved, and a bank match fills the gap without any lookup at all.
+If Frankfurter cannot be reached, the receipt has no euro amount yet and asks **Why is there no euro amount?** The lookup is tried again the next time the receipt is read or saved, and a bank match fills the gap without any lookup at all.
 
 ## What a reference rate is not
 

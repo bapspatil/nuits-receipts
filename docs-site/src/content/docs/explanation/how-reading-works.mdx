@@ -13,7 +13,7 @@ Reading is done by Clairic (`@cf/cloudflare/clairic`) on Workers AI. Clairic is 
 
 The app asks Clairic for a fixed set of fields: vendor, receipt or invoice number, currency, issue date, due date, total, amount before VAT, VAT amount, VAT rate, and up to 20 line descriptions. The instructions are deliberately strict. The total is "the final amount due or paid, not the subtotal". Amounts are to be read as printed and "never calculated". The vendor is the printed issuer, not whoever forwarded the email.
 
-For each field Clairic returns a value, a confidence, and an estimate of how likely it is that the field is not on the page at all. The app only trusts a value when the confidence is at least 0.9 and the "not there" estimate is at most 0.1. Those two thresholds can be changed under **Settings**, within limits.
+For each field Clairic returns a value, a confidence, and an estimate of how likely it is that the field is not on the page at all. The app only trusts a value when the confidence is at least 0.9 and the "not there" estimate is at most 0.1. Those two thresholds can be changed under **Settings** > **Advanced**, within limits.
 
 ### What Clairic sees
 
@@ -36,7 +36,7 @@ Then the two readings are compared, field by field:
 
 ### VAT arithmetic
 
-The arithmetic is checked in code, never by the model. Amount before VAT plus VAT must equal the total, to within two cents. If it does not, the receipt is flagged "The numbers don't add up". When the VAT rate is known, the VAT must also match that percentage of the amount before VAT. When two of the three amounts are settled and they add up, the third is treated as settled too.
+The arithmetic is checked in code, never by the model. Amount before VAT plus VAT must equal the total, to within two cents. If it does not, the receipt is flagged and asks **Do the amounts add up?** When the VAT rate is known, the VAT must also match that percentage of the amount before VAT. When two of the three amounts are settled and they add up, the third is treated as settled too.
 
 The code also notices:
 
@@ -64,11 +64,11 @@ A flag means the app could not settle something on its own. It is not an error, 
 - The model stopped early or returned something malformed.
 - The sender of an email could not be verified, so it was not read (see [Email and sender trust](/explanation/email-and-sender-trust/)).
 
-The receipt page shows one card per problem, in plain words, with the fields to fix. The full list of flags and what triggers each one is in [Receipt fields and flags](/reference/receipt-fields-and-flags/).
+The receipt then waits in **Receipts To do**. Its page asks one short question per problem, in plain words, with the field to fill, under a heading such as **2 fields to fill**. The full list of flags and what triggers each one is in [Receipt fields and flags](/reference/receipt-fields-and-flags/).
 
 ## Approving and reading again
 
-You can fix a flagged receipt by correcting the fields, or approve it as it is. Approving a flagged receipt needs a written reason, and it needs the vendor, date, a known currency, the total, the amount before VAT and the VAT amount. The reason is kept with the receipt, so there is a record of why a flag was set aside.
+You can fix a flagged receipt by correcting the fields, or approve it as it is. Approving a flagged receipt needs a reason, kept in its **Note** (it starts as "Checked against the original"), and it needs the vendor, date, a known currency, the total, the amount before VAT and the VAT amount. The reason is kept with the receipt, so there is a record of why a flag was set aside.
 
 **Read again** sends the saved original through the same reading again. It is useful after a temporary failure, or for a sender whose email was held for review. Values you have saved stay as you saved them. See [Check and approve a receipt](/how-to/review-and-approve-a-receipt/).
 

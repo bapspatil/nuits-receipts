@@ -18,6 +18,7 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | Image size | 4 MiB |
 | Images per read | 1 |
 | Files per upload | 10 (`src/invoices.ts`) |
+| Files per share from another app | 10, PDF, PNG, JPEG or WebP. Others are left out. (`src/pwa.ts`) |
 | Upload request body | 40 MiB in total |
 | Text read per document | 40,000 characters of document text plus email context. Longer input is cut and flagged `input_truncated`. |
 | Read lease | 120 seconds. A read that has not finished by then can be taken over by another. |
@@ -31,17 +32,18 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | Email size | 20 MiB. Larger mail is dropped. |
 | Attachments read per email | 10 supported attachments (PDF, PNG, JPEG, WebP). More are skipped and flagged `email_skipped_parts`. |
 | Allowed senders | 75 addresses of up to 254 characters. The longest list fits the 20,000-character limit on a stored setting. |
-| Unknown sender emails waiting | 50 in total and 10 from one sender. More are logged, not kept. |
+| Emails from new senders waiting | 50 in total and 10 from one sender. More are logged, not kept. |
 | Ignored senders | 500 addresses |
-| Mail log | The last 500 emails, plus every Unknown sender email still waiting. |
+| Mail log | The last 500 emails, plus every email from a new sender still waiting. |
 | Forward copy | 1 address |
 | Seller names | 20 names of up to 100 characters |
 
-## Bank CSV import
+## Bank statement import
 
 | Limit | Value |
 | --- | --- |
-| File size | 2 MiB |
+| File size | 2 MiB, for XLSX, CSV and PDF statements |
+| PDF statement pages | 400 (`src/pdf.ts`) |
 | Rows per file | 1 to 5,000 |
 | Columns | 100 |
 | Rows above the column names, or skipped at the end | 100 each |
@@ -79,7 +81,7 @@ Limits set in the code are in `src/domain.ts` unless another file is named. Size
 | Users | One user per deployment, with one shared password, or the emails in `ACCESS_ALLOWED_EMAILS` in Access mode. No roles. |
 | Sign-out | None with HTTP Basic. Access mode has **Sign out**. |
 | Bank connections | XLSX, CSV and PDF statement import only. No bank API sync, no scanned PDF statements. |
-| Bulk actions | 500 rows per action, including **Select all N**. A list with more shows no **Select all N**; narrow the filter. **Match** on Bank takes up to 100 matches at a time (`src/match.ts`). **Read again** and **Move** send 10 per request, and the page sends them in groups with a progress bar (`src/bulk.ts`). |
+| Bulk actions | 500 rows per action (`BULK_CAP` in `src/bulk.ts`). On a list with more, the button reads **Select the first 500**, in the list's order. **Match** on Bank takes up to 100 matches at a time (`src/match.ts`). **Read again** and **Move** send 10 per request, and the page sends them in groups with a progress bar (`src/bulk.ts`). |
 | Matching | One bank row per document. Split and combined payments, refunds, fees and currency conversion are not matched automatically. |
 
 ## Cloudflare plan limits

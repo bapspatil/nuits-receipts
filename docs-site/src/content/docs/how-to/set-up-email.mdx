@@ -35,7 +35,7 @@ Select **Save**. Only one rule should use this pattern: if two do, only the firs
   </Step>
   <Step title="Tell the app the address and the allowed senders">
 
-In the app, open **Settings > Email** and fill in **Receipt address**: the address you just routed. It is shown next to the upload form. Routing, not this field, decides what reaches the Worker. Once you change it, tick "I’ve added the Email Routing rule for this address" and press **Save**.
+In the app, open **Settings > Email** and fill in **Receipt address**: the address you just routed. It is shown under the form on **Add**. Routing, not this field, decides what reaches the Worker. Once you change it, tick "I’ve added the Email Routing rule for this address" and press **Save**.
 
 Then open **Settings > Email > Email senders**, type each address you forward from in the address box and press **Add**. Mail from these addresses is read. Mail from anyone else waits in **Receipts To do**, as a **New sender** row, if Cloudflare's checks prove who sent it.
 
@@ -55,13 +55,13 @@ Recent Wrangler versions can also create **Send to a Worker** rules on deploy fr
 
 ## Check it worked
 
-Within a minute or so the receipt appears on **Receipts**: under **To do** if anything needs a look, else under **All**. The email itself is kept in your R2 bucket as the original.
+Within a minute or so the receipt appears: in **Receipts** To do if anything needs a look, else on **Home**. The email itself is kept in your R2 bucket as the original.
 
 If nothing appears:
 
-- **The sender is not approved yet.** Mail from anyone not on your allowed senders waits in **Receipts To do** as a **New sender** row. Press **Allow** to read it, and their later mail is read as it arrives. Tick several to allow them at once.
+- **The sender is not approved yet.** Mail from anyone not on your allowed senders waits in **Receipts To do** as a **New sender** row. Press **Allow** to read it and anything else waiting from them; their later mail is read as it arrives.
 - **The sender failed SPF.** Mail from an allowed address must pass SPF in the result Email Routing records. A fail or softfail is dropped and logged as `sender_auth_failed` in the Worker's logs.
-- **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept, unread, with the flag **Is this email genuine?** It is not read by AI. Download the original, check it, and upload it if it is genuine.
+- **The sender could not be proven.** Mail with no usable result (for example SPF none with DKIM only) is kept, unread, with the flag **Is this email genuine?** It is not read by AI. Open it from **Receipts** To do, check the original, and select **Read it** if it is genuine.
 - **The email was too big.** Emails over 20 MiB are dropped and logged as `email_too_large`. At most 10 supported attachments per email are read; see [Limits](/reference/limits/).
 
 ## Change the address later
@@ -73,7 +73,7 @@ If nothing appears:
 
 ## Related
 
-- [Email and sender trust](/explanation/email-and-sender-trust/) explains approved senders, Unknown sender and the SPF check.
+- [Email and sender trust](/explanation/email-and-sender-trust/) explains approved senders, new senders and the SPF check.
 - [Forward a copy of incoming mail](/how-to/forward-a-copy-of-incoming-mail/), for one-time codes sent to the receipt address.
 - [Keep sales invoices](/how-to/keep-sales-invoices/) with a second routed address.
 - [Configuration](/reference/configuration/) for `RECEIPT_ADDRESS` and `ALLOWED_SENDER_EMAILS`.

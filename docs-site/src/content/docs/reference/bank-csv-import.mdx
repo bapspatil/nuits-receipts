@@ -33,9 +33,9 @@ The editor shows these with the file it was given.
 | Account name | `account_label` | New account only |
 | Bank | `bank_name` | New account only |
 | Currency | `account_currency` | New account only. One of the ten supported currencies. |
-| Text encoding | `encoding` | **Detect BOM or UTF-8** (`auto`), UTF-8, UTF-16 LE, UTF-16 BE, Windows-1252 / ISO-8859-1 |
+| Text encoding | `encoding` | `utf-8`, `utf-16le`, `utf-16be` or `windows-1252`, shown as those values. The form also accepts `auto`, which the one-step import uses: UTF-8 or the file's BOM, else Windows-1252. |
 
-A new account is created only when the import is confirmed. The editor's **Text encoding** sits under **File options**.
+A new account is created only when the import is confirmed. The editor's **Text encoding** sits under **The file**.
 
 ## Mapping fields
 

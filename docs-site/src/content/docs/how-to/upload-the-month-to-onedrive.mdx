@@ -23,7 +23,7 @@ Use this guide to send each month's files straight into a OneDrive or SharePoint
 
 The redirect URI is `https://<your host><APP_BASE_PATH>/settings/onedrive/callback`, for example `https://receipts.example.com/settings/onedrive/callback`, or `https://receipts.example.com/app/settings/onedrive/callback` with `APP_BASE_PATH=/app`.
 
-Once `MS_CLIENT_ID` and both secrets are set, **Settings > OneDrive > Redirect URI** shows the exact value for your deployment.
+Once `MS_CLIENT_ID` and both secrets are set, **Settings > Sending > OneDrive** shows the exact value for your deployment under **Redirect URI for Microsoft Entra**.
 
   </Step>
   <Step title="Create the registration">
@@ -95,7 +95,7 @@ Never put `MS_CLIENT_SECRET` or `ONEDRIVE_TOKEN_KEY` in `vars`. The deploy scrip
 <Steps>
   <Step title="Connect your Microsoft account">
 
-In the app, open **Settings > OneDrive** and press **Connect**. Sign in to Microsoft and accept the permissions. You come back to Settings with "Microsoft account connected."
+In the app, open **Settings > Sending** and, under **OneDrive**, press **Connect**. Sign in to Microsoft and accept the permissions. You come back to Settings with "Microsoft account connected."
 
   </Step>
   <Step title="Choose the folder">
@@ -113,23 +113,23 @@ For a folder shared from another organisation, open the link once in your browse
 2. Press **Upload to** your folder. The files go into a subfolder named like the ZIP, for example `receipts-2026-10`.
 3. Ten files go up per request. If more remain, the page shows how many are done, such as "4 of 12 uploaded."; press **Continue upload** until all are up.
 
-When everything is up, the page says "Uploaded to" your folder, "Marked as sent."
+When everything is up, the banner says "Uploaded to OneDrive. Marked as sent."
 
 ## Check it worked
 
-- **Settings > OneDrive** shows your **Account** and the chosen **Folder**, and its summary names the account.
+- **Settings > Sending > OneDrive** shows your **Account** and the chosen **Folder**.
 - The subfolder in OneDrive holds the originals and the index spreadsheet, with the same names and `check-these/` rules as the ZIP.
 
 If Microsoft asks the app to slow down, the page says how many seconds to wait before you continue. Files already uploaded are skipped next time; corrected ones replace their old copy.
 
 ## When something stops working
 
-- **"Not set up"** under **Settings > OneDrive**: `MS_CLIENT_ID` is set but one of the two secrets is missing.
+- **"`MS_CLIENT_SECRET` or `ONEDRIVE_TOKEN_KEY` is missing."** under **Settings > Sending > OneDrive**: `MS_CLIENT_ID` is set but one of the two secrets is not.
 - **Sign-in fails after months of working**: the client secret has expired. Create a new one in Entra and store it with `wrangler secret put MS_CLIENT_SECRET` again.
 - **Asked to reconnect**: Microsoft ends a sign-in after 90 days without use. Press **Connect** again.
 - **The other organisation blocks outside accounts**: only the ZIP works for that folder, and Settings says so.
 
-To stop, press **Disconnect**. This deletes the stored sign-in and the upload records from the app.
+To stop, press **Disconnect** under **OneDrive**, then **Disconnect** again to confirm. This deletes the stored sign-in and the upload records from the app.
 
 ## Related
 

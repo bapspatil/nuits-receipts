@@ -1,14 +1,14 @@
 ---
 title: Your first month
-description: Upload two sample receipts, check and approve them, import a sample bank statement, see the match and send September to your accountant.
+description: Add two sample receipts, check them, import a sample bank statement, see the match, send September to your accountant and find a receipt again on Home.
 sidebar:
   order: 2
   label: Your first month
 ---
 
-In this tutorial we take one month through Nuits Receipts from start to finish, using synthetic sample files. We upload two receipts, check and approve them, import a bank statement, see a payment matched to its receipt, download the month's ZIP and mark it as sent.
+In this tutorial we take one month through Nuits Receipts from start to finish, using synthetic sample files. We add two receipts, check them, import a bank statement, see a payment matched to its receipt, download the month's ZIP and mark it as sent. Then we find one of the receipts again on Home.
 
-At the end, September 2026 in your copy shows **Sent**, and you have the ZIP your accountant would receive.
+At the end, September 2026 in your copy shows **Sent**, you have the ZIP your accountant would receive, and you know where every document waits for you later.
 
 You need a copy of the app you can sign in to. If you do not have one yet, follow [Deploy your own copy](/tutorials/deploy-your-own-copy/) first.
 
@@ -35,69 +35,75 @@ These are the values printed on the two receipts. We check the app's reading aga
 | VAT amount | 25.50 | 0.00 |
 | Total | 125.50 | 20.00 |
 
-## Upload the receipts
+## Add the receipts
 
-Sign in to your copy. **Home** opens on **Welcome**, with a short setup checklist above the Add form. You can finish the checklist later. The same form is one press away on every page: **Add** in the sidebar on a computer, or in the middle of the tab bar on a phone.
+Sign in to your copy. A new copy opens on **Welcome**: a **Finish setting up** list, and under it the Add form, which asks **What are these?** You can finish setting up later.
 
-![The Add page, with Receipts and bills selected and sample.pdf and sample.png both marked Added](../../../assets/screenshots/upload.png)
+The same form is behind the **Add** button, which sits in the same place on every page: first in the sidebar on a computer, and the round button in the middle of the tab bar on a phone.
 
-1. Leave **Receipts and bills** selected.
-2. Choose `sample.pdf` and `sample.png` together.
+![The Add page with Receipts and bills selected, the banner 2 of 2 added. They are being read now., and sample.pdf and sample.png both marked Added with an Open link](../../../assets/screenshots/upload.png)
+
+1. Under **What are these?**, leave **Receipts and bills** selected.
+2. Choose `sample.pdf` and `sample.png` together, or drop both on **Drop files here**.
 3. Press **Upload**.
 
-Each file shows **Added** with an **Open** link, and the page says **2 of 2 added. They are being read now.**
+Each file shows **Added · Open**, and the form says **2 of 2 added. They are being read now.**
 
-## Check and approve each receipt
+## Check each receipt
 
-Open **Receipts** in the sidebar (on a phone, the tab bar at the bottom). It opens on **To do**, which lists the receipts the app wants you to check, each with a **Needs you** stamp. Press **Start checking** to open the first one.
+Press **Receipts** in the sidebar (on a phone, in the tab bar). It opens on **To do**, beside **All**. To do lists the receipts the app wants you to check, each marked **Needs you**. Press **Start checking** at the top of the page. Its number is how many receipts are waiting.
 
-The receipt page shows **The original** beside what the app read. Anything it is unsure of comes first, as a short question with its field, under a heading such as **5 fields to fill**. The bar at the bottom says where you are, for example **1 of 1 to check**, and holds **Approve receipt**.
+The receipt page shows the original beside what the app read. What it needs from you comes first, one short question per field, under a heading such as **2 fields to fill**. The values it read itself are under **Already filled in**. The bar at the bottom says where you are, for example **1 of 1 to check**, and holds **Approve receipt**.
 
-![A receipt page marked Needs you, with the text that was read on the left, the currency, total, amount before VAT and VAT amount marked Required on the right, and Approve receipt in the bar](../../../assets/screenshots/receipt-review.png)
+![A receipt page for sample.png marked Needs you, with The original on the left, 7 fields to fill on the right with the required ones marked Required, and 1 of 1 to check, Discard, More and Approve receipt in the bar](../../../assets/screenshots/receipt-review.png)
 
-This screenshot is a different sample receipt; your copy may ask for other fields.
+The screenshot comes from a local copy, which reads nothing from the image, so it asks for every field. Your copy asks only for what it could not read.
 
-For each receipt in To do:
+For each receipt:
 
-1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. Set **Which currency?** from the list. The fields that were not flagged are under **Other fields**.
-2. Leave **Part** and **Kind** as they are.
-3. Leave the **Note** as **Checked against the original**.
+1. Compare every field with the table above. Fill in anything that is empty and correct anything that differs. If the page asks **Which currency?**, pick the currency from the table. The fields it did not ask about are under **Other fields**.
+2. Leave **Kind** under **Other fields** as it is.
+3. Leave the **Note** as it is. It already says **Checked against the original**.
 4. Press **Approve receipt**.
 
-**Approve receipt** opens the next receipt in To do, with a banner that names the one you approved and offers **Undo**. After the last one you are back on To do, which says **All checked** and points you to the next step: **Import statement**. For the USD receipt, **Other fields** shows a euro amount converted at the ECB reference rate.
+**Approve receipt** opens the next receipt to check, with a banner such as **Approved Sample Cloud Lantern Oy.** and an **Undo** button. Undo puts the receipt back as it was, in case you pressed too soon.
+
+After the last one you are back on To do, which says **Nothing to do.** The banner says **Every receipt is checked. Next, add September's bank statement.** with an **Import statement** link.
+
+For the USD receipt, **Other fields** also shows its euro amount, converted at the ECB reference rate.
 
 :::note
-If the app read a receipt correctly, it is already **Ready** and does not appear in To do. Open it from **Receipts** > **All** later if you want to compare it with the table anyway.
+If the app read a receipt with nothing left to ask, it is **Ready** and does not appear in To do. You find it on Home in the last step.
 :::
 
 ## Import the bank statement
 
-Press **Import statement** on **To do**, or open **Bank** in the sidebar (on a phone, the tab bar at the bottom) and press **Import statement** there. The **Import a bank statement** page opens.
+Press **Import statement** in the banner. The **Import a bank statement** page opens.
 
 1. Under **Bank statement (XLSX, CSV or PDF)**, choose `bank.csv`.
 2. Press **Import statement**.
 
-The app picks your account and reads the sample's columns itself. If it asks **Which account is this?**, pick **Bank account** and press **Import statement** again.
+The app finds your account and reads the sample's columns itself, so there is nothing else to fill in.
 
-![The Import a bank statement page, with one file field and the Import statement button](../../../assets/screenshots/import-preview.png)
+![The Import a bank statement page, with bank.csv chosen under Bank statement (XLSX, CSV or PDF) and the Import statement button](../../../assets/screenshots/import-preview.png)
 
 ## See the match
 
-The app takes you to **Bank** for September 2026, with **Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.** and **Undo** at the top.
+The app opens **Bank** for September 2026. The banner says **Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing.** with **See them** and **Undo**. Undo here would take the whole import back out.
 
-![The Bank page for September 2026 on To do, with the import banner and Undo, and the Sample Missing Vendor payment missing its receipt, with Match and Not a purchase](../../../assets/screenshots/payments.png)
+![The Bank page for September 2026 on To do, with the banner Added 2 payments. Paid out: 1 matched, 0 not a purchase, 1 missing. and Undo, and Sample Missing Vendor marked Missing with No receipt fits., Match and Not a purchase](../../../assets/screenshots/payments.png)
 
-The page opens on **To do**, under the line "2 out, 1 matched, 0 not a purchase, 1 missing". Sample Missing Vendor shows the **Missing** stamp and **No receipt fits.**, because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows **Matched** and a **Receipt** link: the app paired it with the PDF receipt by amount, date and name. When a receipt only nearly fits, the app shows it beside the payment as **Likely** and leaves the choice to you.
+Under the month is the line "2 out, 1 matched, 0 not a purchase, 1 missing", then **To do** and **All**. To do holds Sample Missing Vendor, marked **Missing**, with **No receipt fits.** because none of your receipts fits it. Under **All**, the Sample Cloud Lantern Oy payment shows **Matched** and a **Receipt** link: the app paired it with the PDF receipt by amount, date and name.
 
-This sample payment has no receipt on purpose. Under it, press **Not a purchase**. It leaves To do, the banner offers **Undo**, and the page says **Every payment has a receipt.**
+This sample payment has no receipt on purpose. Under it, press **Not a purchase**. The banner says **Sample Missing Vendor is not a purchase, so it no longer needs a receipt.** with **Undo**, and To do says **Every payment has a receipt.** with a **Send September** button.
 
 ## Send the month
 
-On **Bank**, press **Send September**. **Home** for September 2026 opens, with three rows: **Check**, **Match** and **Send**.
+Press **Send September**. Home opens on September 2026. Under the search field is the month's close, in three steps: **Check** says **All checked**, **Match** says **All matched** and **Send** says **Ready**. Below them is the Send panel, with the **Spent** total, **Download ZIP**, **CSV** and **Did you send it?**
 
-![Home for September 2026, with Check and Match done, Send ready, the Spent total, Download ZIP and CSV buttons and Mark September as sent](../../../assets/screenshots/month.png)
+![Home for September 2026 with Check and Match done and Send ready, showing Spent, Download ZIP, CSV and Mark September as sent](../../../assets/screenshots/month.png)
 
-**Check** says **All checked**, **Match** says **All matched** and **Send** shows **Ready**. Open **In the ZIP** to see the files:
+Open **In the ZIP** to see the files:
 
 ```
 receipts-2026-09/
@@ -106,14 +112,23 @@ receipts-2026-09/
   2026-09-05_Sample-Pixel-Harbor-Ltd_USD-20.00_12cf96.png
 ```
 
-1. Press **Download ZIP**. Your browser saves `receipts-2026-09.zip`. Open it and you find the two originals and the index spreadsheet.
-2. In real use, this is when you send the folder to your accountant.
-3. Press **Mark September as sent**.
+1. Press **Download ZIP**. The button also shows the ZIP's size. Your browser saves `receipts-2026-09.zip`. Open it and you find the two originals and the index spreadsheet.
+2. In real use, this is when you send the ZIP to your accountant.
+3. Under **Did you send it?**, press **Mark September as sent**.
 
-The page says **Marked September 2026 as sent.** and **Send** now reads **Sent** with today's date. If you want the CSV on its own, **CSV** sits beside the ZIP button.
+The banner says **Marked September 2026 as sent.** with **Undo**, and **Send** now reads **Sent** with today's date. If you want the CSV on its own, **CSV** sits beside the ZIP button.
+
+## Find a receipt again
+
+Everything you add stays on Home, below the month's close, whatever month it belongs to.
+
+1. In the search field at the top of Home, type `Lantern` and press **Search**.
+2. The list, headed **Search: Lantern**, shows Sample Cloud Lantern Oy. Press its name.
+
+The receipt opens in the app's own viewer: beside the list on a computer, full screen on a phone.
 
 ## What we did
 
-You put a whole month through Nuits Receipts: two receipts read and approved, a bank statement imported, one payment matched to its receipt, one marked as not needing one, and the month packaged and marked as sent. If a receipt dated September changes later, Home tells you and offers just the changed files.
+You put a whole month through Nuits Receipts: two receipts read and checked, a bank statement imported, one payment matched to its receipt, one marked as not needing one, the month packaged and marked as sent, and a receipt found again by searching Home. If a receipt dated September changes later, Home tells you and offers just the changed files.
 
-From here, the [how-to guides](/how-to/) cover each part of the monthly routine with your own files, starting with [Add receipts](/how-to/add-receipts/) and [Import a bank CSV](/how-to/import-a-bank-csv/).
+From here, the [how-to guides](/how-to/) cover each part of the monthly routine with your own files, starting with [Add receipts](/how-to/add-receipts/) and [Import a bank CSV](/how-to/import-a-bank-csv/). [Find any document](/how-to/find-any-document/) covers Home's folders, search words and saved searches.

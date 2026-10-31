@@ -45,7 +45,7 @@ The message arrives in the destination inbox, forwarded by Cloudflare. If it cam
 
 - Only one address is supported, because Cloudflare forwards each message once.
 - Forwarding runs alongside receipt reading. A failed forward never stops a receipt being read, and a failed read still forwards.
-- The copy itself is not stored, and it is not read by AI unless its sender is allowed in **Settings** > **Senders**.
+- The copy itself is not stored, and it is not read by AI unless its sender is allowed in **Settings** > **Email** > **Email senders**.
 - A destination equal to the address the message was sent to, the receipt address or the invoice address is skipped to avoid a loop, and logged as `forward_copy_loop`.
 - `FORWARD_COPY_TO` must differ from the invoice address if you use one.
 

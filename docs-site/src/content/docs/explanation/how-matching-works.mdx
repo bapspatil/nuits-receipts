@@ -14,7 +14,7 @@ The app links what it can on its own and leaves a choice to you only where two a
 A bank row and a receipt can be matched when all of these hold:
 
 - **The payment is money out.** Money in is matched to sales invoices instead (see below).
-- **The receipt is read.** Approved receipts and receipts still in **Receipts To do** both count. A receipt matched while it still needs a look shows **Needs you** next to the match on **Bank**, and correcting it works the match out again.
+- **The receipt is read.** Approved receipts and receipts still in **Receipts To do** both count. On **Bank**, a payment matched to a receipt that still needs a look shows **Check the receipt** next to **Matched**, and correcting the receipt works the match out again.
 - **The amounts agree**, in one of four ways, best first:
   - the same currency and amount, to within two cents;
   - the original foreign amount on the statement. Holvi prints it as "Currency and amount: USD 10.46"; that line is read on import, from CSV, XLSX and PDF statements alike, and for statements imported before;
@@ -25,7 +25,7 @@ A bank row and a receipt can be matched when all of these hold:
 
 A bank row that just says "Stripe" or "PayPal" says nothing about the seller behind it, so those names never match on their own. Add a bank alias if one seller always appears that way.
 
-The window and the name threshold can be changed under **Settings**.
+The window and the name threshold can be changed under **Settings** > **Advanced**.
 
 ## How the best pair is picked
 
@@ -39,7 +39,7 @@ Matching runs again over every imported month after every import, reading, corre
 
 Not every payment is a purchase. Tax payments, loan repayments, salary and money you move to yourself have no receipt, and listing them as missing would hide the real gaps.
 
-- **Marked for you.** After matching, payments no receipt fits are marked **Not a purchase** when they are clearly not one: money to your own name (as in **Your business names**) or marked as a self-transfer, payments to the tax authority, bank service fees, cash withdrawals, statutory pension insurance, card top-ups and food delivery (Uber Eats, Wolt, Foodora and the like, but not Uber rides or restaurants). A label next to **Not a purchase** says which rule it was. Then, once per import, the payments of that file that read like a bank transfer to a person go to Clef in one question of at most 40 payments; only a confident "not a purchase" is used. The import banner's **Undo not a purchase** turns every automatic mark of that file back, and **Needs a receipt** does it for one payment. Once you have chosen either way, nothing marks that payment again. If a receipt turns up for a payment that was marked automatically, the receipt wins.
+- **Marked for you.** After matching, payments no receipt fits are marked **Not a purchase** when they are clearly not one: money to your own name (as in **Your business names**) or marked as a self-transfer, payments to the tax authority, bank service fees, cash withdrawals, statutory pension insurance, card top-ups and food delivery (Uber Eats, Wolt, Foodora and the like, but not Uber rides or restaurants). A label next to **Not a purchase** says which rule it was. Then, once per import, the payments of that file that read like a bank transfer to a person go to Clef in one question of at most 40 payments; only a confident "not a purchase" is used. **Needs a receipt** turns one automatic mark back. The import banner's **Undo** takes the whole import out again, with its automatic marks and matches, as long as you have not matched or marked any of its payments yourself. Once you have chosen either way, nothing marks that payment again. If a receipt turns up for a payment that was marked automatically, the receipt wins.
 - **Exemptions.** Mark a payment **Not a purchase** yourself. It drops out of the missing list and the month's missing-receipt file. You can undo it with **Needs a receipt** under the payment's **More**.
 - **Own-account transfers.** When you import statements from more than one of your accounts, money moved between them shows up twice: once leaving one account, once arriving in the other. Pairing the two sides, with a short reason, marks both as needing no receipt. The pair must be in different accounts, in the same currency, with equal and opposite amounts. See [Pair an own-account transfer](/how-to/pair-an-own-account-transfer/).
 

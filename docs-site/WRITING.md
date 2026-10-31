@@ -140,6 +140,7 @@ Deploy and configure:
 - `how-to/serve-the-app-under-a-path` (custom domain, `APP_BASE_PATH`)
 - `how-to/change-settings-in-the-app` (Settings, Setup, source tags, reset)
 - `how-to/upgrade-your-deployment`
+- `how-to/install-the-app` (install from the browser, offline page, Android share target)
 Use it every month:
 - `how-to/add-receipts` (upload PDF or photo, forward email)
 - `how-to/review-and-approve-a-receipt` (flags, reason on approve, Retry)
@@ -168,6 +169,7 @@ For contributors:
 - `reference/receipt-fields-and-flags` (extracted fields, statuses, every review flag and what triggers it)
 - `reference/app-pages` (every page in the app: path and what it shows)
 - `reference/pdf-viewer` (the viewer's buttons, keys, fallback and assets)
+- `reference/keyboard-shortcuts` (every key from `KEY_GROUPS` in `src/keys.ts`, plus the bulk keys)
 - `reference/limits` (file sizes, types, Cloudflare plan limits)
 - `reference/outside-calls` (every outbound call: who, when, what is sent)
 - `reference/data-model` (D1 tables and R2 keys, for contributors)

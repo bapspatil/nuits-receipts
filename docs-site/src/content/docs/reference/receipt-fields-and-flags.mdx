@@ -66,7 +66,7 @@ A document with status `needs_review` whose only flag is `missing_eur` can still
 
 ## Review flags
 
-The app shows one card per problem. Codes that describe the same problem share a card. The raw codes are in the `review_reasons` export column.
+The app shows one card per problem, titled with a question or an instruction, with a longer sentence under it. Codes that describe the same problem share a card. The card titles below are taken from `src/flags.ts`. The raw codes are in the `review_reasons` export column.
 
 A receipt is in **Receipts To do** while it has a required flag: one that asks for the seller, date, currency, total, before-VAT or VAT amount (and the client on a sales invoice). Other flags are optional: they stay on the receipt as a note and never block **Approve receipt**.
 
@@ -76,20 +76,20 @@ A receipt is in **Receipts To do** while it has a required flag: one that asks f
 | --- | --- | --- | --- |
 | `missing_vendor` | Who is this from? | Seller | Seller is empty. |
 | `uncertain_vendor` | Who is this from? | Seller | Seller was read but not settled (see below). |
-| `missing_issue_date` | No date on it. | Date | Issue date is empty. |
-| `uncertain_issue_date` | No date on it. | Date | Issue date read but not settled. |
+| `missing_issue_date` | What is the date? | Date | Issue date is empty. |
+| `uncertain_issue_date` | What is the date? | Date | Issue date read but not settled. |
 | `missing_currency` | Which currency? | Amounts | Currency is empty. |
 | `uncertain_currency` | Which currency? | Amounts | Currency read but not settled. |
-| `unsupported_currency` | We don't know this currency. | Amounts | Currency is not one of EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY. |
+| `unsupported_currency` | What is this currency in euros? | Amounts | Currency is not one of EUR, USD, GBP, CHF, SEK, NOK, DKK, CAD, AUD, JPY. |
 | `missing_total` | What was the total? | Amounts | Total is empty. |
 | `uncertain_total` | What was the total? | Amounts | Total read but not settled. |
-| `missing_net` | Amount before VAT is missing. | Amounts | Amount before VAT is empty. |
-| `uncertain_net` | Amount before VAT is missing. | Amounts | Amount before VAT read but not settled. |
-| `missing_vat` | VAT amount is missing. | Amounts | VAT amount is empty. |
-| `uncertain_vat_amount` | VAT amount is missing. | Amounts | VAT amount read but not settled. |
+| `missing_net` | What was the amount before VAT? | Amounts | Amount before VAT is empty. |
+| `uncertain_net` | What was the amount before VAT? | Amounts | Amount before VAT read but not settled. |
+| `missing_vat` | What was the VAT amount? | Amounts | VAT amount is empty. |
+| `uncertain_vat_amount` | What was the VAT amount? | Amounts | VAT amount read but not settled. |
 | `missing_vat_rate` | What VAT % was charged? | Amounts | Total, net and VAT are known, VAT is not 0, and the rate is empty. |
 | `uncertain_vat_rate` | What VAT % was charged? | Amounts | VAT rate read but not settled. |
-| `missing_invoice_number` | No receipt number. | Details | Receipt or invoice number is empty. |
+| `missing_invoice_number` | What is the receipt number? | Details | Receipt or invoice number is empty. |
 
 A read value is **settled** when the document text states it on a labelled line, when Clairic and the text agree, when Clairic is confident (confidence at least `REVIEW_MIN_CONFIDENCE` and `p_null` at most `REVIEW_MAX_UNCERTAINTY`) and the text does not contradict it, or when net plus VAT equals the total and ties it to settled values. `uncertain_*` is raised for seller, issue date, currency and total when they are missing or unsettled, and for net, VAT amount and VAT rate only when they were read but are unsettled. Saving an approval with a reason drops `uncertain_*` flags on later reads.
 
@@ -97,9 +97,9 @@ A read value is **settled** when the document text states it on a labelled line,
 
 | Code | Card title | Group | Trigger |
 | --- | --- | --- | --- |
-| `vat_mismatch` | The numbers don't add up. | Amounts | Net plus VAT differs from the total by more than 2 minor units. |
-| `vat_rate_mismatch` | VAT doesn't match the rate. | Amounts | Net is not 0, a rate is known, and VAT differs from net times the rate by more than 2 minor units and by more than 0.1 % of net. |
-| `credit_or_sign` | This looks like a refund or credit note. | Amounts | Total, net or VAT is negative. |
+| `vat_mismatch` | Do the amounts add up? | Amounts | Net plus VAT differs from the total by more than 2 minor units. |
+| `vat_rate_mismatch` | Does the VAT match the rate? | Amounts | Net is not 0, a rate is known, and VAT differs from net times the rate by more than 2 minor units and by more than 0.1 % of net. |
+| `credit_or_sign` | Is this a refund or credit note? | Amounts | Total, net or VAT is negative. |
 
 `missing_vat_rate`, `vat_mismatch`, `vat_rate_mismatch` and `credit_or_sign` are checked only when total, net and VAT are all known.
 
@@ -107,7 +107,7 @@ A read value is **settled** when the document text states it on a labelled line,
 
 | Code | Card title | Group | Trigger |
 | --- | --- | --- | --- |
-| `missing_eur` | No euro amount yet. | Euro amount | A non-EUR document with a total and issue date has no ECB reference rate, no euro amount typed in, and no match to a EUR bank row. |
+| `missing_eur` | Why is there no euro amount? | Euro amount | A non-EUR document with a total and issue date has no ECB reference rate, no euro amount typed in, and no match to a EUR bank row. |
 
 ### Filing
 
@@ -115,46 +115,46 @@ A read value is **settled** when the document text states it on a labelled line,
 | --- | --- | --- | --- |
 | `uncertain_product` | Which part of the business? | Filing | Clef's product probability is below `REVIEW_MIN_CATEGORY_CONFIDENCE` and its top choice differs from the default product. The default is used. |
 | `uncertain_expense_type` | What kind of cost is this? | Filing | Same, for the expense type. `other` is used. |
-| `classification_failed` | We couldn't file this automatically. | Filing | The Clef call failed or returned an invalid answer. |
-| `rule_conflict` | Two of your rules disagree. | Filing | Two or more vendor rules match at the highest matching priority with different product or expense type. |
+| `classification_failed` | Where does this belong? | Filing | The Clef call failed or returned an invalid answer. |
+| `rule_conflict` | Which rule should win? | Filing | Two or more vendor rules match at the highest matching priority with different product or expense type. |
 
 ### Duplicates
 
 | Code | Card title | Group | Trigger |
 | --- | --- | --- | --- |
-| `probable_duplicate` | Looks like one we already have. | Duplicate | Another document of the same kind, not itself a duplicate, has the same invoice number, issue date, currency, total and normalised seller name. Needs a non-empty invoice number. |
+| `probable_duplicate` | Is this one we already have? | Duplicate | Another document of the same kind, not itself a duplicate, has the same invoice number, issue date, currency, total and normalised seller name. Needs a non-empty invoice number. |
 
 ### Source document
 
 | Code | Card title | Group | Trigger | Action offered |
 | --- | --- | --- | --- | --- |
-| `sender_unverified` | We couldn't verify who sent this email. | Source | Mail from an allowed sender with no Cloudflare SPF result, or a result that proves nothing. Stored, not read. | **It's genuine, read it** |
-| `email_skipped_parts` | Some attachments were skipped. | Source | More than 10 supported attachments, or an attachment that is too large or whose content does not match its type. | |
-| `mime_failed` | We couldn't open this email. | Source | The email could not be parsed. | |
-| `pdf_no_text` | This PDF has no readable text. | Source | The PDF text layer has 10 characters or fewer. | Upload |
-| `pdf_too_large` | This PDF is too big to read. | Source | The PDF is over 10 MiB. | |
-| `pdf_too_many_pages` | This PDF has too many pages to read. | Source | The PDF has more than 25 pages. | |
-| `unsupported_document` | We can't read this file type. | Source | The stored file is not a PDF, image, HTML or plain text. | Upload |
-| `original_missing` | The original file is missing. | Source | The original is not in R2. | Upload |
-| `input_truncated` | This was long, so we only read the start. | Source | Document text plus email context is over 40,000 characters. Only the first 40,000 are read. | |
-| `model_truncated` | The reader stopped early. | Source | Clairic reported a truncated answer. | **Read again** |
-| `invalid_model_output` | The reader got confused. | Source | Clairic's answer did not have the expected shape. | **Read again** |
-| `extraction_failed` | Reading failed. | Source | Any other error while reading. | **Read again** |
+| `sender_unverified` | Is this email genuine? | Source | Mail from an allowed sender with no Cloudflare SPF result, or a result that proves nothing. Stored, not read. | **Read it** |
+| `email_skipped_parts` | Is anything missing from the email? | Source | More than 10 supported attachments, or an attachment that is too large or whose content does not match its type. | |
+| `mime_failed` | Open the email and type the numbers in. | Source | The email could not be parsed. | |
+| `pdf_no_text` | Type the numbers in, or upload a photo. | Source | The PDF text layer has 10 characters or fewer. | **Upload a copy**, which opens **Add** |
+| `pdf_too_large` | Type the key numbers in. | Source | The PDF is over 10 MiB. | |
+| `pdf_too_many_pages` | Type the key numbers in. | Source | The PDF has more than 25 pages. | |
+| `unsupported_document` | Upload a PDF or a photo. | Source | The stored file is not a PDF, image, HTML or plain text. | **Upload a copy**, which opens **Add** |
+| `original_missing` | Upload the original again. | Source | The original is not in R2. | **Upload a copy**, which opens **Add** |
+| `input_truncated` | Do the amounts match the original? | Source | Document text plus email context is over 40,000 characters. Only the first 40,000 are read. | |
+| `model_truncated` | Check the details, or read it again. | Source | Clairic reported a truncated answer. | **Read again** |
+| `invalid_model_output` | Read it again, or type the numbers in. | Source | Clairic's answer did not have the expected shape. | **Read again** |
+| `extraction_failed` | Try reading it again. | Source | Any other error while reading. | **Read again** |
 
 ### Sales invoices only
 
 | Code | Card title | Group | Trigger | Action offered |
 | --- | --- | --- | --- | --- |
-| `seller_mismatch` | This doesn't look like an invoice you sent. | Seller | `SELLER_NAMES` is set and the seller is not one of them, or one of them is printed as the buyer. | **Move to receipts** |
-| `invoice_no_attachment` | The email had no invoice attached. | Source | Mail to `INVOICES_ADDRESS` with no PDF or image attachment. | Upload |
+| `seller_mismatch` | Did you send this invoice? | Seller | `SELLER_NAMES` is set and the seller is not one of them, or one of them is printed as the buyer. | **Move to receipts** |
+| `invoice_no_attachment` | Where is the invoice? | Source | Mail to `INVOICES_ADDRESS` with no PDF or image attachment. | **Upload a copy**, which opens **Add** |
 | `missing_client` | Who did you bill? | Details | Client is empty. | |
 | `vat_treatment_unknown` | How was VAT handled? | Details | A VAT amount is known and the VAT treatment is not. | |
-| `reverse_charge_without_vat_id` | Reverse charge needs the client's VAT number. | Details | Treatment is `reverse_charge` and the client's VAT number is empty. | |
+| `reverse_charge_without_vat_id` | What is the client's VAT number? | Details | Treatment is `reverse_charge` and the client's VAT number is empty. | |
 | `reverse_charge_domestic_client` | Reverse charge to a Finnish client? | Details | Treatment is `reverse_charge` and the client country is `FI`. | |
-| `vat_treatment_mismatch` | The VAT doesn't fit how it was handled. | Amounts | Treatment is not `domestic` and VAT is not 0, or treatment is `domestic` and VAT is 0. | |
-| `domestic_rate_unexpected` | That isn't a Finnish VAT rate. | Amounts | Treatment is `domestic` and the rate is not 25.5 %, 24 %, 14 %, 13.5 % or 10 %. | |
+| `vat_treatment_mismatch` | Does the VAT fit how it was handled? | Amounts | Treatment is not `domestic` and VAT is not 0, or treatment is `domestic` and VAT is 0. | |
+| `domestic_rate_unexpected` | Which Finnish VAT rate applies? | Amounts | Treatment is `domestic` and the rate is not 25.5 %, 24 %, 14 %, 13.5 % or 10 %. | |
 
-Any other code shows as "Something needs a look." in group Other.
+Any other code shows as "Check the details against the original." with "Something needs a look." in group Other.
 
 ## Email intake results
 
@@ -164,7 +164,7 @@ Any other code shows as "Something needs a look." in group Other.
 | Sender not approved and not proven | Dropped. Logged as `sender_auth_failed` or `sender_unverified`. Nothing stored. |
 | Sender ignored from Receipts To do | Logged as `sender_ignored`. Nothing stored. |
 | Same Message-ID already waiting or read | Logged as `duplicate`. Nothing stored. |
-| 50 Unknown sender emails waiting, or 10 from this sender | Logged as `held_limit`. Nothing stored. |
+| 50 emails from new senders waiting, or 10 from this sender | Logged as `held_limit`. Nothing stored. |
 | From address approved and DMARC passed for its domain | Read like mail from an approved envelope sender. |
 | Email over 20 MiB | Dropped. Logged as `email_too_large`. |
 | SPF `fail` or `softfail`, or DMARC `fail`, in Cloudflare's `Authentication-Results`, or a `Received-SPF` envelope sender that differs | Dropped. Logged as `sender_auth_failed`. |

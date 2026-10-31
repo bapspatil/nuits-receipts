@@ -80,7 +80,7 @@ With a base path, the app prefixes every link, form, redirect and export link wi
 
 1. Open `https://example.com/app/` (or your custom domain). The app asks you to sign in and then shows Home.
 2. Click through to **Settings**. The address bar keeps the `/app` prefix.
-3. In **Settings > Advanced > Set at deploy**, **Address** shows your base path, or "Site root" without one.
+3. In **Settings > Advanced > Set when deployed**, **Address** shows your base path, or "Site root" without one.
 4. Open a path on the same hostname outside the base path. It is served by your other content, not by the app.
 
 If every page answers 404, `APP_BASE_PATH` and the routes do not match. Fix one of them and deploy again.
@@ -88,7 +88,7 @@ If every page answers 404, `APP_BASE_PATH` and the routes do not match. Fix one 
 ## Update what depends on the address
 
 - **Cloudflare Access**: protect the new hostname. With a base path, add the hostname with the paths `app` and `app/*`. See [Protect the app with Cloudflare Access](/how-to/protect-the-app-with-cloudflare-access/).
-- **OneDrive upload**: add the new redirect URI to your Microsoft Entra app. **Settings > OneDrive > Redirect URI for Microsoft Entra** shows it. See [Upload the month to OneDrive](/how-to/upload-the-month-to-onedrive/).
+- **OneDrive upload**: add the new redirect URI to your Microsoft Entra app. **Settings > Sending > OneDrive > Redirect URI for Microsoft Entra** shows it. See [Upload the month to OneDrive](/how-to/upload-the-month-to-onedrive/).
 - **Your bookmarks**: the old `workers.dev` address keeps working unless you set `"workers_dev": false`.
 
 ## Related

@@ -1,6 +1,6 @@
 ---
 title: How it works
-description: One Worker, a private R2 bucket, a D1 database and Workers AI, with no queues or scheduled jobs.
+description: One Worker, a private R2 bucket, a D1 database and Workers AI, with no queues or scheduled jobs. How search, the PDF viewer, the installable app and Undo fit in.
 sidebar:
   order: 1
 ---
@@ -9,38 +9,63 @@ Nuits Receipts is a receipt inbox that runs on Cloudflare Workers. Everything it
 
 ## The parts
 
-- **One Worker.** It serves every page as plain HTML from the server, handles form posts, and receives email. There is no single-page app and no separate API.
+- **One Worker.** It serves every page as plain HTML from the server, handles form posts, and receives email. There is no single-page app and no separate API. Small scripts, served by the same Worker, add drag and drop on Add, the PDF viewer and keyboard shortcuts on top.
 - **An R2 bucket for originals.** Every file you upload or forward is stored as it arrived, before anything else happens. The file's SHA-256 hash is its name, so the same file sent twice is stored once.
 - **A D1 database for everything else.** What was read from each receipt, your corrections, bank rows, matches, vendor rules, exchange rates and settings.
 - **Workers AI for reading.** Clairic reads the receipt. Clef picks a product and an expense type when none of your vendor rules match. Both run under your Cloudflare account.
 
-Optional pieces sit around this core: Email Routing to give you an inbox address, Cloudflare Access in front of the sign-in, and an upload of the month to a OneDrive folder. None of them is needed for uploads, review, bank import or the monthly export.
+Optional pieces sit around this core: Email Routing to give you an inbox address, Cloudflare Access in front of the sign-in, and an upload of the month to a OneDrive folder. None of them is needed for adding documents, checking them, bank import or the monthly export.
 
 ## What happens to a receipt
 
-1. **It arrives.** You upload a PDF or a photo, or Email Routing hands a message to the Worker. Email is checked first: only approved senders are read, and their mail has to pass Cloudflare's SPF or DMARC check. Mail from anyone else waits in Receipts To do as a New sender row until you allow or ignore them. See [Email and sender trust](/explanation/email-and-sender-trust/).
+1. **It arrives.** You add a PDF or a photo with **Add**, or Email Routing hands a message to the Worker. Email is checked first: only approved senders are read, and their mail has to pass Cloudflare's SPF or DMARC check. Mail from anyone else waits in Receipts To do as a New sender row until you allow or ignore them. See [Email and sender trust](/explanation/email-and-sender-trust/).
 2. **The original is saved.** It goes into R2 untouched. Every later step works from this copy, which is why reading it again later gives you a fresh result from the same file.
-3. **It is read.** The text of the PDF (or the image itself) goes to Clairic, and the code then checks the answer against the document's own labelled lines and the VAT arithmetic. Anything unsettled is flagged for review. See [How reading works](/explanation/how-reading-works/).
+3. **It is read.** The text of the PDF (or the image itself) goes to Clairic, and the code then checks the answer against the document's own labelled lines and the VAT arithmetic. Anything unsettled is flagged, and the receipt waits in **Receipts To do**. See [How reading works](/explanation/how-reading-works/).
 4. **It is sorted.** Your vendor rules give it a product and an expense type. If none match, Clef suggests one. See [How costs are sorted](/explanation/how-costs-are-sorted/).
 5. **It is matched.** After every receipt is read and every bank CSV is imported, the app looks for payments that fit receipts across every imported month, and marks payments that clearly need none. See [How matching works](/explanation/how-matching-works/).
 6. **It gets a euro amount.** From the matched bank payment if there is one, otherwise from the receipt itself if it is in euros, otherwise from an ECB reference rate. See [Currencies and reference rates](/explanation/currencies-and-reference-rates/).
-7. **It lands in a month.** The month is the receipt's issue date. You review the month, then download a CSV or a ZIP for your accountant.
+7. **It lands in a month, and on Home.** The month is the receipt's issue date. Home shows that month's close as three steps (Check, Match, Send), and you download a CSV or a ZIP for your accountant. The receipt also stays in Home's list of every document, whatever month it is in.
 
 ## Why there are no queues or scheduled jobs
 
 There are no cron triggers, no queues and no background workers. Every action starts from something you do (an upload, a form post, an import) or from an email arriving. Reading an uploaded file happens inside the upload request. Reading an emailed receipt happens just after the message is accepted, in the same Worker invocation.
 
-This keeps the app small and easy to reason about. There is nothing running when you are not using it, nothing to monitor, and no job that can quietly fall behind. The cost is that each request has to do its work within Cloudflare's CPU limits, which is the main reason PDF uploads need the Workers Paid plan (see [Running costs](/explanation/running-costs/)). It also means nothing retries on a timer: if a reading fails, the receipt is flagged and waits for you to have it read again.
+This keeps the app small, with fewer moving parts to reason about. There is nothing running when you are not using it, nothing to monitor, and no job that can quietly fall behind. The cost is that each request has to do its work within Cloudflare's CPU limits, which is the main reason PDF uploads need the Workers Paid plan (see [Running costs](/explanation/running-costs/)). It also means nothing retries on a timer: if a reading fails, the receipt is flagged and waits for you to have it read again.
 
 A receipt being read holds a short lease (two minutes). If a request dies halfway, the lease runs out and the next attempt can pick the receipt up again, so a crash never leaves a receipt stuck as "being read" for ever.
 
+## How search finds a document
+
+Home searches every document by its details and by the words inside it. Each row keeps one `search_text` column: the extracted fields and the PDF's text layer, in lower case with spaces collapsed, written once when the document is read. Each word you type is matched against that column with SQLite's `instr()`. Photos have no text layer and there is no OCR, so a photo is found by the details the app read from it.
+
+Two simpler designs were ruled out. SQLite's full-text index (FTS5) works in D1, but `wrangler d1 export` refuses a database that has one, and that export is how you back up before an upgrade. A plain `LIKE '%word%'` fails because D1 refuses `LIKE` patterns over 50 bytes. `instr()` has neither problem, and searching costs no extra AI reading.
+
+Documents added before search existed have no `search_text` yet. Home indexes a few of them on each visit, and **Settings** > **Advanced** > **Search** indexes the rest in batches. Like everything else here, this needs no scheduled job.
+
+## How documents open
+
+PDFs open in a small viewer of the app's own, built on PDF.js. The Worker serves PDF.js itself, so opening a document makes no call outside your copy. The server sends the PDF's text (or the image) first, and the viewer replaces it with the pages once the PDF has loaded, so a page still shows the document's words when scripts do not run.
+
+The browser's own PDF viewer in a frame would have been less code. It was ruled out because iOS Safari shows only the first page of a framed PDF, and because it needs frames allowed in the app's content security policy.
+
+## The installable app
+
+The app has a web app manifest and a service worker, so a browser can install it with its own icon and window. The service worker does as little as possible. It keeps no copy of your data and is not in the way of any online request. It answers only two things: a page opened while the device is offline, with an offline page, and files shared to the app from another Android app, which it holds for the Add form until you choose what they are and press **Upload**.
+
+It stays out of online requests on purpose. A service worker in that path can swallow the browser's password prompt or the Cloudflare Access redirect, and you would be locked out of your own copy. See [Install the app](/how-to/install-the-app/).
+
 ## How your edits are protected
 
-Three rules keep your own work from being overwritten:
+Four rules keep your own work from being lost or overwritten:
 
 - **What you saved wins.** Once you have saved a receipt's form, the values you saved are kept when the receipt is read again. A new reading can add review flags, but it does not replace your figures.
 - **Stale work is thrown away.** Every receipt has a revision number. A reading that started before you saved a correction cannot overwrite it, and a form saved from an old page is refused with a request to reload.
+- **A mistake can be undone.** Approving, discarding, matching, marking a payment as not a purchase, marking an invoice paid, deleting a rule and importing a statement each leave a banner with **Undo**. Before the action writes, the app copies the rows it is about to change into an `undo_log` table, in the same database batch as the change, so the copy and the change are saved together or not at all. Undo puts those rows back, and skips any row that has changed again since. The Undo button lasts 15 minutes.
 - **Amounts are whole numbers.** Money is stored in cents (or the currency's smallest unit), never as floating-point numbers, so totals in the app and in the export add up to the cent.
+
+## Why Undo instead of "Are you sure?"
+
+The app's lists are work lists: you approve a receipt or mark a payment, it leaves the list, and the next one moves into its place. A question before each of those would stop you on every row to guard against the rare slip. So an action that can be undone runs at once and offers **Undo**, and the banner says what changed. Only an action that loses data asks first, because the log cannot bring that data back: moving a receipt to invoices (or back), which clears its client, VAT, payment and match; ignoring a sender, which deletes their waiting mail; and disconnecting OneDrive, which deletes the stored sign-in. **Read again** has no Undo either: it calls the AI model in chunks, so it cannot be saved as one action to put back.
 
 ## One owner per deployment
 
@@ -48,4 +73,4 @@ Each deployment has one owner and one sign-in. You sign in with HTTP Basic and a
 
 ## Settings
 
-Most behaviour is set by Worker variables at deploy time. Many of them can also be changed in the app under **Settings**, and a value saved there takes precedence over the Worker variable. Secrets, the sign-in method and the bindings stay deploy-time only. The full list is in [Configuration](/reference/configuration/), and [Change settings in the app](/how-to/change-settings-in-the-app/) shows how.
+Most behaviour is set by Worker variables at deploy time. Many of them can also be changed in the app under **Settings**, in five sections (**Business**, **Email**, **Bank**, **Sending** and **Advanced**) with one **Save**. A value saved there takes precedence over the Worker variable. Secrets, the sign-in method and the bindings stay deploy-time only. The full list is in [Configuration](/reference/configuration/), and [Change settings in the app](/how-to/change-settings-in-the-app/) shows how.
