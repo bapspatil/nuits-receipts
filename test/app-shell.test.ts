@@ -284,6 +284,8 @@ test('phones get a bottom tab bar with icons, labels and counts', async () => {
     /nav\.tabs\{display:block;position:fixed;[^}]*bottom:calc\(10px \+ env\(safe-area-inset-bottom\)\)/,
   );
   expect(phone).toMatch(/nav\.tabs a\{[^}]*min-height:64px/);
+  // The Add pill centres its plus sign; place-items does not centre a flex row.
+  expect(phone).toMatch(/nav\.tabs \.tabadd \.ti\{align-items:center;justify-content:center;/);
   expect(phone).toContain('env(safe-area-inset-bottom)');
   expect(phone).toContain('body{padding-bottom:var(--tabbar-height)}');
   expect(phone).toContain('html{scroll-padding-bottom:');
@@ -417,6 +419,14 @@ test('flagged fields are one compact row: the question labels the input, its sen
   expect(html).toContain('<body class="p-reviewItem">');
   expect(phone).toContain('html{scroll-padding-bottom:calc(var(--tabbar-height) + 88px)}');
   expect(await stylesheet(html)).toMatch(/\n\.sbar\{position:sticky;bottom:var\(--space-4\);/);
+  const css = await stylesheet(html);
+  expect(css).toContain('.fix{padding-bottom:7rem}');
+  expect(css).toContain('html:has(.sbar){scroll-padding-bottom:7rem}');
+  expect(css).toContain(
+    '@media (min-width:1200px) and (max-width:1359px){.sbar{padding-left:var(--space-2);gap:0 var(--space-1)}.sbar .prog{flex-basis:100%;',
+  );
+  expect(css).toContain('.sbar>.btn:last-child{margin-left:auto}');
+  expect(css).toMatch(/\.sbar\{[^}]*background:var\(--surface-page\)/);
 });
 
 test('home closes the month and lists what needs you, counting undated receipts', async () => {
@@ -424,6 +434,10 @@ test('home closes the month and lists what needs you, counting undated receipts'
   await env.DB.prepare('UPDATE receipts SET issue_date=NULL WHERE id=?').bind(flagged.id).run();
   await flaggedImage(1);
   const html = await (await request('/?month=2026-09')).text();
+  // The archive's own CSS rides inline on Home; the shared sheet is linked.
+  const css = `${html}${await stylesheet(html)}`;
+  expect(css).toContain('column-gap:var(--space-2);padding:var(--space-2)}');
+  expect(css).toContain('.monthband>.steps span:not(.vh){grid-column:1/-1;font-size:var(--text-sm)}');
   expect(html).toContain(
     `<div class="head"><div class="months" role="group" aria-label="Month"><a href="/?month=2026-08">${icon('chevron-left')}Aug<span class="vh"> 2026</span></a><h1>September 2026</h1><a href="/?month=2026-10">Oct<span class="vh"> 2026</span>${icon('chevron-right')}</a></div></div>`,
   );

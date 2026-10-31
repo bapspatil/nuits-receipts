@@ -169,6 +169,7 @@ footer.foot a{color:var(--text-muted)}
 .months h1{order:-1;flex:1 1 12rem}
 .months a{flex:none;padding:0 var(--space-3);min-height:44px;display:inline-flex;align-items:center;gap:var(--space-1);text-decoration:none;font:500 var(--text-sm)/1 var(--font-num);color:var(--accent);border-radius:var(--radius-md)}
 .months a:hover{background:var(--surface-sunken)}
+.months a.folder-back{font-family:var(--font-ui)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:var(--btn-height);padding:0 var(--space-4);border-radius:var(--radius-md);font:600 var(--text-base)/1.2 var(--font-ui);text-decoration:none;border:1px solid var(--border-strong);box-shadow:0 1px 0 var(--border-strong);cursor:pointer;text-align:center;background:var(--surface-field);color:var(--text)}
 .btn svg.i{color:var(--accent)}
 .btn:hover{border-color:var(--text);background:var(--surface-raised)}
@@ -349,6 +350,7 @@ pre.paper{margin:0 0 var(--space-3);padding:var(--space-4);background:var(--surf
 .sbar>details>.body{position:absolute;left:0;right:0;bottom:100%;max-height:60vh;overflow:auto;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
 .fix{padding-bottom:7rem}
 html:has(.sbar){scroll-padding-bottom:7rem}
+@media (min-width:1200px) and (max-width:1359px){.sbar{padding-left:var(--space-2);gap:0 var(--space-1)}.sbar .prog{flex-basis:100%;padding:var(--space-1) var(--space-2) 0}.sbar>.btn{padding-inline:var(--space-2)}}
 .rs a.tag{min-height:44px;margin:-12px 0;display:inline-flex;align-items:center}
 .rx details{margin:var(--space-2) 0 0}.rx form{margin:0}.rx>.none{margin:var(--space-1) 0 0}
 .fixrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4);margin:var(--space-1) 0 0}.fixrow .none{margin:0;flex-basis:100%}
@@ -488,7 +490,7 @@ nav.tabs a:active{background:var(--surface-accent-quiet)}
 nav.tabs a:focus-visible{outline-offset:-4px}
 nav.tabs .ti{position:relative;display:flex}
 nav.tabs svg{width:24px;height:24px}
-nav.tabs .tabadd .ti{place-items:center;width:48px;height:32px;margin:calc(var(--space-1) * -1) 0;border-radius:16px;background:var(--accent);color:var(--text-on-accent)}nav.tabs .tabadd{color:var(--text)}
+nav.tabs .tabadd .ti{align-items:center;justify-content:center;width:48px;height:32px;margin:calc(var(--space-1) * -1) 0;border-radius:16px;background:var(--accent);color:var(--text-on-accent)}nav.tabs .tabadd{color:var(--text)}
 nav.tabs .count{position:absolute;z-index:1;top:-5px;left:15px;min-width:20px;padding:0 var(--space-1);line-height:1.3;box-shadow:0 0 0 2px var(--surface-raised)}
 body.p-reviewItem nav.tabs{display:none}
 body:has(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button]):focus,select:focus,textarea:focus) :is(nav.tabs,.sbar){display:none}
@@ -680,6 +682,7 @@ const SHEET_CSS = `.keys-sheet{border:1px solid var(--border-strong);border-radi
 .keys-sheet::backdrop{background:rgba(0,0,0,.35)}
 .keys-sheet header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}.keys-sheet header h2{margin:0}.keys-sheet header form{margin:0}
 .keys-sheet h2{margin:0 0 var(--space-3)}.keys-sheet h3{margin:var(--space-4) 0 var(--space-2)}
+#keys-sheet h2[tabindex="-1"]:focus{outline:none}
 .keys-list{margin:0}.keys-list>div{display:flex;gap:var(--space-4);align-items:baseline;padding:var(--space-1) 0}
 .keys-list dt{flex:0 0 5.5rem}.keys-list dd{margin:0}
 kbd{font:500 var(--text-sm)/1.4 var(--font-mono);background:var(--surface-sunken);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 var(--space-2)}
