@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { expect, test } from 'vitest';
 import { folderParam, homeUrl, overview, parseFolder, type Folder, type Overview } from '../src/archive';
 import { snapshotPackage } from '../src/files';
-import { htmlForm, idFrom, locationOf, request, uploadPdf } from './helpers';
+import { htmlForm, idFrom, locationOf, request, stylesheet, uploadPdf } from './helpers';
 
 const post = (path: string, fields: Record<string, string | File>) => {
   const body = new FormData();
@@ -227,8 +227,14 @@ test('folder headings and navigation identify the open folder', async () => {
       expect(chart).toContain('January 2026');
     }
     if (folder === 'year:2026') {
+      expect(html).toContain('<details class="monthfold">');
       expect(html).toContain('href="/?in=year%3A2025"');
       expect(html).toContain('href="/?in=year%3A2027"');
-    } else expect(html).toContain(`href="/?month=${current}"`);
+    } else {
+      expect(html).not.toContain('class="monthfold"');
+      expect(html).toContain(`class="folder-back" href="/?month=${current}"`);
+      expect(await stylesheet(html)).toContain('.months a.folder-back{font-family:var(--font-ui)}');
+    }
   }
+  expect(await page('/?q=sample')).toContain('<details class="monthfold">');
 });

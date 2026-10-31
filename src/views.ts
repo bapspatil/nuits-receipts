@@ -1195,7 +1195,7 @@ export async function home(
   const folderNav =
     aq.folder.type === 'year'
       ? `<a href="${escape(homeUrl({ in: `year:${aq.folder.year - 1}` }))}">${icon('chevron-left')}${aq.folder.year - 1}</a><a href="${escape(homeUrl({ in: `year:${aq.folder.year + 1}` }))}">${aq.folder.year + 1}${icon('chevron-right')}</a>`
-      : `<a href="/?month=${currentMonth}">${icon('chevron-left')}${escape(monthName(currentMonth))}</a>`;
+      : `<a class="folder-back" href="/?month=${currentMonth}">${icon('chevron-left')}${escape(monthName(currentMonth))}</a>`;
   const folderHead = `<div class="head"><div class="months" role="group" aria-label="Folder"><div class="folder-title"><p class="folder-eyebrow">${eyebrow}</p><h1>${escape(folderTitle)}</h1></div>${folderNav}</div></div>`;
   const listHead = `<div class="lhead">${folderHeading && name === folderTitle ? '' : `<h2>${escape(name)}</h2>`}<div class="btns">${download}</div></div>${glance ? overview(glance, aq.folder) : ''}`;
   const list = archiveList(aq, rows, {
@@ -1216,7 +1216,7 @@ export async function home(
   // Search leads: Home is the archive first, with this month's close as a strip under the field.
   return page(
     'home',
-    `${search}<section class="monthband" aria-label="${escape(monthName(selected))}">${monthPanel}</section>${archive}${opened ? VIEWER_SCRIPT : ''}`,
+    `${search}${folderType === 'vendor' || folderType === 'client' || folderType === 'starred' ? '' : `<section class="monthband" aria-label="${escape(monthName(selected))}">${monthPanel}</section>`}${archive}${opened ? VIEWER_SCRIPT : ''}`,
     200,
     env,
     {

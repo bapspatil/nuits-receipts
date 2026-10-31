@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { idFrom, request, uploadPdf } from './helpers';
+import { idFrom, request, stylesheet, uploadPdf } from './helpers';
 
 const SCRIPT_TAG = '<script src="/assets/keys.js" defer></script>';
 
@@ -15,6 +15,9 @@ test('keys.js is served, every page includes it once, and the shortcut sheet is 
     );
   }
   const script = await request('/assets/keys.js');
+  const css = await stylesheet(await (await request('/')).text());
+  expect(css).toContain('#keys-sheet h2[tabindex="-1"]:focus{outline:none}');
+  expect(css).toContain('summary:focus-visible{');
   expect(script.headers.get('Content-Type')).toContain('text/javascript');
   const js = await script.text();
   expect(js).toContain("sheet.querySelector('h2').focus()");
