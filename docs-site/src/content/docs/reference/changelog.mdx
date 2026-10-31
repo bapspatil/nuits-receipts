@@ -9,6 +9,66 @@ This page is built from `CHANGELOG.md` in the repository by `docs-site/scripts/s
 
 To read the releases as a comic, one receipt slip per release, see the [changelog on the project site](https://receipts.nuits.net/changelog/).
 
+## 1.16.0 (2026-10-31)
+
+### Features
+
+- **scripts:** ui-lint, a rerunnable lintapple check of the rendered pages
+- **mockups:** generator for the two v4 directions
+- **mockups:** Native app and Warm paper pages
+- **mockups:** Mix direction, paper look on the native layout with glass
+- **todo:** only required facts put a receipt in To do
+- **discard:** one click, no reason
+- **bulk:** checkboxes are always visible, Select mode is gone
+- **parts:** hide Part while there is only one part
+- **pwa:** render install icons from the app glyph
+- **pwa:** manifest, offline-only service worker, Android share target
+- **bank:** To do | All, open payments first, no offset
+- **worklist:** one model for list state, the next open row and return URLs
+- **worklist:** every action returns to its list at the next open row
+- **worklist:** overdue sales invoices join Receipts To do
+- **receipts:** Review merges into Receipts To do, with All beside it
+- **settings:** one Email senders list holds allowed, ignored and mail we didn't keep
+- **db:** undo_log table for one generic Undo
+- **undo:** registry of undoable actions with same-batch snapshot and guarded restore
+- **undo:** every resolving action leaves the list with one Undo
+- **import:** one-step bank import with skip, Import anyway and an import Undo
+- **tokens:** warn and info colour roles from the Mix mockup
+- **tokens:** the Mix palette, glass at the lowest readable alpha, DM Mono
+- **settings:** five sections and one Save
+- **forms:** show a refused form in place on every route that takes typed input
+- **home:** fold done setup steps, and skip a month held open only by a doubtful date
+- **receipt:** fields to fill, a two-group More, and Approve above the phone keyboard
+- **app:** every screen has a way back, and files and the OneDrive return work standalone
+
+### UI enhancements
+
+- **ui:** Match, one Matched status, lighter Bank rows, fewer folds
+- **ui:** ask before Move and OneDrive Disconnect, which have no Undo
+- **ui:** a resolved row leaves by cross-document view transition, with the next row focused and described
+- **ui:** Lucide icon sprite generated from lucide-static 1.65.0
+- **ui:** ACTIONS and STATUS registries; every control renders from them
+- **ui:** one row() for every list, and the Mix look on the Native layout
+- **ui:** keyboard shortcuts, the ? sheet and a pending cue on submit
+
+### Hotfixes
+
+- **bulk:** Discard still asks before it removes a match
+- **receipts:** search with instr so a long query no longer fails
+- **worklist:** move on from where the acted-on row stood, and land an Undo on what it restored
+- **bulk:** refuse a bulk post whose list state is missing or invalid
+- **lists:** true totals above 500, and select-all takes the first 500
+- **receipt:** every receipt page form keeps the list it was opened from
+- **bank:** an own transfer returns to the Bank view it was made on
+- **review:** Merge duplicates returns to the To do it was offered on
+- **receipt:** start the tab counts with the receipt read
+- **receipts:** the To do header counts the list, and the old Merge form still merges
+- **import:** a transfer paired across imports stops the import's Undo
+- **bulk:** never follow a redirect from the bulk post
+- **invoices:** the sales All view waits on D1 once, not five times
+- **invoices:** the older-invoices note counts other months only
+- **ui:** the finished-steps fold sits 8 px from the panel edge
+
 ## 1.15.0 (2026-10-29)
 
 ### Features
