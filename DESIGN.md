@@ -140,7 +140,7 @@ One ink runs through everything: **petrol `#0D3A36`**. It is the text colour on 
 - **Radius:** slips and receipts are nearly square, at 2px on the site. Buttons and chips are pills. The app's working surfaces are softer (8 to 22px) because they are controls, not paper.
 - **Shadow:** one soft shadow for a lifted slip. Never stack shadows.
 - **Lines:** 1px ink hairlines, or a dashed perforation where paper tears.
-- **Texture:** guilloche and dot-matrix fields on the marketing site, and a 5% paper grain in the app. Texture sits behind content and never under body text.
+- **Texture:** the dithered slips of the pile and the guilloche seal on the marketing site, and a 5% paper grain in the app. Texture sits behind content and never under body text.
 - **Glass:** the app only, for navigation and floating controls, with a solid fallback. The site and docs have none.
 
 ### Iconography and illustration

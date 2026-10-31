@@ -23,7 +23,7 @@ for (const s of shots) {
   });
   const page = await context.newPage();
   await page.goto(`${BASE}?fx-force`, { waitUntil: "networkidle" });
-  await page.waitForSelector(".field[data-ready]", { state: "attached" });
+  await page.waitForSelector(".pile[data-ready]", { state: "attached" });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: OUT + s.file, fullPage: s.full });
   console.log(`wrote ${OUT}${s.file}`);

@@ -81,7 +81,7 @@ let failed = false;
 const todos = [];
 for (const file of htmlUnder("dist")) {
   const html = readFileSync(file, "utf8");
-  const how = region(html, '<section class="scene how"');
+  const how = region(html, '<section class="scene how');
   const small = region(html, '<section class="smallprint"');
   const inside = (r, i) => r && i > r[0] && i < r[1];
   const hits = [...html.matchAll(PREVIEW)].map((m) => m.index);

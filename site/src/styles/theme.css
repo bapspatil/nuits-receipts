@@ -5,7 +5,7 @@
   /* Colour */
   /* #0D3A36. Petrol ink. All primary text, rules, the focus ring. */
   --color-ink: #0D3A36;
-  /* #355650. Secondary text. Measured against the field's worst pick, so it may sit on the hero. */
+  /* #355650. Secondary text on paper and slips. */
   --color-ink-soft: #355650;
   /* #E6EFE9. Cheque-paper mint. The page surface. */
   --color-paper: #E6EFE9;

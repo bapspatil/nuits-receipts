@@ -6,6 +6,7 @@ node_modules/
 .env*
 *.log
 .audit/
+.shots/
 dist/
 .cache/
 # Private deployment config (real account and resource IDs) and generated config.

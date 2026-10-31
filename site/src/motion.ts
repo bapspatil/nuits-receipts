@@ -1,13 +1,11 @@
 // The second motion layer: split-word heading wipes, draw-on illustrations,
-// ambient loops that pause off screen, the export morph and the ink scene.
+// ambient loops that pause off screen and the export morph.
 // Loaded after first paint, so none of it is on the path to the LCP.
 //
 // Everything here starts from content that is already painted. A heading is
 // only split into hidden words once it is about to enter the viewport, and the
 // wipe then runs to the end on its own clock; a trigger that never fires
 // leaves the heading exactly as the static CSS drew it.
-import type { Ink } from "./ink";
-
 export type Motion = { setAnimated(on: boolean): void };
 
 const NEAR = "0px 0px 6% 0px";
@@ -56,7 +54,6 @@ function onceNear(targets: Iterable<Element>, run: (el: HTMLElement) => void, ro
 
 export function startMotion(initial: boolean): Motion {
   let animated = initial;
-  let ink: Ink | null = null;
   let morph: { play(): void; pause(): void; reset(): void } | null = null;
 
   // Typography: section titles wipe in word by word just before they arrive.
@@ -105,17 +102,6 @@ export function startMotion(initial: boolean): Motion {
     if (animated && !exportIcon.hasAttribute("data-offscreen")) morph.play();
   }
 
-  // WebGL: initialised only when an ink section comes within half a screen.
-  const hosts = [...document.querySelectorAll<HTMLElement>(".how, .close")];
-  let inkLoading = false;
-  async function loadInk() {
-    if (inkLoading) return;
-    inkLoading = true;
-    const { startInk } = await import("./ink");
-    ink = startInk(hosts);
-    ink?.setAnimated(animated);
-  }
-
   // Both stay observed, so turning motion on later still starts them.
   const nearHosts = new Set<Element>();
   const near = new IntersectionObserver(
@@ -127,15 +113,13 @@ export function startMotion(initial: boolean): Motion {
   );
   function loadIfNear() {
     if (!animated) return;
-    if (hosts.some((h) => nearHosts.has(h))) void loadInk();
     if (exportIcon && nearHosts.has(exportIcon)) void loadMorph();
   }
-  [...hosts, ...(exportIcon ? [exportIcon] : [])].forEach((el) => near.observe(el));
+  if (exportIcon) near.observe(exportIcon);
 
   return {
     setAnimated(on) {
       animated = on;
-      ink?.setAnimated(on);
       if (!on) morph?.reset();
       if (!on) document.querySelectorAll(".is-revealing, .is-drawing").forEach((el) => el.classList.remove("is-revealing", "is-drawing"));
       loadIfNear();

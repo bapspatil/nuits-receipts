@@ -1,4 +1,7 @@
-/* The home page entry: the shared site styles, then the motion layer, which
-   has to come later in the cascade so its rules win over the scene rules. */
+/* The home page entry: the shared site styles, the scenes kept from the first
+   site, the new scenes, then the motion layer, which has to come last in the
+   cascade so its rules win over the scene rules. */
 @import "./site.css";
+@import "./kept.css";
+@import "./scenes.css";
 @import "./motion.css";

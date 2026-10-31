@@ -1,5 +1,5 @@
 /* The second motion layer: illustrations, split headings, ambient loops,
- * scroll-driven timelines and the ink sections' fallback print.
+ * and scroll-driven timelines.
  *
  * Contract, same as the rest of the site: the static state is the finished
  * page. Every animation below is gated on html[data-motion="on"], which only
@@ -24,48 +24,9 @@
 .ill .mt { fill: var(--color-mint); }
 .ill .sf { fill: var(--color-stamp); }
 
-/* Ink that sits on no paper region would vanish into an ink section. */
-.how .ill .ik-out,
+/* Ink that sits on no paper region would vanish into the ink close. */
 .close .ill .ik-out {
   color: var(--color-paper);
-}
-
-.ill-inbox {
-  width: 11rem;
-  height: auto;
-}
-
-/* On the desk the envelope sits at the centre of the plate, and the scraps
-   are scattered around it (and pile onto it in the reel). */
-@media (min-width: 48rem) {
-  .desk .ill-inbox {
-    position: absolute;
-    left: 50%;
-    bottom: 1.5rem;
-    width: 15rem;
-    translate: -50% 0;
-  }
-}
-
-.step {
-  position: relative;
-}
-
-.step .ill-icon {
-  grid-row: 1;
-  grid-column: 2;
-  width: 4.5rem;
-  height: 4.5rem;
-  padding: 0.6rem;
-  border: 1px solid var(--color-paper);
-}
-
-@media (min-width: 64rem) {
-  .how.is-reel .step .ill-icon {
-    width: 7rem;
-    height: 7rem;
-    padding: 0.9rem;
-  }
 }
 
 .close .ill-export {
@@ -121,7 +82,7 @@
 }
 
 /* Reading progress, a hairline of ink with a paper edge so it reads on the
-   ink sections too. Shown only where a scroll timeline drives it. */
+   ink close too. Shown only where a scroll timeline drives it. */
 .progress {
   display: none;
   position: fixed;
@@ -133,56 +94,6 @@
   transform-origin: 0 50%;
   transform: scaleX(0);
   pointer-events: none;
-}
-
-/* The ink sections. The fallback is the shader's own settled frame, rendered
-   by scripts/measure-ink.mjs at one pixel per CSS pixel, so it is shown
-   unscaled and pixelated and its two colours land exactly. */
-
-.how,
-.close {
-  position: relative;
-  isolation: isolate;
-  image-rendering: pixelated;
-  background: var(--color-ink) url("/ink-rows-narrow.png") right top / auto repeat-y;
-}
-
-.close {
-  overflow-x: clip;
-  background-image: url("/ink-bleed-narrow.png");
-  background-position: right center;
-  background-repeat: no-repeat;
-}
-
-.how > *,
-.close > * {
-  image-rendering: auto;
-}
-
-@media (min-width: 64rem) {
-  .how { background-image: url("/ink-rows-wide.png"); }
-  .close { background-image: url("/ink-bleed-wide.png"); }
-}
-
-.ink-field {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-}
-
-.ink-field:not([data-ready]) {
-  visibility: hidden;
-}
-
-.how-meter {
-  height: 2px;
-  margin-top: -1.5rem;
-  max-width: 18rem;
-  background: var(--color-paper);
-  transform-origin: 0 50%;
 }
 
 /* ---------------------------------------------------------------------------
@@ -245,15 +156,6 @@ html[data-motion="on"] .is-drawing .ik {
 }
 
 /* Ambient loops, paused whenever their element is off screen. */
-html[data-motion="on"] .slip-hero {
-  animation: drift 9s ease-in-out infinite alternate;
-}
-
-html[data-motion="on"] .scrap {
-  animation: bob 5.5s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * -1.3s);
-}
-
 html[data-motion="on"] .seal-turn {
   animation: spin 80s linear infinite;
 }
@@ -317,33 +219,10 @@ html[data-motion="on"] .caret {
     animation-timeline: scroll(root);
   }
 
-  /* The slip settles into the envelope as the problem scrolls past. */
-  html[data-motion="on"] .ill-inbox {
-    view-timeline: --inbox block;
-  }
-
-  html[data-motion="on"] .inbox-slip {
-    animation: sink linear both;
-    animation-timeline: --inbox;
-    animation-range: cover 35% cover 70%;
-  }
-
-  html[data-motion="on"] .slip-hero {
-    animation: drift 9s ease-in-out infinite alternate, lift linear both;
-    animation-timeline: auto, view();
-    animation-range: normal, exit 0% exit 100%;
-  }
-
   html[data-motion="on"] .slip-cost {
     animation: rise linear both;
     animation-timeline: view();
     animation-range: entry 0% cover 40%;
-  }
-
-  html[data-motion="on"] .fact {
-    animation: rise-small linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 100%;
   }
 
   html[data-motion="on"] .nope-list li::before {
@@ -362,15 +241,5 @@ html[data-motion="on"] .caret {
     animation: settle linear both;
     animation-timeline: --close;
     animation-range: entry 0% cover 50%;
-  }
-
-  /* The ledger stamps land row by row on screens the reel does not pin. The
-     rows stay printed throughout; only the stamp wipes in (DESIGN.md). */
-  @media (max-width: 63.99rem) {
-    html[data-motion="on"] .statement tbody .stamp {
-      animation: stamp-land linear both;
-      animation-timeline: view();
-      animation-range: entry 20% cover 35%;
-    }
   }
 }
