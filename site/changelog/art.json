@@ -1,6 +1,38 @@
 {
   "_comment": "Changelog art. Sources live in site/art/ (Codex, text-free, SLIP drawn from art/slip-sheet.png), scripts/changelog-art.mjs snaps them to the brand palette and writes AVIF, WebP, a thumbnail and a blurred placeholder for each into public/changelog-art/. Every release has its own three-panel strip (before, shipped, reaction) on the left page; a release with no strip yet shows its version big and loads no image. Titles are optional; without one the first entry is the title. All words on the art are overlay items drawn as HTML: sfx (crimson sound word), bubble (speech), tag (ink caption); x and y are the item's centre in percent of the art, r degrees, s a size factor, w a width in percent.",
   "strips": {
+    "2.2.2": {
+      "src": "strip-2.2.2.png",
+      "median": 0,
+      "palette": true,
+      "alt": "Manga panel: SLIP the receipt grins and pats a small, normal bar at the bottom of a chart card, while the dashed outline of a giant bar that used to fill the whole card shrinks away. A phone with an upload arrow stands beside SLIP.",
+      "overlay": [
+        {
+          "type": "sfx",
+          "text": "SHRINK!",
+          "x": 22,
+          "y": 12,
+          "r": -8,
+          "s": 0.6
+        },
+        {
+          "type": "bubble",
+          "text": "Much better.",
+          "x": 30,
+          "y": 84,
+          "w": 28,
+          "s": 0.9
+        },
+        {
+          "type": "tag",
+          "text": "Also: Android says Upload",
+          "x": 72,
+          "y": 92,
+          "r": 0,
+          "s": 0.8
+        }
+      ]
+    },
     "2.2.1": {
       "src": "strip-2.2.1.png",
       "median": 0,
