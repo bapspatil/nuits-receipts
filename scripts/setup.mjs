@@ -19,6 +19,7 @@ import {
   database,
   readConfig,
   resolveDatabase,
+  useAccount,
   validateVars,
   wrangler,
   wranglerEnv,
@@ -66,6 +67,7 @@ const account = await ask(
   process.env.CLOUDFLARE_ACCOUNT_ID ?? '',
 );
 if (account) config.account_id = account;
+useAccount(config);
 db.database_name = await ask('D1 database name', `${config.name}`);
 bucket.bucket_name = await ask('Private R2 bucket name', `${config.name}-originals`);
 const vars = config.vars;

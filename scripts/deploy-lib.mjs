@@ -172,6 +172,12 @@ export function checkPassword(value) {
   return null;
 }
 
+// Wrangler's D1 commands ignore the config's account_id when the login reaches more than one
+// account, and fail in a non-interactive run. The environment variable reaches every command.
+export function useAccount(config, env = process.env) {
+  if (config.account_id && !env.CLOUDFLARE_ACCOUNT_ID) env.CLOUDFLARE_ACCOUNT_ID = config.account_id;
+}
+
 export function wranglerEnv(extra = {}) {
   return { ...process.env, WRANGLER_SEND_METRICS: 'false', ...extra };
 }
